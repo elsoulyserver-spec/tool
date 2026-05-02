@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:stape.io)",
+      "WebSearch",
+      "WebFetch(domain:api.app.stape.io)",
+      "Bash(node --check server.js)",
+      "Bash(node --check lib/crypto-vault.js)",
+      "Bash(node --check lib/ss-rate-limiter.js)",
+      "Bash(node --check lib/providers/base.js)",
+      "Bash(node --check lib/providers/stape.js)",
+      "Bash(node --check lib/providers/gcloud.js)"
+    ]
+  }
+}
