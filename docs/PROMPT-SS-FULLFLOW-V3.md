@@ -34,13 +34,18 @@ Container Config: [ eyJhY2NvdW50SWQi... ] [نسخ]
 **ما يحصل:**
 - العميل يدخل الـ URL بتاع السيرفر بتاعه (Stape/Cloud Run/Docker)
 - النظام يـ ping الـ URL ويتأكد إنه شغال (`/api/ss/validate-url`)
-- لو تمام → يحفظ الـ URL في Firestore
+- لو تمام → يحفظ الـ URL في Firestore **ويعمل wire-transport تلقائياً:**
+  1. **Client-Side (Web Container):** يحدّث الـ GA4 Configuration Tag داخل الـ Web GTM Container ويحط الـ URL في حقل `transport_url` — بحيث الـ browser يبعت الـ hits للـ sGTM بدل Google مباشرة
+  2. **Server Container Settings:** يحفظ الـ Server URL في Firestore مرتبط بالـ Server Container ID عشان يظهر في Overview وفي أي تقرير
 
 **UI:**
 ```
 أدخل URL الخادم:
-[ https://gtm.yourdomain.com ] [التحقق ←]
+[ https://gtm.yourdomain.com ] [التحقق والحفظ ←]
+
 ✅ الخادم يستجيب — زمن الاستجابة: 234ms
+✅ تم تحديث Web Container (GTM-XXXXXX) — transport_url = https://gtm.yourdomain.com
+✅ تم حفظ URL في إعدادات Server Container (GTM-YYYYYY)
 ```
 
 **Validation:**
@@ -48,26 +53,26 @@ Container Config: [ eyJhY2NvdW50SWQi... ] [نسخ]
 - لازم يرد بـ status 200
 - timeout: 10 ثانية
 
+**wire-transport التلقائي:**
+- يستدعي `/api/ss/wire-transport` بعد التحقق من الـ URL مباشرة
+- يحدّث الـ GA4 Configuration tag في الـ Web Container
+- يعمل publish للـ Web Container تلقائياً بعد التحديث
+- يخزن الـ URL في Firestore تحت `ssConfig.serverUrl` مرتبط بـ `webContainerId` + `serverContainerId`
+
 ---
 
 ### STEP 3 — Google Analytics 4 (GA4)
 **ما يحصل:**
 - العميل يدخل:
   - **Measurement ID** → مثال: `G-XXXXXXXXXX`
-  - **API Secret** (للـ Measurement Protocol) → مثال: `xxxxxxxxxxxx`
-- النظام يحفظهم encrypted في Firestore
-- يُستخدموا لاحقاً في إرسال Server-Side events لـ GA4
+- النظام يحفظه في Firestore
+- يُستخدم لاحقاً في ربط الـ GA4 tag بالـ Web + Server Container
 
 **UI:**
 ```
-Google Analytics 4 — Measurement Protocol
+Google Analytics 4
 Measurement ID:  [ G-XXXXXXXXXX ]
-API Secret:      [ ************ ] [👁️]
 ```
-
-**ملاحظة:**
-- الـ API Secret يتحفظ encrypted بـ AES-256-GCM
-- يُعرض للعميل كـ `****` دايماً بعد الحفظ
 
 ---
 
@@ -269,7 +274,7 @@ Browser → GTM Web Container (tags client-side)
 | POST | /api/ss/create-containers | إنشاء Web + Server GTM |
 | POST | /api/ss/validate-url | التحقق من Server URL |
 | POST | /api/ss/save-config | حفظ كل الإعدادات |
-| POST | /api/ss/wire-transport | ربط Web ↔ Server |
+| POST | /api/ss/wire-transport | ربط Web ↔ Server (يحدّث transport_url في GA4 tag + publish) |
 | POST | /api/ss/test-event | اختبار إرسال event |
 | GET  | /api/ss/full-status | عرض الحالة الكاملة |
 | GET  | /api/ss/generate-code | توليد كود GTM + DataLayer |
