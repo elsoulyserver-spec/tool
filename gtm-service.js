@@ -618,25 +618,7 @@ async function provisionForClientWithServer(opts) {
     p => onProgress({ stage: 'sgtm_import', ...p }),
   );
 
-  // 4. Grant the service account explicit Publish access on the server container
-  //    before trying to publish — GTM API doesn't auto-grant publish to the SA
-  //    that created the container in some account configurations.
-  try {
-    const sa = getSA();
-    await gtmRequest('POST', `/accounts/${getAccountId()}/user_permissions`,
-      JSON.stringify({
-        accountId: String(getAccountId()),
-        emailAddress: sa.client_email,
-        accountAccess: { permission: 'user' },
-        containerAccess: [{ containerId: String(serverContainerId), permission: 'publish' }],
-      })
-    );
-    console.log('[gtm] granted publish access to SA on server container', serverContainerId);
-  } catch (e) {
-    console.warn('[gtm] grant publish permission non-fatal:', e.message);
-  }
-
-  // 5. Version + publish the server container so containerConfig is generated.
+  // 4. Version + publish the server container so containerConfig is generated.
   onProgress({ stage: 'sgtm_publish', done: 0, total: 1 });
   const verResp  = await createVersion(serverContainerId, serverWorkspaceId,
     'sGTM initial — ' + new Date().toISOString().split('T')[0]);
