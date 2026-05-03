@@ -220,11 +220,18 @@ async function getDefaultWorkspace(containerId) {
 // "Queries per minute per user" quota (default ≈ 40/min), we pace each call.
 async function importContainerJSON(containerId, workspaceId, configJson, mode, onProgress) {
   const acc = getAccountId();
-  const cv = configJson && configJson.containerVersion ? configJson.containerVersion : configJson;
+  const cv = configJson && configJson.containerVersion ? configJson.containerVersion : (configJson || {});
 
   const vars = cv.variable || [];
   const trigs = cv.trigger || [];
   const tags = cv.tag || [];
+
+  // Empty config — nothing to import, skip quietly.
+  if (!vars.length && !trigs.length && !tags.length) {
+    if (typeof onProgress === 'function') onProgress({ stage: 'skip — empty config', done: 0, total: 0 });
+    console.log('[gtm] importContainerJSON: empty config, skipping import');
+    return { importedTagCount: 0, importedTriggerCount: 0, importedVariableCount: 0 };
+  }
 
   const basePath = `/accounts/${acc}/containers/${containerId}/workspaces/${workspaceId}`;
 

@@ -4320,6 +4320,7 @@
             </button>
             <div style="font-size:11px;color:var(--mut);">⏱️ يستغرق 60-120 ثانية</div>
           </div>
+          <div id="ss-p1-config-hint" style="margin-top:10px;font-size:11px;color:var(--mut);"></div>
 
           <div class="ss-wizard-nav">
             <span></span>
@@ -14232,17 +14233,11 @@
         var errorEl    = document.getElementById('ss-p1-error');
         var nextBtn    = document.getElementById('ss-p1-next-btn');
 
-        // Use _cachedGtmStr if available (from Pixel Config flow)
+        // Use _cachedGtmStr if available (from Pixel Config flow).
+        // If not present, the backend creates clean empty containers — no Pixel Config needed.
         var configJson = null;
         if (typeof _cachedGtmStr !== 'undefined' && _cachedGtmStr && _cachedGtmStr.trim()) {
           try { configJson = JSON.parse(_cachedGtmStr); } catch (e) { configJson = null; }
-        }
-        if (!configJson) {
-          if (errorEl) {
-            errorEl.style.display = 'block';
-            errorEl.innerHTML = '⚠️ لا يوجد GTM Config — اذهب إلى <strong>Pixel Config</strong> وكمّل الخطوات الـ 5 أولاً، أو أدخل GTM config يدوياً.';
-          }
-          return;
         }
 
         if (errorEl) errorEl.style.display = 'none';
@@ -14250,12 +14245,17 @@
         if (progressEl) progressEl.style.display = 'block';
         if (resultEl) resultEl.style.display = 'none';
 
-        _ssApi('POST', '/api/ss/create-containers', {
-          configJson:  configJson,
-          projectName: (window.S && S.lead && S.lead.name) ? S.lead.name + ' — SS' : ((window.currentUser && currentUser.email) || 'Client') + ' — SS',
+        var payload = {
+          projectName: (window.S && S.lead && S.lead.name)
+                       ? S.lead.name + ' — SS'
+                       : ((window.currentUser && currentUser.email) || 'Client') + ' — SS',
           ssEvents:    _ssSsEvents,
           ssPlatforms: _ssEnabledPlats,
-        }, function (err, res) {
+        };
+        // Only attach configJson if we have one (backend uses minimal template otherwise)
+        if (configJson) payload.configJson = configJson;
+
+        _ssApi('POST', '/api/ss/create-containers', payload, function (err, res) {
           if (err || !res || !res.ok || !res.data || !res.data.ok) {
             if (createBtn) { createBtn.disabled = false; createBtn.style.opacity = '1'; }
             if (progressEl) progressEl.style.display = 'none';
@@ -14745,10 +14745,25 @@
         navigator.clipboard.writeText(code).then(function () { showToast('✅ تم نسخ الـ Snippet'); }).catch(function () {});
       };
 
+      // ── Step 1 hint: show whether Pixel Config JSON is ready ────
+      function ss_updateConfigHint() {
+        var hintEl = document.getElementById('ss-p1-config-hint');
+        if (!hintEl) return;
+        var hasConfig = (typeof _cachedGtmStr !== 'undefined') && _cachedGtmStr && _cachedGtmStr.trim();
+        if (hasConfig) {
+          hintEl.innerHTML = '✅ GTM Config جاهز من Pixel Config — سيتم استخدامه تلقائياً.';
+          hintEl.style.color = 'var(--acc)';
+        } else {
+          hintEl.innerHTML = '💡 ستُنشأ Containers فارغة — يمكنك استيراد Pixel Config لاحقاً من قسم <strong>Pixel Config</strong>.';
+          hintEl.style.color = 'var(--mut)';
+        }
+      }
+
       // ── Init on view activation ───────────────────────────
       function initServerSideView() {
         if (_ssInit) return;
         _ssInit = true;
+        ss_updateConfigHint();
         ss_loadConfig(function (found) {
           if (found && _ssContainersReady) {
             // Restore UI state

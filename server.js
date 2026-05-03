@@ -1728,12 +1728,9 @@ http.createServer((req, res) => {
             ssEvents, ssPlatforms,
           } = body;
 
-          if (!configJson) {
-            return sendJSON(res, 400, {
-              error: 'حقل configJson مطلوب',
-              hint:  'أكمل Pixel Config أولاً للحصول على GTM JSON، أو مرّر configJson مباشرةً',
-            });
-          }
+          // configJson is optional — backend uses a minimal empty template if absent.
+          const finalConfigJson = configJson ||
+            { containerVersion: { variable: [], trigger: [], tag: [] } };
 
           const activeCount = await firestoreService.countActiveContainers().catch(() => 0);
           if (activeCount >= 490) {
@@ -1750,7 +1747,7 @@ http.createServer((req, res) => {
 
               const both = await gtmService.provisionForClientWithServer({
                 projectName: projectName || ((email || clientId.slice(0, 8)) + ' — SS Setup'),
-                configJson,
+                configJson:   finalConfigJson,
                 publishLive:  false,
                 inviteEmail:  email || null,
                 onProgress:   (p) => _setJob(jobId, { stage: 'gtm_provisioning', progress: p }),
