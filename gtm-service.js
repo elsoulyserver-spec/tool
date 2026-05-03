@@ -327,6 +327,9 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
     if (body.blockingTriggerId) {
       body.blockingTriggerId = body.blockingTriggerId.map(id => triggerMap[id] || id);
     }
+    if (body.enablingTriggerId) {
+      body.enablingTriggerId = body.enablingTriggerId.map(id => triggerMap[id] || id);
+    }
     return gtmRequest('POST', `${basePath}/tags`, JSON.stringify(body));
   });
 
@@ -662,3 +665,5 @@ module.exports = {
   setGA4TransportUrl,
   provisionForClientWithServer,
 };
+
+  // Server-side 
