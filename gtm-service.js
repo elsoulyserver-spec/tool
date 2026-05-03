@@ -176,7 +176,7 @@ async function gtmRequest(method, path, body, attempt = 0) {
   }
 
   const msg = (data && data.error && data.error.message) || JSON.stringify(data);
-  const err = new Error('GTM API ' + status + ': ' + msg);
+  const err = new Error('GTM API ' + status + ' [' + method + ' ' + path + ']: ' + msg);
   err.status = status;
   err.details = data;
   throw err;
@@ -665,5 +665,3 @@ module.exports = {
   setGA4TransportUrl,
   provisionForClientWithServer,
 };
-
-  // Server-side 
