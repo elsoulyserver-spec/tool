@@ -6,7 +6,11 @@
         "name": "GA4 Measurement ID",
         "type": "c",
         "parameter": [
-          { "type": "template", "key": "value", "value": "{{const.ga4_measurement_id}}" }
+          {
+            "type": "template",
+            "key": "value",
+            "value": "{{const.ga4_measurement_id}}"
+          }
         ],
         "notes": "GA4 Measurement ID (G-XXXXXXX). Edit this Constant variable in GTM admin to point at your GA4 stream."
       }
@@ -15,7 +19,8 @@
       {
         "name": "All Pages — sGTM",
         "type": "always",
-        "notes": "Fires on every event the sGTM container receives — used by the GA4 forwarder tag."
+        "notes": "Fires on every event the sGTM container receives — used by the GA4 forwarder tag.",
+        "triggerId": "1"
       }
     ],
     "tag": [
@@ -23,9 +28,15 @@
         "name": "GA4 — Forward to Google",
         "type": "sgtmgaaw",
         "parameter": [
-          { "type": "template", "key": "measurementId", "value": "{{GA4 Measurement ID}}" }
+          {
+            "type": "template",
+            "key": "measurementId",
+            "value": "{{GA4 Measurement ID}}"
+          }
         ],
-        "firingTriggerId": ["1"],
+        "firingTriggerId": [
+          "1"
+        ],
         "tagFiringOption": "oncePerEvent",
         "notes": "Forwards every event the sGTM receives onward to GA4. Add Meta CAPI / TikTok Events / Snap CAPI tags from GTM admin → New Tag → Custom Templates if you want them."
       }
@@ -35,8 +46,16 @@
         "name": "GA4 Client",
         "type": "gaaw_client",
         "parameter": [
-          { "type": "boolean",  "key": "activateGoogleAnalytics", "value": "true" },
-          { "type": "boolean",  "key": "activateGtag",            "value": "true" }
+          {
+            "type": "boolean",
+            "key": "activateGoogleAnalytics",
+            "value": "true"
+          },
+          {
+            "type": "boolean",
+            "key": "activateGtag",
+            "value": "true"
+          }
         ],
         "priority": 100,
         "notes": "Default sGTM client — receives /g/collect requests forwarded from the web container."
