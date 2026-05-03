@@ -1,0 +1,19 @@
+{
+  "name": "easy-track-pixel-setup",
+  "version": "2.0.0",
+  "description": "Easy Track — Pixel Config Generator & Website Tracking Scanner",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.15.2",
+    "firebase-admin": "^12.0.0",
+    "puppeteer": "^22.0.0"
+  }
+}

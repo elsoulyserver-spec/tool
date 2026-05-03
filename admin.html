@@ -1,0 +1,1739 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Easy Track · Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=JetBrains+Mono:wght@400;700&family=Outfit:wght@900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#05090f; --sur:#0b1628; --sur2:#0f1e35;
+  --gold:#e8b84b; --gdim:rgba(232,184,75,.1); --gbdr:rgba(232,184,75,.2);
+  --teal:#0ecfb0;
+  --wht:#f0f4ff; --mut:#5a7090; --mut2:#3a5070;
+  --grn:#34d399; --red:#f87171; --blu:#60a5fa;
+  --bdr:rgba(255,255,255,.06);
+}
+body{background:var(--bg);color:var(--wht);font-family:'Cairo',sans-serif;min-height:100vh;}
+
+/* ── LOGIN ── */
+#loginScreen{
+  position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  background:var(--bg);z-index:999;
+}
+.login-box{
+  background:var(--sur);border:1px solid var(--gbdr);border-radius:24px;
+  padding:48px 40px;width:100%;max-width:420px;
+  box-shadow:0 40px 80px rgba(0,0,0,.5);
+}
+.login-logo{display:flex;align-items:center;gap:10px;margin-bottom:32px;justify-content:center;}
+.login-logo svg{width:36px;height:36px;}
+.login-logo-text{font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--gold);letter-spacing:2px;}
+.login-title{font-size:22px;font-weight:900;margin-bottom:6px;text-align:center;}
+.login-sub{font-size:13px;color:var(--mut);text-align:center;margin-bottom:32px;}
+.inp{
+  width:100%;background:rgba(255,255,255,.03);border:1.5px solid var(--bdr);
+  border-radius:12px;padding:14px 16px;color:var(--wht);font-family:'Cairo',sans-serif;
+  font-size:14px;outline:none;transition:all .2s;margin-bottom:12px;direction:ltr;text-align:right;
+}
+.inp:focus{border-color:var(--gbdr);background:var(--gdim);}
+.inp::placeholder{color:var(--mut2);}
+.btn-login{
+  width:100%;background:linear-gradient(135deg,var(--gold),#c8922a);
+  color:#0a1520;border:none;border-radius:12px;padding:15px;
+  font-family:'Cairo',sans-serif;font-size:16px;font-weight:900;
+  cursor:pointer;transition:all .25s;margin-top:4px;
+}
+.btn-login:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(232,184,75,.3);}
+.btn-login:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+.login-err{display:none;color:var(--red);font-size:12px;margin-top:10px;text-align:center;padding:8px;background:rgba(248,113,113,.08);border-radius:8px;border:1px solid rgba(248,113,113,.2);}
+
+/* ── LAYOUT ── */
+#adminApp{display:none;}
+.sidebar{
+  position:fixed;top:0;right:0;bottom:0;width:240px;
+  background:var(--sur);border-left:1px solid var(--bdr);
+  display:flex;flex-direction:column;padding:24px 0;z-index:100;
+}
+.sidebar-logo{padding:0 20px 24px;border-bottom:1px solid var(--bdr);margin-bottom:16px;}
+.sidebar-logo-inner{display:flex;align-items:center;gap:10px;}
+.sidebar-logo svg{width:32px;height:32px;}
+.sidebar-brand{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--gold);letter-spacing:2px;}
+.sidebar-badge{font-size:9px;color:var(--teal);letter-spacing:1px;margin-top:2px;}
+
+.nav-item{
+  display:flex;align-items:center;gap:12px;padding:12px 20px;
+  color:var(--mut);cursor:pointer;transition:all .2s;font-size:14px;font-weight:600;
+  border-right:3px solid transparent;margin:1px 0;
+}
+.nav-item:hover{color:var(--wht);background:rgba(255,255,255,.03);}
+.nav-item.active{color:var(--gold);background:var(--gdim);border-right-color:var(--gold);}
+.nav-icon{font-size:18px;width:24px;text-align:center;}
+
+.sidebar-bottom{margin-top:auto;padding:16px 20px;border-top:1px solid var(--bdr);}
+.admin-info{font-size:12px;color:var(--mut);margin-bottom:12px;}
+.admin-email{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--teal);display:block;margin-top:2px;}
+.btn-logout{
+  width:100%;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);
+  color:var(--red);border-radius:8px;padding:8px;font-family:'Cairo',sans-serif;
+  font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;
+}
+.btn-logout:hover{background:rgba(248,113,113,.15);}
+
+.main-content{
+  margin-right:240px;padding:32px;min-height:100vh;
+  background:var(--bg);position:relative;z-index:1;
+}
+
+/* ── HEADER ── */
+.page-header{margin-bottom:32px;}
+.page-title{font-size:26px;font-weight:900;margin-bottom:4px;}
+.page-sub{color:var(--mut);font-size:13px;}
+
+/* ── STATS ── */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px;}
+.stat-card{
+  background:var(--sur);border:1px solid var(--bdr);border-radius:16px;padding:24px;
+  transition:all .2s;
+}
+.stat-card:hover{border-color:var(--gbdr);}
+.stat-label{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--mut);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;}
+.stat-num{font-size:36px;font-weight:900;line-height:1;}
+.stat-sub{font-size:12px;color:var(--mut);margin-top:6px;}
+.stat-gold{color:var(--gold);}
+.stat-grn{color:var(--grn);}
+.stat-red{color:var(--red);}
+.stat-blu{color:var(--blu);}
+
+/* ── TABLE ── */
+.card{background:var(--sur);border:1px solid var(--bdr);border-radius:16px;overflow:hidden;margin-bottom:24px;}
+.card-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:20px 24px;border-bottom:1px solid var(--bdr);
+}
+.card-title{font-size:15px;font-weight:900;}
+.card-actions{display:flex;gap:8px;}
+
+.search-inp{
+  background:rgba(255,255,255,.04);border:1px solid var(--bdr);border-radius:8px;
+  padding:8px 14px;color:var(--wht);font-family:'Cairo',sans-serif;font-size:13px;
+  outline:none;width:220px;transition:all .2s;
+}
+.search-inp:focus{border-color:var(--gbdr);}
+.search-inp::placeholder{color:var(--mut2);}
+
+.btn-sm{
+  background:var(--gdim);border:1px solid var(--gbdr);color:var(--gold);
+  border-radius:8px;padding:8px 14px;font-family:'Cairo',sans-serif;
+  font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;
+}
+.btn-sm:hover{background:rgba(232,184,75,.2);}
+
+table{width:100%;border-collapse:collapse;}
+thead tr{background:rgba(255,255,255,.02);}
+th{
+  padding:12px 16px;text-align:right;font-family:'JetBrains Mono',monospace;
+  font-size:10px;color:var(--mut);letter-spacing:1px;text-transform:uppercase;
+  border-bottom:1px solid var(--bdr);font-weight:400;
+}
+td{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.03);font-size:13px;vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(255,255,255,.02);}
+
+.badge{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 10px;border-radius:100px;font-size:11px;font-weight:700;
+  font-family:'JetBrains Mono',monospace;
+}
+.badge-active{background:rgba(52,211,153,.1);color:var(--grn);border:1px solid rgba(52,211,153,.2);}
+.badge-pending{background:rgba(232,184,75,.1);color:var(--gold);border:1px solid rgba(232,184,75,.2);}
+.badge-basic{background:rgba(96,165,250,.1);color:var(--blu);border:1px solid rgba(96,165,250,.2);}
+.badge-growth{background:rgba(232,184,75,.1);color:var(--gold);border:1px solid rgba(232,184,75,.2);}
+.badge-enterprise{background:rgba(167,139,250,.1);color:#a78bfa;border:1px solid rgba(167,139,250,.2);}
+
+.action-btn{
+  background:none;border:1px solid var(--bdr);border-radius:6px;
+  padding:5px 10px;font-size:11px;cursor:pointer;transition:all .2s;
+  font-family:'Cairo',sans-serif;color:var(--mut);
+}
+.action-btn:hover{border-color:var(--gbdr);color:var(--gold);}
+.action-btn.activate{color:var(--grn);border-color:rgba(52,211,153,.3);}
+.action-btn.activate:hover{background:rgba(52,211,153,.1);}
+.action-btn.suspend{color:var(--red);border-color:rgba(248,113,113,.3);}
+.action-btn.suspend:hover{background:rgba(248,113,113,.08);}
+
+/* ── EMPTY STATE ── */
+.empty{text-align:center;padding:60px 20px;color:var(--mut);}
+.empty-icon{font-size:48px;margin-bottom:16px;}
+
+/* ── LOADING ── */
+.loading{text-align:center;padding:40px;color:var(--mut);}
+.spinner{display:inline-block;width:28px;height:28px;border:3px solid var(--bdr);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite;margin-bottom:12px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── TOAST ── */
+#toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);
+  background:var(--sur2);border:1px solid var(--gbdr);border-radius:12px;
+  padding:12px 24px;font-size:13px;font-weight:700;
+  transition:transform .3s;z-index:9999;white-space:nowrap;
+}
+#toast.show{transform:translateX(-50%) translateY(0);}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s;}
+.modal-overlay.on{opacity:1;pointer-events:all;}
+.modal{background:var(--sur);border:1px solid var(--gbdr);border-radius:20px;padding:36px;width:100%;max-width:460px;transform:scale(.95);transition:transform .3s;}
+.modal-overlay.on .modal{transform:scale(1);}
+.modal-title{font-size:18px;font-weight:900;margin-bottom:6px;}
+.modal-sub{color:var(--mut);font-size:13px;margin-bottom:24px;}
+.modal-row{display:flex;gap:12px;margin-bottom:12px;}
+.modal-label{font-size:12px;color:var(--mut);margin-bottom:6px;font-family:'JetBrains Mono',monospace;letter-spacing:1px;}
+.modal-val{font-size:14px;font-weight:700;padding:10px 14px;background:rgba(255,255,255,.03);border:1px solid var(--bdr);border-radius:8px;}
+.plan-select{
+  width:100%;background:var(--sur2);border:1px solid var(--bdr);
+  border-radius:10px;padding:11px 14px;color:var(--wht);
+  font-family:'Cairo',sans-serif;font-size:14px;outline:none;cursor:pointer;
+}
+.plan-select option { background:var(--sur2); color:var(--wht); }
+select { color-scheme: dark; }
+select option { background:#0f1e35; color:#f0f4ff; }
+.modal-actions{display:flex;gap:10px;margin-top:20px;}
+.btn-modal-primary{
+  flex:1;background:linear-gradient(135deg,var(--gold),#c8922a);
+  color:#0a1520;border:none;border-radius:10px;padding:12px;
+  font-family:'Cairo',sans-serif;font-size:14px;font-weight:900;cursor:pointer;transition:all .2s;
+}
+.btn-modal-primary:hover{box-shadow:0 8px 24px rgba(232,184,75,.3);}
+.btn-modal-cancel{
+  flex:1;background:rgba(255,255,255,.04);border:1px solid var(--bdr);
+  color:var(--mut);border-radius:10px;padding:12px;
+  font-family:'Cairo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;
+}
+.btn-modal-cancel:hover{color:var(--wht);}
+
+/* ── PROJECTS PAGE ── */
+.proj-meta{font-size:11px;color:var(--mut);margin-top:3px;font-family:'JetBrains Mono',monospace;}
+.platform-pills{display:flex;gap:4px;flex-wrap:wrap;}
+.plat{background:rgba(255,255,255,.05);border-radius:4px;padding:2px 7px;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--mut);}
+
+/* ── TABS ── */
+.page{display:none;}
+.page.active{display:block;}
+
+/* ── SPLASH ── */
+#splash{position:fixed;inset:0;z-index:9999;background:#05090f;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .7s ease,transform .7s ease;}
+#splash.hide{opacity:0;transform:scale(1.04);pointer-events:none;}
+#splash::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(232,184,75,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(232,184,75,.04) 1px,transparent 1px);background-size:60px 60px;-webkit-mask-image:radial-gradient(ellipse 70% 70% at 50% 50%,black,transparent);mask-image:radial-gradient(ellipse 70% 70% at 50% 50%,black,transparent);}
+#splash::after{content:'';position:absolute;width:480px;height:480px;border-radius:50%;background:radial-gradient(circle,rgba(232,184,75,.09),transparent 65%);top:50%;left:50%;transform:translate(-50%,-50%);animation:sGlow 2.5s ease-in-out infinite alternate;}
+@keyframes sGlow{from{transform:translate(-50%,-50%) scale(.9);opacity:.7}to{transform:translate(-50%,-50%) scale(1.1);opacity:1}}
+.sp-scene{position:relative;z-index:10;perspective:700px;width:140px;height:140px;display:flex;align-items:center;justify-content:center;}
+.sp-logo{width:120px;height:120px;position:relative;animation:sp3d 1.8s cubic-bezier(.16,1,.3,1) forwards;}
+@keyframes sp3d{0%{transform:rotateX(75deg) rotateY(-45deg) scale(.15);opacity:0}25%{opacity:1}65%{transform:rotateX(-6deg) rotateY(12deg) scale(1.06)}82%{transform:rotateX(3deg) rotateY(-4deg) scale(.97)}100%{transform:none;opacity:1}}
+.sp-logo svg{position:absolute;inset:0;width:100%;height:100%;opacity:0;animation:spRing .4s ease forwards;}
+.sp-logo svg:nth-child(1){animation-delay:.35s}.sp-logo svg:nth-child(2){animation-delay:.55s}.sp-logo svg:nth-child(3){animation-delay:.72s}.sp-logo svg:nth-child(4){animation-delay:.88s}.sp-logo svg:nth-child(5){animation-delay:1.02s}
+@keyframes spRing{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:scale(1)}}
+.sp-text{position:relative;z-index:10;text-align:center;margin-top:20px;}
+.sp-brand{display:block;font-family:'Outfit',sans-serif;font-weight:900;font-size:36px;letter-spacing:-2px;color:#f0f4ff;opacity:0;transform:translateY(20px);animation:spT .6s cubic-bezier(.16,1,.3,1) 1.3s forwards;}
+.sp-brand .sg{color:#e8b84b;}
+.sp-sub{display:block;font-family:'JetBrains Mono',monospace;font-size:10px;color:#0ecfb0;letter-spacing:5px;text-transform:uppercase;margin-top:8px;opacity:0;transform:translateY(14px);animation:spT .6s cubic-bezier(.16,1,.3,1) 1.55s forwards;}
+.sp-restricted{display:block;font-family:'JetBrains Mono',monospace;font-size:8px;color:rgba(232,184,75,.55);letter-spacing:4px;text-transform:uppercase;margin-top:5px;opacity:0;animation:spT .5s cubic-bezier(.16,1,.3,1) 1.75s forwards;}
+@keyframes spT{to{opacity:1;transform:translateY(0)}}
+.sp-bar{position:absolute;bottom:0;left:0;right:0;height:2px;background:rgba(255,255,255,.04);}
+.sp-fill{height:100%;background:linear-gradient(90deg,#e8b84b,#0ecfb0);width:0;animation:spBar 2s ease forwards;}
+@keyframes spBar{to{width:100%}}
+
+/* ── PROJECT DETAIL MODAL ── */
+.modal-lg{max-width:640px !important;}
+.proj-section{margin-bottom:18px;}
+.proj-section-title{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--mut);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.proj-section-title::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.05);}
+.plat-chips{display:flex;flex-wrap:wrap;gap:8px;}
+.plat-chip{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:6px 12px;font-size:12px;}
+.plat-chip-dot{width:6px;height:6px;border-radius:50%;background:var(--grn);}
+.event-list{display:flex;flex-direction:column;gap:5px;}
+.event-item{display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:7px;padding:7px 12px;}
+.event-name{font-family:'JetBrains Mono',monospace;font-size:11px;}
+.event-score{font-family:'JetBrains Mono',monospace;font-size:10px;}
+.pixel-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.pixel-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:8px;padding:10px 12px;}
+.pixel-platform{font-size:10px;color:var(--mut);font-family:'JetBrains Mono',monospace;margin-bottom:3px;}
+.pixel-id{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--gold);}
+.detail-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+.detail-field{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:8px;padding:10px 12px;}
+.detail-label{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
+.detail-val{font-size:13px;font-weight:700;}
+
+/* ── ADMINS PAGE ── */
+.perm-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;}
+.perm-item{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:8px;padding:8px 12px;font-size:12px;cursor:pointer;transition:border-color .2s;}
+.perm-item:hover{border-color:var(--gbdr);}
+.perm-check{width:15px;height:15px;border-radius:3px;border:1.5px solid var(--mut2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;transition:all .2s;}
+.perm-check.on{background:var(--gold);border-color:var(--gold);color:#060d18;}
+.badge-superadmin{background:rgba(248,113,113,.1);color:#f87171;border:1px solid rgba(248,113,113,.2);}
+.badge-admin{background:rgba(232,184,75,.1);color:var(--gold);border:1px solid rgba(232,184,75,.2);}
+.badge-viewer{background:rgba(96,165,250,.1);color:var(--blu);border:1px solid rgba(96,165,250,.2);}
+.field-inp{width:100%;background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.08);border-radius:10px;padding:11px 14px;color:var(--wht);font-family:'Cairo',sans-serif;font-size:14px;outline:none;transition:all .2s;margin-bottom:12px;}
+.field-inp:focus{border-color:var(--gbdr);}
+.field-inp::placeholder{color:var(--mut2);}
+select.field-inp{cursor:pointer;}
+.modal-close{position:absolute;top:16px;left:16px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);color:var(--mut);border-radius:8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;transition:all .2s;}
+.modal-close:hover{color:var(--wht);}
+.modal-wrapper{position:relative;}
+
+/* ── ACTIVITY ── */
+.activity-feed{display:flex;flex-direction:column;}
+.activity-item{display:flex;align-items:flex-start;gap:12px;padding:12px 20px;border-bottom:1px solid rgba(255,255,255,.025);}
+.activity-item:last-child{border-bottom:none;}
+.activity-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:rgba(255,255,255,.04);}
+.activity-text{font-size:13px;line-height:1.5;}
+.activity-time{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--mut);margin-top:2px;}
+
+@media(max-width:900px){
+  .sidebar{width:200px;}
+  .main-content{margin-right:200px;padding:20px;}
+  .stats-grid{grid-template-columns:repeat(2,1fr);}
+}
+</style>
+</head>
+<body>
+
+<!-- ════ SPLASH ════ -->
+<div id="splash">
+  <div class="sp-scene">
+    <div class="sp-logo">
+      <svg viewBox="0 0 130 130" fill="none"><defs><linearGradient id="sg1" x1="0" y1="0" x2="130" y2="130" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#e8b84b" stop-opacity=".35"/><stop offset="100%" stop-color="#0ecfb0" stop-opacity=".35"/></linearGradient></defs><path d="M8 60 C8 30.177 32.177 6 62 6" stroke="url(#sg1)" stroke-width="3" stroke-linecap="round"/><path d="M122 60 C122 30.177 97.823 6 68 6" stroke="url(#sg1)" stroke-width="3" stroke-linecap="round"/></svg>
+      <svg viewBox="0 0 130 130" fill="none"><defs><linearGradient id="sg2" x1="0" y1="0" x2="130" y2="130" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#e8b84b" stop-opacity=".6"/><stop offset="100%" stop-color="#0ecfb0" stop-opacity=".6"/></linearGradient></defs><path d="M22 60 C22 37.909 39.909 20 62 20" stroke="url(#sg2)" stroke-width="2.5" stroke-linecap="round"/><path d="M108 60 C108 37.909 90.091 20 68 20" stroke="url(#sg2)" stroke-width="2.5" stroke-linecap="round"/></svg>
+      <svg viewBox="0 0 130 130" fill="none"><path d="M38 60 C38 47.297 48.297 37 61 37" stroke="#e8b84b" stroke-width="2.2" stroke-linecap="round"/><path d="M92 60 C92 47.297 81.703 37 69 37" stroke="#e8b84b" stroke-width="2.2" stroke-linecap="round"/></svg>
+      <svg viewBox="0 0 130 130" fill="none"><defs><radialGradient id="sdg"><stop offset="0%" stop-color="#f5d27a"/><stop offset="100%" stop-color="#e8b84b"/></radialGradient><filter id="sgf"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><circle cx="65" cy="60" r="16" fill="rgba(232,184,75,.12)" filter="url(#sgf)"/><circle cx="65" cy="60" r="9" fill="url(#sdg)"/></svg>
+      <svg viewBox="0 0 130 130" fill="none"><defs><linearGradient id="sag" x1="65" y1="76" x2="65" y2="108" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#e8b84b"/><stop offset="100%" stop-color="#0ecfb0"/></linearGradient></defs><path d="M54 78 L65 106 L76 78" stroke="url(#sag)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+    </div>
+  </div>
+  <div class="sp-text">
+    <span class="sp-brand">easy<span class="sg">TRACK</span></span>
+    <span class="sp-sub">Admin Panel</span>
+    <span class="sp-restricted">Restricted Access</span>
+  </div>
+  <div class="sp-bar"><div class="sp-fill"></div></div>
+</div>
+
+<!-- ════ LOGIN SCREEN ════ -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">
+      <svg viewBox="0 0 64 64" fill="none">
+        <defs>
+          <linearGradient id="lg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#e8b84b"/>
+            <stop offset="100%" stop-color="#0ecfb0"/>
+          </linearGradient>
+        </defs>
+        <path d="M4 30 C4 15.088 16.088 3 31 3" stroke="url(#lg)" stroke-width="2.5" stroke-linecap="round" opacity=".4" fill="none"/>
+        <path d="M60 30 C60 15.088 47.912 3 33 3" stroke="url(#lg)" stroke-width="2.5" stroke-linecap="round" opacity=".4" fill="none"/>
+        <path d="M13 30 C13 20.611 20.611 13 30 13" stroke="url(#lg)" stroke-width="2.2" stroke-linecap="round" opacity=".7" fill="none"/>
+        <path d="M51 30 C51 20.611 43.389 13 34 13" stroke="url(#lg)" stroke-width="2.2" stroke-linecap="round" opacity=".7" fill="none"/>
+        <path d="M22 30 C22 25.029 26.029 21 31 21" stroke="#e8b84b" stroke-width="2" stroke-linecap="round" fill="none"/>
+        <path d="M42 30 C42 25.029 37.971 21 33 21" stroke="#e8b84b" stroke-width="2" stroke-linecap="round" fill="none"/>
+        <circle cx="32" cy="30" r="6" fill="url(#lg)"/>
+        <path d="M27 40 L32 52 L37 40" stroke="url(#lg)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+      <div>
+        <div class="login-logo-text">EASY TRACK</div>
+        <div style="font-size:9px;color:var(--teal);letter-spacing:2px;font-family:'JetBrains Mono',monospace;">ADMIN PANEL</div>
+      </div>
+    </div>
+    <div class="login-title">مرحباً يوسف 👋</div>
+    <div class="login-sub">ادخل الـ Admin Token للوحة التحكم</div>
+    <input class="inp" type="password" id="adminPass" placeholder="ADMIN_TOKEN" dir="ltr" autocomplete="off">
+    <button class="btn-login" id="loginBtn" onclick="adminLogin()">دخول ←</button>
+    <div class="login-err" id="loginErr"></div>
+    <div style="text-align:center;margin-top:16px;font-size:10px;color:var(--mut);line-height:1.6;">
+      التوكن محفوظ في <code style="color:var(--gold);">ADMIN_TOKEN</code> env var على Railway
+    </div>
+  </div>
+</div>
+
+<!-- ════ ADMIN APP ════ -->
+<div id="adminApp">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-inner">
+        <svg viewBox="0 0 64 64" fill="none" width="32" height="32">
+          <defs><linearGradient id="lg2" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#e8b84b"/><stop offset="100%" stop-color="#0ecfb0"/></linearGradient></defs>
+          <path d="M4 30 C4 15.088 16.088 3 31 3" stroke="url(#lg2)" stroke-width="2.5" stroke-linecap="round" opacity=".4" fill="none"/>
+          <path d="M60 30 C60 15.088 47.912 3 33 3" stroke="url(#lg2)" stroke-width="2.5" stroke-linecap="round" opacity=".4" fill="none"/>
+          <path d="M13 30 C13 20.611 20.611 13 30 13" stroke="url(#lg2)" stroke-width="2.2" stroke-linecap="round" opacity=".7" fill="none"/>
+          <path d="M51 30 C51 20.611 43.389 13 34 13" stroke="url(#lg2)" stroke-width="2.2" stroke-linecap="round" opacity=".7" fill="none"/>
+          <circle cx="32" cy="30" r="6" fill="url(#lg2)"/>
+          <path d="M27 40 L32 52 L37 40" stroke="url(#lg2)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <div>
+          <div class="sidebar-brand">EASY TRACK</div>
+          <div class="sidebar-badge">ADMIN PANEL</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-item active" onclick="showPage('dashboard', this)">
+      <span class="nav-icon">📊</span> Dashboard
+    </div>
+    <div class="nav-item" onclick="showPage('revenue', this)">
+      <span class="nav-icon">💰</span> الإيرادات
+    </div>
+    <div class="nav-item" onclick="showPage('clients', this)">
+      <span class="nav-icon">👥</span> العملاء
+    </div>
+    <div class="nav-item" onclick="showPage('projects', this)">
+      <span class="nav-icon">📁</span> المشاريع
+    </div>
+    <div class="nav-item" onclick="showPage('pending', this)">
+      <span class="nav-icon">⏳</span> في انتظار التفعيل
+      <span id="pendingCount" style="margin-right:auto;background:rgba(232,184,75,.2);color:var(--gold);border-radius:100px;padding:1px 8px;font-size:10px;font-family:'JetBrains Mono',monospace;display:none;">0</span>
+    </div>
+    <div class="nav-item" onclick="showPage('activity', this)">
+      <span class="nav-icon">🔔</span> النشاط الأخير
+    </div>
+    <div class="nav-item" id="navAdmins" onclick="showPage('admins', this)" style="display:none;">
+      <span class="nav-icon">🛡️</span> المسؤولون
+    </div>
+
+    <div class="sidebar-bottom">
+      <div class="admin-info">
+        مسجّل كـ Admin
+        <span class="admin-email" id="adminEmailDisplay">Super Admin</span>
+      </div>
+      <button class="btn-logout" onclick="adminLogout()">خروج</button>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+
+    <!-- ── DASHBOARD ── -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div class="page-title">Dashboard</div>
+        <div class="page-sub" id="lastRefresh">جاري التحميل...</div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">إجمالي العملاء</div>
+          <div class="stat-num stat-gold" id="statTotal">—</div>
+          <div class="stat-sub">حساب مسجّل</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">عملاء Active</div>
+          <div class="stat-num stat-grn" id="statActive">—</div>
+          <div class="stat-sub">مفعّل ومشتغل</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">في انتظار التفعيل</div>
+          <div class="stat-num stat-gold" id="statPending">—</div>
+          <div class="stat-sub">دفع ومش متفعّل</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">إجمالي المشاريع</div>
+          <div class="stat-num stat-blu" id="statProjects">—</div>
+          <div class="stat-sub">config تم توليده</div>
+        </div>
+      </div>
+
+      <!-- Recent clients -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">آخر العملاء المسجّلين</div>
+          <div class="card-actions">
+            <button class="btn-sm" onclick="downloadExport()" style="background:linear-gradient(135deg,var(--gold),#c8922a);color:#060d18;border:none;">⬇ تحميل الداتا (JSON)</button>
+            <button class="btn-sm" onclick="loadAll()">↻ تحديث</button>
+          </div>
+        </div>
+        <div id="recentBody">
+          <div class="loading"><div class="spinner"></div><br>جاري التحميل...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CLIENTS ── -->
+    <div class="page" id="page-clients">
+      <div class="page-header">
+        <div class="page-title">العملاء</div>
+        <div class="page-sub">كل الحسابات المسجّلة</div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">كل العملاء</div>
+          <div class="card-actions">
+            <input class="search-inp" type="text" placeholder="ابحث بالاسم أو الإيميل..." oninput="filterClients(this.value)" id="clientSearch">
+            <button class="btn-sm" onclick="loadAll()">↻ تحديث</button>
+          </div>
+        </div>
+        <div id="clientsBody">
+          <div class="loading"><div class="spinner"></div><br>جاري التحميل...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PROJECTS ── -->
+    <div class="page" id="page-projects">
+      <div class="page-header">
+        <div class="page-title">المشاريع</div>
+        <div class="page-sub">كل الـ configs اللي اتولّدت</div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">كل المشاريع</div>
+          <button class="btn-sm" onclick="loadProjects()">↻ تحديث</button>
+        </div>
+        <div id="projectsBody">
+          <div class="loading"><div class="spinner"></div><br>جاري التحميل...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── REVENUE ── -->
+    <div class="page" id="page-revenue">
+      <div class="page-header">
+        <div class="page-title">الإيرادات 💰</div>
+        <div class="page-sub" id="revLastUpdate">—</div>
+      </div>
+
+      <!-- Revenue Stats -->
+      <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">
+        <div class="stat-card">
+          <div class="stat-label">MRR الشهر الحالي</div>
+          <div class="stat-num stat-grn" id="revMRR">—</div>
+          <div class="stat-sub">Monthly Recurring</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">إجمالي العملاء المدفوعين</div>
+          <div class="stat-num stat-gold" id="revPaid">—</div>
+          <div class="stat-sub">Active subscribers</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">متوسط الـ ARPU</div>
+          <div class="stat-num stat-blu" id="revARPU">—</div>
+          <div class="stat-sub">Per active user</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">ARR المتوقع</div>
+          <div class="stat-num" style="color:var(--teal);" id="revARR">—</div>
+          <div class="stat-sub">Annual run rate</div>
+        </div>
+      </div>
+
+      <!-- Chart + Breakdown row -->
+      <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:20px;margin-bottom:20px;">
+
+        <!-- Daily Revenue Chart -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">الإيرادات اليومية — آخر 30 يوم</div>
+            <select id="revChartPeriod" onchange="renderRevenueChart()" style="background:var(--sur2);border:1px solid var(--bdr);border-radius:6px;padding:5px 10px;color:var(--wht);font-family:'Cairo',sans-serif;font-size:12px;outline:none;color-scheme:dark;">
+              <option value="30">30 يوم</option>
+              <option value="14">14 يوم</option>
+              <option value="7">7 أيام</option>
+            </select>
+          </div>
+          <div style="padding:16px 20px;">
+            <canvas id="revChart" height="180"></canvas>
+          </div>
+        </div>
+
+        <!-- Plan Breakdown -->
+        <div class="card">
+          <div class="card-header"><div class="card-title">توزيع الخطط</div></div>
+          <div style="padding:16px 20px;" id="revPlanBreakdown">
+            <div class="loading"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Subscribers Table -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">المشتركين المدفوعين</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--mut);" id="revTableSub">—</div>
+        </div>
+        <div id="revTable">
+          <div class="loading"><div class="spinner"></div><br>جاري التحميل...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PENDING ── -->
+    <div class="page" id="page-pending">
+      <div class="page-header">
+        <div class="page-title">في انتظار التفعيل ⏳</div>
+        <div class="page-sub">العملاء اللي سجّلوا ولسه مش مفعّلين</div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Pending Clients</div>
+          <button class="btn-sm" onclick="loadAll()">↻ تحديث</button>
+        </div>
+        <div id="pendingBody">
+          <div class="loading"><div class="spinner"></div><br>جاري التحميل...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ACTIVITY ── -->
+    <div class="page" id="page-activity">
+      <div class="page-header">
+        <div class="page-title">النشاط الأخير 🔔</div>
+        <div class="page-sub">كل العمليات اللي حصلت</div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Timeline</div><button class="btn-sm" onclick="loadAll()">↻ تحديث</button></div>
+        <div id="activityBody"><div class="loading"><div class="spinner"></div><br>جاري التحميل...</div></div>
+      </div>
+    </div>
+
+    <!-- ── ADMINS ── -->
+    <div class="page" id="page-admins">
+      <div class="page-header">
+        <div class="page-title">المسؤولون 🛡️</div>
+        <div class="page-sub">إدارة الحسابات والصلاحيات</div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">كل المسؤولين</div>
+          <button class="btn-sm" onclick="openAddAdmin()" style="background:linear-gradient(135deg,var(--gold),#c8922a);color:#060d18;border:none;">+ إضافة مسؤول</button>
+        </div>
+        <div id="adminsBody"><div class="loading"><div class="spinner"></div><br>جاري التحميل...</div></div>
+      </div>
+    </div>
+
+  </div><!-- end main-content -->
+</div><!-- end adminApp -->
+
+<!-- ════ CLIENT PROFILE MODAL ════ -->
+<div class="modal-overlay" id="clientModal">
+  <div class="modal" style="max-width:700px;padding:0;overflow:hidden;">
+
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,rgba(232,184,75,.1),rgba(14,207,176,.06));border-bottom:1px solid var(--bdr);padding:24px 28px;display:flex;align-items:flex-start;justify-content:space-between;">
+      <div>
+        <div style="font-size:20px;font-weight:900;color:var(--wht);" id="modalClientName">—</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--teal);margin-top:4px;" id="modalClientEmail">—</div>
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
+          <span id="modalStatusBadge" class="badge badge-active">● Active</span>
+          <span id="modalPlanBadge" class="badge badge-basic">Basic</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--mut);" id="modalCreated">—</span>
+        </div>
+      </div>
+      <button onclick="closeModal()" style="background:rgba(255,255,255,.06);border:1px solid var(--bdr);color:var(--wht2);border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">✕</button>
+    </div>
+
+    <!-- Stats row -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--bdr);">
+      <div style="padding:16px 20px;border-left:1px solid var(--bdr);text-align:center;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;">المشاريع</div>
+        <div style="font-size:28px;font-weight:900;color:var(--gold);" id="mdProjects">—</div>
+      </div>
+      <div style="padding:16px 20px;border-left:1px solid var(--bdr);text-align:center;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;">إجمالي الدفع</div>
+        <div style="font-size:28px;font-weight:900;color:var(--grn);" id="mdRevenue">—</div>
+      </div>
+      <div style="padding:16px 20px;border-left:1px solid var(--bdr);text-align:center;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;">الحد الأقصى</div>
+        <div style="font-size:28px;font-weight:900;color:var(--wht);" id="mdLimit">—</div>
+      </div>
+      <div style="padding:16px 20px;text-align:center;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;">متبقي</div>
+        <div style="font-size:28px;font-weight:900;color:var(--blu);" id="mdRemaining">—</div>
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:20px 28px;max-height:420px;overflow-y:auto;">
+
+      <!-- Upgrade Plan -->
+      <div style="margin-bottom:20px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--mut);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px;">تعديل الخطة والحالة <span style="flex:1;height:1px;background:var(--bdr);display:block;"></span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;">
+          <div>
+            <div style="font-size:11px;color:var(--mut);margin-bottom:5px;">الخطة</div>
+            <select id="modalPlan" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:9px 12px;color:var(--wht);font-family:'Cairo',sans-serif;font-size:13px;outline:none;cursor:pointer;">
+              <option value="Basic">Basic — $29/mo</option>
+              <option value="Growth">Growth — $69/mo</option>
+              <option value="Enterprise">Enterprise — Custom</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--mut);margin-bottom:5px;">الحالة</div>
+            <select id="modalStatusSelect" style="width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:9px 12px;color:var(--wht);font-family:'Cairo',sans-serif;font-size:13px;outline:none;cursor:pointer;">
+              <option value="active">Active ✅</option>
+              <option value="pending">Pending ⏳</option>
+              <option value="suspended">Suspended ⏸</option>
+            </select>
+          </div>
+          <button onclick="saveClientChanges()" style="background:linear-gradient(135deg,var(--gold),#c8922a);color:#060d18;border:none;border-radius:8px;padding:9px 18px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:900;cursor:pointer;white-space:nowrap;">💾 حفظ</button>
+        </div>
+      </div>
+
+      <!-- Client Info (country / whatsapp / job) -->
+      <div style="margin-bottom:20px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--mut);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px;">بيانات العميل <span style="flex:1;height:1px;background:var(--bdr);display:block;"></span></div>
+        <div id="mdClientInfo" style="background:var(--sur2);border:1px solid var(--bdr);border-radius:10px;padding:6px 14px;">
+          <div style="text-align:center;padding:14px;color:var(--mut);font-size:13px;">—</div>
+        </div>
+      </div>
+
+      <!-- Projects History -->
+      <div style="margin-bottom:20px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--mut);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px;">سجل المشاريع <span style="flex:1;height:1px;background:var(--bdr);display:block;"></span></div>
+        <div id="mdProjectsList">
+          <div style="text-align:center;padding:20px;color:var(--mut);font-size:13px;">جاري التحميل...</div>
+        </div>
+      </div>
+
+      <!-- Activity Timeline -->
+      <div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--mut);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px;">سجل النشاط <span style="flex:1;height:1px;background:var(--bdr);display:block;"></span></div>
+        <div id="mdTimeline">
+          <div style="text-align:center;padding:20px;color:var(--mut);font-size:13px;">جاري التحميل...</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div style="padding:14px 28px;border-top:1px solid var(--bdr);display:flex;gap:8px;justify-content:space-between;align-items:center;background:rgba(0,0,0,.15);">
+      <button onclick="deleteClient()" style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);color:var(--red);border-radius:8px;padding:8px 16px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">🗑 حذف الحساب</button>
+      <button onclick="closeModal()" style="background:rgba(255,255,255,.05);border:1px solid var(--bdr);color:var(--wht2);border-radius:8px;padding:8px 20px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+
+<div id="toast"></div>
+
+<!-- ════ PROJECT DETAIL MODAL ════ -->
+<div class="modal-overlay" id="projectModal">
+  <div class="modal modal-lg" style="max-width:640px;">
+    <div class="modal-wrapper">
+      <button class="modal-close" onclick="closeProjectModal()">✕</button>
+    </div>
+    <div class="modal-title" id="pmName">—</div>
+    <div class="modal-sub" id="pmClient">—</div>
+
+    <div class="detail-row" style="margin-top:16px;">
+      <div class="detail-field"><div class="detail-label">CMS</div><div class="detail-val" id="pmCMS">—</div></div>
+      <div class="detail-field"><div class="detail-label">التاريخ</div><div class="detail-val" id="pmDate">—</div></div>
+    </div>
+
+    <div class="proj-section">
+      <div class="proj-section-title">المنصات</div>
+      <div class="plat-chips" id="pmPlatforms"></div>
+    </div>
+
+    <div class="proj-section">
+      <div class="proj-section-title">الـ Events</div>
+      <div class="event-list" id="pmEvents"></div>
+    </div>
+
+    <div class="proj-section">
+      <div class="proj-section-title">Pixel IDs</div>
+      <div class="pixel-grid" id="pmPixels"></div>
+    </div>
+
+    <div class="proj-section">
+      <div class="proj-section-title">GTM Container</div>
+      <div id="pmGtm"></div>
+    </div>
+
+    <div class="proj-section">
+      <div class="proj-section-title">GTM Snippet</div>
+      <div id="pmSnippet"></div>
+    </div>
+
+    <div class="proj-section">
+      <div class="proj-section-title">بيانات العميل</div>
+      <div class="detail-row">
+        <div class="detail-field"><div class="detail-label">الاسم</div><div class="detail-val" id="pmClientName">—</div></div>
+        <div class="detail-field"><div class="detail-label">الإيميل</div><div class="detail-val" id="pmClientEmail" style="font-family:'JetBrains Mono',monospace;font-size:12px;">—</div></div>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeProjectModal()">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ ADD ADMIN MODAL ════ -->
+<div class="modal-overlay" id="addAdminModal">
+  <div class="modal modal-lg" style="max-width:520px;">
+    <div class="modal-wrapper">
+      <button class="modal-close" onclick="closeAddAdmin()">✕</button>
+    </div>
+    <div class="modal-title">إضافة مسؤول جديد</div>
+    <div class="modal-sub">سيتم إنشاء حساب Firebase جديد بالصلاحيات المحددة</div>
+
+    <input class="field-inp" type="text" id="aa-name" placeholder="الاسم الكريم">
+    <input class="field-inp" type="email" id="aa-email" placeholder="البريد الإلكتروني" dir="ltr">
+    <input class="field-inp" type="password" id="aa-pass" placeholder="كلمة المرور (8 أحرف على الأقل)" dir="ltr">
+    <select class="field-inp" id="aa-role" onchange="setPermsByRole(this.value)">
+      <option value="admin">Admin — يشوف ويعدّل بدون حذف</option>
+      <option value="viewer">Viewer — يشوف بس</option>
+      <option value="superadmin">Super Admin — كامل الصلاحيات</option>
+    </select>
+
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;">الصلاحيات التفصيلية</div>
+    <div class="perm-grid">
+      <div class="perm-item" onclick="togglePerm(this)"><div class="perm-check on" data-perm="view_clients">✓</div>عرض العملاء</div>
+      <div class="perm-item" onclick="togglePerm(this)"><div class="perm-check on" data-perm="edit_clients">✓</div>تعديل العملاء</div>
+      <div class="perm-item" onclick="togglePerm(this)"><div class="perm-check on" data-perm="view_projects">✓</div>عرض المشاريع</div>
+      <div class="perm-item" onclick="togglePerm(this)"><div class="perm-check" data-perm="delete_clients">✗</div>حذف العملاء</div>
+      <div class="perm-item" onclick="togglePerm(this)"><div class="perm-check on" data-perm="activate_clients">✓</div>تفعيل الحسابات</div>
+      <div class="perm-item" onclick="togglePerm(this)"><div class="perm-check" data-perm="manage_admins">✗</div>إدارة المسؤولين</div>
+    </div>
+
+    <div class="modal-actions" style="margin-top:20px;">
+      <button class="btn-modal-primary" onclick="doAddAdmin()">إضافة المسؤول</button>
+      <button class="btn-modal-cancel" onclick="closeAddAdmin()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<script data-cfasync="false">
+/* ════════════════════════════════════════
+   CONFIG — Admin uses ADMIN_TOKEN (server-side)
+════════════════════════════════════════ */
+var API_BASE = '';  // same origin
+
+var _adminToken = null;
+var _allClients = [];
+var _allProjects = [];   // normalized managed_containers
+var _modalUid = null;
+var _modalPid = null;
+
+/* ════════════════════════════════════════
+   SPLASH
+════════════════════════════════════════ */
+setTimeout(function() {
+  var sp = document.getElementById('splash');
+  sp.classList.add('hide');
+  setTimeout(function() {
+    sp.style.display = 'none';
+    restoreSession();
+  }, 700);
+}, 2400);
+
+/* ════════════════════════════════════════
+   SESSION
+════════════════════════════════════════ */
+function restoreSession() {
+  var t = sessionStorage.getItem('et_admin_token');
+  if (t) {
+    _adminToken = t;
+    // Validate token against server
+    adminPing(t).then(function(ok) {
+      if (ok) showApp();
+      else {
+        _adminToken = null;
+        sessionStorage.removeItem('et_admin_token');
+        document.getElementById('loginScreen').style.display = 'flex';
+      }
+    });
+    return;
+  }
+  document.getElementById('loginScreen').style.display = 'flex';
+}
+
+function showApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('adminApp').style.display = 'block';
+  var emailEl = document.getElementById('adminEmailDisplay');
+  if (emailEl) emailEl.textContent = 'Super Admin';
+  // Hide admins nav (single-admin system now)
+  var navAdmins = document.getElementById('navAdmins');
+  if (navAdmins) navAdmins.style.display = 'none';
+  loadAll();
+}
+
+/* ════════════════════════════════════════
+   AUTH — ADMIN_TOKEN
+════════════════════════════════════════ */
+async function adminPing(token) {
+  try {
+    var res = await fetch('/api/admin/ping', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    return res.ok;
+  } catch (e) { return false; }
+}
+
+async function adminLogin() {
+  var pass = document.getElementById('adminPass').value.trim();
+  var btn  = document.getElementById('loginBtn');
+  var err  = document.getElementById('loginErr');
+  err.style.display = 'none';
+  if (!pass) { err.textContent = 'ادخل الـ Admin Token'; err.style.display = 'block'; return; }
+  btn.textContent = '⏳ جاري الدخول...'; btn.disabled = true;
+  var ok = await adminPing(pass);
+  if (!ok) {
+    err.textContent = 'التوكن غلط أو منتهي الصلاحية';
+    err.style.display = 'block';
+    btn.textContent = 'دخول ←'; btn.disabled = false;
+    return;
+  }
+  _adminToken = pass;
+  sessionStorage.setItem('et_admin_token', pass);
+  btn.textContent = 'دخول ←'; btn.disabled = false;
+  showApp();
+}
+
+function adminLogout() {
+  sessionStorage.clear();
+  _adminToken = null;
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('adminApp').style.display = 'none';
+}
+
+/* ════════════════════════════════════════
+   ADMIN API HELPERS
+════════════════════════════════════════ */
+function _authHeaders(extra) {
+  var h = { 'Authorization': 'Bearer ' + _adminToken };
+  if (extra) Object.keys(extra).forEach(function(k){ h[k] = extra[k]; });
+  return h;
+}
+
+async function apiFetchAll() {
+  var res = await fetch('/api/admin/export', { headers: _authHeaders() });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+async function apiUpdateClient(uid, fields) {
+  var res = await fetch('/api/admin/client/' + encodeURIComponent(uid), {
+    method: 'POST',
+    headers: _authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(fields)
+  });
+  return res.ok;
+}
+
+async function apiDeleteClient(uid) {
+  var res = await fetch('/api/admin/client/' + encodeURIComponent(uid), {
+    method: 'DELETE',
+    headers: _authHeaders()
+  });
+  return res.ok;
+}
+
+async function downloadExport() {
+  try {
+    var res = await fetch('/api/admin/export?download=1', { headers: _authHeaders() });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var blob = await res.blob();
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    var stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    a.download = 'easytrack-export-' + stamp + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+    toast('تم تحميل الملف ✅');
+  } catch (e) {
+    toast('خطأ في التحميل: ' + e.message + ' ❌');
+  }
+}
+
+/* ════════════════════════════════════════
+   NORMALIZERS — unify old and new schemas
+════════════════════════════════════════ */
+function _tsToISO(v) {
+  if (!v) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') {
+    if (v._seconds !== undefined) return new Date(v._seconds * 1000).toISOString();
+    if (v.seconds  !== undefined) return new Date(v.seconds * 1000).toISOString();
+    if (v.toDate) try { return v.toDate().toISOString(); } catch (_) {}
+  }
+  return '';
+}
+
+function normalizeClient(c) {
+  var created = c.createdAt || c.created_at;
+  return {
+    _id:           c.id || c._id,
+    name:          c.name || (c.email ? c.email.split('@')[0] : '—'),
+    email:         c.email || c.clientEmail || '',
+    country:       c.country || '',
+    whatsapp:      c.whatsapp || c.phone || '',
+    job:           c.job || '',
+    plan:          c.plan || 'Basic',
+    status:        c.status || 'pending',
+    projects_used: c.projects_used || 0,
+    created_at:    _tsToISO(created)
+  };
+}
+
+function normalizeContainer(p) {
+  var created = p.createdAt || p.created_at;
+  var pixelIds = p.pixelIds || p.pixel_ids || {};
+  return {
+    _id:          p.id || p._id || p.gtmPublicId,
+    name:         p.projectName || p.name || p.containerName || 'Container',
+    client_id:    p.clientId || p.client_id,
+    client_name:  p.clientName || p.client_name || '',
+    email:        p.clientEmail || p.email || '',
+    cms:          p.cmsType || p.cms || '',
+    platforms:    Array.isArray(p.platforms) ? p.platforms : [],
+    events:       Array.isArray(p.events) ? p.events : [],
+    events_count: (p.events || []).length || p.events_count || 0,
+    pixel_ids:    pixelIds,
+    created_at:   _tsToISO(created),
+    // GTM-specific (new schema)
+    gtmPublicId:    p.gtmPublicId || '',
+    gtmContainerId: p.gtmContainerId || '',
+    gtmAccountId:   p.gtmAccountId || '',
+    containerName:  p.containerName || '',
+    published:      p.published,
+    invited:        p.invited,
+    snippetHead:    p.snippetHead || '',
+    snippetBody:    p.snippetBody || ''
+  };
+}
+
+/* ════════════════════════════════════════
+   LOAD DATA — uses /api/admin/export
+════════════════════════════════════════ */
+async function loadAll() {
+  try {
+    var dump = await apiFetchAll();
+    var clients    = (dump.clients    || []).map(normalizeClient);
+    var containers = (dump.containers || []).map(normalizeContainer);
+    _allClients  = clients;
+    _allProjects = containers;
+
+    var active  = clients.filter(function(c){ return c.status === 'active'; }).length;
+    var pending = clients.filter(function(c){ return c.status !== 'active'; }).length;
+
+    document.getElementById('statTotal').textContent    = clients.length;
+    document.getElementById('statActive').textContent   = active;
+    document.getElementById('statPending').textContent  = pending;
+    document.getElementById('statProjects').textContent = containers.length;
+    document.getElementById('lastRefresh').textContent  = 'آخر تحديث: ' + new Date().toLocaleTimeString('ar-EG');
+
+    var pb = document.getElementById('pendingCount');
+    if (pending > 0) { pb.textContent = pending; pb.style.display = 'inline'; }
+    else pb.style.display = 'none';
+
+    renderClients(clients);
+    renderRecent(clients);
+    renderPending(clients);
+    renderProjects(containers);
+    renderActivity(clients, containers);
+  } catch(e) {
+    console.error('loadAll error:', e);
+    if (String(e.message).indexOf('401') !== -1 || String(e.message).indexOf('403') !== -1) {
+      adminLogout();
+      toast('انتهت الجلسة — سجّل دخول تاني ❌');
+    } else {
+      toast('خطأ في تحميل البيانات: ' + e.message + ' ❌');
+    }
+  }
+}
+
+async function loadProjects() {
+  // Alias — reload everything (containers live in the same export payload)
+  return loadAll();
+}
+
+/* ════════════════════════════════════════
+   RENDER — CLIENTS
+════════════════════════════════════════ */
+function clientRow(c) {
+  var statusBadge = c.status === 'active'
+    ? '<span class="badge badge-active">● Active</span>'
+    : (c.status === 'suspended'
+        ? '<span class="badge badge-pending">● Suspended</span>'
+        : '<span class="badge badge-pending">● Pending</span>');
+  var planBadge = '<span class="badge badge-' + (c.plan||'basic').toLowerCase() + '">' + (c.plan||'Basic') + '</span>';
+  var created = c.created_at ? new Date(c.created_at).toLocaleDateString('ar-EG') : '—';
+  var actions = '<button class="action-btn" onclick="openClientModal(\'' + c._id + '\')">تفاصيل</button> ';
+  if (c.status !== 'active') actions += '<button class="action-btn activate" onclick="quickActivate(\'' + c._id + '\',this)">✅ تفعيل</button>';
+  else actions += '<button class="action-btn suspend" onclick="quickSuspend(\'' + c._id + '\',this)">⏸ إيقاف</button>';
+  var waHtml = c.whatsapp
+    ? '<a href="https://wa.me/' + String(c.whatsapp).replace(/\D/g,'') + '" target="_blank" style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--teal);text-decoration:none;direction:ltr;">' + c.whatsapp + '</a>'
+    : '<span style="color:var(--mut);">—</span>';
+  return '<tr>' +
+    '<td><div style="font-weight:700;">' + (c.name||'—') + '</div><div style="font-size:11px;color:var(--mut);font-family:\'JetBrains Mono\',monospace;margin-top:2px;">' + (c.email||'') + '</div></td>' +
+    '<td>' + statusBadge + '</td>' +
+    '<td>' + planBadge + '</td>' +
+    '<td style="font-size:12px;">' + (c.country || '<span style="color:var(--mut);">—</span>') + '</td>' +
+    '<td>' + waHtml + '</td>' +
+    '<td style="font-size:12px;color:var(--mut);">' + (c.job || '—') + '</td>' +
+    '<td style="font-family:\'JetBrains Mono\',monospace;font-size:12px;">' + (c.projects_used||0) + '</td>' +
+    '<td style="font-size:12px;color:var(--mut);">' + created + '</td>' +
+    '<td>' + actions + '</td></tr>';
+}
+
+function clientsTableHeader() {
+  return '<table><thead><tr>' +
+    '<th>العميل</th><th>Status</th><th>الخطة</th><th>البلد</th><th>واتساب</th><th>الوظيفة</th><th>مشاريع</th><th>تاريخ التسجيل</th><th>إجراءات</th>' +
+    '</tr></thead><tbody>';
+}
+
+function renderClients(clients) {
+  var body = document.getElementById('clientsBody');
+  if (!body) return;
+  if (!clients.length) { body.innerHTML = '<div class="empty"><div class="empty-icon">👥</div>مفيش عملاء لسه</div>'; return; }
+  body.innerHTML = clientsTableHeader() + clients.map(clientRow).join('') + '</tbody></table>';
+}
+
+function renderRecent(clients) {
+  var body = document.getElementById('recentBody');
+  if (!body) return;
+  var recent = clients.slice().sort(function(a,b){ return (b.created_at||'') > (a.created_at||'') ? 1 : -1; }).slice(0,5);
+  if (!recent.length) { body.innerHTML = '<div class="empty"><div class="empty-icon">👥</div>مفيش عملاء لسه</div>'; return; }
+  body.innerHTML = clientsTableHeader() + recent.map(clientRow).join('') + '</tbody></table>';
+}
+
+function renderPending(clients) {
+  var body = document.getElementById('pendingBody');
+  if (!body) return;
+  var pending = clients.filter(function(c){ return c.status !== 'active'; });
+  if (!pending.length) { body.innerHTML = '<div class="empty"><div class="empty-icon">✅</div>مفيش عملاء في الانتظار</div>'; return; }
+  body.innerHTML = clientsTableHeader() + pending.map(clientRow).join('') + '</tbody></table>';
+}
+
+/* ════════════════════════════════════════
+   RENDER — PROJECTS
+════════════════════════════════════════ */
+function renderProjects(projects) {
+  var body = document.getElementById('projectsBody');
+  if (!body) return;
+  if (!projects.length) { body.innerHTML = '<div class="empty"><div class="empty-icon">📁</div>مفيش مشاريع لسه</div>'; return; }
+  var sorted = projects.slice().sort(function(a,b){ return (b.created_at||'') > (a.created_at||'') ? 1 : -1; });
+  body.innerHTML = '<table><thead><tr><th>المشروع</th><th>العميل</th><th>CMS</th><th>المنصات</th><th>Events</th><th>التاريخ</th><th>تفاصيل</th></tr></thead><tbody>' +
+    sorted.map(function(p){
+      var platforms = Array.isArray(p.platforms) ? p.platforms : [];
+      var pills = platforms.map(function(pl){ return '<span class="plat">' + pl + '</span>'; }).join('');
+      var created = p.created_at ? new Date(p.created_at).toLocaleDateString('ar-EG') : '—';
+      return '<tr><td><div style="font-weight:700;">' + (p.name||'Config') + '</div></td>' +
+        '<td><div style="font-size:12px;">' + (p.client_name||'—') + '</div><div class="proj-meta">' + (p.email||'') + '</div></td>' +
+        '<td><span class="badge badge-basic">' + (p.cms||'—') + '</span></td>' +
+        '<td><div class="platform-pills">' + (pills||'—') + '</div></td>' +
+        '<td style="font-family:\'JetBrains Mono\',monospace;font-size:13px;">' + (p.events_count||0) + '</td>' +
+        '<td style="font-size:12px;color:var(--mut);">' + created + '</td>' +
+        '<td><button class="action-btn" onclick="openProjectModal(\'' + p._id + '\')">عرض التفاصيل</button></td></tr>';
+    }).join('') + '</tbody></table>';
+}
+
+/* ════════════════════════════════════════
+   RENDER — ACTIVITY
+════════════════════════════════════════ */
+function renderActivity(clients, projects) {
+  var body = document.getElementById('activityBody');
+  if (!body) return;
+  var items = [];
+  clients.forEach(function(c) {
+    if (c.created_at) items.push({ icon:'👤', text: (c.name||c.email||'عميل جديد') + ' سجّل حساب — خطة ' + (c.plan||'Basic'), time: c.created_at });
+  });
+  projects.forEach(function(p) {
+    if (p.created_at) items.push({ icon:'📁', text: (p.client_name||'عميل') + ' ولّد config لـ ' + (p.cms||'') + ' — ' + (Array.isArray(p.platforms)?p.platforms.join(', '):'') + ' — ' + (p.events_count||0) + ' events', time: p.created_at });
+  });
+  items.sort(function(a,b){ return (b.time||'') > (a.time||'') ? 1 : -1; });
+  items = items.slice(0, 30);
+  if (!items.length) { body.innerHTML = '<div class="empty"><div class="empty-icon">🔔</div>مفيش نشاط لسه</div>'; return; }
+  body.innerHTML = '<div class="activity-feed">' + items.map(function(i){
+    var dt = i.time ? new Date(i.time).toLocaleString('ar-EG') : '';
+    return '<div class="activity-item"><div class="activity-icon">' + i.icon + '</div><div><div class="activity-text">' + i.text + '</div><div class="activity-time">' + dt + '</div></div></div>';
+  }).join('') + '</div>';
+}
+
+/* ════════════════════════════════════════
+   RENDER — ADMINS
+════════════════════════════════════════ */
+function renderAdmins(admins) {
+  // Single-admin system (ADMIN_TOKEN); nav is hidden anyway.
+  var body = document.getElementById('adminsBody');
+  if (!body) return;
+  body.innerHTML = '<div class="empty"><div class="empty-icon">🔐</div>نظام بتوكن واحد — لإدارة المسؤولين غيّر <code>ADMIN_TOKEN</code></div>';
+}
+
+/* ════════════════════════════════════════
+   CLIENT ACTIONS
+════════════════════════════════════════ */
+async function quickActivate(uid, btn) {
+  btn.textContent = '...'; btn.disabled = true;
+  var ok = await apiUpdateClient(uid, { status: 'active' });
+  if (ok) { toast('تم تفعيل الحساب ✅'); loadAll(); }
+  else { toast('حصل خطأ ❌'); btn.textContent = '✅ تفعيل'; btn.disabled = false; }
+}
+
+async function quickSuspend(uid, btn) {
+  if (!confirm('إيقاف الحساب ده؟')) return;
+  btn.textContent = '...'; btn.disabled = true;
+  var ok = await apiUpdateClient(uid, { status: 'pending' });
+  if (ok) { toast('تم إيقاف الحساب ⏸'); loadAll(); }
+  else { toast('حصل خطأ ❌'); btn.textContent = '⏸ إيقاف'; btn.disabled = false; }
+}
+
+var PLAN_PRICES = { Basic: 29, Growth: 69, Enterprise: 0 };
+var PLAN_LIMITS = { basic: 1, growth: 3, enterprise: 999 };
+
+function openClientModal(uid) {
+  var c = _allClients.find(function(x){ return x._id === uid; });
+  if (!c) return;
+  _modalUid = uid;
+
+  // Header
+  document.getElementById('modalClientName').textContent  = c.name || '—';
+  document.getElementById('modalClientEmail').textContent = c.email || '—';
+  document.getElementById('modalCreated').textContent     = c.created_at ? new Date(c.created_at).toLocaleDateString('ar-EG') : '—';
+
+  // Status badge
+  var sb = document.getElementById('modalStatusBadge');
+  sb.textContent = c.status === 'active' ? '● Active' : c.status === 'suspended' ? '● Suspended' : '● Pending';
+  sb.className = 'badge ' + (c.status === 'active' ? 'badge-active' : 'badge-pending');
+
+  // Plan badge
+  var pb = document.getElementById('modalPlanBadge');
+  pb.textContent = c.plan || 'Basic';
+  pb.className = 'badge badge-' + (c.plan||'basic').toLowerCase();
+
+  // Stats
+  var used    = c.projects_used || 0;
+  var plan    = (c.plan || 'Basic').toLowerCase();
+  var limit   = PLAN_LIMITS[plan] || 1;
+  var price   = PLAN_PRICES[c.plan] || 29;
+  var revenue = price > 0 ? '$' + price + '/mo' : 'Custom';
+
+  document.getElementById('mdProjects').textContent  = used;
+  document.getElementById('mdRevenue').textContent   = revenue;
+  document.getElementById('mdLimit').textContent     = limit === 999 ? '∞' : limit;
+  document.getElementById('mdRemaining').textContent = limit === 999 ? '∞' : Math.max(0, limit - used);
+
+  // Selects
+  document.getElementById('modalPlan').value         = c.plan || 'Basic';
+  document.getElementById('modalStatusSelect').value = c.status || 'pending';
+
+  // Load client's projects
+  var clientProjects = _allProjects.filter(function(p){ return p.client_id === uid || p.email === c.email; });
+  renderClientProjects(clientProjects, c);
+  renderClientTimeline(c, clientProjects);
+  renderClientInfo(c);
+
+  document.getElementById('clientModal').classList.add('on');
+}
+
+function renderClientInfo(c) {
+  var el = document.getElementById('mdClientInfo');
+  if (!el) return;
+  function row(label, val, mono, link) {
+    if (!val) val = '—';
+    var style = mono ? 'font-family:\'JetBrains Mono\',monospace;font-size:12px;direction:ltr;text-align:left;' : 'font-size:13px;';
+    var inner = link ? '<a href="' + link + '" target="_blank" style="color:var(--teal);text-decoration:none;">' + val + '</a>' : val;
+    return '<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px dashed var(--bdr);">' +
+      '<span style="font-size:12px;color:var(--mut);">' + label + '</span>' +
+      '<span style="' + style + '">' + inner + '</span></div>';
+  }
+  var waLink = c.whatsapp ? 'https://wa.me/' + String(c.whatsapp).replace(/\D/g, '') : null;
+  el.innerHTML =
+    row('البلد',     c.country  || '—') +
+    row('الواتساب', c.whatsapp || '—', true, waLink) +
+    row('الوظيفة',  c.job      || '—') +
+    row('UID',       c._id       || '—', true);
+}
+
+function renderClientProjects(projects, client) {
+  var el = document.getElementById('mdProjectsList');
+  if (!projects.length) {
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--mut);font-size:13px;">مفيش مشاريع لسه</div>';
+    return;
+  }
+  el.innerHTML = projects.map(function(p) {
+    var plats = Array.isArray(p.platforms) ? p.platforms : [];
+    var pills = plats.map(function(pl){ return '<span style="background:rgba(255,255,255,.05);border-radius:4px;padding:2px 7px;font-size:9px;font-family:\'JetBrains Mono\',monospace;color:var(--mut);">'+pl+'</span>'; }).join(' ');
+    var dt = p.created_at ? new Date(p.created_at).toLocaleDateString('ar-EG') : '';
+    return '<div style="background:var(--sur2);border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;margin-bottom:8px;">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">' +
+      '<div style="font-weight:700;font-size:13px;">' + (p.name||'Config') + '</div>' +
+      '<div style="display:flex;align-items:center;gap:8px;">' +
+      '<span class="badge badge-basic">' + (p.cms||'—') + '</span>' +
+      '<span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:var(--mut);">' + dt + '</span>' +
+      '<button onclick="openProjectModal(\''+p._id+'\')" style="background:var(--gdim);border:1px solid var(--gbdr);color:var(--gold);border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer;font-family:\'Cairo\',sans-serif;">تفاصيل</button>' +
+      '</div></div>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + (pills||'—') + '</div>' +
+      '<div style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:var(--mut);margin-top:4px;">' + (p.events_count||0) + ' events</div>' +
+      '</div>';
+  }).join('');
+}
+
+function renderClientTimeline(client, projects) {
+  var el = document.getElementById('mdTimeline');
+  var items = [];
+  if (client.created_at) items.push({ icon:'👤', text:'تسجيل حساب جديد', sub: 'خطة '+(client.plan||'Basic'), time: client.created_at, color:'var(--teal)' });
+  projects.forEach(function(p) {
+    if (p.created_at) items.push({ icon:'📁', text:'ولّد config جديد', sub: (p.name||'Config')+' — '+(p.cms||'')+(Array.isArray(p.platforms)?' — '+p.platforms.join(', '):''), time: p.created_at, color:'var(--blu)' });
+  });
+  items.sort(function(a,b){ return (b.time||'') > (a.time||'') ? 1 : -1; });
+  if (!items.length) { el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--mut);font-size:13px;">مفيش نشاط</div>'; return; }
+  el.innerHTML = items.map(function(item, i) {
+    var dt = item.time ? new Date(item.time).toLocaleString('ar-EG') : '';
+    var isLast = i === items.length - 1;
+    return '<div style="display:flex;gap:12px;position:relative;">' +
+      '<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;">' +
+      '<div style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.04);border:1px solid var(--bdr);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">' + item.icon + '</div>' +
+      (!isLast ? '<div style="width:1px;flex:1;background:var(--bdr);margin:4px 0;min-height:20px;"></div>' : '') +
+      '</div>' +
+      '<div style="padding-bottom:' + (isLast?'0':'14px') + ';flex:1;">' +
+      '<div style="font-size:13px;font-weight:700;color:var(--wht);">' + item.text + '</div>' +
+      '<div style="font-size:11px;color:var(--mut);margin-top:2px;">' + item.sub + '</div>' +
+      '<div style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:var(--mut2);margin-top:3px;">' + dt + '</div>' +
+      '</div></div>';
+  }).join('');
+}
+
+function closeModal() {
+  document.getElementById('clientModal').classList.remove('on');
+  _modalUid = null;
+}
+
+async function saveClientChanges() {
+  if (!_modalUid) return;
+  var plan   = document.getElementById('modalPlan').value;
+  var status = document.getElementById('modalStatusSelect').value;
+  var ok = await apiUpdateClient(_modalUid, { plan: plan, status: status });
+  if (ok) {
+    toast('تم الحفظ ✅');
+    // Update badge live
+    var c = _allClients.find(function(x){ return x._id === _modalUid; });
+    if (c) { c.plan = plan; c.status = status; }
+    var sb = document.getElementById('modalStatusBadge');
+    sb.textContent = status === 'active' ? '● Active' : status === 'suspended' ? '● Suspended' : '● Pending';
+    sb.className = 'badge ' + (status === 'active' ? 'badge-active' : 'badge-pending');
+    var pb = document.getElementById('modalPlanBadge');
+    pb.textContent = plan; pb.className = 'badge badge-' + plan.toLowerCase();
+    // Update revenue stat
+    var price = PLAN_PRICES[plan] || 29;
+    document.getElementById('mdRevenue').textContent = price > 0 ? '$' + price + '/mo' : 'Custom';
+    var limit = PLAN_LIMITS[plan.toLowerCase()] || 1;
+    document.getElementById('mdLimit').textContent = limit === 999 ? '∞' : limit;
+    var used = parseInt(document.getElementById('mdProjects').textContent) || 0;
+    document.getElementById('mdRemaining').textContent = limit === 999 ? '∞' : Math.max(0, limit - used);
+    loadAll();
+  } else {
+    toast('خطأ في الحفظ ❌');
+  }
+}
+
+// Keep old modalActivate as alias
+async function modalActivate() { await saveClientChanges(); }
+
+async function deleteClient() {
+  if (!_modalUid) return;
+  var c = _allClients.find(function(x){ return x._id === _modalUid; });
+  if (!confirm('هتحذف حساب ' + (c ? c.name : '') + ' نهائياً؟')) return;
+  var ok = await apiDeleteClient(_modalUid);
+  if (ok) { toast('تم الحذف'); closeModal(); loadAll(); }
+  else toast('خطأ في الحذف ❌');
+}
+
+/* ════════════════════════════════════════
+   PROJECT DETAIL MODAL
+════════════════════════════════════════ */
+function openProjectModal(pid) {
+  var p = _allProjects.find(function(x){ return x._id === pid; });
+  if (!p) return;
+  _modalPid = pid;
+
+  // Header: show container name + GTM ID inline
+  var header = (p.name || 'Config') + (p.gtmPublicId ? ' · ' + p.gtmPublicId : '');
+  document.getElementById('pmName').textContent        = header;
+  document.getElementById('pmClient').textContent      = (p.client_name||'') + (p.email ? (p.client_name ? ' — ' : '') + p.email : '');
+  document.getElementById('pmCMS').textContent         = p.cms || '—';
+  document.getElementById('pmDate').textContent        = p.created_at ? new Date(p.created_at).toLocaleString('ar-EG') : '—';
+  document.getElementById('pmClientName').textContent  = p.client_name || '—';
+  document.getElementById('pmClientEmail').textContent = p.email || '—';
+
+  // Platforms
+  var plats = Array.isArray(p.platforms) ? p.platforms : [];
+  document.getElementById('pmPlatforms').innerHTML = plats.length
+    ? plats.map(function(pl){ return '<div class="plat-chip"><div class="plat-chip-dot"></div>' + pl + '</div>'; }).join('')
+    : '<span style="color:var(--mut);font-size:13px;">لا يوجد</span>';
+
+  // Events
+  var evts = Array.isArray(p.events) ? p.events : [];
+  document.getElementById('pmEvents').innerHTML = evts.length
+    ? evts.map(function(e) {
+        var name  = typeof e === 'string' ? e : (e.name || e.event || String(e));
+        var score = typeof e === 'object' && e.score ? e.score : '';
+        var col   = score >= 8 ? 'var(--grn)' : score >= 5 ? 'var(--gold)' : 'var(--mut)';
+        return '<div class="event-item"><span class="event-name">' + name + '</span>' + (score ? '<span class="event-score" style="color:' + col + ';">' + score + '/10</span>' : '') + '</div>';
+      }).join('')
+    : '<span style="color:var(--mut);font-size:13px;">لا يوجد</span>';
+
+  // Pixel IDs
+  var pix = p.pixel_ids || {};
+  var pixKeys = Object.keys(pix);
+  document.getElementById('pmPixels').innerHTML = pixKeys.length
+    ? pixKeys.map(function(k){ return '<div class="pixel-card"><div class="pixel-platform">' + k + '</div><div class="pixel-id">' + (pix[k]||'') + '</div></div>'; }).join('')
+    : '<span style="color:var(--mut);font-size:13px;">لا يوجد</span>';
+
+  // GTM info (new schema) + snippet — render into a dedicated slot if present
+  var gtmEl = document.getElementById('pmGtm');
+  if (gtmEl) {
+    if (p.gtmPublicId || p.gtmContainerId) {
+      gtmEl.innerHTML =
+        '<div class="detail-row">' +
+          '<div class="detail-field"><div class="detail-label">GTM Public ID</div><div class="detail-val" style="font-family:\'JetBrains Mono\',monospace;font-size:12px;direction:ltr;text-align:left;">' + (p.gtmPublicId||'—') + '</div></div>' +
+          '<div class="detail-field"><div class="detail-label">Container ID</div><div class="detail-val" style="font-family:\'JetBrains Mono\',monospace;font-size:12px;direction:ltr;text-align:left;">' + (p.gtmContainerId||'—') + '</div></div>' +
+        '</div>' +
+        '<div class="detail-row" style="margin-top:8px;">' +
+          '<div class="detail-field"><div class="detail-label">Published</div><div class="detail-val">' + (p.published ? '✅ نعم' : '—') + '</div></div>' +
+          '<div class="detail-field"><div class="detail-label">Invite للعميل</div><div class="detail-val">' + (p.invited ? '✅ تم' : '—') + '</div></div>' +
+        '</div>';
+    } else {
+      gtmEl.innerHTML = '<span style="color:var(--mut);font-size:13px;">بيانات GTM غير متوفرة</span>';
+    }
+  }
+  var snipEl = document.getElementById('pmSnippet');
+  if (snipEl) {
+    if (p.snippetHead || p.snippetBody) {
+      snipEl.innerHTML =
+        '<div style="background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px;margin-bottom:8px;">' +
+          '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--gold);letter-spacing:1.5px;margin-bottom:6px;">HEAD SNIPPET</div>' +
+          '<textarea readonly onclick="this.select()" style="width:100%;min-height:80px;background:#000;color:#0ecfb0;font-family:\'JetBrains Mono\',monospace;font-size:11px;direction:ltr;text-align:left;border:none;border-radius:4px;padding:8px;resize:vertical;">' + (p.snippetHead||'').replace(/</g,'&lt;') + '</textarea>' +
+        '</div>' +
+        '<div style="background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px;">' +
+          '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--gold);letter-spacing:1.5px;margin-bottom:6px;">BODY SNIPPET</div>' +
+          '<textarea readonly onclick="this.select()" style="width:100%;min-height:50px;background:#000;color:#0ecfb0;font-family:\'JetBrains Mono\',monospace;font-size:11px;direction:ltr;text-align:left;border:none;border-radius:4px;padding:8px;resize:vertical;">' + (p.snippetBody||'').replace(/</g,'&lt;') + '</textarea>' +
+        '</div>';
+    } else {
+      snipEl.innerHTML = '<span style="color:var(--mut);font-size:13px;">لا يوجد snippet</span>';
+    }
+  }
+
+  document.getElementById('projectModal').classList.add('on');
+}
+
+function closeProjectModal() {
+  document.getElementById('projectModal').classList.remove('on');
+  _modalPid = null;
+}
+
+/* ════════════════════════════════════════
+   ADMINS MANAGEMENT
+════════════════════════════════════════ */
+function openAddAdmin() {
+  document.getElementById('addAdminModal').classList.add('on');
+}
+function closeAddAdmin() {
+  document.getElementById('addAdminModal').classList.remove('on');
+}
+
+function togglePerm(el) {
+  var ck = el.querySelector('.perm-check');
+  var on = ck.classList.contains('on');
+  ck.classList.toggle('on');
+  ck.textContent = on ? '✗' : '✓';
+}
+
+function setPermsByRole(role) {
+  var P = {
+    superadmin: { view_clients:true, edit_clients:true, view_projects:true, delete_clients:true, activate_clients:true, manage_admins:true },
+    admin:      { view_clients:true, edit_clients:true, view_projects:true, delete_clients:false, activate_clients:true, manage_admins:false },
+    viewer:     { view_clients:true, edit_clients:false, view_projects:true, delete_clients:false, activate_clients:false, manage_admins:false }
+  };
+  var p = P[role] || P.admin;
+  document.querySelectorAll('.perm-check').forEach(function(el) {
+    var on = p[el.getAttribute('data-perm')] || false;
+    el.classList.toggle('on', on);
+    el.textContent = on ? '✓' : '✗';
+  });
+}
+
+// NOTE: Add/delete admin is disabled — single-admin system using ADMIN_TOKEN.
+// To rotate the admin, change ADMIN_TOKEN env var on Railway.
+async function doAddAdmin()   { toast('إدارة المسؤولين معطلة — استخدم ADMIN_TOKEN ❌'); }
+async function deleteAdmin()  { toast('إدارة المسؤولين معطلة ❌'); }
+
+/* ════════════════════════════════════════
+   NAVIGATION
+════════════════════════════════════════ */
+function showPage(name, el) {
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.nav-item').forEach(function(n){ n.classList.remove('active'); });
+  var pg = document.getElementById('page-' + name);
+  if (pg) pg.classList.add('active');
+  if (el) el.classList.add('active');
+  else if (event && event.currentTarget) event.currentTarget.classList.add('active');
+  // Trigger chart render when switching to revenue
+  if (name === 'revenue') setTimeout(renderRevenueChart, 50);
+}
+
+function filterClients(q) {
+  q = (q||'').toLowerCase();
+  renderClients(_allClients.filter(function(c){
+    return (c.name||'').toLowerCase().indexOf(q) !== -1
+        || (c.email||'').toLowerCase().indexOf(q) !== -1
+        || (c.country||'').toLowerCase().indexOf(q) !== -1
+        || (c.whatsapp||'').toLowerCase().indexOf(q) !== -1
+        || (c.job||'').toLowerCase().indexOf(q) !== -1;
+  }));
+}
+
+/* ════════════════════════════════════════
+   TOAST
+════════════════════════════════════════ */
+var _toastTimer;
+function toast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 3000);
+}
+
+/* ════════════════════════════════════════
+   REVENUE PAGE
+════════════════════════════════════════ */
+var _revChart = null;
+
+function renderRevenue() {
+  var clients = _allClients;
+  var active  = clients.filter(function(c){ return c.status === 'active'; });
+  var prices  = { Basic: 29, Growth: 69, Enterprise: 199 };
+
+  // MRR
+  var mrr = active.reduce(function(sum, c) {
+    return sum + (prices[(c.plan||'Basic')] || 29);
+  }, 0);
+
+  var arpu = active.length ? Math.round(mrr / active.length) : 0;
+  var arr  = mrr * 12;
+
+  document.getElementById('revMRR').textContent     = '$' + mrr;
+  document.getElementById('revPaid').textContent    = active.length;
+  document.getElementById('revARPU').textContent    = '$' + arpu;
+  document.getElementById('revARR').textContent     = '$' + arr;
+  document.getElementById('revLastUpdate').textContent = 'آخر تحديث: ' + new Date().toLocaleTimeString('ar-EG');
+
+  // Plan breakdown
+  var planCounts = { Basic: 0, Growth: 0, Enterprise: 0 };
+  var planRev    = { Basic: 0, Growth: 0, Enterprise: 0 };
+  active.forEach(function(c) {
+    var p = c.plan || 'Basic';
+    planCounts[p] = (planCounts[p]||0) + 1;
+    planRev[p]    = (planRev[p]||0) + (prices[p]||29);
+  });
+
+  var breakdownEl = document.getElementById('revPlanBreakdown');
+  if (breakdownEl) {
+    var plans = [
+      { name: 'Basic',      color: 'var(--blu)',  price: 29 },
+      { name: 'Growth',     color: 'var(--gold)', price: 69 },
+      { name: 'Enterprise', color: 'var(--pur)',  price: 199 }
+    ];
+    var colors = { Basic:'var(--blu)', Growth:'var(--gold)', Enterprise:'#a78bfa' };
+    breakdownEl.innerHTML = plans.map(function(pl) {
+      var cnt = planCounts[pl.name] || 0;
+      var rev = planRev[pl.name] || 0;
+      var pct = active.length ? Math.round(cnt / active.length * 100) : 0;
+      return '<div style="margin-bottom:16px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">' +
+        '<div style="display:flex;align-items:center;gap:8px;">' +
+        '<div style="width:10px;height:10px;border-radius:50%;background:' + pl.color + ';"></div>' +
+        '<span style="font-size:13px;font-weight:700;">' + pl.name + '</span>' +
+        '<span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:var(--mut);">$' + pl.price + '/mo</span>' +
+        '</div>' +
+        '<div style="text-align:left;">' +
+        '<span style="font-weight:900;color:' + pl.color + ';">' + cnt + '</span>' +
+        '<span style="font-size:11px;color:var(--mut);"> عميل · $' + rev + '</span>' +
+        '</div></div>' +
+        '<div style="background:rgba(255,255,255,.05);border-radius:100px;height:6px;overflow:hidden;">' +
+        '<div style="width:' + pct + '%;height:100%;background:' + pl.color + ';border-radius:100px;transition:width .5s ease;"></div>' +
+        '</div></div>';
+    }).join('');
+  }
+
+  // Subscribers table
+  var tableEl = document.getElementById('revTable');
+  if (tableEl) {
+    if (!active.length) {
+      tableEl.innerHTML = '<div class="empty"><div class="empty-icon">💰</div>مفيش مشتركين مدفوعين</div>';
+    } else {
+      var sorted = active.slice().sort(function(a,b){ return (b.created_at||'') > (a.created_at||'') ? 1 : -1; });
+      tableEl.innerHTML = '<table><thead><tr>' +
+        '<th>العميل</th><th>الخطة</th><th>الدفع الشهري</th><th>المشاريع</th><th>تاريخ الاشتراك</th><th>إجراءات</th>' +
+        '</tr></thead><tbody>' +
+        sorted.map(function(c) {
+          var price = prices[c.plan||'Basic'] || 29;
+          var pb = '<span class="badge badge-' + (c.plan||'basic').toLowerCase() + '">' + (c.plan||'Basic') + '</span>';
+          var dt = c.created_at ? new Date(c.created_at).toLocaleDateString('ar-EG') : '—';
+          return '<tr>' +
+            '<td><div style="font-weight:700;">' + (c.name||'—') + '</div><div style="font-size:11px;color:var(--mut);font-family:\'JetBrains Mono\',monospace;">' + (c.email||'') + '</div></td>' +
+            '<td>' + pb + '</td>' +
+            '<td><span style="font-family:\'JetBrains Mono\',monospace;font-weight:900;color:var(--grn);">$' + price + '</span></td>' +
+            '<td style="font-family:\'JetBrains Mono\',monospace;font-size:12px;">' + (c.projects_used||0) + '</td>' +
+            '<td style="font-size:12px;color:var(--mut);">' + dt + '</td>' +
+            '<td><button class="action-btn" onclick="openClientModal(\'' + c._id + '\')">تفاصيل</button></td>' +
+            '</tr>';
+        }).join('') +
+        '</tbody></table>';
+      document.getElementById('revTableSub').textContent = 'إجمالي: $' + mrr + '/mo';
+    }
+  }
+
+  renderRevenueChart();
+}
+
+function renderRevenueChart() {
+  var canvas = document.getElementById('revChart');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var days = parseInt(document.getElementById('revChartPeriod').value) || 30;
+  var prices = { Basic: 29, Growth: 69, Enterprise: 199 };
+
+  // Build daily data — عدد المشتركين الجدد كل يوم × سعرهم
+  var now = new Date();
+  var labels = [];
+  var data   = [];
+  var cumData = [];
+  var cumRev = 0;
+
+  for (var i = days - 1; i >= 0; i--) {
+    var d = new Date(now);
+    d.setDate(d.getDate() - i);
+    var dayStr = d.toISOString().substring(0, 10);
+    labels.push(d.toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' }));
+
+    // Count clients who joined on this day
+    var dayRev = _allClients.filter(function(c) {
+      if (c.status !== 'active') return false;
+      var ct = (c.created_at||'').substring(0, 10);
+      return ct === dayStr;
+    }).reduce(function(s, c) { return s + (prices[c.plan||'Basic']||29); }, 0);
+
+    data.push(dayRev);
+    cumRev += dayRev;
+    cumData.push(cumRev);
+  }
+
+  // Draw chart manually (no external lib needed)
+  var W = canvas.offsetWidth || 600;
+  var H = 180;
+  canvas.width  = W;
+  canvas.height = H;
+
+  var maxVal = Math.max.apply(null, cumData.concat([1]));
+  var padL = 50, padR = 20, padT = 20, padB = 40;
+  var chartW = W - padL - padR;
+  var chartH = H - padT - padB;
+  var step   = chartW / (labels.length - 1 || 1);
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,.05)';
+  ctx.lineWidth = 1;
+  for (var g = 0; g <= 4; g++) {
+    var gy = padT + chartH - (g / 4) * chartH;
+    ctx.beginPath(); ctx.moveTo(padL, gy); ctx.lineTo(W - padR, gy); ctx.stroke();
+    ctx.fillStyle = 'rgba(143,163,191,.5)';
+    ctx.font = '10px JetBrains Mono, monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('$' + Math.round(maxVal * g / 4), padL - 6, gy + 4);
+  }
+
+  // Gradient fill under cumulative line
+  var grad = ctx.createLinearGradient(0, padT, 0, padT + chartH);
+  grad.addColorStop(0, 'rgba(52,211,153,.25)');
+  grad.addColorStop(1, 'rgba(52,211,153,.0)');
+  ctx.beginPath();
+  ctx.moveTo(padL, padT + chartH);
+  cumData.forEach(function(v, idx) {
+    var x = padL + idx * step;
+    var y = padT + chartH - (v / maxVal) * chartH;
+    if (idx === 0) ctx.lineTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.lineTo(padL + (cumData.length - 1) * step, padT + chartH);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Cumulative revenue line (green)
+  ctx.beginPath();
+  ctx.strokeStyle = '#34d399';
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'round';
+  cumData.forEach(function(v, idx) {
+    var x = padL + idx * step;
+    var y = padT + chartH - (v / maxVal) * chartH;
+    if (idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Daily bars (gold, subtle)
+  var maxDay = Math.max.apply(null, data.concat([1]));
+  data.forEach(function(v, idx) {
+    if (v === 0) return;
+    var x = padL + idx * step;
+    var barH = (v / maxVal) * chartH * 0.4;
+    ctx.fillStyle = 'rgba(232,184,75,.35)';
+    ctx.fillRect(x - 3, padT + chartH - barH, 6, barH);
+  });
+
+  // X axis labels — every ~5 days
+  ctx.fillStyle = 'rgba(143,163,191,.6)';
+  ctx.font = '9px JetBrains Mono, monospace';
+  ctx.textAlign = 'center';
+  labels.forEach(function(l, idx) {
+    if (idx % Math.ceil(days / 6) === 0 || idx === labels.length - 1) {
+      ctx.fillText(l, padL + idx * step, H - 8);
+    }
+  });
+
+  // Legend
+  ctx.fillStyle = '#34d399';
+  ctx.fillRect(padL, 8, 12, 3);
+  ctx.fillStyle = 'rgba(143,163,191,.7)';
+  ctx.font = '10px Cairo, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('إجمالي متراكم', padL + 80, 14);
+
+  ctx.fillStyle = 'rgba(232,184,75,.7)';
+  ctx.fillRect(padL + 90, 8, 12, 3);
+  ctx.fillStyle = 'rgba(143,163,191,.7)';
+  ctx.textAlign = 'right';
+  ctx.fillText('إيراد يومي', padL + 190, 14);
+}
+
+// Re-render chart on page resize
+window.addEventListener('resize', function() {
+  var pg = document.getElementById('pg-revenue');
+  if (pg && pg.classList.contains('active')) renderRevenueChart();
+});
+
+// Hook into loadAll
+var _origLoadAll = loadAll;
+loadAll = async function() {
+  await _origLoadAll.apply(this, arguments);
+  renderRevenue();
+};
+
+// Close modals on overlay click — safe null checks
+(function() {
+  var cm = document.getElementById('clientModal');
+  var pm = document.getElementById('projectModal');
+  var am = document.getElementById('addAdminModal');
+  var ap = document.getElementById('adminPass');
+  if (cm) cm.addEventListener('click', function(e){ if(e.target===this) closeModal(); });
+  if (pm) pm.addEventListener('click', function(e){ if(e.target===this) closeProjectModal(); });
+  if (am) am.addEventListener('click', function(e){ if(e.target===this) closeAddAdmin(); });
+  if (ap) ap.addEventListener('keydown', function(e){ if(e.key==='Enter') adminLogin(); });
+})();
+</script>
+</body>
+</html>
