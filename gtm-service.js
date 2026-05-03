@@ -619,18 +619,34 @@ async function provisionForClientWithServer(opts) {
   );
 
   // 4. Version + publish the server container so containerConfig is generated.
+  //    Publish is non-fatal — some GTM accounts restrict publish via API on
+  //    freshly-created containers. If it fails we return containerConfig=null
+  //    and the user can publish manually from GTM dashboard.
   onProgress({ stage: 'sgtm_publish', done: 0, total: 1 });
   const verResp  = await createVersion(serverContainerId, serverWorkspaceId,
     'sGTM initial — ' + new Date().toISOString().split('T')[0]);
   const serverVersionId = verResp.containerVersion && verResp.containerVersion.containerVersionId;
+  let publishError = null;
   if (serverVersionId) {
-    await publishVersion(serverContainerId, serverVersionId);
+    try {
+      await publishVersion(serverContainerId, serverVersionId);
+    } catch (e) {
+      publishError = e.message;
+      console.warn('[gtm] publishVersion non-fatal:', e.message);
+    }
   }
   onProgress({ stage: 'sgtm_publish', done: 1, total: 1 });
 
   // 5. Pull the live containerConfig blob — this is what the user pastes
   //    into Stape / Cloud Run / Docker as the CONTAINER_CONFIG env var.
-  const containerConfig = await getContainerConfig(serverContainerId);
+  //    Only available after a successful publish.
+  let containerConfig = null;
+  if (!publishError) {
+    containerConfig = await getContainerConfig(serverContainerId).catch(e => {
+      console.warn('[gtm] getContainerConfig non-fatal:', e.message);
+      return null;
+    });
+  }
 
   return {
     web,                                            // existing shape from provisionForClient
