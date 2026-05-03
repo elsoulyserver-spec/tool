@@ -1,0 +1,26 @@
+# ── Secrets ──────────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*service-account*.json
+*firebase-adminsdk*.json
+*-sa-key*.json
+
+# ── Node ─────────────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# ── OS / Editors ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ── Build / runtime ──────────────────────────────────────────────────────────
+dist/
+build/
+tmp/
+*.log
