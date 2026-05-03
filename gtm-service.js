@@ -618,10 +618,25 @@ async function provisionForClientWithServer(opts) {
     p => onProgress({ stage: 'sgtm_import', ...p }),
   );
 
-  // 4. Version + publish the server container so containerConfig is generated.
-  //    Publish is non-fatal — some GTM accounts restrict publish via API on
-  //    freshly-created containers. If it fails we return containerConfig=null
-  //    and the user can publish manually from GTM dashboard.
+  // 4. Grant the service account explicit Publish access on the server container
+  //    before trying to publish — GTM API doesn't auto-grant publish to the SA
+  //    that created the container in some account configurations.
+  try {
+    const sa = getSA();
+    await gtmRequest('POST', `/accounts/${getAccountId()}/user_permissions`,
+      JSON.stringify({
+        accountId: String(getAccountId()),
+        emailAddress: sa.client_email,
+        accountAccess: { permission: 'user' },
+        containerAccess: [{ containerId: String(serverContainerId), permission: 'publish' }],
+      })
+    );
+    console.log('[gtm] granted publish access to SA on server container', serverContainerId);
+  } catch (e) {
+    console.warn('[gtm] grant publish permission non-fatal:', e.message);
+  }
+
+  // 5. Version + publish the server container so containerConfig is generated.
   onProgress({ stage: 'sgtm_publish', done: 0, total: 1 });
   const verResp  = await createVersion(serverContainerId, serverWorkspaceId,
     'sGTM initial — ' + new Date().toISOString().split('T')[0]);
@@ -637,16 +652,14 @@ async function provisionForClientWithServer(opts) {
   }
   onProgress({ stage: 'sgtm_publish', done: 1, total: 1 });
 
-  // 5. Pull the live containerConfig blob — this is what the user pastes
+  // 6. Pull the live containerConfig blob — this is what the user pastes
   //    into Stape / Cloud Run / Docker as the CONTAINER_CONFIG env var.
   //    Only available after a successful publish.
   let containerConfig = null;
-  if (!publishError) {
-    containerConfig = await getContainerConfig(serverContainerId).catch(e => {
-      console.warn('[gtm] getContainerConfig non-fatal:', e.message);
-      return null;
-    });
-  }
+  containerConfig = await getContainerConfig(serverContainerId).catch(e => {
+    console.warn('[gtm] getContainerConfig non-fatal:', e.message);
+    return null;
+  });
 
   return {
     web,                                            // existing shape from provisionForClient
