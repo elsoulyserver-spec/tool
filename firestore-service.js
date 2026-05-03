@@ -267,4 +267,36 @@ async function deleteSSConfig(clientId) {
 // AUTH — Firebase ID token verification
 // Called by server.js auth middleware to authenticate /api/ss/* requests.
 // Throws on:
-//   - admin not initialised (
+//   - admin not initialised (FIREBASE_SA_KEY_JSON missing)
+//   - token expired / revoked / signature mismatch / wrong project
+// Returns the decoded token (DecodedIdToken) on success — { uid, email, ... }.
+// ══════════════════════════════════════════════════════════════════════════════
+async function verifyIdToken(idToken) {
+  init();
+  if (_initError) throw _initError;
+  if (!admin) throw new Error('firebase-admin is not installed');
+  if (!idToken || typeof idToken !== 'string') throw new Error('idToken is required');
+  // checkRevoked = true makes admin re-fetch the user record and reject tokens
+  // issued before signOut/password-change. Costs an extra Firestore read per
+  // request but gives us proper revocation — acceptable for /api/ss/* volume.
+  return await admin.auth().verifyIdToken(idToken, true);
+}
+
+module.exports = {
+  isConfigured,
+  saveContainer,
+  getContainer,
+  listContainersByClient,
+  countActiveContainers,
+  markGracePeriod,
+  exportAll,
+  updateClient,
+  deleteClient,
+  // Server-Side Tracking config
+  saveSSConfig,
+  getSSConfig,
+  getSSConfigPublic,
+  deleteSSConfig,
+  // Auth
+  verifyIdToken,
+};
