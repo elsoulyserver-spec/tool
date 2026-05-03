@@ -839,9 +839,12 @@ http.createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/api/managed/health') {
     (async () => {
       const ready = gtmService.isConfigured() && firestoreService.isConfigured();
-      let count = null, tokenOk = false, err = null;
+      let count = null, tokenOk = false, err = null, containers = null;
       if (ready) {
         try { await gtmService.getAccessToken(); tokenOk = true; } catch (e) { err = e.message; }
+        if (tokenOk) {
+          try { containers = await gtmService.listContainers(); } catch (e) { err = err || e.message; }
+        }
         try { count = await firestoreService.countActiveContainers(); } catch (e) { err = err || e.message; }
       }
       sendJSON(res, 200, {
@@ -852,6 +855,8 @@ http.createServer((req, res) => {
         error: err,
         gtmConfigured:       gtmService.isConfigured(),
         firestoreConfigured: firestoreService.isConfigured(),
+        gtmAccountId:        process.env.GTM_ACCOUNT_ID || null,
+        gtmContainerCount:   containers ? containers.length : null,
       });
     })().catch(e => sendJSON(res, 500, { error: e.message }));
     return;
@@ -1929,7 +1934,7 @@ http.createServer((req, res) => {
   serveFile(filePath);
 
 }).listen(PORT, '0.0.0.0', () => {
-  const mode = puppeteer ? '🟢 Puppeteer (headless Chrome)' : '🟡 HTTP fallback (install puppeteer for full analysis)';
+  const mode = puppeteer ? '\U0001f7e2 Puppeteer (headless Chrome)' : '\U0001f7e1 HTTP fallback (install puppeteer for full analysis)';
   console.log(`Easy Track server running at http://0.0.0.0:${PORT}`);
   console.log(`Scanner mode: ${mode}`);
 });
