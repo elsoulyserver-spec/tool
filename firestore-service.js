@@ -196,12 +196,32 @@ async function saveSSConfig(clientId, config) {
   const now = admin.firestore.FieldValue.serverTimestamp();
   const snap = await db().collection(SS_COLLECTION).doc(clientId).get();
   const doc = {
+    // Core fields
     provider:         config.provider         || 'selfhosted',
     serverUrl:        config.serverUrl         || '',
     platforms:        config.platforms         || [],
     encryptedTokens:  config.encryptedTokens  || {},
     stapeApiKey:      config.stapeApiKey       || null,
     stapeContainerId: config.stapeContainerId  || null,
+    // Extended client_server mode fields
+    mode:                 config.mode                 || null,
+    webContainerId:       config.webContainerId        || null,
+    webPublicId:          config.webPublicId           || null,
+    webWorkspaceId:       config.webWorkspaceId        || null,
+    serverContainerId:    config.serverContainerId     || null,
+    serverPublicId:       config.serverPublicId        || null,
+    serverWorkspaceId:    config.serverWorkspaceId     || null,
+    serverVersionId:      config.serverVersionId       || null,
+    containerConfig:      config.containerConfig       || null,
+    transportUrlWired:    config.transportUrlWired     || false,
+    transportUrlWiredAt:  config.transportUrlWiredAt   || null,
+    stapeAutoDeployed:    config.stapeAutoDeployed     || false,
+    stapeDeployError:     config.stapeDeployError      || null,
+    // New 6-step flow fields
+    ga4MeasurementId:     config.ga4MeasurementId      || null,
+    ga4Events:            Array.isArray(config.ga4Events)       ? config.ga4Events       : [],
+    googleAdsEvents:      Array.isArray(config.googleAdsEvents) ? config.googleAdsEvents : [],
+    ssEvents:             Array.isArray(config.ssEvents)        ? config.ssEvents        : [],
     updatedAt: now,
     createdAt: snap.exists ? snap.data().createdAt : now,
   };
@@ -247,36 +267,4 @@ async function deleteSSConfig(clientId) {
 // AUTH — Firebase ID token verification
 // Called by server.js auth middleware to authenticate /api/ss/* requests.
 // Throws on:
-//   - admin not initialised (FIREBASE_SA_KEY_JSON missing)
-//   - token expired / revoked / signature mismatch / wrong project
-// Returns the decoded token (DecodedIdToken) on success — { uid, email, ... }.
-// ══════════════════════════════════════════════════════════════════════════════
-async function verifyIdToken(idToken) {
-  init();
-  if (_initError) throw _initError;
-  if (!admin) throw new Error('firebase-admin is not installed');
-  if (!idToken || typeof idToken !== 'string') throw new Error('idToken is required');
-  // checkRevoked = true makes admin re-fetch the user record and reject tokens
-  // issued before signOut/password-change. Costs an extra Firestore read per
-  // request but gives us proper revocation — acceptable for /api/ss/* volume.
-  return await admin.auth().verifyIdToken(idToken, true);
-}
-
-module.exports = {
-  isConfigured,
-  saveContainer,
-  getContainer,
-  listContainersByClient,
-  countActiveContainers,
-  markGracePeriod,
-  exportAll,
-  updateClient,
-  deleteClient,
-  // Server-Side Tracking config
-  saveSSConfig,
-  getSSConfig,
-  getSSConfigPublic,
-  deleteSSConfig,
-  // Auth
-  verifyIdToken,
-};
+//   - admin not initialised (

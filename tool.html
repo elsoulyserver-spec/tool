@@ -3655,6 +3655,47 @@
           </div>
         </div>
 
+        <!-- GTM Containers Status — always visible, loads on sign-in -->
+        <div id="ovGtmStatus" style="background:var(--sur2);border:1px solid var(--bdr2);border-radius:16px;padding:20px;margin-bottom:24px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+            <span class="material-symbols-outlined" style="font-size:17px;color:var(--acc);">code_blocks</span>
+            <span style="font-family:var(--font-display);font-size:14px;font-weight:800;color:var(--wht);">GTM Snippets</span>
+            <button onclick="switchAppView('serverside',document.getElementById('sbServerSide'))" style="margin-right:auto;background:rgba(70,241,197,.08);border:1px solid rgba(70,241,197,.2);border-radius:8px;padding:3px 10px;font-size:11px;font-weight:700;color:var(--acc);cursor:pointer;font-family:var(--font-ui);">إعداد ←</button>
+          </div>
+          <!-- Web + Server GTM IDs -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+            <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:10px;padding:12px;">
+              <div style="font-size:10px;color:var(--mut);margin-bottom:4px;font-family:var(--font-mono);letter-spacing:.8px;">WEB GTM (CLIENT-SIDE)</div>
+              <div id="ovWebGtmId" style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--wht);">—</div>
+              <div id="ovWebGtmBadge" style="font-size:10px;margin-top:4px;color:var(--mut);">غير مُعدّ</div>
+            </div>
+            <div style="background:var(--sur);border:1px solid var(--bdr);border-radius:10px;padding:12px;">
+              <div style="font-size:10px;color:var(--mut);margin-bottom:4px;font-family:var(--font-mono);letter-spacing:.8px;">SERVER GTM (SERVER-SIDE)</div>
+              <div id="ovServerGtmId" style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--wht);">—</div>
+              <div id="ovServerGtmBadge" style="font-size:10px;margin-top:4px;color:var(--mut);">غير مُعدّ</div>
+            </div>
+          </div>
+          <!-- Web Snippet (shown when available) -->
+          <div id="ovWebSnippetWrap" style="display:none;margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:600;color:var(--wht2);margin-bottom:4px;">Web GTM Snippet (للـ &lt;head&gt;):</div>
+            <div style="position:relative;">
+              <pre id="ovWebSnippetCode" style="background:#080b10;border:1px solid var(--bdr);border-radius:8px;padding:10px 12px;font-size:10px;color:#a8d8a8;overflow-x:auto;max-height:90px;overflow-y:auto;margin:0;white-space:pre-wrap;word-break:break-all;"></pre>
+              <button onclick="ovCopySnippet('head')" style="position:absolute;top:6px;left:6px;background:rgba(70,241,197,.1);border:1px solid rgba(70,241,197,.2);border-radius:5px;padding:2px 8px;font-size:9px;font-weight:700;color:var(--acc);cursor:pointer;font-family:var(--font-ui);">📋 نسخ</button>
+            </div>
+          </div>
+          <!-- Active Platforms grid -->
+          <div id="ovActivePlatforms" style="display:none;">
+            <div style="font-size:11px;font-weight:600;color:var(--wht2);margin-bottom:8px;">المنصات الشغالة:</div>
+            <div id="ovActivePlatGrid" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+          </div>
+          <!-- Placeholder when nothing configured yet -->
+          <div id="ovGtmPlaceholder" style="text-align:center;padding:16px 0;color:var(--mut);font-size:12px;">
+            <span class="material-symbols-outlined" style="font-size:28px;display:block;margin-bottom:6px;opacity:.4;">dns</span>
+            لم يتم إعداد أي GTM Container بعد —
+            <button onclick="switchAppView('serverside',document.getElementById('sbServerSide'))" style="background:none;border:none;color:var(--acc);cursor:pointer;font-size:12px;font-family:var(--font-ui);font-weight:700;padding:0 4px;">ابدأ الإعداد ←</button>
+          </div>
+        </div>
+
         <!-- URL Scanner (Moved to Overview) -->
         <div
           style="background:var(--sur2);border:1px solid var(--bdr2);border-radius:16px;padding:20px;margin-bottom:24px;">
@@ -4161,30 +4202,41 @@
 
       <!-- ══════ SERVER-SIDE VIEW ══════ -->
       <div class="app-view" id="view-serverside">
+
         <div class="page-hdr">
           <div>
             <h2 class="page-title">
               <span class="material-symbols-outlined" style="color:var(--acc);">dns</span>
               Server-Side Tracking
             </h2>
-            <p class="page-sub">اربط sGTM container وابعت events للمنصات من الخادم مباشرةً مع تشفير كامل للـ tokens</p>
+            <p class="page-sub">إعداد شامل — ينشئ Web + Server GTM Containers ويربطهم تلقائياً</p>
           </div>
-          <button class="btn-ghost-sm" id="ss-hdr-test-btn" onclick="ss_sendTestEvent()" style="display:none;">
-            <span class="material-symbols-outlined" style="font-size:14px;">science</span>
-            إرسال Test Event
+          <button class="btn-ghost-sm" id="ss-hdr-reset-btn" onclick="ss_resetConfig()" style="display:none;color:#f87171;border-color:rgba(248,113,113,.3);">
+            <span class="material-symbols-outlined" style="font-size:14px;">delete</span>
+            إعادة ضبط
           </button>
         </div>
 
-        <!-- ── Wizard Step Indicator ── -->
-        <div class="ss-wizard-bar">
-          <div class="ss-wstep active" id="ss-step-ind-1" onclick="ss_goToStep(1)">
+        <!-- ── Completed Banner ── -->
+        <div id="ss-done-banner" style="display:none;margin-bottom:20px;padding:16px 20px;border-radius:14px;background:rgba(70,241,197,.08);border:1px solid rgba(70,241,197,.25);align-items:center;gap:12px;">
+          <span class="material-symbols-outlined" style="color:var(--acc);font-size:22px;flex-shrink:0;">check_circle</span>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:700;color:var(--acc);">Server-Side Tracking مفعّل ✓</div>
+            <div id="ss-done-url" style="font-size:11px;color:var(--mut);font-family:var(--font-mono);margin-top:2px;"></div>
+          </div>
+          <button class="btn-ghost-sm" onclick="ss_editSetup()" style="font-size:11px;flex-shrink:0;">تعديل</button>
+        </div>
+
+        <!-- ── Step Indicator (6 steps) ── -->
+        <div class="ss-wizard-bar" id="ss-step-bar">
+          <div class="ss-wstep active" id="ss-step-ind-1" onclick="ss_goToStep(1)" title="إنشاء Containers">
             <span class="ss-wstep-num">1</span>
-            <span class="ss-wstep-label">المزود</span>
+            <span class="ss-wstep-label">Container</span>
           </div>
           <div class="ss-wstep-line" id="ss-step-line-1"></div>
           <div class="ss-wstep" id="ss-step-ind-2">
             <span class="ss-wstep-num">2</span>
-            <span class="ss-wstep-label">الخادم</span>
+            <span class="ss-wstep-label">URL الخادم</span>
           </div>
           <div class="ss-wstep-line" id="ss-step-line-2"></div>
           <div class="ss-wstep" id="ss-step-ind-3">
@@ -4194,423 +4246,341 @@
           <div class="ss-wstep-line" id="ss-step-line-3"></div>
           <div class="ss-wstep" id="ss-step-ind-4">
             <span class="ss-wstep-num">4</span>
-            <span class="ss-wstep-label">اختبار</span>
+            <span class="ss-wstep-label">Events</span>
+          </div>
+          <div class="ss-wstep-line" id="ss-step-line-4"></div>
+          <div class="ss-wstep" id="ss-step-ind-5">
+            <span class="ss-wstep-num">5</span>
+            <span class="ss-wstep-label">Client-Side</span>
+          </div>
+          <div class="ss-wstep-line" id="ss-step-line-5"></div>
+          <div class="ss-wstep" id="ss-step-ind-6">
+            <span class="ss-wstep-num">6</span>
+            <span class="ss-wstep-label">مراجعة</span>
           </div>
         </div>
 
-        <!-- ── Step 1: Choose Provider ── -->
+        <!-- ════════════════════════════ STEP 1 ════════════════════════════ -->
         <div class="ss-wizard-panel" id="ss-panel-1">
-          <div class="ss-panel-title">اختر مزود الـ Server-Side GTM</div>
-          <div class="ss-panel-sub">المزود هو الخدمة التي تستضيف server-side GTM container الخاص بك</div>
-          <div class="ss-provider-grid">
-            <div class="ss-provider-card" id="ss-card-stape" onclick="ss_selectProvider('stape')">
-              <div class="ss-provider-badge-top">موصى به</div>
-              <div class="ss-provider-icon">🔷</div>
-              <div class="ss-provider-name">Stape.io</div>
-              <div class="ss-provider-sub">نشر تلقائي كامل عبر API — لا تحتاج إعداد يدوي</div>
-              <ul class="ss-provider-features">
-                <li>✓ نشر بـ API Key واحد</li>
-                <li>✓ إدارة ومراقبة مدمجة</li>
-                <li>✓ دعم منطقة الشرق الأوسط</li>
-              </ul>
+          <div class="ss-panel-title">إنشاء GTM Containers (Web + Server)</div>
+          <div class="ss-panel-sub">الأداة ستنشئ Web Container وServer Container في GTM ثم تعطيك الـ Container Config لنشره على مزودك</div>
+
+          <!-- Progress area (hidden until job starts) -->
+          <div id="ss-p1-progress" style="display:none;margin-bottom:20px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+              <div class="ss-spin"></div>
+              <div id="ss-p1-stage-msg" style="font-size:13px;color:var(--wht2);">جارٍ الإنشاء...</div>
             </div>
-            <div class="ss-provider-card" id="ss-card-gcloud" onclick="ss_selectProvider('gcloud')">
-              <div class="ss-provider-icon">☁️</div>
-              <div class="ss-provider-name">Google Cloud Run</div>
-              <div class="ss-provider-sub">دليل خطوة بخطوة لنشر sGTM على مشروعك</div>
-              <ul class="ss-provider-features">
-                <li>✓ تحكم كامل في البنية التحتية</li>
-                <li>✓ تكامل مع Google Cloud</li>
-                <li>~ يتطلب gcloud CLI</li>
-              </ul>
-            </div>
-            <div class="ss-provider-card" id="ss-card-selfhosted" onclick="ss_selectProvider('selfhosted')">
-              <div class="ss-provider-icon">🖥️</div>
-              <div class="ss-provider-name">Self-Hosted</div>
-              <div class="ss-provider-sub">الصق رابط sGTM container الخاص بك ونتحقق منه</div>
-              <ul class="ss-provider-features">
-                <li>✓ أي hosting provider</li>
-                <li>✓ Docker / VPS / K8s</li>
-                <li>~ الإعداد يدوياً بالكامل</li>
-              </ul>
+            <div style="height:4px;border-radius:4px;background:var(--sur);overflow:hidden;">
+              <div id="ss-p1-bar" style="height:100%;background:var(--acc);transition:width .4s;width:5%;border-radius:4px;"></div>
             </div>
           </div>
+
+          <!-- containerConfig result (hidden until done) -->
+          <div id="ss-p1-result" style="display:none;margin-bottom:20px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <span class="material-symbols-outlined" style="color:var(--acc);font-size:18px;">check_circle</span>
+              <span style="font-size:14px;font-weight:700;color:var(--acc);">تم إنشاء الـ Containers بنجاح!</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+              <div style="background:var(--sur);border:1px solid rgba(70,241,197,.2);border-radius:10px;padding:12px;">
+                <div style="font-size:10px;color:var(--mut);margin-bottom:4px;font-family:var(--font-mono);letter-spacing:1px;">WEB GTM</div>
+                <div id="ss-p1-web-id" style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--wht);">—</div>
+              </div>
+              <div style="background:var(--sur);border:1px solid rgba(70,241,197,.2);border-radius:10px;padding:12px;">
+                <div style="font-size:10px;color:var(--mut);margin-bottom:4px;font-family:var(--font-mono);letter-spacing:1px;">SERVER GTM</div>
+                <div id="ss-p1-server-id" style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--wht);">—</div>
+              </div>
+            </div>
+
+            <div style="margin-bottom:10px;">
+              <div style="font-size:12px;font-weight:700;color:var(--wht2);margin-bottom:6px;">Container Config الخاص بك:</div>
+              <div style="position:relative;">
+                <pre id="ss-p1-config-json" style="background:#0a0d11;border:1px solid var(--bdr);border-radius:10px;padding:14px;font-size:10px;color:#a8d8a8;overflow-x:auto;max-height:140px;overflow-y:auto;margin:0;white-space:pre-wrap;word-break:break-all;"></pre>
+                <button onclick="ss_copyConfig()" style="position:absolute;top:8px;left:8px;background:rgba(70,241,197,.1);border:1px solid rgba(70,241,197,.25);border-radius:6px;padding:3px 10px;font-size:10px;font-weight:700;color:var(--acc);cursor:pointer;font-family:var(--font-ui);">📋 نسخ</button>
+              </div>
+            </div>
+
+            <div style="background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.25);border-radius:10px;padding:12px 14px;font-size:12px;color:#fbbf24;line-height:1.7;">
+              <strong>📋 الخطوة التالية:</strong><br>
+              روح على <strong>Google Tag Manager ← Admin ← Install Google Tag Manager</strong><br>
+              اختر <strong>"Manually provision tagging server"</strong> والصق الكود أعلاه.<br>
+              أو انشر مباشرةً على Stape / Cloud Run / Docker.
+            </div>
+          </div>
+
+          <!-- Error area -->
+          <div id="ss-p1-error" style="display:none;padding:12px 14px;border-radius:10px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);font-size:12px;color:#f87171;margin-bottom:16px;"></div>
+
+          <!-- Initial create button -->
+          <div id="ss-p1-btn-wrap" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <button class="btn-acc-sm" id="ss-p1-create-btn" onclick="ss_createContainers()">
+              <span class="material-symbols-outlined" style="font-size:14px;">add_circle</span>
+              إنشاء Web + Server Containers
+            </button>
+            <div style="font-size:11px;color:var(--mut);">⏱️ يستغرق 60-120 ثانية</div>
+          </div>
+
           <div class="ss-wizard-nav">
             <span></span>
-            <button class="btn-acc-sm" id="ss-step1-next" onclick="ss_goToStep(2)" disabled>التالي ←</button>
+            <button class="btn-acc-sm" id="ss-p1-next-btn" onclick="ss_goToStep(2)" disabled>التالي ←</button>
           </div>
         </div>
 
-        <!-- ── Step 2: Server URL / GCP Guide ── -->
+        <!-- ════════════════════════════ STEP 2 ════════════════════════════ -->
         <div class="ss-wizard-panel" id="ss-panel-2" style="display:none;">
-          <!-- Content injected by ss_renderStep2() -->
+          <div class="ss-panel-title">أدخل Server URL الخاص بك</div>
+          <div class="ss-panel-sub">بعد نشر الـ Container Config على مزودك، الصق الرابط هنا للتحقق منه</div>
+
+          <div style="margin-bottom:16px;">
+            <label style="font-size:12px;font-weight:600;color:var(--wht2);display:block;margin-bottom:6px;">Server URL</label>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <input type="url" id="ss-p2-url" class="ss-url-input"
+                placeholder="https://your-sgtm-server.com"
+                oninput="ss_p2OnInput()"
+                onkeydown="if(event.key==='Enter'){ss_validateUrl();}" />
+              <button class="btn-ghost-sm" onclick="ss_validateUrl()" id="ss-p2-validate-btn">
+                <span class="material-symbols-outlined" style="font-size:14px;">wifi_tethering</span>
+                تحقق
+              </button>
+            </div>
+            <div id="ss-p2-status" class="ss-url-status" style="margin-top:8px;"></div>
+          </div>
+
+          <div style="background:var(--sur);border:1px solid var(--bdr2);border-radius:10px;padding:12px 14px;font-size:12px;color:var(--mut);line-height:1.7;margin-bottom:16px;">
+            💡 <strong style="color:var(--wht2);">مزودون موصى بهم:</strong>
+            <a href="https://stape.io" target="_blank" style="color:var(--acc);">Stape.io</a> ·
+            <a href="https://cloud.google.com/run" target="_blank" style="color:var(--acc);">Google Cloud Run</a> ·
+            Docker / VPS
+          </div>
+
+          <div class="ss-wizard-nav">
+            <button class="btn-ghost-sm" onclick="ss_goToStep(1)">← السابق</button>
+            <button class="btn-acc-sm" id="ss-p2-next-btn" onclick="ss_goToStep(3)" disabled>التالي ←</button>
+          </div>
         </div>
 
-        <!-- ── Step 3: Platforms & Tokens ── -->
+        <!-- ════════════════════════════ STEP 3 ════════════════════════════ -->
         <div class="ss-wizard-panel" id="ss-panel-3" style="display:none;">
-          <div class="ss-panel-title">فعّل المنصات وأدخل الـ Access Tokens</div>
-          <div class="ss-panel-sub">الـ tokens مشفّرة بـ AES-256-GCM ومخزّنة في Firestore — لا تُحفظ في المتصفح أبداً</div>
-          <div id="ss-plat-list" class="ss-plat-list-wrap"></div>
+          <div class="ss-panel-title">اختر المنصات للـ Server-Side</div>
+          <div class="ss-panel-sub">هذه المنصات ستستقبل الـ Events من الخادم مباشرةً عبر Conversions APIs</div>
+
+          <div style="background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.25);border-radius:10px;padding:10px 14px;font-size:12px;color:#fbbf24;margin-bottom:16px;">
+            ⚠️ <strong>تنبيه:</strong> كل Request على السيرفر بيكلف — اختار المنصات بحكمة.
+          </div>
+
+          <div id="ss-p3-plat-list" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;"></div>
+
           <div class="ss-wizard-nav">
             <button class="btn-ghost-sm" onclick="ss_goToStep(2)">← السابق</button>
             <button class="btn-acc-sm" onclick="ss_goToStep(4)">التالي ←</button>
           </div>
         </div>
 
-        <!-- ── Step 4: Test & Deploy ── -->
+        <!-- ════════════════════════════ STEP 4 ════════════════════════════ -->
         <div class="ss-wizard-panel" id="ss-panel-4" style="display:none;">
-          <div class="ss-panel-title">اختبر الاتصال ثم احفظ الإعدادات</div>
-          <div class="ss-panel-sub">أرسل test event حقيقي للتأكد أن sGTM يستقبل الأحداث قبل الحفظ</div>
+          <div class="ss-panel-title">اختر Events الـ Server-Side</div>
+          <div class="ss-panel-sub">Events اللي هتتتبع من الخادم — اختار بحكمة لأن كل event بيكلف request</div>
 
-          <div class="ss-card" style="margin-bottom:16px;">
-            <div class="ss-card-title">
-              <span class="material-symbols-outlined" style="font-size:16px;color:var(--acc);">science</span>
-              إرسال Test Event
-            </div>
-            <p style="font-size:12px;color:var(--mut);margin:0 0 12px;">سيُرسل حدث purchase تجريبي لـ sGTM URL المحدد</p>
-            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-              <button class="btn-acc-sm" onclick="ss_sendTestEvent()">
-                <span class="material-symbols-outlined" style="font-size:14px;">send</span>
-                إرسال Test Event
-              </button>
-              <div id="ss-test-status" style="font-size:12px;color:var(--mut);font-family:var(--font-mono);"></div>
-            </div>
-            <div id="ss-test-result" style="display:none;margin-top:12px;padding:10px 14px;border-radius:10px;border:1px solid var(--bdr2);background:var(--sur2);font-family:var(--font-mono);font-size:11px;color:var(--wht2);line-height:1.7;"></div>
+          <div id="ss-p4-events-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;"></div>
+
+          <div style="background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.25);border-radius:10px;padding:10px 14px;font-size:12px;color:#fca5a5;margin-bottom:16px;">
+            🚫 <strong>PageView على السيرفر = تكلفة عالية + قيمة منخفضة</strong> — تجنبه إلا لو محتاجه بالضرورة.
           </div>
 
-          <div class="ss-card">
-            <div class="ss-card-title">
-              <span class="material-symbols-outlined" style="font-size:16px;color:var(--acc);">save</span>
-              حفظ الإعدادات
-            </div>
-            <p style="font-size:12px;color:var(--mut);margin:0 0 12px;">بعد الحفظ سيتم تفعيل SS في GTM Container المولّد تلقائياً</p>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;">
-              <button class="btn-acc-sm" id="ss-save-btn" onclick="ss_saveConfig()">
-                <span class="material-symbols-outlined" style="font-size:14px;">check_circle</span>
-                حفظ وتفعيل
-              </button>
-              <button class="btn-ghost-sm" id="ss-deploy-btn" onclick="ss_deployProvider()" style="display:none;">
-                <span class="material-symbols-outlined" style="font-size:14px;">rocket_launch</span>
-                نشر على Stape
-              </button>
-              <div id="ss-save-status" style="font-size:12px;color:var(--mut);font-family:var(--font-mono);align-self:center;"></div>
-            </div>
-          </div>
-
-          <div class="ss-wizard-nav" style="margin-top:16px;">
+          <div class="ss-wizard-nav">
             <button class="btn-ghost-sm" onclick="ss_goToStep(3)">← السابق</button>
-            <button class="btn-ghost-sm" id="ss-reset-btn" onclick="ss_resetConfig()" style="color:#f87171;border-color:rgba(248,113,113,.3);">
-              <span class="material-symbols-outlined" style="font-size:14px;">delete</span>
-              حذف الإعدادات
-            </button>
+            <button class="btn-acc-sm" onclick="ss_goToStep(5)">التالي ←</button>
           </div>
         </div>
 
-        <!-- ── Saved config banner (shown when config exists) ── -->
-        <div id="ss-active-banner" style="display:none;margin-top:16px;padding:12px 16px;border-radius:12px;background:rgba(70,241,197,.08);border:1px solid rgba(70,241,197,.2);display:none;align-items:center;gap:10px;">
-          <span class="material-symbols-outlined" style="color:var(--acc);font-size:18px;">check_circle</span>
-          <div style="flex:1;">
-            <div style="font-size:13px;font-weight:700;color:var(--acc);">Server-Side Tracking مفعّل</div>
-            <div id="ss-active-url" style="font-size:11px;color:var(--mut);font-family:var(--font-mono);"></div>
+        <!-- ════════════════════════════ STEP 5 ════════════════════════════ -->
+        <div class="ss-wizard-panel" id="ss-panel-5" style="display:none;">
+          <div class="ss-panel-title">إعداد Client-Side (Web GTM)</div>
+          <div class="ss-panel-sub">GA4 بيكون الـ Data Layer اللي يجمع الداتا ويبعتها للسيرفر — Google Ads مستقل تماماً</div>
+
+          <!-- 5A: GA4 ID -->
+          <div style="background:var(--sur);border:1px solid var(--bdr2);border-radius:12px;padding:16px;margin-bottom:14px;">
+            <div style="font-size:13px;font-weight:700;color:var(--wht);margin-bottom:4px;display:flex;align-items:center;gap:6px;">
+              <span style="font-size:16px;">📊</span> GA4 Measurement ID (جديدة للسيرفر)
+            </div>
+            <div style="font-size:11px;color:var(--mut);margin-bottom:10px;">أنشئ GA4 Property جديدة مخصصة للـ Server-Side — لا تستخدم نفس الـ GA4 القديمة</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <input type="text" id="ss-p5-ga4-id" class="ss-url-input"
+                placeholder="G-XXXXXXXXXX"
+                oninput="ss_p5OnInput()"
+                style="max-width:220px;"
+                value="" />
+              <a href="https://analytics.google.com" target="_blank" style="font-size:11px;color:var(--acc);font-family:var(--font-ui);font-weight:700;">إنشاء Property ↗</a>
+            </div>
+            <div style="font-size:11px;color:var(--mut);margin-top:6px;">💡 الـ sGTM سيستقبل الداتا من GA4 ويوزعها على المنصات المختارة</div>
           </div>
-          <button class="btn-ghost-sm" onclick="ss_goToStep(1);document.getElementById('ss-active-banner').style.display='none';" style="font-size:11px;">تعديل</button>
+
+          <!-- 5B: Client-Side Platforms -->
+          <div style="background:var(--sur);border:1px solid var(--bdr2);border-radius:12px;padding:16px;margin-bottom:14px;">
+            <div style="font-size:13px;font-weight:700;color:var(--wht);margin-bottom:4px;">منصات الـ Client-Side (Web GTM)</div>
+            <div style="font-size:11px;color:var(--mut);margin-bottom:12px;">هذه المنصات ستشتغل مباشرةً في المتصفح</div>
+            <div id="ss-p5-client-plats" style="display:flex;flex-direction:column;gap:8px;"></div>
+            <div style="margin-top:10px;padding:10px 12px;border-radius:8px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);font-size:11px;color:#fca5a5;">
+              🚨 <strong>قاعدة: Google Ads مستقل</strong> — لا تستخدم GA4 Events كـ Trigger لـ Google Ads أبداً.
+              كل Conversion Action لها Tag مستقل.
+            </div>
+          </div>
+
+          <!-- 5C: Events Selection -->
+          <div style="background:var(--sur);border:1px solid var(--bdr2);border-radius:12px;padding:16px;margin-bottom:14px;">
+            <div style="font-size:13px;font-weight:700;color:var(--wht);margin-bottom:12px;">Events Client-Side</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div>
+                <div style="font-size:11px;font-weight:700;color:#4285F4;margin-bottom:8px;display:flex;align-items:center;gap:4px;">
+                  <span>🔵</span> Google Ads Conversions
+                </div>
+                <div id="ss-p5-gads-events" style="display:flex;flex-direction:column;gap:6px;"></div>
+              </div>
+              <div>
+                <div style="font-size:11px;font-weight:700;color:#F9AB00;margin-bottom:8px;display:flex;align-items:center;gap:4px;">
+                  <span>📊</span> GA4 Events (Data Layer)
+                </div>
+                <div id="ss-p5-ga4-events" style="display:flex;flex-direction:column;gap:6px;"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="ss-wizard-nav">
+            <button class="btn-ghost-sm" onclick="ss_goToStep(4)">← السابق</button>
+            <button class="btn-acc-sm" id="ss-p5-next-btn" onclick="ss_goToStep(6)">التالي ←</button>
+          </div>
         </div>
+
+        <!-- ════════════════════════════ STEP 6 ════════════════════════════ -->
+        <div class="ss-wizard-panel" id="ss-panel-6" style="display:none;">
+          <div class="ss-panel-title">مراجعة وتأكيد</div>
+          <div class="ss-panel-sub">راجع الإعدادات ثم اضغط تأكيد — الأداة ستربط الـ Web Container بالسيرفر وتحفظ كل شيء</div>
+
+          <div id="ss-p6-summary" style="margin-bottom:16px;"></div>
+
+          <!-- Platform Tokens (only for enabled SS platforms) -->
+          <div id="ss-p6-tokens-wrap" style="margin-bottom:16px;">
+            <div style="font-size:13px;font-weight:700;color:var(--wht);margin-bottom:4px;">🔑 Access Tokens للـ Server-Side</div>
+            <div style="font-size:11px;color:var(--mut);margin-bottom:10px;">مشفّرة بـ AES-256-GCM — لا تُخزن في المتصفح أبداً</div>
+            <div id="ss-p6-tokens-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+          </div>
+
+          <!-- Action buttons -->
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <button class="btn-acc-sm" id="ss-p6-confirm-btn" onclick="ss_confirmSetup()" style="font-size:14px;padding:11px 24px;">
+              <span class="material-symbols-outlined" style="font-size:16px;">check_circle</span>
+              تأكيد وإنشاء الـ Containers ✓
+            </button>
+            <div id="ss-p6-status" style="font-size:12px;color:var(--mut);font-family:var(--font-mono);"></div>
+          </div>
+          <div id="ss-p6-error" style="display:none;margin-top:10px;padding:10px 14px;border-radius:10px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);font-size:12px;color:#f87171;"></div>
+
+          <div class="ss-wizard-nav">
+            <button class="btn-ghost-sm" onclick="ss_goToStep(5)">← السابق</button>
+            <span></span>
+          </div>
+        </div>
+
       </div>
 
       <!-- ── Server-Side Wizard CSS ── -->
       <style>
         .ss-wizard-bar {
-          display: flex;
-          align-items: center;
-          gap: 0;
+          display: flex; align-items: center; gap: 0;
           margin-bottom: 24px;
-          background: var(--sur2);
-          border: 1px solid var(--bdr2);
-          border-radius: 14px;
-          padding: 14px 20px;
+          background: var(--sur2); border: 1px solid var(--bdr2); border-radius: 14px;
+          padding: 14px 16px; flex-wrap: nowrap; overflow-x: auto;
         }
         .ss-wstep {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 4px;
-          cursor: pointer;
-          min-width: 56px;
+          display: flex; flex-direction: column; align-items: center; gap: 4px;
+          cursor: pointer; min-width: 48px;
         }
         .ss-wstep-num {
-          width: 28px; height: 28px;
-          border-radius: 50%;
-          background: var(--sur);
-          border: 2px solid var(--bdr2);
-          color: var(--mut);
-          font-family: var(--font-display);
-          font-weight: 800;
-          font-size: 12px;
-          display: flex; align-items: center; justify-content: center;
+          width: 26px; height: 26px; border-radius: 50%;
+          background: var(--sur); border: 2px solid var(--bdr2);
+          color: var(--mut); font-family: var(--font-display); font-weight: 800;
+          font-size: 11px; display: flex; align-items: center; justify-content: center;
           transition: all .2s;
         }
         .ss-wstep.active .ss-wstep-num {
-          background: var(--acc);
-          border-color: var(--acc);
-          color: #00382b;
+          background: var(--acc); border-color: var(--acc); color: #00382b;
           box-shadow: 0 0 0 3px rgba(70,241,197,.2);
         }
-        .ss-wstep.done .ss-wstep-num {
-          background: rgba(70,241,197,.15);
-          border-color: var(--acc);
-          color: var(--acc);
-        }
-        .ss-wstep-label {
-          font-size: 10px;
-          color: var(--mut);
-          font-family: var(--font-ui);
-          font-weight: 600;
-          letter-spacing: .3px;
-        }
+        .ss-wstep.done .ss-wstep-num { background: rgba(70,241,197,.15); border-color: var(--acc); color: var(--acc); }
+        .ss-wstep-label { font-size: 9px; color: var(--mut); font-family: var(--font-ui); font-weight: 600; white-space: nowrap; }
         .ss-wstep.active .ss-wstep-label { color: var(--acc); }
-        .ss-wstep-line {
-          flex: 1;
-          height: 2px;
-          background: var(--bdr2);
-          margin-bottom: 12px;
-          transition: background .3s;
-        }
+        .ss-wstep-line { flex: 1; height: 2px; background: var(--bdr2); margin-bottom: 12px; transition: background .3s; min-width: 10px; }
         .ss-wstep-line.done { background: var(--acc); }
         .ss-wizard-panel {
-          background: var(--sur2);
-          border: 1px solid var(--bdr2);
-          border-radius: 16px;
-          padding: 24px;
+          background: var(--sur2); border: 1px solid var(--bdr2); border-radius: 16px; padding: 24px;
         }
-        .ss-panel-title {
-          font-family: var(--font-display);
-          font-size: 17px;
-          font-weight: 800;
-          color: var(--wht);
-          margin-bottom: 6px;
-        }
-        .ss-panel-sub {
-          font-size: 12px;
-          color: var(--mut);
-          margin-bottom: 20px;
-        }
-        .ss-provider-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 14px;
-          margin-bottom: 20px;
-        }
-        .ss-provider-card {
-          background: var(--sur);
-          border: 2px solid var(--bdr2);
-          border-radius: 14px;
-          padding: 18px 16px;
-          cursor: pointer;
-          transition: border-color .15s, transform .15s;
-          position: relative;
-          text-align: center;
-        }
-        .ss-provider-card:hover { border-color: rgba(70,241,197,.4); transform: translateY(-2px); }
-        .ss-provider-card.selected { border-color: var(--acc); background: rgba(70,241,197,.06); }
-        .ss-provider-badge-top {
-          position: absolute;
-          top: -1px; right: 14px;
-          background: var(--acc);
-          color: #00382b;
-          font-size: 9px;
-          font-weight: 800;
-          padding: 2px 8px;
-          border-radius: 0 0 6px 6px;
-          font-family: var(--font-display);
-        }
-        .ss-provider-icon { font-size: 28px; margin-bottom: 8px; }
-        .ss-provider-name {
-          font-family: var(--font-display);
-          font-size: 14px;
-          font-weight: 800;
-          color: var(--wht);
-          margin-bottom: 4px;
-        }
-        .ss-provider-sub { font-size: 11px; color: var(--mut); margin-bottom: 10px; }
-        .ss-provider-features {
-          list-style: none;
-          padding: 0; margin: 0;
-          text-align: right;
-        }
-        .ss-provider-features li {
-          font-size: 11px;
-          color: var(--mut);
-          padding: 2px 0;
-          font-family: var(--font-ui);
-        }
+        .ss-panel-title { font-family: var(--font-display); font-size: 17px; font-weight: 800; color: var(--wht); margin-bottom: 6px; }
+        .ss-panel-sub { font-size: 12px; color: var(--mut); margin-bottom: 20px; }
         .ss-wizard-nav {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-top: 20px;
-          padding-top: 16px;
-          border-top: 1px solid var(--bdr2);
+          display: flex; justify-content: space-between; align-items: center;
+          margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--bdr2);
         }
-        /* GCP instructions */
-        .ss-gcp-step {
-          background: var(--sur);
-          border: 1px solid var(--bdr2);
-          border-radius: 12px;
-          padding: 14px 16px;
-          margin-bottom: 10px;
-        }
-        .ss-gcp-step-num {
-          display: inline-flex;
-          width: 22px; height: 22px;
-          border-radius: 50%;
-          background: rgba(70,241,197,.15);
-          border: 1px solid var(--acc);
-          color: var(--acc);
-          font-size: 11px; font-weight: 800;
-          align-items: center; justify-content: center;
-          margin-left: 8px;
-          flex-shrink: 0;
-        }
-        .ss-gcp-step-title {
-          font-family: var(--font-display);
-          font-size: 13px;
-          font-weight: 700;
-          color: var(--wht);
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          margin-bottom: 8px;
-        }
-        .ss-gcp-cmd {
-          background: #0a0d11;
-          border: 1px solid var(--bdr);
-          border-radius: 8px;
-          padding: 10px 12px;
-          font-family: var(--font-mono);
-          font-size: 11px;
-          color: #a8d8a8;
-          white-space: pre-wrap;
-          word-break: break-all;
-          position: relative;
-          margin: 6px 0;
-        }
-        .ss-gcp-copy-btn {
-          position: absolute;
-          top: 6px; left: 6px;
-          background: rgba(70,241,197,.1);
-          border: 1px solid rgba(70,241,197,.2);
-          border-radius: 6px;
-          padding: 2px 8px;
-          font-size: 10px;
-          color: var(--acc);
-          cursor: pointer;
-          font-family: var(--font-ui);
-          font-weight: 700;
-        }
-        /* Platform list */
-        .ss-plat-list-wrap { display: flex; flex-direction: column; gap: 10px; }
-        .ss-plat-row {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          background: var(--sur);
-          border: 1px solid var(--bdr2);
-          border-radius: 12px;
-          padding: 12px 14px;
-          transition: border-color .15s;
-        }
-        .ss-plat-row.enabled { border-color: rgba(70,241,197,.3); }
-        .ss-plat-ico { font-size: 22px; width: 36px; text-align: center; flex-shrink: 0; }
-        .ss-plat-info { flex: 1; min-width: 0; }
-        .ss-plat-name { font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--wht); }
-        .ss-plat-sub { font-size: 11px; color: var(--mut); margin-bottom: 6px; }
-        .ss-plat-token-row { display: flex; gap: 6px; align-items: center; }
-        .ss-plat-token {
-          flex: 1;
-          background: var(--sur2);
-          border: 1px solid var(--bdr2);
-          border-radius: 8px;
-          padding: 6px 10px;
-          font-family: var(--font-mono);
-          font-size: 11px;
-          color: var(--wht2);
-          outline: none;
-          transition: border-color .15s;
-        }
-        .ss-plat-token:focus { border-color: var(--acc); }
-        .ss-plat-token:disabled { opacity: .4; }
-        .ss-plat-docs {
-          font-size: 10px;
-          color: var(--acc);
-          text-decoration: none;
-          white-space: nowrap;
-          font-family: var(--font-ui);
-          font-weight: 700;
-          opacity: .8;
-        }
-        .ss-plat-docs:hover { opacity: 1; }
-        /* Toggle */
-        .ss-toggle { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; cursor: pointer; }
-        .ss-toggle input { opacity: 0; width: 0; height: 0; }
-        .ss-toggle-slider {
-          position: absolute; inset: 0;
-          background: var(--sur);
-          border: 1.5px solid var(--bdr2);
-          border-radius: 22px;
-          transition: .2s;
-        }
-        .ss-toggle-slider:before {
-          content: '';
-          position: absolute;
-          height: 14px; width: 14px;
-          left: 3px; top: 50%;
-          transform: translateY(-50%);
-          background: var(--mut);
-          border-radius: 50%;
-          transition: .2s;
-        }
-        .ss-toggle input:checked + .ss-toggle-slider { background: rgba(70,241,197,.2); border-color: var(--acc); }
-        .ss-toggle input:checked + .ss-toggle-slider:before { background: var(--acc); transform: translateY(-50%) translateX(16px); }
-        /* URL input section */
-        .ss-url-section { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 14px; }
+        /* URL input */
         .ss-url-input {
-          flex: 1; min-width: 220px;
-          background: var(--sur);
-          border: 1.5px solid var(--bdr2);
-          border-radius: 10px;
-          padding: 10px 14px;
-          font-family: var(--font-mono);
-          font-size: 12px;
-          color: var(--wht);
-          outline: none;
-          transition: border-color .15s;
+          flex: 1; min-width: 180px; background: var(--sur); border: 1.5px solid var(--bdr2);
+          border-radius: 10px; padding: 9px 14px; font-family: var(--font-mono); font-size: 12px;
+          color: var(--wht); outline: none; transition: border-color .15s; box-sizing: border-box;
         }
         .ss-url-input:focus { border-color: var(--acc); }
-        .ss-url-status {
-          font-size: 12px;
-          font-family: var(--font-mono);
-          padding: 6px 10px;
-          border-radius: 8px;
-          display: none;
-        }
-        .ss-url-status.ok { color: #34d399; background: rgba(52,211,153,.08); border: 1px solid rgba(52,211,153,.2); display: block; }
+        .ss-url-status { font-size: 12px; font-family: var(--font-mono); padding: 6px 10px; border-radius: 8px; display: none; }
+        .ss-url-status.ok  { color: #34d399; background: rgba(52,211,153,.08); border: 1px solid rgba(52,211,153,.2); display: block; }
         .ss-url-status.err { color: #f87171; background: rgba(248,113,113,.08); border: 1px solid rgba(248,113,113,.2); display: block; }
         .ss-url-status.testing { color: var(--acc); background: rgba(70,241,197,.06); border: 1px solid rgba(70,241,197,.15); display: block; }
-        /* Card within wizard */
-        .ss-card { background: var(--sur); border: 1px solid var(--bdr2); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
-        .ss-card-title { font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--wht); display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
-        /* Step 2 form elements */
-        .ss-field-group { display: flex; flex-direction: column; gap: 4px; }
-        .ss-field-label { font-size: 12px; font-weight: 600; color: var(--wht2); }
-        .ss-input {
-          width: 100%; box-sizing: border-box;
-          background: var(--sur2); border: 1px solid var(--bdr2); border-radius: 10px;
-          padding: 9px 12px; font-size: 13px; color: var(--wht); outline: none;
-          font-family: var(--font-mono); transition: border-color .15s;
+        /* Plat / event row */
+        .ss-sel-row {
+          display: flex; align-items: center; gap: 12px;
+          background: var(--sur); border: 1.5px solid var(--bdr2); border-radius: 12px;
+          padding: 10px 14px; cursor: pointer; transition: border-color .15s;
         }
-        .ss-input:focus { border-color: var(--acc); }
-        .ss-field-hint { font-size: 11px; color: var(--mut); }
-        .ss-gcloud-steps { border: 1px solid var(--bdr); border-radius: 12px; padding: 4px 14px; background: var(--sur2); }
+        .ss-sel-row:hover { border-color: rgba(70,241,197,.3); }
+        .ss-sel-row.selected { border-color: var(--acc); background: rgba(70,241,197,.04); }
+        .ss-sel-ico { font-size: 20px; width: 32px; text-align: center; flex-shrink: 0; }
+        .ss-sel-info { flex: 1; min-width: 0; }
+        .ss-sel-name { font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--wht); }
+        .ss-sel-sub  { font-size: 11px; color: var(--mut); }
+        .ss-sel-badge { font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 4px; font-family: var(--font-display); flex-shrink: 0; }
+        .ss-sel-badge.rec { background: rgba(70,241,197,.15); color: var(--acc); border: 1px solid rgba(70,241,197,.25); }
+        .ss-sel-badge.warn { background: rgba(248,113,113,.1); color: #f87171; border: 1px solid rgba(248,113,113,.2); }
+        /* Event checkbox row (small) */
+        .ss-ev-row {
+          display: flex; align-items: center; gap: 8px;
+          padding: 6px 10px; border-radius: 8px; border: 1px solid var(--bdr2);
+          background: var(--sur); cursor: pointer; transition: border-color .15s;
+        }
+        .ss-ev-row:hover { border-color: rgba(70,241,197,.25); }
+        .ss-ev-row.checked { border-color: rgba(70,241,197,.3); background: rgba(70,241,197,.03); }
+        .ss-ev-row input[type=checkbox] { accent-color: var(--acc); flex-shrink: 0; }
+        .ss-ev-row-label { font-size: 12px; color: var(--wht2); font-family: var(--font-ui); font-weight: 600; }
+        /* Token input */
+        .ss-tok-input {
+          width: 100%; box-sizing: border-box; background: var(--sur2);
+          border: 1px solid var(--bdr2); border-radius: 8px; padding: 7px 10px;
+          font-family: var(--font-mono); font-size: 11px; color: var(--wht); outline: none;
+          transition: border-color .15s; margin-top: 6px;
+        }
+        .ss-tok-input:focus { border-color: var(--acc); }
+        /* Spinner */
+        .ss-spin {
+          width: 18px; height: 18px; border-radius: 50%;
+          border: 2px solid rgba(70,241,197,.2); border-top-color: var(--acc);
+          animation: ss-rotate 0.7s linear infinite; flex-shrink: 0;
+        }
+        @keyframes ss-rotate { to { transform: rotate(360deg); } }
+        /* Summary table */
+        .ss-summary-block { background: var(--sur); border: 1px solid var(--bdr2); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
+        .ss-summary-label { font-size: 10px; color: var(--mut); font-family: var(--font-mono); letter-spacing: .8px; text-transform: uppercase; margin-bottom: 6px; }
+        .ss-summary-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--bdr); }
+        .ss-summary-row:last-child { border-bottom: none; }
+        .ss-summary-key { font-size: 12px; color: var(--mut); }
+        .ss-summary-val { font-size: 12px; color: var(--wht); font-weight: 600; font-family: var(--font-ui); text-align: left; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        /* Active banner */
+        #ss-active-banner { display: none; }
       </style>
       <!-- END SERVER-SIDE VIEW -->
 
@@ -14127,63 +14097,103 @@
 
 
       // ══════════════════════════════════════════════════════
-      // 11. SERVER-SIDE WIZARD
+      // 11. SERVER-SIDE WIZARD (6-step flow)
       // ══════════════════════════════════════════════════════
 
-      // ── Wizard state ─────────────────────────────────────
-      var _ssProvider        = null;   // 'stape' | 'gcloud' | 'selfhosted'
-      var _ssStep            = 1;
-      var _ssServerUrl       = '';
-      var _ssStapeApiKey     = '';     // never stored beyond this variable
-      var _ssStapeContId     = '';
-      var _ssEnabledPlats    = [];     // array of platform keys
-      var _ssTokens          = {};     // { meta: '...raw...', tiktok: '...' } — in-memory only
-      var _ssConfigLoaded    = false;
+      // ── Wizard state ──────────────────────────────────────
+      var _ssStep           = 1;
+      var _ssServerUrl      = '';
+      var _ssEnabledPlats   = [];   // server-side platforms  e.g. ['meta','tiktok']
+      var _ssSsEvents       = ['purchase'];  // server-side events (default: purchase)
+      var _ssGa4Id          = '';   // GA4 Measurement ID for SS
+      var _ssClientPlats    = ['google_ads','ga4'];  // client-side platforms
+      var _ssGa4Events      = ['purchase','add_to_cart','view_item','begin_checkout','page_view'];
+      var _ssGoogleAdsEvents= ['purchase','lead'];   // Google Ads conversion events
+      var _ssTokens         = {};   // { meta: 'raw...', tiktok: '...' } — in-memory only
+      var _ssConfigLoaded   = false;
+      var _ssJobId          = null;
+      var _ssJobPollTimer   = null;
+      // container IDs filled after step 1
+      var _ssWebGtmId       = '';
+      var _ssServerGtmId    = '';
+      var _ssContainerConfig= '';
+      var _ssWebSnippetHead = '';
+      var _ssWebSnippetBody = '';
+      var _ssContainersReady= false;
+      var _ssUrlValidated   = false;
+      // init guard
+      var _ssInit           = false;
 
+      // ── Platform definitions ──────────────────────────────
       var _ssPlatDefs = [
-        { key: 'meta',     name: 'Meta CAPI',          sub: 'Conversions API',        icon: '👥', color: '#1877F2', ph: 'Access Token (EAABsbCS...)' },
-        { key: 'tiktok',   name: 'TikTok Events API',  sub: 'Pixel Server-Side',      icon: '🎵', color: '#69C9D0', ph: 'Access Token (tta_...)' },
-        { key: 'snapchat', name: 'Snapchat CAPI',       sub: 'Conversions API',        icon: '👻', color: '#FFFC00', ph: 'Access Token' },
-        { key: 'ga4',      name: 'GA4 Measurement',    sub: 'Measurement Protocol',   icon: '📊', color: '#4285F4', ph: 'API Secret' },
-        { key: 'mixpanel', name: 'Mixpanel',           sub: 'Server-Side Tracking',   icon: '📈', color: '#7856FF', ph: 'Project Token' }
+        { key: 'meta',     name: 'Meta CAPI',         sub: 'Conversions API',       icon: '👥', color: '#1877F2', ph: 'Access Token (EAABsbCS...)' },
+        { key: 'tiktok',   name: 'TikTok Events API', sub: 'Pixel Server-Side',     icon: '🎵', color: '#69C9D0', ph: 'Access Token (tta_...)' },
+        { key: 'snapchat', name: 'Snapchat CAPI',     sub: 'Conversions API',       icon: '👻', color: '#FFFC00', ph: 'Access Token' },
+        { key: 'linkedin', name: 'LinkedIn CAPI',     sub: 'Conversions API',       icon: '💼', color: '#0A66C2', ph: 'Access Token' },
+        { key: 'twitter',  name: 'Twitter CAPI',      sub: 'Conversions API',       icon: '🐦', color: '#1DA1F2', ph: 'Access Token' },
+        { key: 'ga4',      name: 'GA4 Measurement',  sub: 'Measurement Protocol',  icon: '📊', color: '#F9AB00', ph: 'API Secret' },
       ];
 
-      // ── Helper: get clientId for API calls ───────────────
-      function _ssClientId() {
-        return (window.ET && window.ET.clientId) || window._clientId || '';
-      }
+      // SS events catalogue
+      var _ssEventDefs = [
+        { key: 'purchase',         label: 'Purchase',          rec: true,  warn: false },
+        { key: 'add_to_cart',      label: 'AddToCart',         rec: false, warn: false },
+        { key: 'initiate_checkout',label: 'InitiateCheckout',  rec: false, warn: false },
+        { key: 'view_content',     label: 'ViewContent',       rec: false, warn: false },
+        { key: 'lead',             label: 'Lead',              rec: false, warn: false },
+        { key: 'sign_up',          label: 'SignUp',            rec: false, warn: false },
+        { key: 'page_view',        label: 'PageView',          rec: false, warn: true  },
+      ];
 
-      // ── Helper: get a fresh Firebase ID token ─────────────
-      // Returns null on signed-out / no-firebase. The /api/ss/* endpoints
-      // require a valid token and will reject with 401 if missing.
+      // Client-side platform defs
+      var _ssClientPlatDefs = [
+        { key: 'google_ads', name: 'Google Ads',      sub: 'Conversion Tracking مستقل',    icon: '🔵' },
+        { key: 'ga4',        name: 'GA4 (Data Layer)',sub: 'يبعت الداتا للسيرفر عبر transport_url', icon: '📊' },
+        { key: 'microsoft',  name: 'Microsoft Ads',   sub: 'UET Tag',                      icon: '🟦' },
+        { key: 'pinterest',  name: 'Pinterest Ads',   sub: 'Tag',                          icon: '📌' },
+      ];
+
+      // GA4 events for client-side
+      var _ssGa4EventDefs = [
+        { key: 'purchase',        label: 'purchase' },
+        { key: 'add_to_cart',     label: 'add_to_cart' },
+        { key: 'view_item',       label: 'view_item' },
+        { key: 'begin_checkout',  label: 'begin_checkout' },
+        { key: 'page_view',       label: 'page_view' },
+        { key: 'search',          label: 'search' },
+        { key: 'login',           label: 'login' },
+        { key: 'sign_up',         label: 'sign_up' },
+      ];
+
+      // Google Ads conversion events
+      var _ssGadsEventDefs = [
+        { key: 'purchase', label: 'Purchase (Conversion)' },
+        { key: 'lead',     label: 'Lead (Conversion)' },
+        { key: 'sign_up',  label: 'SignUp (Conversion)' },
+        { key: 'contact',  label: 'Contact (Conversion)' },
+      ];
+
+      // ── Helper: get Firebase ID token ────────────────────
       async function _ssIdToken() {
         try {
           if (!window.firebase || !firebase.auth) return null;
           var u = firebase.auth().currentUser;
           if (!u) return null;
-          // getIdToken(false) returns the cached token unless it's near expiry —
-          // Firebase auto-refreshes, so we don't force-refresh on every call.
           return await u.getIdToken(false);
         } catch (e) { return null; }
       }
 
-      // ── Helper: generic API call ─────────────────────────
-      // Attaches Authorization: Bearer <Firebase ID token> to every /api/ss/*
-      // request. The legacy X-Client-Id header is kept as defense-in-depth —
-      // the server cross-checks it against decoded.uid and rejects mismatches.
+      function _ssClientId() {
+        return (window.ET && window.ET.clientId) || window._clientId || '';
+      }
+
+      // ── Generic authenticated API call ───────────────────
       function _ssApi(method, path, body, cb) {
         _ssIdToken().then(function (idToken) {
-          if (!idToken) {
-            cb(new Error('غير مسجّل دخول — أعد تسجيل الدخول للمتابعة'), null);
-            return;
-          }
+          if (!idToken) { cb(new Error('غير مسجّل دخول — أعد تسجيل الدخول للمتابعة'), null); return; }
           var opts = {
             method: method,
-            headers: {
-              'Content-Type':  'application/json',
-              'Authorization': 'Bearer ' + idToken,
-              'X-Client-Id':   _ssClientId(),
-            },
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken, 'X-Client-Id': _ssClientId() },
           };
           if (body) opts.body = JSON.stringify(body);
           fetch(path, opts)
@@ -14193,381 +14203,590 @@
         });
       }
 
-      // ── Step navigation ───────────────────────────────────
+      // ── Step navigator ────────────────────────────────────
       window.ss_goToStep = function (n) {
-        if (n === 2 && !_ssProvider) return;
+        if (n < 1 || n > 6) return;
+        // Guard: can't skip past step 1 unless containers are ready
+        if (n > 1 && !_ssContainersReady) { showToast('أنشئ الـ Containers أولاً في الخطوة 1'); return; }
+        if (n > 2 && !_ssUrlValidated)    { showToast('تحقق من Server URL أولاً في الخطوة 2'); return; }
         _ssStep = n;
-        for (var i = 1; i <= 4; i++) {
+        for (var i = 1; i <= 6; i++) {
           var ind = document.getElementById('ss-step-ind-' + i);
-          if (!ind) continue;
-          ind.classList.remove('active', 'done');
-          if (i < n) ind.classList.add('done');
-          else if (i === n) ind.classList.add('active');
+          if (ind) { ind.classList.remove('active','done'); if (i < n) ind.classList.add('done'); else if (i === n) ind.classList.add('active'); }
+          var line = document.getElementById('ss-step-line-' + i);
+          if (line) line.classList.toggle('done', i < n);
+          var panel = document.getElementById('ss-panel-' + i);
+          if (panel) panel.style.display = (i === n) ? '' : 'none';
         }
-        for (var j = 1; j <= 3; j++) {
-          var line = document.getElementById('ss-step-line-' + j);
-          if (line) line.classList.toggle('done', j < n);
-        }
-        for (var k = 1; k <= 4; k++) {
-          var panel = document.getElementById('ss-panel-' + k);
-          if (panel) panel.style.display = k === n ? '' : 'none';
-        }
-        if (n === 2) ss_renderStep2(_ssProvider);
-        if (n === 3) ss_renderPlatformList();
-        if (n === 4) {
-          var deployBtn = document.getElementById('ss-deploy-btn');
-          if (deployBtn) deployBtn.style.display = _ssProvider === 'stape' ? '' : 'none';
-        }
+        if (n === 3) ss_renderPlatList();
+        if (n === 4) ss_renderEventList();
+        if (n === 5) ss_renderClientConfig();
+        if (n === 6) ss_renderSummary();
       };
 
-      // ── Provider selection ────────────────────────────────
-      window.ss_selectProvider = function (p) {
-        _ssProvider = p;
-        ['stape', 'gcloud', 'selfhosted'].forEach(function (k) {
-          var c = document.getElementById('ss-card-' + k);
-          if (c) c.classList.toggle('selected', k === p);
+      // ── STEP 1: Create containers ─────────────────────────
+      window.ss_createContainers = function () {
+        var createBtn = document.getElementById('ss-p1-create-btn');
+        var progressEl = document.getElementById('ss-p1-progress');
+        var resultEl   = document.getElementById('ss-p1-result');
+        var errorEl    = document.getElementById('ss-p1-error');
+        var nextBtn    = document.getElementById('ss-p1-next-btn');
+
+        // Use _cachedGtmStr if available (from Pixel Config flow)
+        var configJson = null;
+        if (typeof _cachedGtmStr !== 'undefined' && _cachedGtmStr && _cachedGtmStr.trim()) {
+          try { configJson = JSON.parse(_cachedGtmStr); } catch (e) { configJson = null; }
+        }
+        if (!configJson) {
+          if (errorEl) {
+            errorEl.style.display = 'block';
+            errorEl.innerHTML = '⚠️ لا يوجد GTM Config — اذهب إلى <strong>Pixel Config</strong> وكمّل الخطوات الـ 5 أولاً، أو أدخل GTM config يدوياً.';
+          }
+          return;
+        }
+
+        if (errorEl) errorEl.style.display = 'none';
+        if (createBtn) { createBtn.disabled = true; createBtn.style.opacity = '.5'; }
+        if (progressEl) progressEl.style.display = 'block';
+        if (resultEl) resultEl.style.display = 'none';
+
+        _ssApi('POST', '/api/ss/create-containers', {
+          configJson:  configJson,
+          projectName: (window.S && S.lead && S.lead.name) ? S.lead.name + ' — SS' : ((window.currentUser && currentUser.email) || 'Client') + ' — SS',
+          ssEvents:    _ssSsEvents,
+          ssPlatforms: _ssEnabledPlats,
+        }, function (err, res) {
+          if (err || !res || !res.ok || !res.data || !res.data.ok) {
+            if (createBtn) { createBtn.disabled = false; createBtn.style.opacity = '1'; }
+            if (progressEl) progressEl.style.display = 'none';
+            var msg = (res && res.data && res.data.error) || (err && err.message) || 'فشل الإنشاء';
+            if (errorEl) { errorEl.style.display = 'block'; errorEl.textContent = '❌ ' + msg; }
+            return;
+          }
+          _ssJobId = res.data.jobId;
+          ss_pollJob(_ssJobId);
         });
-        var nextBtn = document.getElementById('ss-step1-next');
-        if (nextBtn) nextBtn.disabled = false;
       };
 
-      // ── Step 2: render provider-specific panel ────────────
-      window.ss_renderStep2 = function (provider) {
-        var panel = document.getElementById('ss-panel-2');
-        if (!panel) return;
-        var html = '';
-        if (provider === 'stape') {
-          html = '<div class="ss-panel-title">إعداد Stape.io</div>' +
-            '<div class="ss-panel-sub">أدخل بيانات Stape — سيتم النشر تلقائياً عبر الـ API</div>' +
-            '<div class="ss-field-group">' +
-            '<label class="ss-field-label">Stape API Key</label>' +
-            '<input type="password" id="ss-stape-apikey" class="ss-input" placeholder="sk_stape_..." value="' + (_ssStapeApiKey || '') + '" autocomplete="off">' +
-            '<div class="ss-field-hint">API Key من <a href="https://app.stape.io" target="_blank" style="color:var(--acc);">app.stape.io</a> → Settings → API</div>' +
-            '</div>' +
-            '<div class="ss-field-group" style="margin-top:12px;">' +
-            '<label class="ss-field-label">Server URL (اختياري — إذا عندك container قائم)</label>' +
-            '<input type="url" id="ss-stape-url" class="ss-input" placeholder="https://your-container.stape.io" value="' + (_ssServerUrl || '') + '">' +
-            '<div id="ss-step2-url-status" style="font-size:11px;font-family:var(--font-mono);margin-top:6px;"></div>' +
-            '</div>' +
-            '<div class="ss-wizard-nav">' +
-            '<button class="btn-ghost-sm" onclick="ss_goToStep(1)">← السابق</button>' +
-            '<div style="display:flex;gap:8px;">' +
-            '<button class="btn-ghost-sm" onclick="ss_testUrl(\'stape\')">اختبر الاتصال</button>' +
-            '<button class="btn-acc-sm" onclick="ss_step2Next()">التالي ←</button>' +
-            '</div></div>';
-        } else if (provider === 'gcloud') {
-          html = '<div class="ss-panel-title">نشر sGTM على Google Cloud Run</div>' +
-            '<div class="ss-panel-sub">اتبع الخطوات التالية ثم الصق الـ URL الناتج</div>' +
-            '<div class="ss-gcloud-steps">' +
-            _ssGcloudStep(1, 'install_desktop', 'تثبيت gcloud CLI', 'حمّل وثبّت Google Cloud SDK', null, 'https://cloud.google.com/sdk/docs/install', 'فتح صفحة التحميل') +
-            _ssGcloudStep(2, 'api', 'تفعيل Cloud Run API', null, 'gcloud services enable run.googleapis.com', null, null) +
-            _ssGcloudStep(3, 'build', 'الحصول على Container Config', 'Google Tag Manager → Server container → Admin → Install manually → انسخ "Container config"', null, 'https://tagmanager.google.com', 'فتح GTM') +
-            _ssGcloudStep(4, 'rocket_launch', 'Deploy sGTM', 'شغّل الأمر التالي وضع CONFIG_BODY الذي نسخته:',
-              'gcloud run deploy sgtm \\\n  --image=gcr.io/cloud-tagging-10302018/gtm-cloud-image:stable \\\n  --platform=managed --region=me-central1 \\\n  --allow-unauthenticated --min-instances=1 \\\n  --set-env-vars=CONFIG_BODY=YOUR_CONFIG_BODY', null, null) +
-            '</div>' +
-            '<div class="ss-field-group" style="margin-top:12px;">' +
-            '<label class="ss-field-label">Cloud Run URL (بعد انتهاء الـ deploy)</label>' +
-            '<input type="url" id="ss-gcloud-url" class="ss-input" placeholder="https://sgtm-xxxx-xx.a.run.app" value="' + (_ssServerUrl || '') + '">' +
-            '<div id="ss-step2-url-status" style="font-size:11px;font-family:var(--font-mono);margin-top:6px;"></div>' +
-            '</div>' +
-            '<div class="ss-wizard-nav">' +
-            '<button class="btn-ghost-sm" onclick="ss_goToStep(1)">← السابق</button>' +
-            '<div style="display:flex;gap:8px;">' +
-            '<button class="btn-ghost-sm" onclick="ss_testUrl(\'gcloud\')">اختبر الاتصال</button>' +
-            '<button class="btn-acc-sm" onclick="ss_step2Next()">التالي ←</button>' +
-            '</div></div>';
-        } else {
-          html = '<div class="ss-panel-title">Self-Hosted sGTM</div>' +
-            '<div class="ss-panel-sub">الصق رابط sGTM server الخاص بك لنتحقق منه</div>' +
-            '<div class="ss-field-group">' +
-            '<label class="ss-field-label">Server URL</label>' +
-            '<input type="url" id="ss-self-url" class="ss-input" placeholder="https://sgtm.yourdomain.com" value="' + (_ssServerUrl || '') + '">' +
-            '<div id="ss-step2-url-status" style="font-size:11px;font-family:var(--font-mono);margin-top:6px;"></div>' +
-            '</div>' +
-            '<div style="padding:12px 14px;border-radius:10px;background:var(--sur2);border:1px solid var(--bdr2);font-size:12px;color:var(--mut);margin-top:12px;">' +
-            '💡 للإعداد على Docker أو VPS، راجع <strong style="color:var(--wht2);">docs/SERVER-SIDE-SETUP.md</strong> في مجلد المشروع' +
-            '</div>' +
-            '<div class="ss-wizard-nav">' +
-            '<button class="btn-ghost-sm" onclick="ss_goToStep(1)">← السابق</button>' +
-            '<div style="display:flex;gap:8px;">' +
-            '<button class="btn-ghost-sm" onclick="ss_testUrl(\'selfhosted\')">اختبر الاتصال</button>' +
-            '<button class="btn-acc-sm" onclick="ss_step2Next()">التالي ←</button>' +
-            '</div></div>';
+      function ss_pollJob(jobId) {
+        if (!jobId) return;
+        var stageMsgs = {
+          queued:           'في الطابور...',
+          capacity_check:   'التحقق من السعة...',
+          gtm_provisioning: 'جارٍ إنشاء GTM Containers...',
+          saving:           'جارٍ الحفظ...',
+          done:             'اكتمل!',
+          error:            'حصل خطأ',
+        };
+        var progressEl  = document.getElementById('ss-p1-progress');
+        var stageEl     = document.getElementById('ss-p1-stage-msg');
+        var barEl       = document.getElementById('ss-p1-bar');
+        var createBtn   = document.getElementById('ss-p1-create-btn');
+        var resultEl    = document.getElementById('ss-p1-result');
+        var errorEl     = document.getElementById('ss-p1-error');
+        var nextBtn     = document.getElementById('ss-p1-next-btn');
+        var startedAt   = Date.now();
+        var maxWaitMs   = 15 * 60 * 1000;
+        var pollEveryMs = 4000;
+        var barPct      = 10;
+
+        function doPoll() {
+          if (Date.now() - startedAt > maxWaitMs) {
+            if (progressEl) progressEl.style.display = 'none';
+            if (errorEl)    { errorEl.style.display = 'block'; errorEl.textContent = '⏱️ انتهت مهلة الانتظار — حاول مرة أخرى'; }
+            if (createBtn)  { createBtn.disabled = false; createBtn.style.opacity = '1'; }
+            return;
+          }
+          fetch('/api/managed/job/' + encodeURIComponent(jobId))
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+              if (d.status === 'completed' && d.result && d.result.ok) {
+                // ── Success ──
+                barPct = 100;
+                if (barEl) barEl.style.width = '100%';
+                if (progressEl) progressEl.style.display = 'none';
+                if (createBtn)  { createBtn.disabled = false; createBtn.style.opacity = '1'; }
+
+                var res = d.result;
+                _ssWebGtmId       = res.gtmPublicId     || '';
+                _ssWebSnippetHead = res.snippetHead      || '';
+                _ssWebSnippetBody = res.snippetBody      || '';
+                _ssServerGtmId    = (res.server && res.server.publicId)        || '';
+                _ssContainerConfig= (res.server && res.server.containerConfig) || '';
+                _ssContainersReady= true;
+
+                // Fill UI
+                var webIdEl   = document.getElementById('ss-p1-web-id');
+                var srvIdEl   = document.getElementById('ss-p1-server-id');
+                var cfgEl     = document.getElementById('ss-p1-config-json');
+                if (webIdEl)  webIdEl.textContent  = _ssWebGtmId    || '—';
+                if (srvIdEl)  srvIdEl.textContent  = _ssServerGtmId || '—';
+                if (cfgEl)    cfgEl.textContent    = _ssContainerConfig || '(لا يوجد config — يُستخدم Auto-deploy)';
+                if (resultEl) resultEl.style.display = '';
+                if (nextBtn)  nextBtn.disabled = false;
+
+                // Refresh overview GTM card
+                try { ovRefreshGtmStatus(); } catch (_) {}
+              } else if (d.status === 'failed') {
+                if (progressEl) progressEl.style.display = 'none';
+                if (createBtn)  { createBtn.disabled = false; createBtn.style.opacity = '1'; }
+                var msg = d.error || 'فشل الإنشاء';
+                if (errorEl) { errorEl.style.display = 'block'; errorEl.textContent = '❌ ' + msg; }
+              } else {
+                // Still running — update progress
+                var stg = d.stage || '';
+                if (stageEl) stageEl.textContent = stageMsgs[stg] || ('جارٍ ' + stg + '...');
+                barPct = Math.min(barPct + 5, 90);
+                if (barEl) barEl.style.width = barPct + '%';
+                _ssJobPollTimer = setTimeout(doPoll, pollEveryMs);
+              }
+            })
+            .catch(function () { _ssJobPollTimer = setTimeout(doPoll, pollEveryMs + 2000); });
         }
-        panel.innerHTML = html;
-      };
-
-      function _ssGcloudStep(n, icon, title, desc, cmd, url, urlLabel) {
-        return '<div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--bdr);">' +
-          '<div style="width:28px;height:28px;border-radius:50%;background:var(--acc);color:#000;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;">' + n + '</div>' +
-          '<div style="flex:1;">' +
-          '<div style="font-size:13px;font-weight:600;color:var(--wht);margin-bottom:4px;">' + title + '</div>' +
-          (desc ? '<div style="font-size:12px;color:var(--mut);margin-bottom:6px;">' + desc + '</div>' : '') +
-          (cmd ? '<pre style="background:var(--sur2);border:1px solid var(--bdr2);border-radius:8px;padding:8px 12px;font-size:10px;color:var(--wht2);overflow-x:auto;margin:0 0 6px;">' + cmd + '</pre>' : '') +
-          (url ? '<a href="' + url + '" target="_blank" style="font-size:11px;color:var(--acc);">' + (urlLabel || url) + ' ↗</a>' : '') +
-          '</div></div>';
+        _ssJobPollTimer = setTimeout(doPoll, pollEveryMs);
       }
 
-      // ── Step 2 → 3 transition ─────────────────────────────
-      window.ss_step2Next = function () {
-        var urlInput = document.getElementById('ss-stape-url') ||
-                       document.getElementById('ss-gcloud-url') ||
-                       document.getElementById('ss-self-url');
-        var url = urlInput ? urlInput.value.trim() : '';
-        if (_ssProvider === 'stape') {
-          var keyIn = document.getElementById('ss-stape-apikey');
-          var key = keyIn ? keyIn.value.trim() : '';
-          if (!key) { showToast('أدخل Stape API Key أولاً'); return; }
-          _ssStapeApiKey = key;
-          _ssServerUrl   = url || _ssServerUrl;
-        } else {
-          if (!url) { showToast('أدخل Server URL أولاً'); return; }
-          _ssServerUrl = url;
-        }
-        ss_goToStep(3);
+      window.ss_copyConfig = function () {
+        if (!_ssContainerConfig) return;
+        navigator.clipboard.writeText(_ssContainerConfig).then(function () { showToast('✅ تم نسخ Container Config'); }).catch(function () {});
       };
 
-      // ── URL validation (calls backend) ────────────────────
-      window.ss_testUrl = function (provider) {
-        var urlInput = document.getElementById('ss-stape-url') ||
-                       document.getElementById('ss-gcloud-url') ||
-                       document.getElementById('ss-self-url');
-        var statusEl = document.getElementById('ss-step2-url-status');
-        var url = urlInput ? urlInput.value.trim() : '';
-        if (!url) { if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">أدخل URL أولاً</span>'; return; }
-        if (statusEl) statusEl.innerHTML = '<span style="color:var(--mut);">⏳ جارٍ الاختبار...</span>';
-        _ssApi('POST', '/api/ss/validate-url', { url: url }, function (err, res) {
-          if (!statusEl) return;
-          if (err || !res) { statusEl.innerHTML = '<span style="color:#f87171;">❌ تعذّر الاتصال بالخادم</span>'; return; }
-          if (res.ok && res.data.valid) {
-            statusEl.innerHTML = '<span style="color:var(--acc);">✅ متصل — ' + (res.data.latencyMs || '?') + 'ms</span>';
+      // ── STEP 2: URL validation ────────────────────────────
+      window.ss_p2OnInput = function () {
+        var nextBtn = document.getElementById('ss-p2-next-btn');
+        if (nextBtn) nextBtn.disabled = true;
+        _ssUrlValidated = false;
+        var statusEl = document.getElementById('ss-p2-status');
+        if (statusEl) { statusEl.className = 'ss-url-status'; statusEl.textContent = ''; }
+      };
+
+      window.ss_validateUrl = function () {
+        var inp      = document.getElementById('ss-p2-url');
+        var statusEl = document.getElementById('ss-p2-status');
+        var nextBtn  = document.getElementById('ss-p2-next-btn');
+        var url      = inp ? inp.value.trim() : '';
+        if (!url) { if (statusEl) { statusEl.className = 'ss-url-status err'; statusEl.textContent = '⚠️ أدخل URL أولاً'; } return; }
+        if (!/^https?:\/\/.+\..+/.test(url)) { if (statusEl) { statusEl.className = 'ss-url-status err'; statusEl.textContent = '❌ URL غير صالح — يجب أن يبدأ بـ https://'; } return; }
+        if (statusEl) { statusEl.className = 'ss-url-status testing'; statusEl.textContent = '⏳ جارٍ الاختبار...'; }
+        _ssApi('POST', '/api/ss/validate-url', { url: url, provider: 'selfhosted' }, function (err, res) {
+          if (err || !res) { if (statusEl) { statusEl.className = 'ss-url-status err'; statusEl.textContent = '❌ تعذّر الاتصال'; } return; }
+          if (res.data && res.data.valid) {
+            var lat = res.data.latencyMs ? ' (' + res.data.latencyMs + 'ms)' : '';
+            if (statusEl) { statusEl.className = 'ss-url-status ok'; statusEl.textContent = '✅ متصل' + lat; }
             _ssServerUrl = url;
+            _ssUrlValidated = true;
+            if (nextBtn) nextBtn.disabled = false;
           } else {
-            var msg = (res.data && res.data.error) || 'فشل الاتصال';
-            statusEl.innerHTML = '<span style="color:#f87171;">❌ ' + msg + '</span>';
+            var msg = (res.data && res.data.error) || 'الخادم لا يستجيب';
+            if (statusEl) { statusEl.className = 'ss-url-status err'; statusEl.textContent = '❌ ' + msg; }
           }
         });
       };
 
-      // ── Platform list (step 3) ────────────────────────────
-      window.ss_renderPlatformList = function () {
-        var container = document.getElementById('ss-plat-list');
+      // ── STEP 3: Platform list ─────────────────────────────
+      window.ss_renderPlatList = function () {
+        var container = document.getElementById('ss-p3-plat-list');
         if (!container) return;
         container.innerHTML = _ssPlatDefs.map(function (p) {
           var enabled = _ssEnabledPlats.indexOf(p.key) !== -1;
-          var tok = _ssTokens[p.key] || '';
-          var isConfigured = tok === '***CONFIGURED***';
-          return '<div class="ss-plat-row">' +
-            '<div class="ss-plat-icon" style="background:' + p.color + '20;color:' + p.color + ';">' + p.icon + '</div>' +
-            '<div class="ss-plat-info" style="flex:1;">' +
-            '<div class="ss-plat-name">' + p.name + '</div>' +
-            '<div class="ss-plat-sub">' + p.sub + '</div>' +
-            '<input type="password" class="ss-plat-input" id="ss-tok-' + p.key + '"' +
-            ' placeholder="' + (isConfigured ? 'محفوظ — اتركه فارغاً للإبقاء عليه' : p.ph) + '"' +
-            ' value=""' +
-            (enabled ? '' : ' disabled') +
-            ' style="margin-top:6px;">' +
-            (isConfigured ? '<div style="font-size:10px;color:var(--acc);margin-top:3px;">✓ مشفّر ومحفوظ</div>' : '') +
+          return '<div class="ss-sel-row' + (enabled ? ' selected' : '') + '" id="ss-p3-row-' + p.key + '" onclick="ss_togglePlatRow(\'' + p.key + '\')">' +
+            '<div class="ss-sel-ico">' + p.icon + '</div>' +
+            '<div class="ss-sel-info"><div class="ss-sel-name">' + p.name + '</div><div class="ss-sel-sub">' + p.sub + '</div></div>' +
+            '<div style="width:22px;height:22px;border-radius:50%;border:2px solid ' + (enabled ? 'var(--acc)' : 'var(--bdr2)') + ';background:' + (enabled ? 'var(--acc)' : 'transparent') + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;" id="ss-p3-chk-' + p.key + '">' +
+            (enabled ? '<span style="color:#00382b;font-size:14px;font-weight:900;">✓</span>' : '') +
             '</div>' +
-            '<label class="ss-toggle" style="flex-shrink:0;"><input type="checkbox" id="ss-tog-' + p.key + '"' +
-            (enabled ? ' checked' : '') +
-            ' onchange="ss_togglePlat(\'' + p.key + '\',this.checked)">' +
-            '<span class="ss-toggle-slider"></span></label>' +
             '</div>';
         }).join('');
       };
 
-      window.ss_togglePlat = function (key, enabled) {
+      window.ss_togglePlatRow = function (key) {
         var idx = _ssEnabledPlats.indexOf(key);
-        if (enabled && idx === -1) _ssEnabledPlats.push(key);
-        if (!enabled && idx !== -1) _ssEnabledPlats.splice(idx, 1);
-        var inp = document.getElementById('ss-tok-' + key);
-        if (inp) inp.disabled = !enabled;
+        if (idx === -1) _ssEnabledPlats.push(key);
+        else            _ssEnabledPlats.splice(idx, 1);
+        ss_renderPlatList();
       };
 
-      // ── Test event (step 4) ───────────────────────────────
-      window.ss_sendTestEvent = function () {
-        var statusEl = document.getElementById('ss-test-status');
-        var resultEl = document.getElementById('ss-test-result');
-        if (!_ssServerUrl) { if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">لا يوجد Server URL محفوظ</span>'; return; }
-        if (statusEl) statusEl.innerHTML = '⏳ جارٍ الإرسال...';
-        if (resultEl) resultEl.style.display = 'none';
-        _ssApi('POST', '/api/ss/test-event', {
-          serverUrl: _ssServerUrl,
-          provider:  _ssProvider || 'selfhosted'
-        }, function (err, res) {
-          if (!statusEl) return;
-          if (err || !res) { statusEl.innerHTML = '<span style="color:#f87171;">❌ خطأ في الاتصال</span>'; return; }
-          // Server returns 200 with { ok: false } when sGTM rejects the event — must check body, not HTTP status
-          var bodyOk = res.data && res.data.ok;
-          if (res.ok && bodyOk) {
-            var lat = res.data.latencyMs ? ' (' + res.data.latencyMs + 'ms)' : '';
-            statusEl.innerHTML = '<span style="color:var(--acc);">✅ تم الإرسال بنجاح' + lat + '</span>';
-            if (resultEl) {
-              resultEl.style.display = 'block';
-              resultEl.textContent = JSON.stringify(res.data, null, 2);
-            }
-          } else {
-            var msg = (res.data && (res.data.error || ('Status ' + res.data.status))) || 'فشل الإرسال';
-            statusEl.innerHTML = '<span style="color:#f87171;">❌ ' + msg + '</span>';
-            if (resultEl && res.data) {
-              resultEl.style.display = 'block';
-              resultEl.textContent = JSON.stringify(res.data, null, 2);
-            }
-          }
-        });
+      // ── STEP 4: Event list ────────────────────────────────
+      window.ss_renderEventList = function () {
+        var container = document.getElementById('ss-p4-events-list');
+        if (!container) return;
+        container.innerHTML = _ssEventDefs.map(function (ev) {
+          var enabled = _ssSsEvents.indexOf(ev.key) !== -1;
+          var badge = ev.rec ? '<span class="ss-sel-badge rec">⭐ موصى به</span>' : (ev.warn ? '<span class="ss-sel-badge warn">⚠️ تكلفة عالية</span>' : '');
+          return '<div class="ss-sel-row' + (enabled ? ' selected' : '') + '" onclick="ss_toggleEvent(\'' + ev.key + '\')">' +
+            '<div class="ss-sel-info"><div class="ss-sel-name" style="font-size:13px;">' + ev.label + '</div></div>' +
+            badge +
+            '<div style="width:22px;height:22px;border-radius:50%;border:2px solid ' + (enabled ? 'var(--acc)' : 'var(--bdr2)') + ';background:' + (enabled ? 'var(--acc)' : 'transparent') + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;">' +
+            (enabled ? '<span style="color:#00382b;font-size:14px;font-weight:900;">✓</span>' : '') +
+            '</div>' +
+            '</div>';
+        }).join('');
       };
 
-      // ── Save config (step 4) ──────────────────────────────
-      window.ss_saveConfig = function () {
-        var saveBtn  = document.getElementById('ss-save-btn');
-        var statusEl = document.getElementById('ss-save-status');
-        if (!_ssServerUrl) { if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">لا يوجد Server URL</span>'; return; }
+      window.ss_toggleEvent = function (key) {
+        var idx = _ssSsEvents.indexOf(key);
+        if (idx === -1) _ssSsEvents.push(key);
+        else            _ssSsEvents.splice(idx, 1);
+        ss_renderEventList();
+      };
 
-        // Collect current token inputs
+      // ── STEP 5: Client-side config ────────────────────────
+      window.ss_p5OnInput = function () {
+        var val = (document.getElementById('ss-p5-ga4-id') || {}).value || '';
+        _ssGa4Id = val.trim();
+      };
+
+      window.ss_renderClientConfig = function () {
+        // Client platforms
+        var cpEl = document.getElementById('ss-p5-client-plats');
+        if (cpEl) {
+          cpEl.innerHTML = _ssClientPlatDefs.map(function (p) {
+            var enabled = _ssClientPlats.indexOf(p.key) !== -1;
+            return '<div class="ss-ev-row' + (enabled ? ' checked' : '') + '" onclick="ss_toggleClientPlat(\'' + p.key + '\')">' +
+              '<input type="checkbox" id="ss-cp-' + p.key + '"' + (enabled ? ' checked' : '') + ' onclick="event.stopPropagation();ss_toggleClientPlat(\'' + p.key + '\')" style="accent-color:var(--acc);">' +
+              '<span style="font-size:16px;">' + p.icon + '</span>' +
+              '<div><div class="ss-ev-row-label">' + p.name + '</div><div style="font-size:10px;color:var(--mut);">' + p.sub + '</div></div>' +
+              '</div>';
+          }).join('');
+        }
+        // Google Ads events
+        var gaEl = document.getElementById('ss-p5-gads-events');
+        if (gaEl) {
+          gaEl.innerHTML = _ssGadsEventDefs.map(function (ev) {
+            var checked = _ssGoogleAdsEvents.indexOf(ev.key) !== -1;
+            return '<div class="ss-ev-row' + (checked ? ' checked' : '') + '" onclick="ss_toggleGadsEvent(\'' + ev.key + '\')">' +
+              '<input type="checkbox"' + (checked ? ' checked' : '') + ' onclick="event.stopPropagation();ss_toggleGadsEvent(\'' + ev.key + '\')" style="accent-color:#4285F4;">' +
+              '<span class="ss-ev-row-label">' + ev.label + '</span>' +
+              '</div>';
+          }).join('');
+        }
+        // GA4 events
+        var g4El = document.getElementById('ss-p5-ga4-events');
+        if (g4El) {
+          g4El.innerHTML = _ssGa4EventDefs.map(function (ev) {
+            var checked = _ssGa4Events.indexOf(ev.key) !== -1;
+            return '<div class="ss-ev-row' + (checked ? ' checked' : '') + '" onclick="ss_toggleGa4Event(\'' + ev.key + '\')">' +
+              '<input type="checkbox"' + (checked ? ' checked' : '') + ' onclick="event.stopPropagation();ss_toggleGa4Event(\'' + ev.key + '\')" style="accent-color:#F9AB00;">' +
+              '<span class="ss-ev-row-label">' + ev.label + '</span>' +
+              '</div>';
+          }).join('');
+        }
+        // Restore GA4 ID input
+        var idInp = document.getElementById('ss-p5-ga4-id');
+        if (idInp && _ssGa4Id) idInp.value = _ssGa4Id;
+      };
+
+      window.ss_toggleClientPlat = function (key) {
+        var idx = _ssClientPlats.indexOf(key);
+        if (idx === -1) _ssClientPlats.push(key); else _ssClientPlats.splice(idx, 1);
+        ss_renderClientConfig();
+      };
+      window.ss_toggleGadsEvent = function (key) {
+        var idx = _ssGoogleAdsEvents.indexOf(key);
+        if (idx === -1) _ssGoogleAdsEvents.push(key); else _ssGoogleAdsEvents.splice(idx, 1);
+        ss_renderClientConfig();
+      };
+      window.ss_toggleGa4Event = function (key) {
+        var idx = _ssGa4Events.indexOf(key);
+        if (idx === -1) _ssGa4Events.push(key); else _ssGa4Events.splice(idx, 1);
+        ss_renderClientConfig();
+      };
+
+      // ── STEP 6: Summary + Confirm ─────────────────────────
+      window.ss_renderSummary = function () {
+        var sumEl = document.getElementById('ss-p6-summary');
+        if (!sumEl) return;
+
+        // Read GA4 ID from input (may have been typed just now)
+        var idInp = document.getElementById('ss-p5-ga4-id');
+        if (idInp) _ssGa4Id = idInp.value.trim();
+
+        var rows = function (pairs) {
+          return pairs.map(function (p) {
+            return '<div class="ss-summary-row"><span class="ss-summary-key">' + p[0] + '</span><span class="ss-summary-val">' + p[1] + '</span></div>';
+          }).join('');
+        };
+
+        sumEl.innerHTML =
+          '<div class="ss-summary-block"><div class="ss-summary-label">Server-Side (sGTM)</div>' +
+          rows([
+            ['Server URL', _ssServerUrl || '—'],
+            ['Web GTM',    _ssWebGtmId    || '—'],
+            ['Server GTM', _ssServerGtmId || '—'],
+            ['المنصات',    _ssEnabledPlats.length ? _ssEnabledPlats.join(', ') : '—'],
+            ['SS Events',  _ssSsEvents.length     ? _ssSsEvents.join(', ')     : '—'],
+          ]) + '</div>' +
+          '<div class="ss-summary-block"><div class="ss-summary-label">Client-Side (Web GTM)</div>' +
+          rows([
+            ['GA4 ID',          _ssGa4Id || '—'],
+            ['المنصات',         _ssClientPlats.join(', ')],
+            ['Google Ads Conv.', _ssGoogleAdsEvents.length ? _ssGoogleAdsEvents.join(', ') : '—'],
+            ['GA4 Events',      _ssGa4Events.length        ? _ssGa4Events.join(', ')       : '—'],
+          ]) + '</div>';
+
+        // Token inputs for enabled SS platforms
+        var tokList = document.getElementById('ss-p6-tokens-list');
+        if (tokList) {
+          tokList.innerHTML = _ssPlatDefs.filter(function (p) { return _ssEnabledPlats.indexOf(p.key) !== -1; })
+            .map(function (p) {
+              var tok = _ssTokens[p.key] || '';
+              var isConf = tok === '***CONFIGURED***';
+              return '<div style="display:flex;align-items:center;gap:10px;background:var(--sur);border:1px solid var(--bdr2);border-radius:10px;padding:10px 12px;">' +
+                '<span style="font-size:18px;">' + p.icon + '</span>' +
+                '<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--wht);">' + p.name + '</div>' +
+                '<input type="password" id="ss-tok-' + p.key + '" class="ss-tok-input" placeholder="' + (isConf ? 'محفوظ — اتركه فارغاً للإبقاء عليه' : p.ph) + '">' +
+                (isConf ? '<div style="font-size:10px;color:var(--acc);margin-top:2px;">✓ مشفّر ومحفوظ</div>' : '') +
+                '</div></div>';
+            }).join('') || '<div style="font-size:12px;color:var(--mut);">لم تختر أي منصة Server-Side — يمكن إضافتها لاحقاً.</div>';
+        }
+      };
+
+      // ── Confirm & wire ────────────────────────────────────
+      window.ss_confirmSetup = function () {
+        var btn      = document.getElementById('ss-p6-confirm-btn');
+        var statusEl = document.getElementById('ss-p6-status');
+        var errorEl  = document.getElementById('ss-p6-error');
+
+        if (errorEl) errorEl.style.display = 'none';
+
+        // Read GA4 ID
+        var idInp = document.getElementById('ss-p5-ga4-id');
+        if (idInp) _ssGa4Id = idInp.value.trim();
+
+        // Collect tokens
         var tokens = {};
         _ssPlatDefs.forEach(function (p) {
           var inp = document.getElementById('ss-tok-' + p.key);
           if (inp && inp.value.trim()) tokens[p.key] = inp.value.trim();
         });
 
-        var payload = {
-          provider:         _ssProvider,
-          serverUrl:        _ssServerUrl,
-          platforms:        _ssEnabledPlats,
-          tokens:           tokens,
-          stapeApiKey:      _ssProvider === 'stape' ? _ssStapeApiKey : null,
-          stapeContainerId: _ssStapeContId || null
-        };
+        if (!_ssServerUrl)        { if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">لا يوجد Server URL — ارجع للخطوة 2</span>'; return; }
+        if (!_ssContainersReady)  { if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">لم تُنشأ الـ Containers بعد — ارجع للخطوة 1</span>'; return; }
 
-        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'جارٍ الحفظ...'; }
-        if (statusEl) statusEl.innerHTML = '';
+        if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--acc);">⏳ جارٍ الربط والحفظ...</span>';
 
-        _ssApi('POST', '/api/ss/save-config', payload, function (err, res) {
-          if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:14px;">check_circle</span> حفظ وتفعيل'; }
-          if (err || !res) { if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">❌ خطأ في الاتصال</span>'; return; }
-          if (res.ok) {
-            if (statusEl) statusEl.innerHTML = '<span style="color:var(--acc);">✅ تم الحفظ</span>';
-            // Activate SS globally
+        // Step 1: wire transport URL
+        var doSaveConfig = function () {
+          _ssApi('POST', '/api/ss/save-config', {
+            provider:         'selfhosted',
+            serverUrl:        _ssServerUrl,
+            platforms:        _ssEnabledPlats,
+            tokens:           tokens,
+            ga4MeasurementId: _ssGa4Id,
+            ga4Events:        _ssGa4Events,
+            googleAdsEvents:  _ssGoogleAdsEvents,
+            ssEvents:         _ssSsEvents,
+          }, function (err2, res2) {
+            if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+            if (err2 || !res2 || !res2.ok || !res2.data || !res2.data.ok) {
+              var m = (res2 && res2.data && res2.data.error) || (err2 && err2.message) || 'فشل الحفظ';
+              if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">❌ ' + m + '</span>';
+              if (errorEl) { errorEl.style.display = 'block'; errorEl.textContent = '❌ ' + m; }
+              return;
+            }
+            if (statusEl) statusEl.innerHTML = '<span style="color:var(--acc);">✅ تم الإعداد بالكامل</span>';
+            // Update ET global
             if (window.ET) {
-              window.ET.ssEnabled   = true;
-              window.ET.ssUrl       = _ssServerUrl;
+              window.ET.ssEnabled = true; window.ET.ssUrl = _ssServerUrl;
               window.ET.ssPlatforms = {};
               _ssEnabledPlats.forEach(function (k) { window.ET.ssPlatforms[k] = true; });
             }
-            // Set cookie for server-side use
             document.cookie = 'et_ss_url=' + encodeURIComponent(_ssServerUrl) + ';path=/;max-age=31536000;SameSite=Lax';
-            _ssShowBanner();
-            showToast('✅ Server-Side Tracking مفعّل');
-          } else {
-            var msg = (res.data && res.data.error) || 'فشل الحفظ';
-            if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">❌ ' + msg + '</span>';
-          }
-        });
-      };
-
-      // ── Deploy on Stape (step 4) ──────────────────────────
-      window.ss_deployProvider = function () {
-        if (_ssProvider !== 'stape' || !_ssStapeApiKey) { showToast('أدخل Stape API Key في الخطوة 2'); return; }
-        var deployBtn = document.getElementById('ss-deploy-btn');
-        var statusEl  = document.getElementById('ss-save-status');
-        if (deployBtn) { deployBtn.disabled = true; deployBtn.textContent = 'جارٍ النشر...'; }
-        _ssApi('POST', '/api/ss/deploy-stape', {
-          stapeApiKey:   _ssStapeApiKey,
-          containerName: 'Easy Track sGTM'
-        }, function (err, res) {
-          if (deployBtn) { deployBtn.disabled = false; deployBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:14px;">rocket_launch</span> نشر على Stape'; }
-          if (err || !res) { if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">❌ خطأ في الاتصال</span>'; return; }
-          if (res.ok && res.data.serverUrl) {
-            _ssServerUrl   = res.data.serverUrl;
-            _ssStapeContId = res.data.containerId || '';
-            if (statusEl) statusEl.innerHTML = '<span style="color:var(--acc);">✅ تم النشر: ' + _ssServerUrl + '</span>';
-            showToast('✅ تم نشر Stape container');
-          } else {
-            var hint = res.data && res.data.hint ? ' — ' + res.data.hint : '';
-            var msg  = (res.data && res.data.error) || 'فشل النشر';
-            if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">❌ ' + msg + hint + '</span>';
-          }
-        });
-      };
-
-      // ── Load saved config from server ─────────────────────
-      // Backend response shape: { ok: true, config: { provider, serverUrl, platforms, encryptedTokens, stapeApiKey, stapeContainerId } }
-      window.ss_loadConfig = function (cb) {
-        _ssApi('GET', '/api/ss/config', null, function (err, res) {
-          if (err || !res || !res.ok || !res.data || !res.data.ok || !res.data.config) {
-            if (cb) cb(false);
-            return;
-          }
-          var d = res.data.config;
-          _ssProvider     = d.provider     || 'selfhosted';
-          _ssServerUrl    = d.serverUrl    || '';
-          _ssEnabledPlats = Array.isArray(d.platforms) ? d.platforms : [];
-          // tokens are redacted on server — keep sentinel so UI shows "configured"
-          _ssTokens = {};
-          var et = d.encryptedTokens || {};
-          Object.keys(et).forEach(function (k) {
-            if (et[k]) _ssTokens[k] = '***CONFIGURED***';
+            ss_showDoneBanner();
+            try { ovRefreshGtmStatus(); } catch (_) {}
+            showToast('✅ Server-Side Tracking مفعّل بالكامل!');
           });
-          if (d.stapeApiKey) _ssStapeApiKey = '***CONFIGURED***';
-          if (d.stapeContainerId) _ssStapeContId = d.stapeContainerId;
-          if (cb) cb(true);
+        };
+
+        // Wire transport URL first (links Web GTM → sGTM server)
+        _ssApi('POST', '/api/ss/wire-transport', { sgtmUrl: _ssServerUrl }, function (err, res) {
+          if (err || !res || !res.ok) {
+            // Wire may fail if already wired or containers not in expected state — non-fatal, continue to save
+            console.warn('[ss] wire-transport non-fatal:', err || (res && res.data && res.data.error));
+          }
+          doSaveConfig();
         });
       };
 
-      // ── Delete config ─────────────────────────────────────
+      // ── Done banner ───────────────────────────────────────
+      function ss_showDoneBanner() {
+        var banner = document.getElementById('ss-done-banner');
+        var urlEl  = document.getElementById('ss-done-url');
+        var resetBtn = document.getElementById('ss-hdr-reset-btn');
+        if (banner) { banner.style.display = 'flex'; }
+        if (urlEl)  { urlEl.textContent = _ssServerUrl + ' — ' + (_ssEnabledPlats.join(', ') || 'لا منصات'); }
+        if (resetBtn) resetBtn.style.display = '';
+        // Hide step bar + panels
+        var bar = document.getElementById('ss-step-bar');
+        if (bar) bar.style.display = 'none';
+        for (var i = 1; i <= 6; i++) {
+          var p = document.getElementById('ss-panel-' + i);
+          if (p) p.style.display = 'none';
+        }
+      }
+
+      window.ss_editSetup = function () {
+        var banner = document.getElementById('ss-done-banner');
+        if (banner) banner.style.display = 'none';
+        var bar = document.getElementById('ss-step-bar');
+        if (bar) bar.style.display = '';
+        _ssContainersReady = !!_ssWebGtmId;
+        _ssUrlValidated    = !!_ssServerUrl;
+        ss_goToStep(_ssContainersReady ? (_ssUrlValidated ? 3 : 2) : 1);
+      };
+
+      // ── Reset ─────────────────────────────────────────────
       window.ss_resetConfig = function () {
-        if (!confirm('حذف إعدادات Server-Side Tracking؟ لا يمكن التراجع عن هذا.')) return;
+        if (!confirm('حذف إعدادات Server-Side Tracking؟ لا يمكن التراجع.')) return;
         _ssApi('DELETE', '/api/ss/config', null, function (err, res) {
           if (err || !res || !res.ok) { showToast('❌ فشل الحذف'); return; }
-          _ssProvider = null; _ssServerUrl = ''; _ssEnabledPlats = []; _ssTokens = {};
-          _ssStapeApiKey = ''; _ssStapeContId = '';
+          _ssEnabledPlats = []; _ssSsEvents = ['purchase']; _ssServerUrl = '';
+          _ssGa4Id = ''; _ssTokens = {}; _ssContainersReady = false; _ssUrlValidated = false;
+          _ssWebGtmId = ''; _ssServerGtmId = ''; _ssContainerConfig = '';
           if (window.ET) { window.ET.ssEnabled = false; window.ET.ssUrl = ''; window.ET.ssPlatforms = {}; }
           document.cookie = 'et_ss_url=;path=/;max-age=0';
-          var banner = document.getElementById('ss-active-banner');
+          var banner = document.getElementById('ss-done-banner');
           if (banner) banner.style.display = 'none';
+          var bar = document.getElementById('ss-step-bar'); if (bar) bar.style.display = '';
+          var resetBtn = document.getElementById('ss-hdr-reset-btn'); if (resetBtn) resetBtn.style.display = 'none';
           ss_goToStep(1);
+          try { ovRefreshGtmStatus(); } catch (_) {}
           showToast('تم حذف إعدادات Server-Side Tracking');
         });
       };
 
-      // ── Active config banner ──────────────────────────────
-      function _ssShowBanner() {
-        var banner  = document.getElementById('ss-active-banner');
-        var urlEl   = document.getElementById('ss-active-url');
-        if (!banner) return;
-        banner.style.display = 'flex';
-        if (urlEl) urlEl.textContent = _ssServerUrl + ' — ' + (_ssEnabledPlats.join(', ') || 'لا توجد منصات');
-      }
+      // ── Load saved config ─────────────────────────────────
+      window.ss_loadConfig = function (cb) {
+        _ssApi('GET', '/api/ss/config', null, function (err, res) {
+          if (err || !res || !res.ok || !res.data || !res.data.ok || !res.data.config) { if (cb) cb(false); return; }
+          var d = res.data.config;
+          _ssServerUrl    = d.serverUrl    || '';
+          _ssEnabledPlats = Array.isArray(d.platforms) ? d.platforms : [];
+          _ssGa4Id        = d.ga4MeasurementId || '';
+          _ssGa4Events    = Array.isArray(d.ga4Events)       ? d.ga4Events       : _ssGa4Events;
+          _ssGoogleAdsEvents = Array.isArray(d.googleAdsEvents) ? d.googleAdsEvents : _ssGoogleAdsEvents;
+          _ssSsEvents     = Array.isArray(d.ssEvents)        ? d.ssEvents        : _ssSsEvents;
+          _ssWebGtmId     = d.webPublicId    || '';
+          _ssServerGtmId  = d.serverPublicId || '';
+          _ssContainersReady = !!(d.webContainerId || d.webPublicId);
+          _ssUrlValidated    = !!_ssServerUrl;
+          // token sentinels
+          _ssTokens = {};
+          var et = d.encryptedTokens || {};
+          Object.keys(et).forEach(function (k) { if (et[k]) _ssTokens[k] = '***CONFIGURED***'; });
+          if (cb) cb(true);
+        });
+      };
+
+      // ── Overview GTM Status refresh ───────────────────────
+      window.ovRefreshGtmStatus = function () {
+        _ssApi('GET', '/api/ss/full-status', null, function (err, res) {
+          var webId    = _ssWebGtmId    || (res && res.data && res.data.container && res.data.container.webGtmId)    || null;
+          var srvId    = _ssServerGtmId || (res && res.data && res.data.container && res.data.container.serverGtmId) || null;
+          var snippet  = (res && res.data && res.data.container && res.data.container.snippetHead) || _ssWebSnippetHead || null;
+          var platforms= (res && res.data && res.data.container && res.data.container.platforms)   || [];
+          var ssCfg    = (res && res.data && res.data.ss)        || null;
+
+          var webIdEl     = document.getElementById('ovWebGtmId');
+          var srvIdEl     = document.getElementById('ovServerGtmId');
+          var webBadge    = document.getElementById('ovWebGtmBadge');
+          var srvBadge    = document.getElementById('ovServerGtmBadge');
+          var placeholder = document.getElementById('ovGtmPlaceholder');
+          var snippetWrap = document.getElementById('ovWebSnippetWrap');
+          var snippetCode = document.getElementById('ovWebSnippetCode');
+          var platWrap    = document.getElementById('ovActivePlatforms');
+          var platGrid    = document.getElementById('ovActivePlatGrid');
+
+          var hasAny = !!(webId || srvId);
+
+          if (placeholder) placeholder.style.display = hasAny ? 'none' : '';
+
+          if (webIdEl)  webIdEl.textContent  = webId  || '—';
+          if (srvIdEl)  srvIdEl.textContent  = srvId  || '—';
+
+          if (webBadge) {
+            webBadge.textContent = webId  ? '🟢 مُعدّ' : '🔴 غير مُعدّ';
+            webBadge.style.color = webId  ? 'var(--acc)' : 'var(--mut)';
+          }
+          if (srvBadge) {
+            var srvUrl = ssCfg && ssCfg.serverUrl ? ssCfg.serverUrl : null;
+            srvBadge.textContent = (srvId && srvUrl) ? '🟢 مُعدّ + مُنشور' : (srvId ? '🟡 منشور جزئياً' : '🔴 غير مُعدّ');
+            srvBadge.style.color = (srvId && srvUrl) ? 'var(--acc)' : (srvId ? '#fbbf24' : 'var(--mut)');
+          }
+
+          if (snippet && snippetWrap && snippetCode) {
+            snippetWrap.style.display = '';
+            snippetCode.textContent = snippet.length > 300 ? snippet.substring(0,300) + '…' : snippet;
+          } else if (snippetWrap) { snippetWrap.style.display = 'none'; }
+
+          // Active platforms (web + server combined)
+          var allPlats = [];
+          if (platforms && platforms.length) platforms.forEach(function (k) { allPlats.push({ key: k, side: 'client' }); });
+          if (ssCfg && Array.isArray(ssCfg.platforms)) ssCfg.platforms.forEach(function (k) { allPlats.push({ key: k, side: 'server' }); });
+          if (platWrap && platGrid && allPlats.length) {
+            platWrap.style.display = '';
+            var platIcons = { meta:'👥', tiktok:'🎵', snapchat:'👻', ga4:'📊', google:'🔵', google_ads:'🔵', linkedin:'💼', twitter:'🐦', mixpanel:'📈' };
+            var platNames = { meta:'Meta', tiktok:'TikTok', snapchat:'Snap', ga4:'GA4', google:'Google Ads', google_ads:'Google Ads', linkedin:'LinkedIn', twitter:'Twitter', mixpanel:'Mixpanel' };
+            platGrid.innerHTML = allPlats.map(function (p) {
+              return '<div style="display:inline-flex;align-items:center;gap:4px;background:var(--sur);border:1px solid var(--bdr2);border-radius:20px;padding:4px 10px;font-size:11px;font-family:var(--font-ui);font-weight:600;color:var(--wht2);">' +
+                (platIcons[p.key] || '📡') + ' ' + (platNames[p.key] || p.key) +
+                '<span style="font-size:9px;background:' + (p.side==='server'?'rgba(70,241,197,.15)':'rgba(66,133,244,.15)') + ';color:' + (p.side==='server'?'var(--acc)':'#93c5fd') + ';border-radius:4px;padding:1px 5px;margin-right:2px;">' +
+                (p.side==='server'?'SS':'CS') + '</span>' +
+                '</div>';
+            }).join('');
+          } else if (platWrap) { platWrap.style.display = 'none'; }
+        });
+      };
+
+      window.ovCopySnippet = function (type) {
+        var code = type === 'head' ? _ssWebSnippetHead : _ssWebSnippetBody;
+        if (!code) { showToast('لا يوجد snippet'); return; }
+        navigator.clipboard.writeText(code).then(function () { showToast('✅ تم نسخ الـ Snippet'); }).catch(function () {});
+      };
 
       // ── Init on view activation ───────────────────────────
-      var _ssInit = false;
       function initServerSideView() {
         if (_ssInit) return;
         _ssInit = true;
         ss_loadConfig(function (found) {
-          if (found && _ssServerUrl) {
-            if (window.ET) {
-              window.ET.ssEnabled   = true;
-              window.ET.ssUrl       = _ssServerUrl;
-              window.ET.ssPlatforms = {};
-              _ssEnabledPlats.forEach(function (k) { window.ET.ssPlatforms[k] = true; });
-            }
-            _ssShowBanner();
+          if (found && _ssContainersReady) {
+            // Restore UI state
+            var p1Result = document.getElementById('ss-p1-result');
+            var p1Next   = document.getElementById('ss-p1-next-btn');
+            var p1WebId  = document.getElementById('ss-p1-web-id');
+            var p1SrvId  = document.getElementById('ss-p1-server-id');
+            var p1Cfg    = document.getElementById('ss-p1-config-json');
+            if (p1Result) p1Result.style.display = '';
+            if (p1Next)   p1Next.disabled = false;
+            if (p1WebId)  p1WebId.textContent  = _ssWebGtmId    || '—';
+            if (p1SrvId)  p1SrvId.textContent  = _ssServerGtmId || '—';
+            if (p1Cfg)    p1Cfg.textContent     = '(Container already created)';
+          }
+          if (found && _ssServerUrl && _ssEnabledPlats.length) {
+            // Config complete — show done banner
+            ss_showDoneBanner();
+            var resetBtn = document.getElementById('ss-hdr-reset-btn');
+            if (resetBtn) resetBtn.style.display = '';
+          }
+          if (window.ET) {
+            window.ET.ssEnabled   = found && !!_ssServerUrl;
+            window.ET.ssUrl       = _ssServerUrl;
+            window.ET.ssPlatforms = {};
+            _ssEnabledPlats.forEach(function (k) { window.ET.ssPlatforms[k] = true; });
           }
         });
       }
 
-      // ══════════════════════════════════════════════════════
-      // 12. PATCH switchAppView to init new views
-      // ══════════════════════════════════════════════════════
-      var _origSwitchAppView = window.switchAppView;
+      // ── Hook into view switcher ───────────────────────────
+      var _origSwitchAppView2 = window.switchAppView;
       window.switchAppView = function (viewKey, btnEl) {
-        if (_origSwitchAppView) _origSwitchAppView(viewKey, btnEl);
+        if (_origSwitchAppView2) _origSwitchAppView2(viewKey, btnEl);
         if (viewKey === 'serverside') { setTimeout(initServerSideView, 50); }
+        if (viewKey === 'overview')   { setTimeout(function () { try { ovRefreshGtmStatus(); } catch (_) {} }, 200); }
       };
 
-      // ══════════════════════════════════════════════════════
+
       // 13. TOAST HELPER
       // ══════════════════════════════════════════════════════
       function showToast(msg, color) {
@@ -14588,77 +14807,4 @@
         var _genHook = window.generate;
         // After generate, sync to DLM engine
         window.generate = function () {
-          _genHook.apply(this, arguments);
-          setTimeout(function () {
-            var plats = window.S && window.S.platforms;
-            if (plats && plats.length) {
-              _activePlatforms = plats.slice();
-              ET.platforms = plats.slice();
-            }
-          }, 200);
-        };
-      }
-
-      console.log('%c[Easy Track] Full Marketing Data Infrastructure Engine v4.0 loaded ✓', 'color:#46f1c5;font-size:13px;font-weight:bold;');
-      console.log('%c  DataLayer Normalizer · Attribution · Deduplication · Multi-Platform · Server-Side', 'color:#85948d;font-size:11px;');
-    })();
-  </script>
-
-  <!-- ═══════════════════════════════════════════
-       WhatsApp Floating Button
-  ════════════════════════════════════════════ -->
-  <a href="https://wa.me/201552388174?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D8%8C%20%D8%A3%D8%B1%D9%8A%D8%AF%20%D8%A7%D9%84%D8%A7%D8%B3%D8%AA%D9%81%D8%B3%D8%A7%D8%B1%20%D8%B9%D9%86%20Easy%20Track"
-     target="_blank"
-     id="wa-float-btn"
-     title="تواصل معنا على واتساب"
-     style="
-       position:fixed;
-       bottom:28px;
-       left:28px;
-       z-index:9998;
-       width:58px;
-       height:58px;
-       background:#25D366;
-       border-radius:50%;
-       display:flex;
-       align-items:center;
-       justify-content:center;
-       box-shadow:0 4px 24px rgba(37,211,102,0.55);
-       text-decoration:none;
-       transition:transform .25s, box-shadow .25s;
-     "
-     onmouseover="this.style.transform='scale(1.12)';this.style.boxShadow='0 8px 36px rgba(37,211,102,0.75)'"
-     onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 4px 24px rgba(37,211,102,0.55)'"
-  >
-    <!-- WhatsApp SVG icon -->
-    <svg width="30" height="30" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
-      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-    </svg>
-    <!-- Pulse ring -->
-    <span style="
-      position:absolute;inset:0;border-radius:50%;
-      background:rgba(37,211,102,0.4);
-      animation:wa-ping 2s infinite;
-      pointer-events:none;
-    "></span>
-  </a>
-  <style>
-    @keyframes wa-ping {
-      0%   { transform:scale(1);   opacity:.5; }
-      70%  { transform:scale(1.7); opacity:0;  }
-      100% { transform:scale(1.7); opacity:0;  }
-    }
-  </style>
-
-  <!-- ═══════════════════════════════════════════
-       Domain Footer Bar
-  ════════════════════════════════════════════ -->
-  <div style="
-    width:100%;
-    text-align:center;
-    padding:14px 0 18px;
-    background:rgba(11,14,20,0.9);
-    border-top:1px solid rgba(70,241,197,0.08);
-    font-family:'IBM Plex Mono',monospace;
-    font-size:11px;
-    lette
+          _genHook.

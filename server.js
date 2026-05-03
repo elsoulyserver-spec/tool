@@ -1699,6 +1699,185 @@ http.createServer((req, res) => {
       return;
     }
 
+    // ────────────────────────────────────────────────────────────────────────
+    // POST /api/ss/create-containers
+    // Authenticated via Firebase token.
+    // Body: { configJson, projectName?, ga4MeasurementId?, ga4Events?,
+    //         googleAdsEvents?, ssEvents?, ssPlatforms? }
+    // Spawns a GTM provisioning job (mode=client_server) and returns jobId
+    // immediately. Poll GET /api/managed/job/:jobId for progress.
+    // ────────────────────────────────────────────────────────────────────────
+    if (req.method === 'POST' && ssPath === '/api/ss/create-containers') {
+      (async () => {
+        const auth = await ssAuthAndRate();
+        if (!auth) return;
+        const { clientId, email } = auth;
+        if (!ssRequireFirestore()) return;
+
+        if (!gtmService.isConfigured()) {
+          return sendJSON(res, 503, {
+            error: 'GTM غير مُهيَّأ على هذا الخادم',
+            hint:  'اضبط GTM_SA_KEY_JSON و GTM_ACCOUNT_ID في .env',
+          });
+        }
+
+        ssParseBody(async body => {
+          const {
+            configJson, projectName,
+            ga4MeasurementId, ga4Events, googleAdsEvents,
+            ssEvents, ssPlatforms,
+          } = body;
+
+          if (!configJson) {
+            return sendJSON(res, 400, {
+              error: 'حقل configJson مطلوب',
+              hint:  'أكمل Pixel Config أولاً للحصول على GTM JSON، أو مرّر configJson مباشرةً',
+            });
+          }
+
+          const activeCount = await firestoreService.countActiveContainers().catch(() => 0);
+          if (activeCount >= 490) {
+            return sendJSON(res, 507, { error: 'حساب GTM وصل للحد الأقصى (490 container)' });
+          }
+
+          const jobId = _newJobId();
+          _setJob(jobId, { status: 'pending', stage: 'queued', clientId, startedAt: Date.now() });
+
+          // Fire-and-forget provisioning
+          (async () => {
+            try {
+              _setJob(jobId, { status: 'running', stage: 'gtm_provisioning', mode: 'client_server' });
+
+              const both = await gtmService.provisionForClientWithServer({
+                projectName: projectName || ((email || clientId.slice(0, 8)) + ' — SS Setup'),
+                configJson,
+                publishLive:  false,
+                inviteEmail:  email || null,
+                onProgress:   (p) => _setJob(jobId, { stage: 'gtm_provisioning', progress: p }),
+              });
+
+              const { web, server } = both;
+              _setJob(jobId, { stage: 'saving' });
+
+              // Persist web container record
+              await firestoreService.saveContainer({
+                clientId,
+                clientEmail:    email || null,
+                projectName:    projectName || null,
+                platforms:      ssPlatforms || [],
+                events:         ssEvents    || [],
+                gtmAccountId:   web.gtmAccountId,
+                gtmContainerId: web.gtmContainerId,
+                gtmPublicId:    web.gtmPublicId,
+                gtmWorkspaceId: web.gtmWorkspaceId,
+                gtmVersionId:   web.gtmVersionId,
+                published:      false,
+                snippetHead:    web.snippetHead,
+                snippetBody:    web.snippetBody,
+                mode:           'client_server',
+                serverContainerPublicId: server ? server.publicId : null,
+              });
+
+              // Persist SS config with step-1 results (no URL yet)
+              try {
+                const existing = await firestoreService.getSSConfig(clientId).catch(() => null);
+                await firestoreService.saveSSConfig(clientId, {
+                  provider:           'pending',
+                  serverUrl:          '',
+                  platforms:          ssPlatforms   || [],
+                  encryptedTokens:    (existing && existing.encryptedTokens) || {},
+                  stapeApiKey:        null,
+                  stapeContainerId:   null,
+                  mode:               'client_server',
+                  webContainerId:     web.gtmContainerId,
+                  webPublicId:        web.gtmPublicId,
+                  webWorkspaceId:     web.gtmWorkspaceId,
+                  serverContainerId:  server ? server.containerId  : null,
+                  serverPublicId:     server ? server.publicId     : null,
+                  serverWorkspaceId:  server ? server.workspaceId  : null,
+                  serverVersionId:    server ? server.versionId    : null,
+                  containerConfig:    server ? (server.containerConfig || null) : null,
+                  transportUrlWired:  false,
+                  ga4MeasurementId:   ga4MeasurementId || null,
+                  ga4Events:          ga4Events        || [],
+                  googleAdsEvents:    googleAdsEvents  || [],
+                  ssEvents:           ssEvents         || [],
+                });
+              } catch (saveErr) {
+                console.warn('[ss/create-containers] saveSSConfig failed (non-fatal):', saveErr.message);
+              }
+
+              _setJob(jobId, {
+                status:    'completed',
+                stage:     'done',
+                result:    { ok: true, mode: 'client_server', ...web, server },
+                finishedAt: Date.now(),
+              });
+              _scheduleJobCleanup(jobId);
+            } catch (e) {
+              console.error('[ss/create-containers][job ' + jobId + ']', e);
+              _setJob(jobId, {
+                status:    'failed',
+                stage:     'error',
+                error:     e.message,
+                code:      e.code    || null,
+                httpStatus: (e.status >= 400 && e.status < 600) ? e.status : 502,
+                finishedAt: Date.now(),
+              });
+              _scheduleJobCleanup(jobId);
+            }
+          })();
+
+          sendJSON(res, 202, { ok: true, jobId });
+        });
+      })();
+      return;
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // GET /api/ss/full-status
+    // Returns combined container + SS config data for the Overview section.
+    // Tokens are always redacted. Container snippets are included.
+    // ────────────────────────────────────────────────────────────────────────
+    if (req.method === 'GET' && ssPath === '/api/ss/full-status') {
+      (async () => {
+        const auth = await ssAuthAndRate();
+        if (!auth) return;
+        const { clientId } = auth;
+        if (!ssRequireFirestore()) return;
+        try {
+          const [ssCfg, containers] = await Promise.all([
+            firestoreService.getSSConfigPublic(clientId).catch(() => null),
+            firestoreService.listContainersByClient(clientId).catch(() => []),
+          ]);
+
+          // Prefer the client_server container; fallback to most-recent
+          const sorted = (containers || []).sort((a, b) => {
+            const ta = (a.updatedAt && a.updatedAt.toMillis) ? a.updatedAt.toMillis() : 0;
+            const tb = (b.updatedAt && b.updatedAt.toMillis) ? b.updatedAt.toMillis() : 0;
+            return tb - ta;
+          });
+          const csContainer = sorted.find(c => c.mode === 'client_server') || sorted[0] || null;
+
+          sendJSON(res, 200, {
+            ok: true,
+            ss: ssCfg || null,
+            container: csContainer ? {
+              webGtmId:    csContainer.gtmPublicId              || null,
+              serverGtmId: csContainer.serverContainerPublicId  || null,
+              snippetHead: csContainer.snippetHead              || null,
+              snippetBody: csContainer.snippetBody              || null,
+              platforms:   csContainer.platforms                || [],
+              events:      csContainer.events                   || [],
+              published:   csContainer.published                || false,
+              mode:        csContainer.mode                     || 'client',
+            } : null,
+          });
+        } catch (e) { sendJSON(res, 500, { error: e.message }); }
+      })();
+      return;
+    }
+
     // Unknown /api/ss/* path
     sendJSON(res, 404, { error: 'SS endpoint غير موجود: ' + ssPath });
     return;
