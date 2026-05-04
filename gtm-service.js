@@ -661,4 +661,35 @@ async function provisionForClientWithServer(opts) {
   });
 
   return {
-    web,                                       
+    web,                                            // existing shape from provisionForClient
+    server: {
+      gtmAccountId:    getAccountId(),
+      containerId:     serverContainerId,
+      publicId:        serverPublicId,
+      workspaceId:     serverWorkspaceId,
+      versionId:       serverVersionId,
+      containerName:   serverName,
+      containerConfig,                              // ← the deploy blob
+      importedTagCount:      importResult.importedTagCount      || 0,
+      importedTriggerCount:  importResult.importedTriggerCount  || 0,
+      importedVariableCount: importResult.importedVariableCount || 0,
+    },
+  };
+}
+
+module.exports = {
+  isConfigured,
+  getAccessToken,
+  listContainers,
+  createContainer,
+  importContainerJSON,
+  createVersion,
+  publishVersion,
+  inviteUserToContainer,
+  provisionForClient,
+  // Server-side (client + server flow)
+  createServerContainer,
+  getContainerConfig,
+  setGA4TransportUrl,
+  provisionForClientWithServer,
+};
