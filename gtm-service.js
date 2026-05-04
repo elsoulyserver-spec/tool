@@ -572,6 +572,44 @@ async function setGA4TransportUrl(webContainerId, webWorkspaceId, sgtmUrl) {
   return { tagId: ga4.tagId, versionId, transportUrl: sgtmUrl };
 }
 
+// Create or update the "ET - sGTM URL" constant variable in a server container
+// workspace.  Called by wire-transport after the user supplies their sGTM URL.
+async function upsertServerUrlVariable(serverContainerId, serverWorkspaceId, sgtmUrl) {
+  const acc      = getAccountId();
+  const basePath = `/accounts/${acc}/containers/${serverContainerId}/workspaces/${serverWorkspaceId}`;
+
+  // List existing variables and look for one named "ET - sGTM URL".
+  const varsResp  = await gtmRequest('GET', `${basePath}/variables`).catch(() => ({ variable: [] }));
+  const variables = varsResp.variable || [];
+  const existing  = variables.find(v => v.name === 'ET - sGTM URL');
+
+  const varBody = {
+    name:      'ET - sGTM URL',
+    type:      'c',   // constant
+    parameter: [{ type: 'template', key: 'value', value: sgtmUrl }],
+    notes:     'sGTM server URL — set by Easy Track wire-transport',
+  };
+
+  let variable;
+  if (existing) {
+    const updated = { ...existing, ...varBody };
+    variable = await gtmRequest('PUT', `${basePath}/variables/${existing.variableId}`, JSON.stringify(updated));
+  } else {
+    variable = await gtmRequest('POST', `${basePath}/variables`, JSON.stringify(varBody));
+  }
+
+  // Re-version + republish the server container so the variable is live.
+  try {
+    const ver = await createVersion(serverContainerId, serverWorkspaceId, 'wire sGTM URL variable');
+    const versionId = ver.containerVersion && ver.containerVersion.containerVersionId;
+    if (versionId) await publishVersion(serverContainerId, versionId);
+  } catch (e) {
+    console.warn('[gtm] upsertServerUrlVariable republish non-fatal:', e.message);
+  }
+
+  return { variableId: variable.variableId, name: variable.name };
+}
+
 // End-to-end provisioning when the user picks "client + server".
 // 1. Web container — same as provisionForClient (kept unpublished, we publish
 //    after wiring transport_url so we don't ship two versions).
@@ -622,12 +660,11 @@ async function provisionForClientWithServer(opts) {
   const serverWs = await getDefaultWorkspace(serverContainerId);
   const serverWorkspaceId = serverWs.workspaceId;
 
-  // Use an empty config at creation time — the full Variable/Trigger/Tag/Client
-  // config (built from the user's wizard selections) is imported later via the
-  // POST /api/ss/populate-containers endpoint, which runs at Step 8 after the
-  // user has entered GA4 ID, pixels, events, etc.  Keeping the creation config
-  // empty avoids duplicate GA4 Forward tags and GA4 Clients.
-  const sgtmConfig = { containerVersion: { variable: [], trigger: [], tag: [] } };
+  // Use the caller-supplied server config if provided (built from wizard data),
+  // otherwise fall back to a minimal empty template.
+  const sgtmConfig = (opts.serverConfigJson && typeof opts.serverConfigJson === 'object')
+    ? opts.serverConfigJson
+    : { containerVersion: { variable: [], trigger: [], tag: [] } };
 
   onProgress({ stage: 'sgtm_import', done: 0, total: 1 });
   const importResult = await importContainerJSON(
@@ -691,5 +728,6 @@ module.exports = {
   createServerContainer,
   getContainerConfig,
   setGA4TransportUrl,
+  upsertServerUrlVariable,
   provisionForClientWithServer,
 };

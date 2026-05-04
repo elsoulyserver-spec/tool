@@ -1784,6 +1784,19 @@ http.createServer((req, res) => {
               cfg.webContainerId, cfg.webWorkspaceId, sgtmUrl,
             );
 
+            // Also upsert ET - sGTM URL constant variable in the server container
+            // so server-side tags can reference the URL without hardcoding it.
+            let serverVarResult = null;
+            if (cfg.serverContainerId && cfg.serverWorkspaceId) {
+              try {
+                serverVarResult = await gtmService.upsertServerUrlVariable(
+                  cfg.serverContainerId, cfg.serverWorkspaceId, sgtmUrl,
+                );
+              } catch (varErr) {
+                console.warn('[ss/wire-transport] upsertServerUrlVariable non-fatal:', varErr.message);
+              }
+            }
+
             await firestoreService.saveSSConfig(clientId, {
               ...cfg,
               serverUrl:           sgtmUrl,
@@ -1797,6 +1810,7 @@ http.createServer((req, res) => {
               tagId:        result.tagId,
               versionId:    result.versionId,
               transportUrl: result.transportUrl,
+              serverVarId:  serverVarResult ? serverVarResult.variableId : null,
               message:      'تم ربط الـ web container بـ sGTM ونشره بنجاح',
             });
           } catch (e) {
@@ -1873,11 +1887,8 @@ http.createServer((req, res) => {
             configJson, projectName,
             ga4MeasurementId, ga4Events, googleAdsEvents,
             ssEvents, ssPlatforms,
+            pixelIds, ecommPlatform,
           } = body;
-
-          // configJson is optional — backend uses a minimal empty template if absent.
-          const finalConfigJson = configJson ||
-            { containerVersion: { variable: [], trigger: [], tag: [] } };
 
           const activeCount = await firestoreService.countActiveContainers().catch(() => 0);
           if (activeCount >= 490) {
@@ -1892,12 +1903,33 @@ http.createServer((req, res) => {
             try {
               _setJob(jobId, { status: 'running', stage: 'gtm_provisioning', mode: 'client_server' });
 
+              // Build full web + server configs from wizard data at creation time so
+              // containers are populated with the user's actual GA4 ID, pixels, events.
+              // sgtmUrl is empty — it gets wired later via /api/ss/wire-transport.
+              const { buildWebConfig, buildServerConfig } = require('./lib/gtm-config-builder');
+
+              const webConfig = configJson || buildWebConfig({
+                ga4MeasurementId: ga4MeasurementId || '',
+                sgtmUrl:          '',
+                pixelIds:         (pixelIds && typeof pixelIds === 'object') ? pixelIds : {},
+                events:           ssEvents       || [],
+                ecommPlatform:    ecommPlatform  || '',
+              });
+
+              const serverConfig = buildServerConfig({
+                ga4MeasurementId: ga4MeasurementId || '',
+                sgtmUrl:          '',
+                platforms:        ssPlatforms || [],
+                events:           ssEvents    || [],
+              });
+
               const both = await gtmService.provisionForClientWithServer({
-                projectName: projectName || ((email || clientId.slice(0, 8)) + ' — SS Setup'),
-                configJson:   finalConfigJson,
-                publishLive:  false,
-                inviteEmail:  email || null,
-                onProgress:   (p) => _setJob(jobId, { stage: 'gtm_provisioning', progress: p }),
+                projectName:      projectName || ((email || clientId.slice(0, 8)) + ' — SS Setup'),
+                configJson:       webConfig,
+                serverConfigJson: serverConfig,
+                publishLive:      false,
+                inviteEmail:      email || null,
+                onProgress:       (p) => _setJob(jobId, { stage: 'gtm_provisioning', progress: p }),
               });
 
               const { web, server } = both;
@@ -1946,6 +1978,8 @@ http.createServer((req, res) => {
                   ga4Events:          ga4Events        || [],
                   googleAdsEvents:    googleAdsEvents  || [],
                   ssEvents:           ssEvents         || [],
+                  pixelIds:           (pixelIds && typeof pixelIds === 'object') ? pixelIds : {},
+                  ecommPlatform:      ecommPlatform    || '',
                 });
               } catch (saveErr) {
                 console.warn('[ss/create-containers] saveSSConfig failed (non-fatal):', saveErr.message);

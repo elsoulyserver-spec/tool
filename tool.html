@@ -4229,424 +4229,276 @@
 
         <!-- ── Step Indicator (8 steps) ── -->
         <div class="ss-wizard-bar" id="ss-step-bar">
-          <div class="ss-wstep active" id="ss-step-ind-1" onclick="ss_goToStep(1)" title="إنشاء Containers">
+          <div class="ss-wstep active" id="ss-step-ind-1" onclick="ss_goToStep(1)" title="GA4 Measurement ID">
             <span class="ss-wstep-num">1</span>
-            <span class="ss-wstep-label">Container</span>
-          </div>
-          <div class="ss-wstep-line" id="ss-step-line-1"></div>
-          <div class="ss-wstep" id="ss-step-ind-2" onclick="ss_goToStep(2)">
-            <span class="ss-wstep-num">2</span>
-            <span class="ss-wstep-label">URL الخادم</span>
-          </div>
-          <div class="ss-wstep-line" id="ss-step-line-2"></div>
-          <div class="ss-wstep" id="ss-step-ind-3" onclick="ss_goToStep(3)">
-            <span class="ss-wstep-num">3</span>
             <span class="ss-wstep-label">GA4</span>
           </div>
-          <div class="ss-wstep-line" id="ss-step-line-3"></div>
-          <div class="ss-wstep" id="ss-step-ind-4" onclick="ss_goToStep(4)">
-            <span class="ss-wstep-num">4</span>
+          <div class="ss-wstep-sep"></div>
+          <div class="ss-wstep" id="ss-step-ind-2" onclick="ss_goToStep(2)" title="منصة التجارة">
+            <span class="ss-wstep-num">2</span>
             <span class="ss-wstep-label">المنصة</span>
           </div>
-          <div class="ss-wstep-line" id="ss-step-line-4"></div>
-          <div class="ss-wstep" id="ss-step-ind-5" onclick="ss_goToStep(5)">
-            <span class="ss-wstep-num">5</span>
+          <div class="ss-wstep-sep"></div>
+          <div class="ss-wstep" id="ss-step-ind-3" onclick="ss_goToStep(3)" title="Pixels + Tokens">
+            <span class="ss-wstep-num">3</span>
             <span class="ss-wstep-label">Pixels</span>
           </div>
-          <div class="ss-wstep-line" id="ss-step-line-5"></div>
-          <div class="ss-wstep" id="ss-step-ind-6" onclick="ss_goToStep(6)">
-            <span class="ss-wstep-num">6</span>
+          <div class="ss-wstep-sep"></div>
+          <div class="ss-wstep" id="ss-step-ind-4" onclick="ss_goToStep(4)" title="Events">
+            <span class="ss-wstep-num">4</span>
             <span class="ss-wstep-label">Events</span>
           </div>
-          <div class="ss-wstep-line" id="ss-step-line-6"></div>
-          <div class="ss-wstep" id="ss-step-ind-7" onclick="ss_goToStep(7)">
-            <span class="ss-wstep-num">7</span>
-            <span class="ss-wstep-label">الكود</span>
+          <div class="ss-wstep-sep"></div>
+          <div class="ss-wstep" id="ss-step-ind-5" onclick="ss_goToStep(5)" title="إنشاء Containers">
+            <span class="ss-wstep-num">5</span>
+            <span class="ss-wstep-label">إنشاء</span>
           </div>
-          <div class="ss-wstep-line" id="ss-step-line-7"></div>
-          <div class="ss-wstep" id="ss-step-ind-8" onclick="ss_goToStep(8)">
+          <div class="ss-wstep-sep"></div>
+          <div class="ss-wstep" id="ss-step-ind-6" onclick="ss_goToStep(6)" title="نشر السيرفر">
+            <span class="ss-wstep-num">6</span>
+            <span class="ss-wstep-label">السيرفر</span>
+          </div>
+          <div class="ss-wstep-sep"></div>
+          <div class="ss-wstep" id="ss-step-ind-7" onclick="ss_goToStep(7)" title="ربط URL الخادم">
+            <span class="ss-wstep-num">7</span>
+            <span class="ss-wstep-label">ربط URL</span>
+          </div>
+          <div class="ss-wstep-sep"></div>
+          <div class="ss-wstep" id="ss-step-ind-8" onclick="ss_goToStep(8)" title="تم">
             <span class="ss-wstep-num">8</span>
-            <span class="ss-wstep-label">نشر</span>
+            <span class="ss-wstep-label">تم ✅</span>
           </div>
         </div>
 
-        <!-- ════════════════════════════ STEP 1 ════════════════════════════ -->
+        <!-- ════ STEP 1: GA4 ════ -->
         <div class="ss-wizard-panel" id="ss-panel-1">
-          <div class="ss-panel-title">إنشاء GTM Containers (Web + Server)</div>
-          <div class="ss-panel-sub">الأداة ستنشئ Web Container وServer Container في GTM ثم تعطيك الـ Container Config لنشره على مزودك</div>
+          <div class="ss-panel-title">Google Analytics 4</div>
+          <div class="ss-panel-sub">أدخل الـ Measurement ID — سيُربط الـ Web Container بالـ Server Container عبر transport_url</div>
+          <div style="margin-bottom:20px;">
+            <label class="ss-px-label">GA4 Measurement ID</label>
+            <input type="text" id="ss-p1-ga4-id" class="ss-url-input" placeholder="G-XXXXXXXXXX"
+              oninput="ss_onGa4Input()" autocomplete="off" style="letter-spacing:.05em;">
+            <div id="ss-p1-ga4-hint" style="font-size:11px;color:var(--mut);margin-top:8px;line-height:1.5;"></div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <button class="btn-acc-sm" onclick="ss_goToStep(2)">التالي ←</button>
+            <div style="font-size:11px;color:var(--mut);">يمكنك تخطيه وإضافته لاحقاً</div>
+          </div>
+        </div>
 
-          <!-- Progress area (hidden until job starts) -->
-          <div id="ss-p1-progress" style="display:none;margin-bottom:20px;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-              <div class="ss-spin"></div>
-              <div id="ss-p1-stage-msg" style="font-size:13px;color:var(--wht2);">جارٍ الإنشاء...</div>
+        <!-- ════ STEP 2: E-Commerce Platform ════ -->
+        <div class="ss-wizard-panel" id="ss-panel-2" style="display:none;">
+          <div class="ss-panel-title">منصة التجارة الإلكترونية</div>
+          <div class="ss-panel-sub">حدد المنصة — سيُولَّد DataLayer Code مخصص لها</div>
+          <div id="ss-p2-ecomm-list" style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;"></div>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <button class="btn-ghost-sm" onclick="ss_goToStep(1)">← السابق</button>
+            <button class="btn-acc-sm" onclick="ss_goToStep(3)">التالي ←</button>
+          </div>
+        </div>
+
+        <!-- ════ STEP 3: Pixels + Tokens ════ -->
+        <div class="ss-wizard-panel" id="ss-panel-3" style="display:none;">
+          <div class="ss-panel-title">Pixels + Access Tokens</div>
+          <div class="ss-panel-sub">أدخل الـ Pixel IDs والـ CAPI Tokens — تُحفظ مشفّرة AES-256-GCM ولا تُرسل للمتصفح</div>
+          <div id="ss-p3-px-cards" style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;"></div>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <button class="btn-ghost-sm" onclick="ss_goToStep(2)">← السابق</button>
+            <button class="btn-acc-sm" onclick="ss_goToStep(4)">التالي ←</button>
+          </div>
+        </div>
+
+        <!-- ════ STEP 4: Events ════ -->
+        <div class="ss-wizard-panel" id="ss-panel-4" style="display:none;">
+          <div class="ss-panel-title">اختر الأحداث</div>
+          <div class="ss-panel-sub">اختر Events التي تريد تتبعها — الموصى بها مُفعَّلة تلقائياً</div>
+          <div id="ss-p4-events-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;"></div>
+          <div style="padding:10px 14px;border-radius:10px;background:rgba(70,241,197,.05);border:1px solid rgba(70,241,197,.15);font-size:11px;color:var(--mut);margin-bottom:16px;line-height:1.6;">
+            ⚡ <strong style="color:var(--acc);">Deduplication:</strong> كل حدث يحصل على <code>event_id = order_id + "_" + timestamp</code> لمنع التكرار
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <button class="btn-ghost-sm" onclick="ss_goToStep(3)">← السابق</button>
+            <button class="btn-acc-sm" onclick="ss_goToStep(5)">التالي — مراجعة ←</button>
+          </div>
+        </div>
+
+        <!-- ════ STEP 5: Review + Create Containers ════ -->
+        <div class="ss-wizard-panel" id="ss-panel-5" style="display:none;">
+          <div class="ss-panel-title">مراجعة وإنشاء Containers</div>
+          <div class="ss-panel-sub">راجع الإعدادات ثم اضغط إنشاء — سيتم بناء Web Container وServer Container بكل الداتا</div>
+
+          <!-- Review Summary -->
+          <div id="ss-p5-review" style="margin-bottom:20px;"></div>
+
+          <!-- Progress -->
+          <div id="ss-p5-progress" style="display:none;margin-bottom:20px;">
+            <div style="font-size:12px;color:var(--mut);margin-bottom:8px;display:flex;justify-content:space-between;">
+              <span id="ss-p5-stage-msg">جارٍ الإنشاء...</span>
+              <span id="ss-p5-pct">0%</span>
             </div>
-            <div style="height:4px;border-radius:4px;background:var(--sur);overflow:hidden;">
-              <div id="ss-p1-bar" style="height:100%;background:var(--acc);transition:width .4s;width:5%;border-radius:4px;"></div>
+            <div style="height:6px;background:var(--bdr2);border-radius:3px;overflow:hidden;">
+              <div id="ss-p5-bar" style="height:100%;background:var(--acc);transition:width .4s;width:5%;border-radius:3px;"></div>
             </div>
           </div>
 
-          <!-- containerConfig result (hidden until done) -->
-          <div id="ss-p1-result" style="display:none;margin-bottom:20px;">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-              <span class="material-symbols-outlined" style="color:var(--acc);font-size:18px;">check_circle</span>
-              <span style="font-size:14px;font-weight:700;color:var(--acc);">تم إنشاء الـ Containers بنجاح!</span>
-            </div>
+          <!-- Result (hidden until done) -->
+          <div id="ss-p5-result" style="display:none;margin-bottom:20px;">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-              <div style="background:var(--sur);border:1px solid rgba(70,241,197,.2);border-radius:10px;padding:12px;">
-                <div style="font-size:10px;color:var(--mut);margin-bottom:4px;font-family:var(--font-mono);letter-spacing:1px;">WEB GTM</div>
-                <div id="ss-p1-web-id" style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--wht);">—</div>
+              <div style="background:var(--sur2);border:1px solid var(--bdr2);border-radius:10px;padding:12px 14px;">
+                <div style="font-size:10px;color:var(--mut);margin-bottom:4px;">Web Container</div>
+                <div id="ss-p5-web-id" style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--wht);">—</div>
               </div>
-              <div style="background:var(--sur);border:1px solid rgba(70,241,197,.2);border-radius:10px;padding:12px;">
-                <div style="font-size:10px;color:var(--mut);margin-bottom:4px;font-family:var(--font-mono);letter-spacing:1px;">SERVER GTM</div>
-                <div id="ss-p1-server-id" style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--wht);">—</div>
-              </div>
-            </div>
-
-            <div style="margin-bottom:10px;">
-              <div style="font-size:12px;font-weight:700;color:var(--wht2);margin-bottom:6px;">Container Config الخاص بك:</div>
-              <div style="position:relative;">
-                <pre id="ss-p1-config-json" style="background:#0a0d11;border:1px solid var(--bdr);border-radius:10px;padding:14px;font-size:10px;color:#a8d8a8;overflow-x:auto;max-height:140px;overflow-y:auto;margin:0;white-space:pre-wrap;word-break:break-all;"></pre>
-                <button onclick="ss_copyConfig()" style="position:absolute;top:8px;left:8px;background:rgba(70,241,197,.1);border:1px solid rgba(70,241,197,.25);border-radius:6px;padding:3px 10px;font-size:10px;font-weight:700;color:var(--acc);cursor:pointer;font-family:var(--font-ui);">📋 نسخ</button>
+              <div style="background:var(--sur2);border:1px solid var(--bdr2);border-radius:10px;padding:12px 14px;">
+                <div style="font-size:10px;color:var(--mut);margin-bottom:4px;">Server Container</div>
+                <div id="ss-p5-server-id" style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--wht);">—</div>
               </div>
             </div>
-
-            <div style="background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.25);border-radius:10px;padding:12px 14px;font-size:12px;color:#fbbf24;line-height:1.7;">
-              <strong>📋 الخطوة التالية:</strong><br>
-              روح على <strong>Google Tag Manager ← Admin ← Install Google Tag Manager</strong><br>
-              اختر <strong>"Manually provision tagging server"</strong> والصق الكود أعلاه.<br>
-              أو انشر مباشرةً على Stape / Cloud Run / Docker.
+            <div style="font-size:11px;color:var(--acc);padding:8px 12px;border-radius:8px;background:rgba(70,241,197,.07);border:1px solid rgba(70,241,197,.2);">
+              ✅ تم إنشاء الـ Containers بنجاح مع كل Variables و Tags و Triggers
             </div>
           </div>
 
-          <!-- Error area -->
-          <div id="ss-p1-error" style="display:none;padding:12px 14px;border-radius:10px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);font-size:12px;color:#f87171;margin-bottom:16px;"></div>
+          <div id="ss-p5-error" style="display:none;padding:12px 14px;border-radius:10px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);font-size:12px;color:#f87171;margin-bottom:16px;"></div>
 
-          <!-- Initial create button -->
-          <div id="ss-p1-btn-wrap" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-            <button class="btn-acc-sm" id="ss-p1-create-btn" onclick="ss_createContainers()">
+          <div id="ss-p5-btn-wrap" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <button class="btn-ghost-sm" onclick="ss_goToStep(4)">← السابق</button>
+            <button class="btn-acc-sm" id="ss-p5-create-btn" onclick="ss_createContainers()">
               <span class="material-symbols-outlined" style="font-size:14px;">add_circle</span>
               إنشاء Web + Server Containers
             </button>
-            <div style="font-size:11px;color:var(--mut);">⏱️ يستغرق 60-120 ثانية</div>
+            <div style="font-size:11px;color:var(--mut);">⏱️ 60-120 ثانية</div>
           </div>
-          <div id="ss-p1-config-hint" style="margin-top:10px;font-size:11px;color:var(--mut);"></div>
-
-          <div class="ss-wizard-nav">
-            <span></span>
-            <button class="btn-acc-sm" id="ss-p1-next-btn" onclick="ss_goToStep(2)" disabled>التالي ←</button>
+          <div id="ss-p5-next-wrap" style="display:none;margin-top:12px;">
+            <button class="btn-acc-sm" onclick="ss_goToStep(6)">التالي — نشر السيرفر ←</button>
           </div>
         </div>
 
-        <!-- ════════════════════════════ STEP 2 ════════════════════════════ -->
-        <div class="ss-wizard-panel" id="ss-panel-2" style="display:none;">
-          <div class="ss-panel-title">أدخل Server URL الخاص بك</div>
-          <div class="ss-panel-sub">بعد نشر الـ Container Config على مزودك، الصق الرابط هنا للتحقق منه</div>
+        <!-- ════ STEP 6: Deploy Server Container ════ -->
+        <div class="ss-wizard-panel" id="ss-panel-6" style="display:none;">
+          <div class="ss-panel-title">نشر Server Container</div>
+          <div class="ss-panel-sub">انسخ الـ Container Config وانشره على Stape أو Cloud Run أو Docker</div>
+
+          <!-- containerConfig block -->
+          <div style="margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <label class="ss-px-label" style="margin:0;">Container Config</label>
+              <button class="btn-ghost-sm" onclick="ss_copyContainerConfig()" style="font-size:11px;padding:4px 10px;">
+                <span class="material-symbols-outlined" style="font-size:12px;vertical-align:middle;">content_copy</span> نسخ
+              </button>
+            </div>
+            <pre id="ss-p6-config-blob" style="background:#080b10;border:1px solid var(--bdr);border-radius:10px;padding:14px;font-size:9px;color:#a8d8a8;overflow-x:auto;max-height:120px;overflow-y:auto;margin:0;white-space:pre-wrap;word-break:break-all;font-family:var(--font-mono);"></pre>
+          </div>
+
+          <!-- Deploy options -->
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;">
+            <div style="padding:12px 14px;border-radius:10px;background:var(--sur2);border:1px solid var(--bdr2);font-size:12px;color:var(--wht2);">
+              <div style="font-weight:700;color:var(--wht);margin-bottom:6px;">🚀 Stape.io (الأسهل)</div>
+              <ol style="margin:0;padding-right:16px;line-height:1.9;color:var(--mut);">
+                <li>افتح <a href="https://stape.io" target="_blank" style="color:var(--acc);">stape.io</a> وأنشئ Server Container</li>
+                <li>الصق الـ Container Config في حقل "Container Config"</li>
+                <li>انسخ الـ Server URL وارجع للخطوة التالية</li>
+              </ol>
+            </div>
+            <div style="padding:12px 14px;border-radius:10px;background:var(--sur2);border:1px solid var(--bdr2);font-size:12px;color:var(--wht2);">
+              <div style="font-weight:700;color:var(--wht);margin-bottom:6px;">☁️ Google Cloud Run</div>
+              <div style="color:var(--mut);line-height:1.7;">انشر الـ Docker image الرسمي لـ sGTM مع <code>CONTAINER_CONFIG</code> كـ env var</div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;align-items:center;">
+            <button class="btn-ghost-sm" onclick="ss_goToStep(5)">← السابق</button>
+            <button class="btn-acc-sm" onclick="ss_goToStep(7)">نشرت — التالي ←</button>
+          </div>
+        </div>
+
+        <!-- ════ STEP 7: Enter Server URL + Wire ════ -->
+        <div class="ss-wizard-panel" id="ss-panel-7" style="display:none;">
+          <div class="ss-panel-title">ربط URL الخادم</div>
+          <div class="ss-panel-sub">أدخل URL الخادم بعد النشر — سيتم ربطه في GA4 Config Tag (transport_url) وفي Server Container</div>
 
           <div style="margin-bottom:16px;">
-            <label style="font-size:12px;font-weight:600;color:var(--wht2);display:block;margin-bottom:6px;">Server URL</label>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;">
-              <input type="url" id="ss-p2-url" class="ss-url-input"
-                placeholder="https://your-sgtm-server.com"
-                oninput="ss_p2OnInput()"
-                onkeydown="if(event.key==='Enter'){ss_validateUrl();}" />
-              <button class="btn-ghost-sm" onclick="ss_validateUrl()" id="ss-p2-validate-btn">
-                <span class="material-symbols-outlined" style="font-size:14px;">wifi_tethering</span>
+            <label class="ss-px-label">Server URL</label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="url" id="ss-p7-url" class="ss-url-input"
+                placeholder="https://gtm.yourdomain.com" autocomplete="off"
+                onkeydown="if(event.key==='Enter') ss_validateUrl()"
+                style="flex:1;">
+              <button class="btn-ghost-sm" onclick="ss_validateUrl()" id="ss-p7-validate-btn"
+                style="white-space:nowrap;flex-shrink:0;">
+                <span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle;">wifi_tethering</span>
                 تحقق
               </button>
             </div>
-            <div id="ss-p2-status" class="ss-url-status" style="margin-top:8px;"></div>
+            <div id="ss-p7-status" style="margin-top:8px;font-size:12px;color:var(--mut);font-family:var(--font-mono);"></div>
           </div>
 
-          <div style="background:var(--sur);border:1px solid var(--bdr2);border-radius:10px;padding:12px 14px;font-size:12px;color:var(--mut);line-height:1.7;margin-bottom:16px;">
-            💡 <strong style="color:var(--wht2);">مزودون موصى بهم:</strong>
-            <a href="https://stape.io" target="_blank" style="color:var(--acc);">Stape.io</a> ·
-            <a href="https://cloud.google.com/run" target="_blank" style="color:var(--acc);">Google Cloud Run</a> ·
-            Docker / VPS
+          <!-- Wire button (shows after validation) -->
+          <div id="ss-p7-wire-wrap" style="display:none;margin-bottom:16px;">
+            <div style="padding:10px 14px;border-radius:10px;background:rgba(70,241,197,.05);border:1px solid rgba(70,241,197,.15);font-size:12px;color:var(--wht2);margin-bottom:12px;line-height:1.6;">
+              ✅ الخادم يستجيب — جاهز للربط<br>
+              <span style="color:var(--mut);font-size:11px;">سيتم: إضافة transport_url للـ Web Container + إضافة URL للـ Server Container + نشر كلاهما</span>
+            </div>
+            <button class="btn-acc-sm" id="ss-p7-wire-btn" onclick="ss_wireUrl()">
+              <span class="material-symbols-outlined" style="font-size:14px;">cable</span>
+              ربط ونشر الـ Containers
+            </button>
           </div>
 
-          <div class="ss-wizard-nav">
-            <button class="btn-ghost-sm" onclick="ss_goToStep(1)">← السابق</button>
-            <button class="btn-acc-sm" id="ss-p2-next-btn" onclick="ss_goToStep(3)" disabled>التالي ←</button>
+          <div id="ss-p7-error" style="display:none;padding:10px 14px;border-radius:10px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);font-size:12px;color:#f87171;margin-bottom:12px;"></div>
+
+          <div style="display:flex;gap:10px;align-items:center;">
+            <button class="btn-ghost-sm" onclick="ss_goToStep(6)">← السابق</button>
           </div>
         </div>
 
-        <!-- ════════════════════════════ STEP 3 — GA4 ════════════════════════════ -->
-        <div class="ss-wizard-panel" id="ss-panel-3" style="display:none;">
-          <div class="ss-panel-title">Google Analytics 4</div>
-          <div class="ss-panel-sub">أدخل الـ Measurement ID — سيكون الـ Data Layer الذي يجمع الداتا ويبعتها للسيرفر</div>
+        <!-- ════ STEP 8: Done ════ -->
+        <div class="ss-wizard-panel" id="ss-panel-8" style="display:none;">
+          <div class="ss-panel-title">تم الإعداد بالكامل ✅</div>
+          <div class="ss-panel-sub">Server-Side Tracking جاهز — الصق الكود أدناه في موقعك</div>
 
-          <div style="background:var(--sur);border:1px solid var(--bdr2);border-radius:12px;padding:18px;margin-bottom:16px;">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
-              <span style="font-size:22px;">📊</span>
-              <div>
-                <div style="font-size:13px;font-weight:700;color:var(--wht);">GA4 Measurement ID</div>
-                <div style="font-size:11px;color:var(--mut);">يُستخدم لربط الـ Web Container بالـ Server Container تلقائياً</div>
-              </div>
+          <!-- GTM Snippet -->
+          <div style="margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <label class="ss-px-label" style="margin:0;">GTM Snippet — &lt;head&gt;</label>
+              <button class="btn-ghost-sm" onclick="ss_copySnippet('head')" style="font-size:11px;padding:4px 10px;">
+                <span class="material-symbols-outlined" style="font-size:12px;vertical-align:middle;">content_copy</span> نسخ
+              </button>
             </div>
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-              <input type="text" id="ss-p3-ga4-id" class="ss-url-input"
-                placeholder="G-XXXXXXXXXX"
-                oninput="ss_p3Ga4Input()"
-                style="max-width:260px;" />
-              <a href="https://analytics.google.com" target="_blank"
-                style="font-size:11px;color:var(--acc);font-family:var(--font-ui);font-weight:700;white-space:nowrap;">إنشاء Property ↗</a>
+            <pre id="ss-p8-snippet-head" style="background:#080b10;border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;font-size:10px;color:#a8c8d8;overflow-x:auto;max-height:100px;overflow-y:auto;margin:0;white-space:pre;font-family:var(--font-mono);"></pre>
+          </div>
+
+          <div style="margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <label class="ss-px-label" style="margin:0;">GTM Snippet — &lt;body&gt;</label>
+              <button class="btn-ghost-sm" onclick="ss_copySnippet('body')" style="font-size:11px;padding:4px 10px;">
+                <span class="material-symbols-outlined" style="font-size:12px;vertical-align:middle;">content_copy</span> نسخ
+              </button>
             </div>
-            <div id="ss-p3-ga4-hint" style="font-size:11px;color:var(--mut);margin-top:8px;">
-              💡 الـ sGTM سيستقبل الـ hits من GA4 عبر transport_url ويوزعها على المنصات المختارة
-            </div>
-          </div>
-
-          <div class="ss-wizard-nav">
-            <button class="btn-ghost-sm" onclick="ss_goToStep(2)">← السابق</button>
-            <button class="btn-acc-sm" id="ss-p3-next-btn" onclick="ss_goToStep(4)">التالي ←</button>
-          </div>
-        </div>
-
-        <!-- ════════════════════════════ STEP 4 — E-Commerce Platform ════════════════════════════ -->
-        <div class="ss-wizard-panel" id="ss-panel-4" style="display:none;">
-          <div class="ss-panel-title">اختر منصتك</div>
-          <div class="ss-panel-sub">حدد المنصة التي يعمل عليها متجرك — سيُولَّد الكود المناسب لها تلقائياً</div>
-
-          <div id="ss-p4-ecomm-list" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;"></div>
-
-          <div style="background:var(--sur);border:1px solid var(--bdr2);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--mut);margin-bottom:16px;">
-            🔮 قريباً: Shopify · WooCommerce · Magento · Custom
-          </div>
-
-          <div class="ss-wizard-nav">
-            <button class="btn-ghost-sm" onclick="ss_goToStep(3)">← السابق</button>
-            <button class="btn-acc-sm" onclick="ss_goToStep(5)">التالي ←</button>
-          </div>
-        </div>
-
-        <!-- ════════════════════════════ STEP 5 — Pixels + Tokens ════════════════════════════ -->
-        <div class="ss-wizard-panel" id="ss-panel-5" style="display:none;">
-          <div class="ss-panel-title">Pixels + Access Tokens</div>
-          <div class="ss-panel-sub">أدخل الـ Pixel IDs والـ Tokens — الـ Tokens تُحفظ مشفّرة AES-256-GCM ولا تُرسل للمتصفح أبداً</div>
-
-          <!-- Meta -->
-          <div class="ss-px-card" id="ss-px-meta">
-            <div class="ss-px-header" onclick="ss_togglePxCard('meta')">
-              <span style="font-size:18px;">👥</span>
-              <div style="flex:1;">
-                <div class="ss-px-name">Meta (Facebook) Pixel</div>
-                <div class="ss-px-sub">Conversions API — server-side</div>
-              </div>
-              <div class="ss-px-toggle" id="ss-px-toggle-meta"></div>
-              <span class="ss-px-chevron material-symbols-outlined" id="ss-px-chev-meta" style="color:var(--mut);font-size:18px;transition:transform .2s;">expand_more</span>
-            </div>
-            <div class="ss-px-body" id="ss-px-body-meta" style="display:none;">
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-                <div>
-                  <label class="ss-px-label">Pixel ID</label>
-                  <input type="text" id="ss-pid-meta" class="ss-tok-input" placeholder="1234567890" oninput="ss_onPixelInput()">
-                </div>
-                <div>
-                  <label class="ss-px-label">Access Token</label>
-                  <div style="position:relative;">
-                    <input type="password" id="ss-tok-meta" class="ss-tok-input" placeholder="EAABsbCS...">
-                    <button onclick="ss_toggleTokVis('meta')" style="position:absolute;top:50%;left:6px;transform:translateY(-50%);background:none;border:none;color:var(--mut);cursor:pointer;padding:2px;">
-                      <span class="material-symbols-outlined" style="font-size:14px;" id="ss-tok-eye-meta">visibility</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <label class="ss-px-label">Test Event Code (اختياري)</label>
-                <input type="text" id="ss-tec-meta" class="ss-tok-input" placeholder="TEST12345" style="max-width:180px;">
-              </div>
-            </div>
-          </div>
-
-          <!-- Google Ads -->
-          <div class="ss-px-card" id="ss-px-gads">
-            <div class="ss-px-header" onclick="ss_togglePxCard('gads')">
-              <span style="font-size:18px;">🔵</span>
-              <div style="flex:1;">
-                <div class="ss-px-name">Google Ads</div>
-                <div class="ss-px-sub">Conversion Tracking</div>
-              </div>
-              <div class="ss-px-toggle" id="ss-px-toggle-gads"></div>
-              <span class="ss-px-chevron material-symbols-outlined" id="ss-px-chev-gads" style="color:var(--mut);font-size:18px;transition:transform .2s;">expand_more</span>
-            </div>
-            <div class="ss-px-body" id="ss-px-body-gads" style="display:none;">
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                <div>
-                  <label class="ss-px-label">Conversion ID</label>
-                  <input type="text" id="ss-pid-gads" class="ss-tok-input" placeholder="AW-XXXXXXXXX" oninput="ss_onPixelInput()">
-                </div>
-                <div>
-                  <label class="ss-px-label">Conversion Label</label>
-                  <input type="text" id="ss-lab-gads" class="ss-tok-input" placeholder="xxxxxxxxxxxx">
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Snapchat -->
-          <div class="ss-px-card" id="ss-px-snap">
-            <div class="ss-px-header" onclick="ss_togglePxCard('snap')">
-              <span style="font-size:18px;">👻</span>
-              <div style="flex:1;">
-                <div class="ss-px-name">Snapchat Pixel</div>
-                <div class="ss-px-sub">Conversions API</div>
-              </div>
-              <div class="ss-px-toggle" id="ss-px-toggle-snap"></div>
-              <span class="ss-px-chevron material-symbols-outlined" id="ss-px-chev-snap" style="color:var(--mut);font-size:18px;transition:transform .2s;">expand_more</span>
-            </div>
-            <div class="ss-px-body" id="ss-px-body-snap" style="display:none;">
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                <div>
-                  <label class="ss-px-label">Pixel ID</label>
-                  <input type="text" id="ss-pid-snap" class="ss-tok-input" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" oninput="ss_onPixelInput()">
-                </div>
-                <div>
-                  <label class="ss-px-label">Access Token</label>
-                  <div style="position:relative;">
-                    <input type="password" id="ss-tok-snap" class="ss-tok-input" placeholder="Access Token">
-                    <button onclick="ss_toggleTokVis('snap')" style="position:absolute;top:50%;left:6px;transform:translateY(-50%);background:none;border:none;color:var(--mut);cursor:pointer;padding:2px;">
-                      <span class="material-symbols-outlined" style="font-size:14px;" id="ss-tok-eye-snap">visibility</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- TikTok -->
-          <div class="ss-px-card" id="ss-px-tiktok">
-            <div class="ss-px-header" onclick="ss_togglePxCard('tiktok')">
-              <span style="font-size:18px;">🎵</span>
-              <div style="flex:1;">
-                <div class="ss-px-name">TikTok Pixel</div>
-                <div class="ss-px-sub">Events API</div>
-              </div>
-              <div class="ss-px-toggle" id="ss-px-toggle-tiktok"></div>
-              <span class="ss-px-chevron material-symbols-outlined" id="ss-px-chev-tiktok" style="color:var(--mut);font-size:18px;transition:transform .2s;">expand_more</span>
-            </div>
-            <div class="ss-px-body" id="ss-px-body-tiktok" style="display:none;">
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                <div>
-                  <label class="ss-px-label">Pixel ID</label>
-                  <input type="text" id="ss-pid-tiktok" class="ss-tok-input" placeholder="XXXXXXXXXXXXXXXXXX" oninput="ss_onPixelInput()">
-                </div>
-                <div>
-                  <label class="ss-px-label">Access Token</label>
-                  <div style="position:relative;">
-                    <input type="password" id="ss-tok-tiktok" class="ss-tok-input" placeholder="Access Token">
-                    <button onclick="ss_toggleTokVis('tiktok')" style="position:absolute;top:50%;left:6px;transform:translateY(-50%);background:none;border:none;color:var(--mut);cursor:pointer;padding:2px;">
-                      <span class="material-symbols-outlined" style="font-size:14px;" id="ss-tok-eye-tiktok">visibility</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div id="ss-p5-no-plat" style="display:none;padding:12px;text-align:center;font-size:12px;color:var(--mut);">
-            ⚠️ فتح أي منصة واحدة على الأقل للمتابعة
-          </div>
-
-          <div class="ss-wizard-nav">
-            <button class="btn-ghost-sm" onclick="ss_goToStep(4)">← السابق</button>
-            <button class="btn-acc-sm" onclick="ss_goToStep(6)">التالي ←</button>
-          </div>
-        </div>
-
-        <!-- ════════════════════════════ STEP 6 — Events ════════════════════════════ -->
-        <div class="ss-wizard-panel" id="ss-panel-6" style="display:none;">
-          <div class="ss-panel-title">اختر الأحداث</div>
-          <div class="ss-panel-sub">اختر Events التي تريد تتبعها — الموصى بها مُفعَّلة تلقائياً</div>
-
-          <div id="ss-p6-events-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;"></div>
-
-          <div style="background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.25);border-radius:10px;padding:10px 14px;font-size:12px;color:#fca5a5;margin-bottom:16px;">
-            🚫 <strong>PageView على السيرفر = تكلفة عالية + قيمة منخفضة</strong> — تجنبه إلا لو محتاجه بالضرورة.
-          </div>
-
-          <div style="background:rgba(70,241,197,.04);border:1px solid rgba(70,241,197,.15);border-radius:10px;padding:12px 14px;font-size:12px;color:var(--wht2);margin-bottom:8px;">
-            ✅ <strong>Deduplication تلقائي:</strong> كل event سيحصل على <code style="font-family:var(--font-mono);font-size:11px;color:var(--acc);">event_id = order_id + "_" + timestamp</code> — تمنع العدّ المزدوج تلقائياً.
-          </div>
-
-          <div class="ss-wizard-nav">
-            <button class="btn-ghost-sm" onclick="ss_goToStep(5)">← السابق</button>
-            <button class="btn-acc-sm" onclick="ss_goToStep(7)">التالي ←</button>
-          </div>
-        </div>
-
-        <!-- ════════════════════════════ STEP 7 — Code Generation ════════════════════════════ -->
-        <div class="ss-wizard-panel" id="ss-panel-7" style="display:none;">
-          <div class="ss-panel-title">الكود المولَّد</div>
-          <div class="ss-panel-sub">كود GTM Container Config + DataLayer مخصص لمنصتك — انسخه والصقه مباشرةً</div>
-
-          <div style="background:rgba(70,241,197,.04);border:1px solid rgba(70,241,197,.15);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--wht2);margin-bottom:16px;">
-            🤖 الكود يشمل: Tags لكل Pixel · Triggers للـ Events · Variables للـ user data · DataLayer push للمنصة · Deduplication IDs
+            <pre id="ss-p8-snippet-body" style="background:#080b10;border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;font-size:10px;color:#a8c8d8;overflow-x:auto;max-height:80px;overflow-y:auto;margin:0;white-space:pre;font-family:var(--font-mono);"></pre>
           </div>
 
           <!-- DataLayer Code -->
-          <div style="margin-bottom:14px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-              <div style="font-size:12px;font-weight:700;color:var(--wht2);">
-                <span id="ss-p7-plat-label">كود DataLayer للمنصة</span>
-              </div>
-              <div style="display:flex;gap:6px;">
-                <button onclick="ss_copyCode('datalayer')" style="background:rgba(70,241,197,.1);border:1px solid rgba(70,241,197,.25);border-radius:6px;padding:4px 12px;font-size:11px;font-weight:700;color:var(--acc);cursor:pointer;font-family:var(--font-ui);">📋 نسخ</button>
-              </div>
+          <div style="margin-bottom:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <label class="ss-px-label" style="margin:0;" id="ss-p8-dl-label">DataLayer Code</label>
+              <button class="btn-ghost-sm" onclick="ss_copyCode('datalayer')" style="font-size:11px;padding:4px 10px;">
+                <span class="material-symbols-outlined" style="font-size:12px;vertical-align:middle;">content_copy</span> نسخ
+              </button>
             </div>
-            <pre id="ss-p7-datalayer-code" style="background:#080b10;border:1px solid var(--bdr);border-radius:10px;padding:14px;font-size:10px;color:#a8d8c8;overflow-x:auto;max-height:220px;overflow-y:auto;margin:0;white-space:pre;line-height:1.6;font-family:var(--font-mono);"></pre>
+            <pre id="ss-p8-datalayer-code" style="background:#080b10;border:1px solid var(--bdr);border-radius:10px;padding:14px;font-size:10px;color:#a8d8c8;overflow-x:auto;max-height:220px;overflow-y:auto;margin:0;white-space:pre;line-height:1.6;font-family:var(--font-mono);"></pre>
           </div>
 
-          <!-- GTM Events Summary -->
-          <div style="margin-bottom:14px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-              <div style="font-size:12px;font-weight:700;color:var(--wht2);">GTM Tag Summary</div>
-              <button onclick="ss_copyCode('summary')" style="background:rgba(70,241,197,.1);border:1px solid rgba(70,241,197,.25);border-radius:6px;padding:4px 12px;font-size:11px;font-weight:700;color:var(--acc);cursor:pointer;font-family:var(--font-ui);">📋 نسخ</button>
-            </div>
-            <div id="ss-p7-tag-summary" style="background:#080b10;border:1px solid var(--bdr);border-radius:10px;padding:14px;font-size:11px;color:var(--wht2);max-height:180px;overflow-y:auto;line-height:1.8;"></div>
-          </div>
+          <!-- Summary -->
+          <div id="ss-p8-summary" style="padding:12px 14px;border-radius:10px;background:var(--sur2);border:1px solid var(--bdr2);font-size:11px;color:var(--wht2);line-height:1.8;margin-bottom:16px;"></div>
 
-          <div class="ss-wizard-nav">
-            <button class="btn-ghost-sm" onclick="ss_goToStep(6)">← السابق</button>
-            <button class="btn-acc-sm" onclick="ss_goToStep(8)">التالي — نشر ←</button>
-          </div>
-        </div>
-
-        <!-- ════════════════════════════ STEP 8 — Deploy + Review ════════════════════════════ -->
-        <div class="ss-wizard-panel" id="ss-panel-8" style="display:none;">
-          <div class="ss-panel-title">نشر وتأكيد</div>
-          <div class="ss-panel-sub">راجع كل الإعدادات ثم اضغط تأكيد — سيتم الربط الكامل ونشر الـ Containers تلقائياً</div>
-
-          <div id="ss-p8-summary" style="margin-bottom:16px;"></div>
-
-          <!-- Deduplication + User Data status -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
-            <div style="background:rgba(70,241,197,.04);border:1px solid rgba(70,241,197,.2);border-radius:10px;padding:12px 14px;">
-              <div style="font-size:11px;font-weight:700;color:var(--acc);margin-bottom:6px;">🔄 Deduplication</div>
-              <div style="font-size:11px;color:var(--wht2);">✅ مفعّل</div>
-              <div style="font-size:10px;color:var(--mut);margin-top:3px;font-family:var(--font-mono);">event_id = order_id + timestamp</div>
-            </div>
-            <div style="background:rgba(70,241,197,.04);border:1px solid rgba(70,241,197,.2);border-radius:10px;padding:12px 14px;">
-              <div style="font-size:11px;font-weight:700;color:var(--acc);margin-bottom:6px;">🔒 User Data</div>
-              <div style="font-size:11px;color:var(--wht2);">✅ Hashed (SHA-256)</div>
-              <div style="font-size:10px;color:var(--mut);margin-top:3px;font-family:var(--font-mono);">email · phone</div>
-            </div>
-          </div>
-
-          <!-- Action buttons -->
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-            <button class="btn-acc-sm" id="ss-p8-confirm-btn" onclick="ss_confirmSetup()" style="font-size:14px;padding:11px 24px;">
-              <span class="material-symbols-outlined" style="font-size:16px;">rocket_launch</span>
-              تأكيد ونشر ✓
-            </button>
-            <div id="ss-p8-status" style="font-size:12px;color:var(--mut);font-family:var(--font-mono);"></div>
-          </div>
-          <div id="ss-p8-error" style="display:none;margin-top:10px;padding:10px 14px;border-radius:10px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);font-size:12px;color:#f87171;"></div>
-
-          <div class="ss-wizard-nav">
+          <div style="display:flex;gap:10px;align-items:center;">
             <button class="btn-ghost-sm" onclick="ss_goToStep(7)">← السابق</button>
-            <span></span>
+            <button class="btn-acc-sm" onclick="ss_confirmSetup()">
+              <span class="material-symbols-outlined" style="font-size:14px;">check_circle</span>
+              حفظ وإنهاء
+            </button>
           </div>
+          <div id="ss-p8-status" style="font-size:12px;color:var(--mut);font-family:var(--font-mono);margin-top:10px;"></div>
         </div>
 
       </div>
@@ -14295,200 +14147,256 @@
 
 
       // ══════════════════════════════════════════════════════
-      // 11. SERVER-SIDE WIZARD (8-step flow — Full Flow v3)
+      // 11. SERVER-SIDE WIZARD — Hybrid Flow v4
+      //     Steps: GA4 → Platform → Pixels → Events →
+      //            Create Containers → Deploy Server →
+      //            Wire URL → Done
       // ══════════════════════════════════════════════════════
 
-      // ── Wizard state ──────────────────────────────────────
+      // ── State ────────────────────────────────────────────
       var _ssStep           = 1;
-      var _ssServerUrl      = '';
-      var _ssGa4Id          = '';         // step 3 — GA4 Measurement ID
-      var _ssEcommPlatform  = '';         // step 4 — e-commerce platform: 'salla' | 'zid'
-      var _ssEnabledPlats   = [];         // step 5 — ad platforms with pixels enabled
-      var _ssPixelIds       = {};         // { meta:'123', gads:'AW-xxx', gads_label:'xxx', snap:'...', tiktok:'...' }
-      var _ssTokens         = {};         // { meta:'raw...', snap:'...', tiktok:'...' } — in-memory only
-      var _ssMetaTec        = '';         // Meta Test Event Code
-      var _ssSsEvents       = ['purchase','add_to_cart','initiate_checkout','view_content'];  // step 6
-      var _ssClientPlats    = ['google_ads','ga4'];
-      var _ssGa4Events      = ['purchase','add_to_cart','view_item','begin_checkout','page_view'];
-      var _ssGoogleAdsEvents= ['purchase','lead'];
-      var _ssConfigLoaded   = false;
-      var _ssJobId          = null;
-      var _ssJobPollTimer   = null;
-      // container IDs filled after step 1
-      var _ssWebGtmId       = '';
-      var _ssServerGtmId    = '';
+      var _ssGa4Id          = '';
+      var _ssEcommPlatform  = '';
+      var _ssPixelIds       = {};
+      var _ssTokens         = {};
+      var _ssSsEvents       = ['purchase','add_to_cart','initiate_checkout','view_content'];
+      var _ssEnabledPlats   = [];
       var _ssContainerConfig= '';
       var _ssWebSnippetHead = '';
       var _ssWebSnippetBody = '';
+      var _ssWebGtmId       = '';
+      var _ssServerGtmId    = '';
       var _ssContainersReady= false;
+      var _ssServerUrl      = '';
       var _ssUrlValidated   = false;
-      // pixel card open/close state
+      var _ssJobId          = null;
       var _ssPxOpen         = { meta: false, gads: false, snap: false, tiktok: false };
-      // init guard
       var _ssInit           = false;
 
-      // ── E-commerce platform definitions (step 4) ─────────
       var _ssEcommDefs = [
         { key: 'salla', name: 'سلة', nameEn: 'Salla', icon: '🛒', color: '#7C3AED', sub: 'منصة سلة للتجارة الإلكترونية' },
         { key: 'zid',   name: 'زد',  nameEn: 'Zid',   icon: '🏪', color: '#059669', sub: 'منصة زد للتجارة الإلكترونية' },
+        { key: 'other', name: 'أخرى', nameEn: 'Other', icon: '🌐', color: '#0284C7', sub: 'منصة أخرى أو custom' },
       ];
 
-      // ── Ad platform definitions (step 5 pixel cards) ─────
-      var _ssPlatDefs = [
-        { key: 'meta',     name: 'Meta CAPI',         sub: 'Conversions API',       icon: '👥', color: '#1877F2', ph: 'Access Token (EAABsbCS...)' },
-        { key: 'tiktok',   name: 'TikTok Events API', sub: 'Pixel Server-Side',     icon: '🎵', color: '#69C9D0', ph: 'Access Token (tta_...)' },
-        { key: 'snapchat', name: 'Snapchat CAPI',     sub: 'Conversions API',       icon: '👻', color: '#FFFC00', ph: 'Access Token' },
-        { key: 'linkedin', name: 'LinkedIn CAPI',     sub: 'Conversions API',       icon: '💼', color: '#0A66C2', ph: 'Access Token' },
-        { key: 'twitter',  name: 'Twitter CAPI',      sub: 'Conversions API',       icon: '🐦', color: '#1DA1F2', ph: 'Access Token' },
-        { key: 'ga4',      name: 'GA4 Measurement',  sub: 'Measurement Protocol',  icon: '📊', color: '#F9AB00', ph: 'API Secret' },
+      var _ssPxDefs = [
+        { key: 'meta',   label: 'Meta Pixel',      idLabel: 'Pixel ID',          tokLabel: 'CAPI Access Token',      idPh: '1234567890123456',  tokPh: 'EAAxxxxx...' },
+        { key: 'gads',   label: 'Google Ads',       idLabel: 'Conversion ID',     tokLabel: 'Conversion Label',       idPh: 'AW-1234567890',     tokPh: 'AbCd_xxxxx' },
+        { key: 'snap',   label: 'Snapchat Pixel',   idLabel: 'Pixel ID',          tokLabel: 'CAPI Token',             idPh: 'xxxxxxxx-xxxx-...',  tokPh: 'eyJhbGci...' },
+        { key: 'tiktok', label: 'TikTok Pixel',     idLabel: 'Pixel ID',          tokLabel: 'Events API Access Token',idPh: 'CXXXXXXXXXXXXXXXX',  tokPh: 'xxxxxxxx...' },
       ];
 
-      // SS events catalogue
-      var _ssEventDefs = [
-        { key: 'purchase',         label: 'Purchase',          rec: true,  warn: false },
-        { key: 'add_to_cart',      label: 'AddToCart',         rec: false, warn: false },
-        { key: 'initiate_checkout',label: 'InitiateCheckout',  rec: false, warn: false },
-        { key: 'view_content',     label: 'ViewContent',       rec: false, warn: false },
-        { key: 'lead',             label: 'Lead',              rec: false, warn: false },
-        { key: 'sign_up',          label: 'SignUp',            rec: false, warn: false },
-        { key: 'page_view',        label: 'PageView',          rec: false, warn: true  },
+      var _ssSsEventDefs = [
+        { key: 'purchase',          label: 'Purchase',          icon: '💰' },
+        { key: 'add_to_cart',       label: 'Add to Cart',       icon: '🛒' },
+        { key: 'initiate_checkout', label: 'Initiate Checkout', icon: '💳' },
+        { key: 'view_content',      label: 'View Content',      icon: '👁️' },
+        { key: 'page_view',         label: 'Page View',         icon: '📄' },
+        { key: 'lead',              label: 'Lead',              icon: '📋' },
+        { key: 'sign_up',           label: 'Sign Up',           icon: '✍️' },
+        { key: 'search',            label: 'Search',            icon: '🔍' },
       ];
 
-      // Client-side platform defs
-      var _ssClientPlatDefs = [
-        { key: 'google_ads', name: 'Google Ads',      sub: 'Conversion Tracking مستقل',    icon: '🔵' },
-        { key: 'ga4',        name: 'GA4 (Data Layer)',sub: 'يبعت الداتا للسيرفر عبر transport_url', icon: '📊' },
-        { key: 'microsoft',  name: 'Microsoft Ads',   sub: 'UET Tag',                      icon: '🟦' },
-        { key: 'pinterest',  name: 'Pinterest Ads',   sub: 'Tag',                          icon: '📌' },
-      ];
+      // ── Navigation ───────────────────────────────────────
+      window.ss_goToStep = function (n) {
+        for (var i = 1; i <= 8; i++) {
+          var panel = document.getElementById('ss-panel-' + i);
+          var ind   = document.getElementById('ss-step-ind-' + i);
+          if (panel) panel.style.display = (i === n) ? '' : 'none';
+          if (ind)   ind.classList.toggle('active', i === n);
+          if (ind)   ind.classList.toggle('done', i < n);
+        }
+        _ssStep = n;
+        if (n === 2) ss_renderEcommStep();
+        if (n === 3) ss_renderPixelsStep();
+        if (n === 4) ss_renderEventsStep();
+        if (n === 5) ss_renderReviewStep();
+        if (n === 8) ss_renderDoneStep();
+      };
 
-      // GA4 events for client-side
-      var _ssGa4EventDefs = [
-        { key: 'purchase',        label: 'purchase' },
-        { key: 'add_to_cart',     label: 'add_to_cart' },
-        { key: 'view_item',       label: 'view_item' },
-        { key: 'begin_checkout',  label: 'begin_checkout' },
-        { key: 'page_view',       label: 'page_view' },
-        { key: 'search',          label: 'search' },
-        { key: 'login',           label: 'login' },
-        { key: 'sign_up',         label: 'sign_up' },
-      ];
+      // ── STEP 1: GA4 input handler ─────────────────────────
+      window.ss_onGa4Input = function () {
+        var inp = document.getElementById('ss-p1-ga4-id');
+        if (!inp) return;
+        var v = inp.value.trim();
+        _ssGa4Id = v;
+        var hint = document.getElementById('ss-p1-ga4-hint');
+        if (!hint) return;
+        if (!v) { hint.textContent = ''; return; }
+        if (/^G-[A-Z0-9]{4,}$/i.test(v)) {
+          hint.innerHTML = '<span style="color:var(--acc);">✅ صحيح</span>';
+        } else {
+          hint.innerHTML = '<span style="color:#fbbf24;">⚠️ الصيغة المتوقعة: G-XXXXXXXXXX</span>';
+        }
+      };
 
-      // Google Ads conversion events
-      var _ssGadsEventDefs = [
-        { key: 'purchase', label: 'Purchase (Conversion)' },
-        { key: 'lead',     label: 'Lead (Conversion)' },
-        { key: 'sign_up',  label: 'SignUp (Conversion)' },
-        { key: 'contact',  label: 'Contact (Conversion)' },
-      ];
-
-      // ── Helper: get Firebase ID token ────────────────────
-      async function _ssIdToken() {
-        try {
-          if (!window.firebase || !firebase.auth) return null;
-          var u = firebase.auth().currentUser;
-          if (!u) return null;
-          return await u.getIdToken(false);
-        } catch (e) { return null; }
+      // ── STEP 2: E-Commerce ────────────────────────────────
+      function ss_renderEcommStep() {
+        var el = document.getElementById('ss-p2-ecomm-list');
+        if (!el) return;
+        el.innerHTML = _ssEcommDefs.map(function (d) {
+          var sel = _ssEcommPlatform === d.key;
+          return '<div onclick="ss_selectEcomm('' + d.key + '')" style="cursor:pointer;padding:14px 16px;border-radius:12px;background:' +
+            (sel ? 'rgba(70,241,197,.08)' : 'var(--sur2)') + ';border:1.5px solid ' +
+            (sel ? 'var(--acc)' : 'var(--bdr2)') + ';display:flex;align-items:center;gap:12px;transition:all .15s;">' +
+            '<span style="font-size:22px;">' + d.icon + '</span>' +
+            '<div><div style="font-size:13px;font-weight:700;color:var(--wht);">' + d.name + ' <span style="color:var(--mut);font-weight:400;font-size:11px;">(' + d.nameEn + ')</span></div>' +
+            '<div style="font-size:11px;color:var(--mut);">' + d.sub + '</div></div>' +
+            (sel ? '<span class="material-symbols-outlined" style="margin-right:auto;color:var(--acc);font-size:18px;">check_circle</span>' : '') +
+            '</div>';
+        }).join('');
       }
 
-      function _ssClientId() {
-        return (window.ET && window.ET.clientId) || window._clientId || '';
+      window.ss_selectEcomm = function (key) {
+        _ssEcommPlatform = key;
+        ss_renderEcommStep();
+      };
+
+      // ── STEP 3: Pixels ────────────────────────────────────
+      function ss_renderPixelsStep() {
+        var el = document.getElementById('ss-p3-px-cards');
+        if (!el) return;
+        el.innerHTML = _ssPxDefs.map(function (d) {
+          var open = !!_ssPxOpen[d.key];
+          var pxVal  = (_ssPixelIds[d.key]            || '');
+          var tokVal = (d.key === 'gads'
+            ? (_ssPixelIds['gads_label'] || '')
+            : (_ssTokens[d.key]         || ''));
+          return '<div class="ss-px-card' + (open ? ' active' : '') + '" id="ss-pxcard-' + d.key + '">' +
+            '<div class="ss-px-header" onclick="ss_togglePxCard('' + d.key + '')">' +
+            '<span style="font-size:13px;font-weight:700;color:var(--wht);">' + d.label + '</span>' +
+            '<span class="ss-px-toggle material-symbols-outlined">' + (open ? 'expand_less' : 'expand_more') + '</span>' +
+            '</div>' +
+            '<div class="ss-px-body" style="' + (open ? '' : 'display:none;') + '">' +
+            '<div style="margin-bottom:10px;"><label class="ss-px-label">' + d.idLabel + '</label>' +
+            '<input type="text" id="ss-px-id-' + d.key + '" class="ss-url-input" placeholder="' + d.idPh + '" value="' + pxVal + '" autocomplete="off"></div>' +
+            '<div><label class="ss-px-label">' + d.tokLabel + '</label>' +
+            '<div style="position:relative;">' +
+            '<input type="password" id="ss-px-tok-' + d.key + '" class="ss-url-input" placeholder="' + d.tokPh + '" value="' + tokVal + '" autocomplete="new-password" style="padding-left:36px;">' +
+            '<span class="material-symbols-outlined" onclick="ss_toggleTokVis('' + d.key + '')" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--mut);cursor:pointer;" id="ss-tok-eye-' + d.key + '">visibility</span>' +
+            '</div></div></div></div>';
+        }).join('');
       }
 
-      // ── Generic authenticated API call ───────────────────
-      function _ssApi(method, path, body, cb) {
-        _ssIdToken().then(function (idToken) {
-          if (!idToken) { cb(new Error('غير مسجّل دخول — أعد تسجيل الدخول للمتابعة'), null); return; }
-          var opts = {
-            method: method,
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken, 'X-Client-Id': _ssClientId() },
-          };
-          if (body) opts.body = JSON.stringify(body);
-          fetch(path, opts)
-            .then(function (r) {
-              var status = r.status;
-              return r.text().then(function (text) {
-                var data;
-                try { data = JSON.parse(text); }
-                catch (_) {
-                  // Server returned non-JSON (likely HTML error page)
-                  var preview = text.slice(0, 120).replace(/\s+/g, ' ');
-                  cb(new Error('HTTP ' + status + ' — الخادم أرجع استجابة غير JSON: ' + preview), null);
-                  return null;
-                }
-                cb(null, { ok: r.ok, status: status, data: data });
-                return null;
-              });
-            })
-            .catch(function (err) { cb(err, null); });
+      window.ss_togglePxCard = function (key) {
+        _ssPxOpen[key] = !_ssPxOpen[key];
+        ss_renderPixelsStep();
+      };
+
+      window.ss_toggleTokVis = function (key) {
+        var inp = document.getElementById('ss-px-tok-' + key);
+        var eye = document.getElementById('ss-tok-eye-' + key);
+        if (!inp) return;
+        inp.type = inp.type === 'password' ? 'text' : 'password';
+        if (eye) eye.textContent = inp.type === 'password' ? 'visibility' : 'visibility_off';
+      };
+
+      function ss_collectPixelData() {
+        _ssPixelIds = {}; _ssEnabledPlats = [];
+        _ssPxDefs.forEach(function (d) {
+          var idInp  = document.getElementById('ss-px-id-' + d.key);
+          var tokInp = document.getElementById('ss-px-tok-' + d.key);
+          var idVal  = idInp  ? idInp.value.trim()  : '';
+          var tokVal = tokInp ? tokInp.value.trim()  : '';
+          if (idVal) {
+            if (d.key === 'gads') {
+              _ssPixelIds['gads']       = idVal;
+              _ssPixelIds['gads_label'] = tokVal;
+            } else {
+              _ssPixelIds[d.key] = idVal;
+              if (tokVal) _ssTokens[d.key] = tokVal;
+            }
+            _ssEnabledPlats.push(d.key);
+          }
         });
       }
 
-      // ── Step navigator ────────────────────────────────────
-      window.ss_goToStep = function (n) {
-        if (n < 1 || n > 8) return;
-        // Guards
-        if (n > 1 && !_ssContainersReady) { showToast('أنشئ الـ Containers أولاً في الخطوة 1'); return; }
-        if (n > 2 && !_ssUrlValidated)    { showToast('تحقق من Server URL أولاً في الخطوة 2'); return; }
-        _ssStep = n;
-        for (var i = 1; i <= 8; i++) {
-          var ind = document.getElementById('ss-step-ind-' + i);
-          if (ind) { ind.classList.remove('active','done'); if (i < n) ind.classList.add('done'); else if (i === n) ind.classList.add('active'); }
-          var line = document.getElementById('ss-step-line-' + i);
-          if (line) line.classList.toggle('done', i < n);
-          var panel = document.getElementById('ss-panel-' + i);
-          if (panel) panel.style.display = (i === n) ? '' : 'none';
-        }
-        if (n === 3) ss_renderGa4Step();
-        if (n === 4) ss_renderEcommStep();
-        if (n === 5) ss_renderPixelsStep();
-        if (n === 6) ss_renderEventsStep();
-        if (n === 7) ss_renderCodeStep();
-        if (n === 8) ss_renderDeployStep();
+      // ── STEP 4: Events ────────────────────────────────────
+      function ss_renderEventsStep() {
+        var el = document.getElementById('ss-p4-events-list');
+        if (!el) return;
+        el.innerHTML = _ssSsEventDefs.map(function (d) {
+          var on = _ssSsEvents.indexOf(d.key) >= 0;
+          return '<label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;background:' +
+            (on ? 'rgba(70,241,197,.06)' : 'var(--sur2)') + ';border:1px solid ' +
+            (on ? 'rgba(70,241,197,.25)' : 'var(--bdr2)') + ';cursor:pointer;transition:all .15s;">' +
+            '<input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="ss_toggleEvent('' + d.key + '')" style="accent-color:var(--acc);width:15px;height:15px;cursor:pointer;">' +
+            '<span style="font-size:15px;">' + d.icon + '</span>' +
+            '<span style="font-size:13px;font-weight:600;color:var(--wht);">' + d.label + '</span>' +
+            '<span style="font-size:11px;color:var(--mut);font-family:var(--font-mono);">' + d.key + '</span>' +
+            '</label>';
+        }).join('');
+      }
+
+      window.ss_toggleEvent = function (key) {
+        var idx = _ssSsEvents.indexOf(key);
+        if (idx >= 0) _ssSsEvents.splice(idx, 1);
+        else           _ssSsEvents.push(key);
+        ss_renderEventsStep();
       };
 
-      // ── STEP 1: Create containers ─────────────────────────
-      window.ss_createContainers = function () {
-        var createBtn = document.getElementById('ss-p1-create-btn');
-        var progressEl = document.getElementById('ss-p1-progress');
-        var resultEl   = document.getElementById('ss-p1-result');
-        var errorEl    = document.getElementById('ss-p1-error');
-        var nextBtn    = document.getElementById('ss-p1-next-btn');
-
-        // Use _cachedGtmStr if available (from Pixel Config flow).
-        // If not present, the backend creates clean empty containers — no Pixel Config needed.
-        var configJson = null;
-        if (typeof _cachedGtmStr !== 'undefined' && _cachedGtmStr && _cachedGtmStr.trim()) {
-          try { configJson = JSON.parse(_cachedGtmStr); } catch (e) { configJson = null; }
+      // ── STEP 5: Review + Create ───────────────────────────
+      function ss_renderReviewStep() {
+        ss_collectPixelData();
+        var el = document.getElementById('ss-p5-review');
+        if (!el) return;
+        var rows = [
+          ['GA4 ID',      _ssGa4Id        || '<span style="color:var(--mut);">غير محدد</span>'],
+          ['المنصة',       _ssEcommPlatform || '<span style="color:var(--mut);">غير محددة</span>'],
+          ['Pixels',      _ssEnabledPlats.length ? _ssEnabledPlats.join(', ') : '<span style="color:var(--mut);">لا يوجد</span>'],
+          ['Events',      _ssSsEvents.join(', ') || '<span style="color:var(--mut);">لا يوجد</span>'],
+        ];
+        el.innerHTML = '<div style="border:1px solid var(--bdr2);border-radius:12px;overflow:hidden;">' +
+          rows.map(function (r, i) {
+            return '<div style="display:flex;gap:12px;padding:10px 14px;' +
+              (i < rows.length-1 ? 'border-bottom:1px solid var(--bdr2);' : '') +
+              'background:var(--sur2);">' +
+              '<span style="font-size:12px;color:var(--mut);min-width:70px;">' + r[0] + '</span>' +
+              '<span style="font-size:12px;color:var(--wht);font-family:var(--font-mono);">' + r[1] + '</span></div>';
+          }).join('') + '</div>';
+        if (_ssContainersReady) {
+          document.getElementById('ss-p5-result') && (document.getElementById('ss-p5-result').style.display = '');
+          document.getElementById('ss-p5-next-wrap') && (document.getElementById('ss-p5-next-wrap').style.display = '');
+          document.getElementById('ss-p5-btn-wrap') && (document.getElementById('ss-p5-btn-wrap').style.display = 'none');
         }
+      }
 
-        if (errorEl) errorEl.style.display = 'none';
-        if (createBtn) { createBtn.disabled = true; createBtn.style.opacity = '.5'; }
-        if (progressEl) progressEl.style.display = 'block';
-        if (resultEl) resultEl.style.display = 'none';
-
-        // Read GA4 ID input if already filled by the user (optional at step 1)
-        var ga4Inp = document.getElementById('ss-p3-ga4-id');
+      window.ss_createContainers = function () {
+        ss_collectPixelData();
+        var ga4Inp = document.getElementById('ss-p1-ga4-id');
         if (ga4Inp && ga4Inp.value.trim()) _ssGa4Id = ga4Inp.value.trim();
 
+        var createBtn  = document.getElementById('ss-p5-create-btn');
+        var progressEl = document.getElementById('ss-p5-progress');
+        var resultEl   = document.getElementById('ss-p5-result');
+        var errorEl    = document.getElementById('ss-p5-error');
+        var btnWrap    = document.getElementById('ss-p5-btn-wrap');
+        var nextWrap   = document.getElementById('ss-p5-next-wrap');
+
+        if (errorEl)   errorEl.style.display = 'none';
+        if (createBtn) { createBtn.disabled = true; createBtn.style.opacity = '.5'; }
+        if (progressEl) progressEl.style.display = '';
+        if (resultEl)   resultEl.style.display = 'none';
+        if (nextWrap)   nextWrap.style.display = 'none';
+
         var payload = {
-          projectName: (window.S && S.lead && S.lead.name)
-                       ? S.lead.name + ' — SS'
-                       : ((window.currentUser && currentUser.email) || 'Client') + ' — SS',
-          ssEvents:         _ssSsEvents,
+          projectName:      (window.S && S.lead && S.lead.name)
+                            ? S.lead.name + ' — SS'
+                            : ((window.currentUser && currentUser.email) || 'Client') + ' — SS',
+          ga4MeasurementId: _ssGa4Id          || '',
+          pixelIds:         _ssPixelIds,
+          events:           _ssSsEvents,
+          ecommPlatform:    _ssEcommPlatform   || '',
           ssPlatforms:      _ssEnabledPlats,
-          ga4MeasurementId: _ssGa4Id   || null,
+          ssEvents:         _ssSsEvents,
         };
-        // Only attach configJson if we have one (backend uses minimal template otherwise)
-        if (configJson) payload.configJson = configJson;
 
         _ssApi('POST', '/api/ss/create-containers', payload, function (err, res) {
           if (err || !res || !res.ok || !res.data || !res.data.ok) {
-            if (createBtn) { createBtn.disabled = false; createBtn.style.opacity = '1'; }
-            if (progressEl) progressEl.style.display = 'none';
+            if (createBtn)  { createBtn.disabled = false; createBtn.style.opacity = '1'; }
+            if (progressEl)   progressEl.style.display = 'none';
             var msg = (res && res.data && res.data.error) || (err && err.message) || 'فشل الإنشاء';
-            if (errorEl) { errorEl.style.display = 'block'; errorEl.textContent = '❌ ' + msg; }
+            if (errorEl) { errorEl.style.display = ''; errorEl.textContent = '❌ ' + msg; }
             return;
           }
           _ssJobId = res.data.jobId;
@@ -14498,546 +14406,318 @@
 
       function ss_pollJob(jobId) {
         if (!jobId) return;
-        var stageMsgs = {
-          queued:           'في الطابور...',
-          capacity_check:   'التحقق من السعة...',
-          gtm_provisioning: 'جارٍ إنشاء GTM Containers...',
-          saving:           'جارٍ الحفظ...',
-          done:             'اكتمل!',
-          error:            'حصل خطأ',
-        };
-        var progressEl  = document.getElementById('ss-p1-progress');
-        var stageEl     = document.getElementById('ss-p1-stage-msg');
-        var barEl       = document.getElementById('ss-p1-bar');
-        var createBtn   = document.getElementById('ss-p1-create-btn');
-        var resultEl    = document.getElementById('ss-p1-result');
-        var errorEl     = document.getElementById('ss-p1-error');
-        var nextBtn     = document.getElementById('ss-p1-next-btn');
+        var progressEl  = document.getElementById('ss-p5-progress');
+        var stageEl     = document.getElementById('ss-p5-stage-msg');
+        var pctEl       = document.getElementById('ss-p5-pct');
+        var barEl       = document.getElementById('ss-p5-bar');
+        var createBtn   = document.getElementById('ss-p5-create-btn');
+        var resultEl    = document.getElementById('ss-p5-result');
+        var errorEl     = document.getElementById('ss-p5-error');
+        var btnWrap     = document.getElementById('ss-p5-btn-wrap');
+        var nextWrap    = document.getElementById('ss-p5-next-wrap');
         var startedAt   = Date.now();
         var maxWaitMs   = 15 * 60 * 1000;
-        var pollEveryMs = 4000;
         var barPct      = 10;
+        var stageMsgs   = {
+          queued: 'في الطابور...', gtm_provisioning: 'إنشاء GTM Containers...',
+          saving: 'حفظ...', done: 'اكتمل!', error: 'حصل خطأ',
+        };
 
         function doPoll() {
           if (Date.now() - startedAt > maxWaitMs) {
             if (progressEl) progressEl.style.display = 'none';
-            if (errorEl)    { errorEl.style.display = 'block'; errorEl.textContent = '⏱️ انتهت مهلة الانتظار — حاول مرة أخرى'; }
-            if (createBtn)  { createBtn.disabled = false; createBtn.style.opacity = '1'; }
+            if (errorEl) { errorEl.style.display = ''; errorEl.textContent = '⏱️ انتهت مهلة الانتظار — حاول مرة أخرى'; }
+            if (createBtn) { createBtn.disabled = false; createBtn.style.opacity = '1'; }
             return;
           }
           fetch('/api/managed/job/' + encodeURIComponent(jobId))
             .then(function (r) { return r.json(); })
             .then(function (d) {
               if (d.status === 'completed' && d.result && d.result.ok) {
-                // ── Success ──
                 barPct = 100;
-                if (barEl) barEl.style.width = '100%';
+                if (barEl)  barEl.style.width = '100%';
+                if (pctEl)  pctEl.textContent = '100%';
                 if (progressEl) progressEl.style.display = 'none';
                 if (createBtn)  { createBtn.disabled = false; createBtn.style.opacity = '1'; }
 
-                var res = d.result;
-                _ssWebGtmId       = res.gtmPublicId     || '';
-                _ssWebSnippetHead = res.snippetHead      || '';
-                _ssWebSnippetBody = res.snippetBody      || '';
-                _ssServerGtmId    = (res.server && res.server.publicId)        || '';
-                _ssContainerConfig= (res.server && res.server.containerConfig) || '';
-                _ssContainersReady= true;
+                var r = d.result;
+                _ssWebGtmId       = r.gtmPublicId    || r.webGtmId    || '';
+                _ssServerGtmId    = (r.server && r.server.publicId)  || '';
+                _ssContainerConfig= (r.server && r.server.containerConfig) || '';
+                _ssWebSnippetHead = r.snippetHead || '';
+                _ssWebSnippetBody = r.snippetBody || '';
+                _ssContainersReady = true;
 
-                // Fill UI
-                var webIdEl   = document.getElementById('ss-p1-web-id');
-                var srvIdEl   = document.getElementById('ss-p1-server-id');
-                var cfgEl     = document.getElementById('ss-p1-config-json');
-                if (webIdEl)  webIdEl.textContent  = _ssWebGtmId    || '—';
-                if (srvIdEl)  srvIdEl.textContent  = _ssServerGtmId || '—';
-                if (cfgEl)    cfgEl.textContent    = _ssContainerConfig || '(لا يوجد config — يُستخدم Auto-deploy)';
-                if (resultEl) resultEl.style.display = '';
-                if (nextBtn)  nextBtn.disabled = false;
+                var webIdEl = document.getElementById('ss-p5-web-id');
+                var srvIdEl = document.getElementById('ss-p5-server-id');
+                if (webIdEl) webIdEl.textContent = _ssWebGtmId    || '—';
+                if (srvIdEl) srvIdEl.textContent = _ssServerGtmId || '—';
 
-                // Refresh overview GTM card
-                try { ovRefreshGtmStatus(); } catch (_) {}
+                if (resultEl)  resultEl.style.display  = '';
+                if (btnWrap)   btnWrap.style.display    = 'none';
+                if (nextWrap)  nextWrap.style.display   = '';
+
+                // Pre-fill containerConfig in step 6
+                var cfgEl = document.getElementById('ss-p6-config-blob');
+                if (cfgEl) cfgEl.textContent = _ssContainerConfig || '(لا يوجد — يُنشأ بعد نشر الـ Server Container)';
+
+                showToast('✅ تم إنشاء الـ Containers بنجاح!');
               } else if (d.status === 'failed') {
                 if (progressEl) progressEl.style.display = 'none';
                 if (createBtn)  { createBtn.disabled = false; createBtn.style.opacity = '1'; }
-                var msg = d.error || 'فشل الإنشاء';
-                if (errorEl) { errorEl.style.display = 'block'; errorEl.textContent = '❌ ' + msg; }
+                if (errorEl) { errorEl.style.display = ''; errorEl.textContent = '❌ ' + (d.error || 'فشل الإنشاء'); }
               } else {
-                // Still running — update progress
-                var stg = d.stage || '';
-                if (stageEl) stageEl.textContent = stageMsgs[stg] || ('جارٍ ' + stg + '...');
-                barPct = Math.min(barPct + 5, 90);
+                barPct = Math.min(barPct + 8, 90);
                 if (barEl) barEl.style.width = barPct + '%';
-                _ssJobPollTimer = setTimeout(doPoll, pollEveryMs);
+                if (pctEl) pctEl.textContent = barPct + '%';
+                var sm = stageMsgs[d.stage] || d.stage || '...';
+                if (stageEl) stageEl.textContent = sm;
+                setTimeout(doPoll, 4000);
               }
             })
-            .catch(function () { _ssJobPollTimer = setTimeout(doPoll, pollEveryMs + 2000); });
+            .catch(function () { setTimeout(doPoll, 5000); });
         }
-        _ssJobPollTimer = setTimeout(doPoll, pollEveryMs);
+        setTimeout(doPoll, 2000);
       }
 
-      window.ss_copyConfig = function () {
-        if (!_ssContainerConfig) return;
-        navigator.clipboard.writeText(_ssContainerConfig).then(function () { showToast('✅ تم نسخ Container Config'); }).catch(function () {});
+      // ── STEP 6: ContainerConfig copy ─────────────────────
+      window.ss_copyContainerConfig = function () {
+        if (!_ssContainerConfig) { showToast('لا يوجد Container Config بعد'); return; }
+        navigator.clipboard.writeText(_ssContainerConfig)
+          .then(function () { showToast('✅ تم النسخ!'); })
+          .catch(function () {
+            var ta = document.createElement('textarea');
+            ta.value = _ssContainerConfig;
+            document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+            document.body.removeChild(ta); showToast('✅ تم النسخ!');
+          });
       };
 
-      // ── STEP 2: URL validation ────────────────────────────
-      window.ss_p2OnInput = function () {
-        var nextBtn = document.getElementById('ss-p2-next-btn');
-        if (nextBtn) nextBtn.disabled = true;
-        _ssUrlValidated = false;
-        var statusEl = document.getElementById('ss-p2-status');
-        if (statusEl) { statusEl.className = 'ss-url-status'; statusEl.textContent = ''; }
-      };
-
+      // ── STEP 7: Validate URL ──────────────────────────────
       window.ss_validateUrl = function () {
-        var inp      = document.getElementById('ss-p2-url');
-        var statusEl = document.getElementById('ss-p2-status');
-        var nextBtn  = document.getElementById('ss-p2-next-btn');
-        var url      = inp ? inp.value.trim() : '';
-        if (!url) { if (statusEl) { statusEl.className = 'ss-url-status err'; statusEl.textContent = '⚠️ أدخل URL أولاً'; } return; }
-        if (!/^https?:\/\/.+\..+/.test(url)) { if (statusEl) { statusEl.className = 'ss-url-status err'; statusEl.textContent = '❌ URL غير صالح — يجب أن يبدأ بـ https://'; } return; }
-        if (statusEl) { statusEl.className = 'ss-url-status testing'; statusEl.textContent = '⏳ جارٍ الاختبار...'; }
-        _ssApi('POST', '/api/ss/validate-url', { url: url, provider: 'selfhosted' }, function (err, res) {
-          if (err || !res) { if (statusEl) { statusEl.className = 'ss-url-status err'; statusEl.textContent = '❌ تعذّر الاتصال'; } return; }
-          if (res.data && res.data.valid) {
-            var lat = res.data.latencyMs ? ' (' + res.data.latencyMs + 'ms)' : '';
-            if (statusEl) { statusEl.className = 'ss-url-status ok'; statusEl.textContent = '✅ متصل' + lat; }
-            _ssServerUrl = url;
-            _ssUrlValidated = true;
-            if (nextBtn) nextBtn.disabled = false;
-          } else {
-            var msg = (res.data && res.data.error) || 'الخادم لا يستجيب';
-            if (statusEl) { statusEl.className = 'ss-url-status err'; statusEl.textContent = '❌ ' + msg; }
-          }
-        });
-      };
+        var inp     = document.getElementById('ss-p7-url');
+        var statusEl = document.getElementById('ss-p7-status');
+        var wireWrap = document.getElementById('ss-p7-wire-wrap');
+        var errorEl  = document.getElementById('ss-p7-error');
+        var btn      = document.getElementById('ss-p7-validate-btn');
 
-      // ── STEP 3: GA4 ───────────────────────────────────────
-      window.ss_renderGa4Step = function () {
-        var inp = document.getElementById('ss-p3-ga4-id');
-        if (inp && _ssGa4Id) inp.value = _ssGa4Id;
-      };
-
-      window.ss_p3Ga4Input = function () {
-        var val = (document.getElementById('ss-p3-ga4-id') || {}).value || '';
-        _ssGa4Id = val.trim();
-      };
-
-      // ── STEP 4: E-commerce platform ───────────────────────
-      window.ss_renderEcommStep = function () {
-        var container = document.getElementById('ss-p4-ecomm-list');
-        if (!container) return;
-        container.innerHTML = _ssEcommDefs.map(function (p) {
-          var sel = _ssEcommPlatform === p.key;
-          return '<div class="ss-sel-row' + (sel ? ' selected' : '') + '" onclick="ss_selectEcomm(\'' + p.key + '\')" style="padding:16px 18px;">' +
-            '<div class="ss-sel-ico" style="font-size:28px;">' + p.icon + '</div>' +
-            '<div class="ss-sel-info">' +
-              '<div class="ss-sel-name" style="font-size:15px;">' + p.name + ' <span style="font-size:12px;color:var(--mut);font-weight:400;">(' + p.nameEn + ')</span></div>' +
-              '<div class="ss-sel-sub">' + p.sub + '</div>' +
-            '</div>' +
-            '<div style="width:22px;height:22px;border-radius:50%;border:2px solid ' + (sel ? 'var(--acc)' : 'var(--bdr2)') + ';background:' + (sel ? 'var(--acc)' : 'transparent') + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;">' +
-            (sel ? '<span style="color:#00382b;font-size:14px;font-weight:900;">✓</span>' : '') +
-            '</div></div>';
-        }).join('');
-      };
-
-      window.ss_selectEcomm = function (key) {
-        _ssEcommPlatform = key;
-        ss_renderEcommStep();
-      };
-
-      // ── STEP 5: Pixels + Tokens ───────────────────────────
-      window.ss_renderPixelsStep = function () {
-        // Restore any saved pixel IDs into inputs
-        var fields = {
-          meta:   ['ss-pid-meta',   'ss-tok-meta'],
-          gads:   ['ss-pid-gads',   'ss-lab-gads'],
-          snap:   ['ss-pid-snap',   'ss-tok-snap'],
-          tiktok: ['ss-pid-tiktok', 'ss-tok-tiktok'],
-        };
-        // restore pixel IDs
-        ['meta','snap','tiktok'].forEach(function (k) {
-          var inp = document.getElementById('ss-pid-' + k);
-          if (inp && _ssPixelIds[k]) inp.value = _ssPixelIds[k];
-        });
-        var gadsInp = document.getElementById('ss-pid-gads');
-        if (gadsInp && _ssPixelIds.gads) gadsInp.value = _ssPixelIds.gads;
-        var labInp = document.getElementById('ss-lab-gads');
-        if (labInp && _ssPixelIds.gads_label) labInp.value = _ssPixelIds.gads_label;
-        var tecInp = document.getElementById('ss-tec-meta');
-        if (tecInp && _ssMetaTec) tecInp.value = _ssMetaTec;
-        // restore token sentinels
-        ['meta','snap','tiktok'].forEach(function (k) {
-          var tinp = document.getElementById('ss-tok-' + k);
-          if (tinp && _ssTokens[k] === '***CONFIGURED***') tinp.placeholder = 'محفوظ — اتركه فارغاً للإبقاء عليه';
-        });
-        // Refresh active state of cards
-        ['meta','gads','snap','tiktok'].forEach(function (k) {
-          var card = document.getElementById('ss-px-' + k);
-          var body = document.getElementById('ss-px-body-' + k);
-          var chev = document.getElementById('ss-px-chev-' + k);
-          if (!card) return;
-          if (_ssPxOpen[k]) {
-            card.classList.add('active');
-            if (body) body.style.display = '';
-            if (chev) chev.style.transform = 'rotate(180deg)';
-          } else {
-            card.classList.remove('active');
-            if (body) body.style.display = 'none';
-            if (chev) chev.style.transform = '';
-          }
-        });
-      };
-
-      window.ss_togglePxCard = function (key) {
-        _ssPxOpen[key] = !_ssPxOpen[key];
-        var card = document.getElementById('ss-px-' + key);
-        var body = document.getElementById('ss-px-body-' + key);
-        var chev = document.getElementById('ss-px-chev-' + key);
-        if (!card) return;
-        if (_ssPxOpen[key]) {
-          card.classList.add('active');
-          if (body) body.style.display = '';
-          if (chev) chev.style.transform = 'rotate(180deg)';
-        } else {
-          card.classList.remove('active');
-          if (body) body.style.display = 'none';
-          if (chev) chev.style.transform = '';
-        }
-        ss_collectPixelData();
-      };
-
-      window.ss_toggleTokVis = function (key) {
-        var inp = document.getElementById('ss-tok-' + key);
-        var eye = document.getElementById('ss-tok-eye-' + key);
         if (!inp) return;
-        inp.type = inp.type === 'password' ? 'text' : 'password';
-        if (eye) eye.textContent = inp.type === 'password' ? 'visibility' : 'visibility_off';
-      };
+        var url = inp.value.trim();
+        if (!url) { if (statusEl) statusEl.textContent = '⚠️ أدخل الـ URL أولاً'; return; }
+        if (!/^https:\/\//.test(url)) { if (statusEl) statusEl.innerHTML = '<span style="color:#fbbf24;">⚠️ يجب أن يبدأ بـ https://</span>'; return; }
 
-      window.ss_onPixelInput = function () { ss_collectPixelData(); };
+        if (errorEl)   errorEl.style.display = 'none';
+        if (wireWrap)  wireWrap.style.display = 'none';
+        if (statusEl)  statusEl.textContent = '⏳ جارٍ التحقق...';
+        if (btn)       { btn.disabled = true; btn.style.opacity = '.6'; }
 
-      function ss_collectPixelData () {
-        // Collect enabled platforms based on which cards are open
-        _ssEnabledPlats = [];
-        ['meta','snap','tiktok'].forEach(function (k) {
-          var pidEl = document.getElementById('ss-pid-' + k);
-          var pid = pidEl ? pidEl.value.trim() : '';
-          if (_ssPxOpen[k] || pid) {
-            _ssPixelIds[k] = pid;
-            if (pid) _ssEnabledPlats.push(k === 'snap' ? 'snapchat' : k);
+        _ssApi('POST', '/api/ss/validate-url', { url: url }, function (err, res) {
+          if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+          if (!err && res && res.data && res.data.ok) {
+            _ssServerUrl   = url;
+            _ssUrlValidated = true;
+            if (statusEl) statusEl.innerHTML = '<span style="color:var(--acc);">✅ الخادم يستجيب (' + (res.data.latencyMs || '') + 'ms)</span>';
+            if (wireWrap)  wireWrap.style.display = '';
+          } else {
+            var m = (res && res.data && res.data.message) || (err && err.message) || 'لا يستجيب';
+            if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">❌ ' + m + '</span>';
           }
         });
-        // Tokens
-        ['meta','snap','tiktok'].forEach(function (k) {
-          var tokEl = document.getElementById('ss-tok-' + k);
-          if (tokEl && tokEl.value.trim()) _ssTokens[k === 'snap' ? 'snapchat' : k] = tokEl.value.trim();
+      };
+
+      // ── STEP 7: Wire transport_url + Server Container ─────
+      window.ss_wireUrl = function () {
+        var wireBtn  = document.getElementById('ss-p7-wire-btn');
+        var statusEl = document.getElementById('ss-p7-status');
+        var errorEl  = document.getElementById('ss-p7-error');
+
+        if (!_ssServerUrl) return;
+        if (wireBtn) { wireBtn.disabled = true; wireBtn.style.opacity = '.6'; }
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--acc);">⏳ جارٍ الربط...</span>';
+
+        _ssApi('POST', '/api/ss/wire-transport', { sgtmUrl: _ssServerUrl }, function (err, res) {
+          if (wireBtn) { wireBtn.disabled = false; wireBtn.style.opacity = '1'; }
+          if (err || !res || !res.ok || !res.data || !res.data.ok) {
+            var m = (res && res.data && res.data.error) || (err && err.message) || 'فشل الربط';
+            if (errorEl) { errorEl.style.display = ''; errorEl.textContent = '❌ ' + m; }
+            return;
+          }
+          if (statusEl) statusEl.innerHTML = '<span style="color:var(--acc);">✅ تم الربط ونشر الـ Containers</span>';
+          showToast('✅ تم ربط transport_url!');
+          setTimeout(function () { ss_goToStep(8); }, 800);
         });
-        // Meta TEC
-        var tecEl = document.getElementById('ss-tec-meta');
-        if (tecEl) _ssMetaTec = tecEl.value.trim();
-        // Google Ads
-        var gadsEl = document.getElementById('ss-pid-gads');
-        var labEl  = document.getElementById('ss-lab-gads');
-        if (gadsEl && gadsEl.value.trim()) {
-          _ssPixelIds.gads = gadsEl.value.trim();
-          _ssEnabledPlats.push('google_ads');
+      };
+
+      // ── STEP 8: Done ──────────────────────────────────────
+      function ss_renderDoneStep() {
+        var headEl = document.getElementById('ss-p8-snippet-head');
+        var bodyEl = document.getElementById('ss-p8-snippet-body');
+        var dlEl   = document.getElementById('ss-p8-datalayer-code');
+        var sumEl  = document.getElementById('ss-p8-summary');
+        var lblEl  = document.getElementById('ss-p8-dl-label');
+
+        if (headEl) headEl.textContent = _ssWebSnippetHead || '(اضغط على زر الإنشاء في الخطوة 5 أولاً)';
+        if (bodyEl) bodyEl.textContent = _ssWebSnippetBody || '';
+        if (dlEl)   dlEl.textContent   = ss_buildDataLayerCode();
+        if (lblEl)  lblEl.textContent  = 'DataLayer Code' + (_ssEcommPlatform ? ' — ' + _ssEcommPlatform : '');
+
+        if (sumEl) {
+          var lines = [];
+          if (_ssWebGtmId)    lines.push('🌐 Web GTM: <strong>' + _ssWebGtmId + '</strong>');
+          if (_ssServerGtmId) lines.push('🖥️ Server GTM: <strong>' + _ssServerGtmId + '</strong>');
+          if (_ssServerUrl)   lines.push('🔗 Server URL: <strong>' + _ssServerUrl + '</strong>');
+          if (_ssGa4Id)       lines.push('📊 GA4 ID: <strong>' + _ssGa4Id + '</strong>');
+          if (_ssEnabledPlats.length) lines.push('📡 Pixels: <strong>' + _ssEnabledPlats.join(', ') + '</strong>');
+          lines.push('🎯 Events: <strong>' + _ssSsEvents.join(', ') + '</strong>');
+          sumEl.innerHTML = lines.join('<br>');
         }
-        if (labEl) _ssPixelIds.gads_label = labEl.value.trim();
       }
-
-      // ── STEP 6: Events ────────────────────────────────────
-      window.ss_renderEventsStep = function () {
-        var container = document.getElementById('ss-p6-events-list');
-        if (!container) return;
-        container.innerHTML = _ssEventDefs.map(function (ev) {
-          var enabled = _ssSsEvents.indexOf(ev.key) !== -1;
-          var badge = ev.rec ? '<span class="ss-sel-badge rec">⭐ موصى به</span>' : (ev.warn ? '<span class="ss-sel-badge warn">⚠️ تكلفة عالية</span>' : '');
-          return '<div class="ss-sel-row' + (enabled ? ' selected' : '') + '" onclick="ss_toggleEvent(\'' + ev.key + '\')">' +
-            '<div class="ss-sel-info"><div class="ss-sel-name" style="font-size:13px;">' + ev.label + '</div></div>' +
-            badge +
-            '<div style="width:22px;height:22px;border-radius:50%;border:2px solid ' + (enabled ? 'var(--acc)' : 'var(--bdr2)') + ';background:' + (enabled ? 'var(--acc)' : 'transparent') + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;">' +
-            (enabled ? '<span style="color:#00382b;font-size:14px;font-weight:900;">✓</span>' : '') +
-            '</div></div>';
-        }).join('');
-      };
-
-      window.ss_toggleEvent = function (key) {
-        var idx = _ssSsEvents.indexOf(key);
-        if (idx === -1) _ssSsEvents.push(key);
-        else            _ssSsEvents.splice(idx, 1);
-        ss_renderEventsStep();
-      };
-
-      // ── STEP 7: Code Generation ───────────────────────────
-      window.ss_renderCodeStep = function () {
-        ss_collectPixelData();
-        var platLabel = document.getElementById('ss-p7-plat-label');
-        var ecommName = _ssEcommPlatform ? (_ssEcommPlatform === 'salla' ? 'سلة (Salla)' : 'زد (Zid)') : 'المنصة';
-        if (platLabel) platLabel.textContent = 'كود DataLayer لـ ' + ecommName;
-
-        // Generate DataLayer code
-        var codeEl = document.getElementById('ss-p7-datalayer-code');
-        if (codeEl) codeEl.textContent = ss_buildDataLayerCode();
-
-        // Generate tag summary
-        var sumEl = document.getElementById('ss-p7-tag-summary');
-        if (sumEl) sumEl.innerHTML = ss_buildTagSummary();
-      };
 
       function ss_buildDataLayerCode() {
-        var plat = _ssEcommPlatform || 'salla';
-        var platComment = plat === 'salla' ? 'Salla — أضف هذا الكود في الـ Custom Script في إعدادات التتبع' : 'Zid — أضف هذا الكود في الـ Custom Script في إعدادات التتبع';
-        var eventsCode = _ssSsEvents.map(function(ev) {
-          if (ev === 'purchase') {
-            return [
-              '// ─── Purchase ──────────────────────────────────────────',
-              '// تُطلَق تلقائياً عند إتمام الطلب',
-              'window.dataLayer = window.dataLayer || [];',
-              'window.dataLayer.push({',
-              '  event: \'purchase\',',
-              '  event_id: \'{{order_id}}_\' + Math.floor(Date.now()/1000),  // Deduplication ID',
-              '  value: \'{{order_total}}\',',
-              '  currency: \'SAR\',',
-              '  transaction_id: \'{{order_id}}\',',
-              '  user_data: {',
-              '    em: sha256(\'{{customer_email}}\'.toLowerCase().trim()),',
-              '    ph: sha256(\'{{customer_phone}}\'),',
-              '    fn: \'{{customer_first_name}}\',',
-              '    ln: \'{{customer_last_name}}\',',
-              '  },',
-              '  items: [{ item_id: \'{{product_id}}\', item_name: \'{{product_name}}\', price: \'{{product_price}}\', quantity: \'{{quantity}}\' }]',
-              '});'
-            ].join('\n');
-          }
-          if (ev === 'view_content') {
-            return [
-              '// ─── ViewContent ────────────────────────────────────────',
-              'window.dataLayer.push({',
-              '  event: \'view_item\',',
-              '  event_id: \'{{product_id}}_\' + Math.floor(Date.now()/1000),',
-              '  content_ids: [\'{{product_id}}\'],',
-              '  content_name: \'{{product_name}}\',',
-              '  value: \'{{product_price}}\',',
-              '  currency: \'SAR\',',
-              '});'
-            ].join('\n');
-          }
-          if (ev === 'add_to_cart') {
-            return [
-              '// ─── AddToCart ──────────────────────────────────────────',
-              'window.dataLayer.push({',
-              '  event: \'add_to_cart\',',
-              '  event_id: \'{{product_id}}_\' + Math.floor(Date.now()/1000),',
-              '  content_ids: [\'{{product_id}}\'],',
-              '  value: \'{{product_price}}\',',
-              '  currency: \'SAR\',',
-              '});'
-            ].join('\n');
-          }
-          if (ev === 'initiate_checkout') {
-            return [
-              '// ─── InitiateCheckout ────────────────────────────────────',
-              'window.dataLayer.push({',
-              '  event: \'begin_checkout\',',
-              '  event_id: \'checkout_\' + Math.floor(Date.now()/1000),',
-              '  value: \'{{cart_total}}\',',
-              '  currency: \'SAR\',',
-              '});'
-            ].join('\n');
-          }
-          return '// ' + ev + ': window.dataLayer.push({ event: \'' + ev + '\', event_id: \'' + ev + '_\' + Math.floor(Date.now()/1000) });';
-        }).join('\n\n');
-
-        return [
-          '// ════════════════════════════════════════════════════',
-          '// Easy Track — DataLayer Code',
-          '// ' + platComment,
-          '// GA4 transport_url: ' + (_ssServerUrl || 'https://gtm.yourdomain.com'),
-          '// ════════════════════════════════════════════════════',
-          '',
-          '// SHA-256 helper (مطلوبة لـ hashing)',
-          'async function sha256(str) {',
-          '  const buf = await crypto.subtle.digest(\'SHA-256\', new TextEncoder().encode(str));',
-          '  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,\'0\')).join(\'\');',
-          '}',
-          '',
-          eventsCode,
-        ].join('\n');
-      }
-
-      function ss_buildTagSummary() {
+        var ecomm = _ssEcommPlatform || 'other';
+        var evts  = _ssSsEvents;
+        var hasGA4 = !!_ssGa4Id;
         var lines = [];
-        var plats = _ssEnabledPlats.length ? _ssEnabledPlats : ['(لم تختر منصات بعد)'];
-        lines.push('<div style="color:var(--acc);font-weight:700;margin-bottom:8px;">🏷️ Tags في Web GTM Container (' + (_ssWebGtmId || 'GTM-XXXXXX') + ')</div>');
-        lines.push('<div style="color:var(--wht2);">📊 <strong>GA4 Configuration Tag</strong></div>');
-        lines.push('<div style="color:var(--mut);padding-right:18px;margin-bottom:6px;">Measurement ID: ' + (_ssGa4Id || 'G-XXXXXXXXXX') + ' | transport_url → ' + (_ssServerUrl || 'https://gtm.yourdomain.com') + '</div>');
 
-        if (_ssPixelIds.meta) {
-          lines.push('<div style="color:var(--wht2);">👥 <strong>Meta Pixel Tag</strong> (Client-Side)</div>');
-          lines.push('<div style="color:var(--mut);padding-right:18px;margin-bottom:6px;">Pixel ID: ' + _ssPixelIds.meta + (_ssMetaTec ? ' | Test Code: ' + _ssMetaTec : '') + '</div>');
+        lines.push('// EasyTrac DataLayer — ' + (ecomm === 'salla' ? 'Salla' : ecomm === 'zid' ? 'Zid' : 'Custom'));
+        lines.push('// Events: ' + evts.join(', '));
+        lines.push('// SHA-256 hashing is applied to email/phone before pushing');
+        lines.push('');
+        lines.push('async function sha256(str) {');
+        lines.push('  if (!str) return "";');
+        lines.push('  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str.trim().toLowerCase()));');
+        lines.push('  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");');
+        lines.push('}');
+        lines.push('');
+
+        if (ecomm === 'salla') {
+          lines.push('// Salla — purchase event');
+          lines.push('salla.event.on("order:created", async (order) => {');
+          lines.push('  const emHash = await sha256(order.customer?.email || "");');
+          lines.push('  const phHash = await sha256(order.customer?.mobile || "");');
+          lines.push('  const evId   = order.id + "_" + Math.floor(Date.now()/1000);');
+          lines.push('  window.dataLayer = window.dataLayer || [];');
+          lines.push('  window.dataLayer.push({');
+          lines.push('    event:          "purchase",');
+          lines.push('    event_id:        evId,');
+          lines.push('    transaction_id:  String(order.id),');
+          lines.push('    value:           order.amounts?.total?.amount || 0,');
+          lines.push('    currency:        "SAR",');
+          lines.push('    items:           (order.items || []).map(i => ({');
+          lines.push('      item_id:   String(i.id), item_name: i.name,');
+          lines.push('      price:     i.price?.amount || 0, quantity: i.quantity || 1');
+          lines.push('    })),');
+          lines.push('    content_ids:     (order.items || []).map(i => String(i.id)),');
+          lines.push('    external_id:     String(order.customer?.id || ""),');
+          lines.push('    user_data: { em: emHash, ph: phHash,');
+          lines.push('      fn: order.customer?.first_name || "",');
+          lines.push('      ln: order.customer?.last_name  || "" }');
+          lines.push('  });');
+          lines.push('});');
+        } else if (ecomm === 'zid') {
+          lines.push('// Zid — purchase event (after_order_created hook)');
+          lines.push('document.addEventListener("zid:order:created", async (e) => {');
+          lines.push('  const order  = e.detail || {};');
+          lines.push('  const emHash = await sha256(order.customer_email || "");');
+          lines.push('  const phHash = await sha256(order.customer_mobile || "");');
+          lines.push('  const evId   = order.order_id + "_" + Math.floor(Date.now()/1000);');
+          lines.push('  window.dataLayer = window.dataLayer || [];');
+          lines.push('  window.dataLayer.push({');
+          lines.push('    event:          "purchase",');
+          lines.push('    event_id:        evId,');
+          lines.push('    transaction_id:  String(order.order_id),');
+          lines.push('    value:           order.total_price || 0,');
+          lines.push('    currency:        order.currency || "SAR",');
+          lines.push('    external_id:     String(order.customer_id || ""),');
+          lines.push('    user_data: { em: emHash, ph: phHash }');
+          lines.push('  });');
+          lines.push('});');
+        } else {
+          lines.push('// Generic purchase push — adapt to your platform');
+          lines.push('window.dataLayer = window.dataLayer || [];');
+          lines.push('// Call this after a successful order:');
+          lines.push('async function pushPurchase(order) {');
+          lines.push('  const emHash = await sha256(order.email || "");');
+          lines.push('  const phHash = await sha256(order.phone || "");');
+          lines.push('  const evId   = order.id + "_" + Math.floor(Date.now()/1000);');
+          lines.push('  window.dataLayer.push({');
+          lines.push('    event: "purchase", event_id: evId,');
+          lines.push('    transaction_id: String(order.id),');
+          lines.push('    value: order.total, currency: order.currency || "SAR",');
+          lines.push('    user_data: { em: emHash, ph: phHash }');
+          lines.push('  });');
+          lines.push('}');
         }
-        if (_ssPixelIds.gads) {
-          lines.push('<div style="color:var(--wht2);">🔵 <strong>Google Ads Conversion Tag</strong></div>');
-          lines.push('<div style="color:var(--mut);padding-right:18px;margin-bottom:6px;">Conversion ID: ' + _ssPixelIds.gads + ' | Label: ' + (_ssPixelIds.gads_label || '—') + '</div>');
-        }
-        if (_ssPixelIds.snap) {
-          lines.push('<div style="color:var(--wht2);">👻 <strong>Snapchat Pixel Tag</strong></div>');
-          lines.push('<div style="color:var(--mut);padding-right:18px;margin-bottom:6px;">Pixel ID: ' + _ssPixelIds.snap + '</div>');
-        }
-        if (_ssPixelIds.tiktok) {
-          lines.push('<div style="color:var(--wht2);">🎵 <strong>TikTok Pixel Tag</strong></div>');
-          lines.push('<div style="color:var(--mut);padding-right:18px;margin-bottom:6px;">Pixel ID: ' + _ssPixelIds.tiktok + '</div>');
-        }
-        lines.push('<div style="border-top:1px solid var(--bdr2);margin:8px 0;"></div>');
-        lines.push('<div style="color:var(--acc);font-weight:700;margin-bottom:4px;">🖥️ Server GTM Container (' + (_ssServerGtmId || 'GTM-YYYYYY') + ')</div>');
-        lines.push('<div style="color:var(--wht2);">📡 <strong>GA4 Client → Fan-out Tags:</strong></div>');
-        _ssSsEvents.forEach(function(ev) {
-          lines.push('<div style="color:var(--mut);padding-right:18px;">• ' + ev + ' → ' + plats.join(' · ') + '</div>');
-        });
-        lines.push('<div style="color:var(--wht2);margin-top:6px;">✅ <strong>Deduplication:</strong> event_id = order_id + "_" + timestamp</div>');
-        lines.push('<div style="color:var(--wht2);">🔒 <strong>User Data Hashing:</strong> SHA-256 (email · phone)</div>');
-        return lines.join('');
+        return lines.join('
+');
       }
 
-      window.ss_copyCode = function(type) {
-        var el = type === 'datalayer'
-          ? document.getElementById('ss-p7-datalayer-code')
-          : document.getElementById('ss-p7-tag-summary');
-        if (!el) return;
-        var text = type === 'datalayer' ? el.textContent : el.innerText;
-        navigator.clipboard.writeText(text).then(function () { showToast('✅ تم نسخ الكود'); }).catch(function(){});
-      };
-
-      // ── STEP 8: Deploy summary ─────────────────────────────
-      window.ss_renderDeployStep = function () {
-        ss_collectPixelData();
-        var sumEl = document.getElementById('ss-p8-summary');
-        if (!sumEl) return;
-
-        var rows = function (pairs) {
-          return pairs.map(function (p) {
-            return '<div class="ss-summary-row"><span class="ss-summary-key">' + p[0] + '</span><span class="ss-summary-val">' + (p[1] || '—') + '</span></div>';
-          }).join('');
-        };
-
-        var platName = _ssEcommPlatform === 'salla' ? '✅ سلة' : _ssEcommPlatform === 'zid' ? '✅ زد' : '—';
-        var pixelsSummary = [];
-        if (_ssPixelIds.meta)   pixelsSummary.push('Meta (' + _ssPixelIds.meta + ')');
-        if (_ssPixelIds.gads)   pixelsSummary.push('Google Ads (' + _ssPixelIds.gads + ')');
-        if (_ssPixelIds.snap)   pixelsSummary.push('Snapchat (' + _ssPixelIds.snap + ')');
-        if (_ssPixelIds.tiktok) pixelsSummary.push('TikTok (' + _ssPixelIds.tiktok + ')');
-
-        sumEl.innerHTML =
-          '<div class="ss-summary-block"><div class="ss-summary-label">🖥️ Infrastructure</div>' +
-          rows([
-            ['Web Container',    _ssWebGtmId    ? '✅ ' + _ssWebGtmId    : '—'],
-            ['Server Container', _ssServerGtmId ? '✅ ' + _ssServerGtmId : '—'],
-            ['Server URL',       _ssServerUrl   ? '✅ ' + _ssServerUrl   : '—'],
-            ['GA4',              _ssGa4Id       ? '✅ ' + _ssGa4Id       : '—'],
-          ]) + '</div>' +
-          '<div class="ss-summary-block"><div class="ss-summary-label">📦 E-Commerce + Pixels</div>' +
-          rows([
-            ['المنصة',  platName],
-            ['Pixels',  pixelsSummary.length ? pixelsSummary.join(' · ') : '—'],
-            ['Tokens',  _ssEnabledPlats.length ? _ssEnabledPlats.length + ' منصة مشفّرة 🔒' : '—'],
-            ['Events',  _ssSsEvents.length ? _ssSsEvents.join(', ') : '—'],
-          ]) + '</div>';
-      };
-
-      // ── Confirm & wire (step 8) ───────────────────────────
-      window.ss_confirmSetup = function () {
-        var btn      = document.getElementById('ss-p8-confirm-btn');
-        var statusEl = document.getElementById('ss-p8-status');
-        var errorEl  = document.getElementById('ss-p8-error');
-
-        if (errorEl) errorEl.style.display = 'none';
-
-        ss_collectPixelData();
-
-        var ga4Inp = document.getElementById('ss-p3-ga4-id');
-        if (ga4Inp && ga4Inp.value.trim()) _ssGa4Id = ga4Inp.value.trim();
-
-        if (!_ssServerUrl)       { if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">لا يوجد Server URL — ارجع للخطوة 2</span>'; return; }
-        if (!_ssContainersReady) { if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">لم تُنشأ الـ Containers بعد — ارجع للخطوة 1</span>'; return; }
-
-        if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
-        if (statusEl) statusEl.innerHTML = '<span style="color:var(--acc);">⏳ جارٍ نقل الإعدادات إلى GTM...</span>';
-
-        var doSaveConfig = function () {
-          if (statusEl) statusEl.innerHTML = '<span style="color:var(--acc);">⏳ جارٍ الحفظ...</span>';
-          _ssApi('POST', '/api/ss/save-config', {
-            provider:           'selfhosted',
-            serverUrl:          _ssServerUrl,
-            platforms:          _ssEnabledPlats,
-            tokens:             _ssTokens,
-            pixelIds:           _ssPixelIds,
-            ecommPlatform:      _ssEcommPlatform,
-            metaTec:            _ssMetaTec,
-            ga4MeasurementId:   _ssGa4Id,
-            ga4Events:          _ssGa4Events,
-            googleAdsEvents:    _ssGoogleAdsEvents,
-            ssEvents:           _ssSsEvents,
-          }, function (err2, res2) {
-            if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
-            if (err2 || !res2 || !res2.ok || !res2.data || !res2.data.ok) {
-              var m = (res2 && res2.data && res2.data.error) || (err2 && err2.message) || 'فشل الحفظ';
-              if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">❌ ' + m + '</span>';
-              if (errorEl) { errorEl.style.display = 'block'; errorEl.textContent = '❌ ' + m; }
-              return;
-            }
-            if (statusEl) statusEl.innerHTML = '<span style="color:var(--acc);">✅ تم الإعداد بالكامل</span>';
-            if (window.ET) {
-              window.ET.ssEnabled = true; window.ET.ssUrl = _ssServerUrl;
-              window.ET.ssPlatforms = {};
-              _ssEnabledPlats.forEach(function (k) { window.ET.ssPlatforms[k] = true; });
-            }
-            document.cookie = 'et_ss_url=' + encodeURIComponent(_ssServerUrl) + ';path=/;max-age=31536000;SameSite=Lax';
-            ss_showDoneBanner();
-            try { ovRefreshGtmStatus(); } catch (_) {}
-            showToast('✅ Server-Side Tracking مفعّل بالكامل!');
+      window.ss_copyCode = function (type) {
+        var code = type === 'datalayer'
+          ? (document.getElementById('ss-p8-datalayer-code') || {}).textContent
+          : null;
+        if (!code) return;
+        navigator.clipboard.writeText(code)
+          .then(function () { showToast('✅ تم النسخ!'); })
+          .catch(function () {
+            var ta = document.createElement('textarea'); ta.value = code;
+            document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+            document.body.removeChild(ta); showToast('✅ تم النسخ!');
           });
-        };
+      };
 
-        // Step 1: Populate both GTM containers with the full config built from
-        //         the user's selections (GA4 ID, pixels, events, ecomm platform).
-        //         populate-containers also sets transport_url on the GA4 Config tag,
-        //         so wire-transport is only needed as a fallback.
-        var populatePayload = {
-          ga4MeasurementId: _ssGa4Id,
-          sgtmUrl:          _ssServerUrl,
-          pixelIds:         _ssPixelIds,
-          events:           _ssSsEvents,
-          ecommPlatform:    _ssEcommPlatform,
-          platforms:        _ssEnabledPlats,
-        };
-        _ssApi('POST', '/api/ss/populate-containers', populatePayload, function (pErr, pRes) {
-          if (!pErr && pRes && pRes.data && pRes.data.ok) {
-            // populate-containers succeeded and already published a version
-            // with transport_url baked in — skip the redundant wire-transport call.
-            console.log('[ss] populate-containers OK — skipping wire-transport');
-            doSaveConfig();
-          } else {
-            // populate-containers failed (e.g. quota exceeded). Fall back to the
-            // lightweight wire-transport patch so the GA4 tag at least gets the URL.
-            console.warn('[ss] populate-containers failed, falling back to wire-transport:',
-              (pRes && pRes.data && pRes.data.error) || (pErr && pErr.message));
-            _ssApi('POST', '/api/ss/wire-transport', { sgtmUrl: _ssServerUrl }, function (err) {
-              if (err) console.warn('[ss] wire-transport non-fatal:', err.message || err);
-              doSaveConfig();
-            });
+      window.ss_copySnippet = function (part) {
+        var code = part === 'head' ? _ssWebSnippetHead : _ssWebSnippetBody;
+        if (!code) { showToast('لا يوجد snippet بعد'); return; }
+        navigator.clipboard.writeText(code)
+          .then(function () { showToast('✅ تم النسخ!'); })
+          .catch(function () {
+            var ta = document.createElement('textarea'); ta.value = code;
+            document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+            document.body.removeChild(ta); showToast('✅ تم النسخ!');
+          });
+      };
+
+      // ── Confirm + Save ────────────────────────────────────
+      window.ss_confirmSetup = function () {
+        var btn      = document.getElementById('ss-p8-status');
+        if (btn) btn.innerHTML = '<span style="color:var(--acc);">⏳ جارٍ الحفظ...</span>';
+
+        _ssApi('POST', '/api/ss/save-config', {
+          provider:           'selfhosted',
+          serverUrl:          _ssServerUrl,
+          platforms:          _ssEnabledPlats,
+          tokens:             _ssTokens,
+          pixelIds:           _ssPixelIds,
+          ecommPlatform:      _ssEcommPlatform,
+          ga4MeasurementId:   _ssGa4Id,
+          ssEvents:           _ssSsEvents,
+        }, function (err, res) {
+          if (err || !res || !res.ok || !res.data || !res.data.ok) {
+            var m = (res && res.data && res.data.error) || (err && err.message) || 'فشل الحفظ';
+            if (btn) btn.innerHTML = '<span style="color:#f87171;">❌ ' + m + '</span>';
+            return;
           }
+          if (btn) btn.innerHTML = '<span style="color:var(--acc);">✅ تم الحفظ</span>';
+          if (window.ET) {
+            window.ET.ssEnabled = true; window.ET.ssUrl = _ssServerUrl;
+            window.ET.ssPlatforms = {};
+            _ssEnabledPlats.forEach(function (k) { window.ET.ssPlatforms[k] = true; });
+          }
+          document.cookie = 'et_ss_url=' + encodeURIComponent(_ssServerUrl) + ';path=/;max-age=31536000;SameSite=Lax';
+          ss_showDoneBanner();
+          try { ovRefreshGtmStatus(); } catch (_) {}
+          showToast('✅ Server-Side Tracking مفعّل بالكامل!');
         });
       };
 
       // ── Done banner ───────────────────────────────────────
       function ss_showDoneBanner() {
-        var banner = document.getElementById('ss-done-banner');
-        var urlEl  = document.getElementById('ss-done-url');
-        var resetBtn = document.getElementById('ss-hdr-reset-btn');
-        if (banner) { banner.style.display = 'flex'; }
-        var platNames = _ssEnabledPlats.length ? _ssEnabledPlats.join(', ') : 'لا منصات';
-        var ecommLabel = _ssEcommPlatform ? (' · ' + (_ssEcommPlatform === 'salla' ? 'سلة' : 'زد')) : '';
-        if (urlEl) urlEl.textContent = _ssServerUrl + ecommLabel + ' — ' + platNames;
+        var banner  = document.getElementById('ss-done-banner');
+        var urlEl   = document.getElementById('ss-done-url');
+        var resetBtn= document.getElementById('ss-hdr-reset-btn');
+        if (banner) banner.style.display = 'flex';
+        if (urlEl)  urlEl.textContent = _ssServerUrl + (_ssEcommPlatform ? ' · ' + _ssEcommPlatform : '') + ' — ' + _ssEnabledPlats.join(', ');
         if (resetBtn) resetBtn.style.display = '';
         var bar = document.getElementById('ss-step-bar');
         if (bar) bar.style.display = 'none';
@@ -15052,9 +14732,7 @@
         if (banner) banner.style.display = 'none';
         var bar = document.getElementById('ss-step-bar');
         if (bar) bar.style.display = '';
-        _ssContainersReady = !!_ssWebGtmId;
-        _ssUrlValidated    = !!_ssServerUrl;
-        ss_goToStep(_ssContainersReady ? (_ssUrlValidated ? 3 : 2) : 1);
+        ss_goToStep(_ssContainersReady ? (_ssUrlValidated ? 7 : 6) : 5);
       };
 
       // ── Reset ─────────────────────────────────────────────
@@ -15062,21 +14740,21 @@
         if (!confirm('حذف إعدادات Server-Side Tracking؟ لا يمكن التراجع.')) return;
         _ssApi('DELETE', '/api/ss/config', null, function (err, res) {
           if (err || !res || !res.ok) { showToast('❌ فشل الحذف'); return; }
-          _ssEnabledPlats = []; _ssSsEvents = ['purchase','add_to_cart','initiate_checkout','view_content'];
-          _ssServerUrl = ''; _ssGa4Id = ''; _ssEcommPlatform = '';
-          _ssPixelIds = {}; _ssTokens = {}; _ssMetaTec = '';
+          _ssGa4Id = ''; _ssEcommPlatform = ''; _ssPixelIds = {}; _ssTokens = {};
+          _ssSsEvents = ['purchase','add_to_cart','initiate_checkout','view_content'];
+          _ssEnabledPlats = []; _ssServerUrl = ''; _ssContainerConfig = '';
+          _ssWebGtmId = ''; _ssServerGtmId = ''; _ssContainersReady = false;
+          _ssUrlValidated = false; _ssWebSnippetHead = ''; _ssWebSnippetBody = '';
           _ssPxOpen = { meta: false, gads: false, snap: false, tiktok: false };
-          _ssContainersReady = false; _ssUrlValidated = false;
-          _ssWebGtmId = ''; _ssServerGtmId = ''; _ssContainerConfig = '';
           if (window.ET) { window.ET.ssEnabled = false; window.ET.ssUrl = ''; window.ET.ssPlatforms = {}; }
-          document.cookie = 'et_ss_url=;path=/;max-age=0';
           var banner = document.getElementById('ss-done-banner');
           if (banner) banner.style.display = 'none';
-          var bar = document.getElementById('ss-step-bar'); if (bar) bar.style.display = '';
-          var resetBtn = document.getElementById('ss-hdr-reset-btn'); if (resetBtn) resetBtn.style.display = 'none';
+          var resetBtn = document.getElementById('ss-hdr-reset-btn');
+          if (resetBtn) resetBtn.style.display = 'none';
+          var bar = document.getElementById('ss-step-bar');
+          if (bar) bar.style.display = '';
           ss_goToStep(1);
-          try { ovRefreshGtmStatus(); } catch (_) {}
-          showToast('تم حذف إعدادات Server-Side Tracking');
+          showToast('✅ تم حذف الإعدادات');
         });
       };
 
@@ -15085,17 +14763,15 @@
         _ssApi('GET', '/api/ss/config', null, function (err, res) {
           if (err || !res || !res.ok || !res.data || !res.data.ok || !res.data.config) { if (cb) cb(false); return; }
           var d = res.data.config;
-          _ssServerUrl       = d.serverUrl       || '';
-          _ssEnabledPlats    = Array.isArray(d.platforms)       ? d.platforms       : [];
+          _ssServerUrl       = d.serverUrl        || '';
+          _ssEnabledPlats    = Array.isArray(d.platforms) ? d.platforms : [];
           _ssGa4Id           = d.ga4MeasurementId || '';
-          _ssEcommPlatform   = d.ecommPlatform    || '';
-          _ssPixelIds        = d.pixelIds         || {};
-          _ssMetaTec         = d.metaTec          || '';
-          _ssGa4Events       = Array.isArray(d.ga4Events)       ? d.ga4Events       : _ssGa4Events;
-          _ssGoogleAdsEvents = Array.isArray(d.googleAdsEvents) ? d.googleAdsEvents : _ssGoogleAdsEvents;
-          _ssSsEvents        = Array.isArray(d.ssEvents)        ? d.ssEvents        : _ssSsEvents;
-          _ssWebGtmId        = d.webPublicId    || '';
-          _ssServerGtmId     = d.serverPublicId || '';
+          _ssEcommPlatform   = d.ecommPlatform     || '';
+          _ssPixelIds        = d.pixelIds          || {};
+          _ssSsEvents        = Array.isArray(d.ssEvents) ? d.ssEvents : _ssSsEvents;
+          _ssWebGtmId        = d.webPublicId       || '';
+          _ssServerGtmId     = d.serverPublicId    || '';
+          _ssContainerConfig = d.containerConfig   || '';
           _ssContainersReady = !!(d.webContainerId || d.webPublicId);
           _ssUrlValidated    = !!_ssServerUrl;
           _ssTokens = {};
@@ -15105,88 +14781,14 @@
           if (_ssPixelIds.gads)                          _ssPxOpen.gads   = true;
           if (_ssPixelIds.snap   || _ssTokens.snapchat) _ssPxOpen.snap   = true;
           if (_ssPixelIds.tiktok || _ssTokens.tiktok)   _ssPxOpen.tiktok = true;
+          // Restore snippets from saved container data if available
+          if (d.snippetHead) _ssWebSnippetHead = d.snippetHead;
+          if (d.snippetBody) _ssWebSnippetBody = d.snippetBody;
           if (cb) cb(true);
         });
       };
 
-      window.ovRefreshGtmStatus = function () {
-        _ssApi('GET', '/api/ss/full-status', null, function (err, res) {
-          var webId    = _ssWebGtmId    || (res && res.data && res.data.container && res.data.container.webGtmId)    || null;
-          var srvId    = _ssServerGtmId || (res && res.data && res.data.container && res.data.container.serverGtmId) || null;
-          var snippet  = (res && res.data && res.data.container && res.data.container.snippetHead) || _ssWebSnippetHead || null;
-          var platforms= (res && res.data && res.data.container && res.data.container.platforms)   || [];
-          var ssCfg    = (res && res.data && res.data.ss)        || null;
-
-          var webIdEl     = document.getElementById('ovWebGtmId');
-          var srvIdEl     = document.getElementById('ovServerGtmId');
-          var webBadge    = document.getElementById('ovWebGtmBadge');
-          var srvBadge    = document.getElementById('ovServerGtmBadge');
-          var placeholder = document.getElementById('ovGtmPlaceholder');
-          var snippetWrap = document.getElementById('ovWebSnippetWrap');
-          var snippetCode = document.getElementById('ovWebSnippetCode');
-          var platWrap    = document.getElementById('ovActivePlatforms');
-          var platGrid    = document.getElementById('ovActivePlatGrid');
-
-          var hasAny = !!(webId || srvId);
-
-          if (placeholder) placeholder.style.display = hasAny ? 'none' : '';
-
-          if (webIdEl)  webIdEl.textContent  = webId  || '—';
-          if (srvIdEl)  srvIdEl.textContent  = srvId  || '—';
-
-          if (webBadge) {
-            webBadge.textContent = webId  ? '🟢 مُعدّ' : '🔴 غير مُعدّ';
-            webBadge.style.color = webId  ? 'var(--acc)' : 'var(--mut)';
-          }
-          if (srvBadge) {
-            var srvUrl = ssCfg && ssCfg.serverUrl ? ssCfg.serverUrl : null;
-            srvBadge.textContent = (srvId && srvUrl) ? '🟢 مُعدّ + مُنشور' : (srvId ? '🟡 منشور جزئياً' : '🔴 غير مُعدّ');
-            srvBadge.style.color = (srvId && srvUrl) ? 'var(--acc)' : (srvId ? '#fbbf24' : 'var(--mut)');
-          }
-
-          if (snippet && snippetWrap && snippetCode) {
-            snippetWrap.style.display = '';
-            snippetCode.textContent = snippet.length > 300 ? snippet.substring(0,300) + '…' : snippet;
-          } else if (snippetWrap) { snippetWrap.style.display = 'none'; }
-
-          // Active platforms (web + server combined)
-          var allPlats = [];
-          if (platforms && platforms.length) platforms.forEach(function (k) { allPlats.push({ key: k, side: 'client' }); });
-          if (ssCfg && Array.isArray(ssCfg.platforms)) ssCfg.platforms.forEach(function (k) { allPlats.push({ key: k, side: 'server' }); });
-          if (platWrap && platGrid && allPlats.length) {
-            platWrap.style.display = '';
-            var platIcons = { meta:'👥', tiktok:'🎵', snapchat:'👻', ga4:'📊', google:'🔵', google_ads:'🔵', linkedin:'💼', twitter:'🐦', mixpanel:'📈' };
-            var platNames = { meta:'Meta', tiktok:'TikTok', snapchat:'Snap', ga4:'GA4', google:'Google Ads', google_ads:'Google Ads', linkedin:'LinkedIn', twitter:'Twitter', mixpanel:'Mixpanel' };
-            platGrid.innerHTML = allPlats.map(function (p) {
-              return '<div style="display:inline-flex;align-items:center;gap:4px;background:var(--sur);border:1px solid var(--bdr2);border-radius:20px;padding:4px 10px;font-size:11px;font-family:var(--font-ui);font-weight:600;color:var(--wht2);">' +
-                (platIcons[p.key] || '📡') + ' ' + (platNames[p.key] || p.key) +
-                '<span style="font-size:9px;background:' + (p.side==='server'?'rgba(70,241,197,.15)':'rgba(66,133,244,.15)') + ';color:' + (p.side==='server'?'var(--acc)':'#93c5fd') + ';border-radius:4px;padding:1px 5px;margin-right:2px;">' +
-                (p.side==='server'?'SS':'CS') + '</span>' +
-                '</div>';
-            }).join('');
-          } else if (platWrap) { platWrap.style.display = 'none'; }
-        });
-      };
-
-      window.ovCopySnippet = function (type) {
-        var code = type === 'head' ? _ssWebSnippetHead : _ssWebSnippetBody;
-        if (!code) { showToast('لا يوجد snippet'); return; }
-        navigator.clipboard.writeText(code).then(function () { showToast('✅ تم نسخ الـ Snippet'); }).catch(function () {});
-      };
-
-      // ── Step 1 hint: show whether Pixel Config JSON is ready ────
-      function ss_updateConfigHint() {
-        var hintEl = document.getElementById('ss-p1-config-hint');
-        if (!hintEl) return;
-        var hasConfig = (typeof _cachedGtmStr !== 'undefined') && _cachedGtmStr && _cachedGtmStr.trim();
-        if (hasConfig) {
-          hintEl.innerHTML = '✅ GTM Config جاهز من Pixel Config — سيتم استخدامه تلقائياً.';
-          hintEl.style.color = 'var(--acc)';
-        } else {
-          hintEl.innerHTML = '💡 ستُنشأ Containers فارغة — يمكنك استيراد Pixel Config لاحقاً من قسم <strong>Pixel Config</strong>.';
-          hintEl.style.color = 'var(--mut)';
-        }
-      }
+      function ss_updateConfigHint() { /* no-op in v4 */ }
 
       // ── Init on view activation ───────────────────────────
       function initServerSideView() {
