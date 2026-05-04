@@ -14236,7 +14236,7 @@
         if (!el) return;
         el.innerHTML = _ssEcommDefs.map(function (d) {
           var sel = _ssEcommPlatform === d.key;
-          return '<div onclick="ss_selectEcomm('' + d.key + '')" style="cursor:pointer;padding:14px 16px;border-radius:12px;background:' +
+          return '<div onclick="ss_selectEcomm(\'' + d.key + '\')" style="cursor:pointer;padding:14px 16px;border-radius:12px;background:' +
             (sel ? 'rgba(70,241,197,.08)' : 'var(--sur2)') + ';border:1.5px solid ' +
             (sel ? 'var(--acc)' : 'var(--bdr2)') + ';display:flex;align-items:center;gap:12px;transition:all .15s;">' +
             '<span style="font-size:22px;">' + d.icon + '</span>' +
@@ -14263,7 +14263,7 @@
             ? (_ssPixelIds['gads_label'] || '')
             : (_ssTokens[d.key]         || ''));
           return '<div class="ss-px-card' + (open ? ' active' : '') + '" id="ss-pxcard-' + d.key + '">' +
-            '<div class="ss-px-header" onclick="ss_togglePxCard('' + d.key + '')">' +
+            '<div class="ss-px-header" onclick="ss_togglePxCard(\'' + d.key + '\')">' +
             '<span style="font-size:13px;font-weight:700;color:var(--wht);">' + d.label + '</span>' +
             '<span class="ss-px-toggle material-symbols-outlined">' + (open ? 'expand_less' : 'expand_more') + '</span>' +
             '</div>' +
@@ -14273,7 +14273,7 @@
             '<div><label class="ss-px-label">' + d.tokLabel + '</label>' +
             '<div style="position:relative;">' +
             '<input type="password" id="ss-px-tok-' + d.key + '" class="ss-url-input" placeholder="' + d.tokPh + '" value="' + tokVal + '" autocomplete="new-password" style="padding-left:36px;">' +
-            '<span class="material-symbols-outlined" onclick="ss_toggleTokVis('' + d.key + '')" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--mut);cursor:pointer;" id="ss-tok-eye-' + d.key + '">visibility</span>' +
+            '<span class="material-symbols-outlined" onclick="ss_toggleTokVis(\'' + d.key + '\')" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--mut);cursor:pointer;" id="ss-tok-eye-' + d.key + '">visibility</span>' +
             '</div></div></div></div>';
         }).join('');
       }
@@ -14320,7 +14320,7 @@
           return '<label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;background:' +
             (on ? 'rgba(70,241,197,.06)' : 'var(--sur2)') + ';border:1px solid ' +
             (on ? 'rgba(70,241,197,.25)' : 'var(--bdr2)') + ';cursor:pointer;transition:all .15s;">' +
-            '<input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="ss_toggleEvent('' + d.key + '')" style="accent-color:var(--acc);width:15px;height:15px;cursor:pointer;">' +
+            '<input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="ss_toggleEvent(\'' + d.key + '\')" style="accent-color:var(--acc);width:15px;height:15px;cursor:pointer;">' +
             '<span style="font-size:15px;">' + d.icon + '</span>' +
             '<span style="font-size:13px;font-weight:600;color:var(--wht);">' + d.label + '</span>' +
             '<span style="font-size:11px;color:var(--mut);font-family:var(--font-mono);">' + d.key + '</span>' +
@@ -14648,8 +14648,7 @@
           lines.push('  });');
           lines.push('}');
         }
-        return lines.join('
-');
+        return lines.join('\n');
       }
 
       window.ss_copyCode = function (type) {
