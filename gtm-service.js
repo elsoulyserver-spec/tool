@@ -222,15 +222,17 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
   const acc = getAccountId();
   const cv = configJson && configJson.containerVersion ? configJson.containerVersion : (configJson || {});
 
-  const vars = cv.variable || [];
-  const trigs = cv.trigger || [];
-  const tags = cv.tag || [];
+  const vars    = cv.variable || [];
+  const trigs   = cv.trigger  || [];
+  const tags    = cv.tag      || [];
+  // client[] lives at the top level of the config (server containers only)
+  const clients = (configJson && configJson.client) || cv.client || [];
 
   // Empty config — nothing to import, skip quietly.
-  if (!vars.length && !trigs.length && !tags.length) {
+  if (!vars.length && !trigs.length && !tags.length && !clients.length) {
     if (typeof onProgress === 'function') onProgress({ stage: 'skip — empty config', done: 0, total: 0 });
     console.log('[gtm] importContainerJSON: empty config, skipping import');
-    return { importedTagCount: 0, importedTriggerCount: 0, importedVariableCount: 0 };
+    return { importedTagCount: 0, importedTriggerCount: 0, importedVariableCount: 0, importedClientCount: 0 };
   }
 
   const basePath = `/accounts/${acc}/containers/${containerId}/workspaces/${workspaceId}`;
@@ -249,7 +251,7 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
   const BURST_SIZE   = 28;
   const BURST_WAIT_MS = 65000;
 
-  const total = vars.length + trigs.length + tags.length;
+  const total = vars.length + trigs.length + tags.length + clients.length;
   let done = 0;
   const report = (stage) => {
     if (typeof onProgress === 'function') {
@@ -333,7 +335,23 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
     return gtmRequest('POST', `${basePath}/tags`, JSON.stringify(body));
   });
 
-  return { importedVariableCount: vars.length, importedTriggerCount: trigs.length, importedTagCount: tags.length };
+  // PHASE 3: Clients (server containers only — independent of triggers/tags)
+  if (clients.length > 0) {
+    await runInBursts(clients, 'client', async (c) => {
+      const body = { ...c };
+      delete body.accountId; delete body.containerId; delete body.workspaceId;
+      delete body.clientId; delete body.fingerprint; delete body.path;
+      delete body.parentFolderId;
+      return gtmRequest('POST', `${basePath}/clients`, JSON.stringify(body));
+    });
+  }
+
+  return {
+    importedVariableCount: vars.length,
+    importedTriggerCount:  trigs.length,
+    importedTagCount:      tags.length,
+    importedClientCount:   clients.length,
+  };
 }
 
 // Create a version from the current workspace state.
@@ -604,13 +622,12 @@ async function provisionForClientWithServer(opts) {
   const serverWs = await getDefaultWorkspace(serverContainerId);
   const serverWorkspaceId = serverWs.workspaceId;
 
-  let sgtmConfig;
-  try {
-    sgtmConfig = require('./lib/sgtm-default-config.json');
-  } catch (e) {
-    sgtmConfig = { containerVersion: { variable: [], trigger: [], tag: [] } };
-    console.warn('[gtm] lib/sgtm-default-config.json missing — server container will be empty');
-  }
+  // Use an empty config at creation time — the full Variable/Trigger/Tag/Client
+  // config (built from the user's wizard selections) is imported later via the
+  // POST /api/ss/populate-containers endpoint, which runs at Step 8 after the
+  // user has entered GA4 ID, pixels, events, etc.  Keeping the creation config
+  // empty avoids duplicate GA4 Forward tags and GA4 Clients.
+  const sgtmConfig = { containerVersion: { variable: [], trigger: [], tag: [] } };
 
   onProgress({ stage: 'sgtm_import', done: 0, total: 1 });
   const importResult = await importContainerJSON(
@@ -644,35 +661,4 @@ async function provisionForClientWithServer(opts) {
   });
 
   return {
-    web,                                            // existing shape from provisionForClient
-    server: {
-      gtmAccountId:    getAccountId(),
-      containerId:     serverContainerId,
-      publicId:        serverPublicId,
-      workspaceId:     serverWorkspaceId,
-      versionId:       serverVersionId,
-      containerName:   serverName,
-      containerConfig,                              // ← the deploy blob
-      importedTagCount:      importResult.importedTagCount      || 0,
-      importedTriggerCount:  importResult.importedTriggerCount  || 0,
-      importedVariableCount: importResult.importedVariableCount || 0,
-    },
-  };
-}
-
-module.exports = {
-  isConfigured,
-  getAccessToken,
-  listContainers,
-  createContainer,
-  importContainerJSON,
-  createVersion,
-  publishVersion,
-  inviteUserToContainer,
-  provisionForClient,
-  // Server-side (client + server flow)
-  createServerContainer,
-  getContainerConfig,
-  setGA4TransportUrl,
-  provisionForClientWithServer,
-};
+    web,                                       

@@ -1435,7 +1435,11 @@ http.createServer((req, res) => {
         if (!ssRequireCrypto()) return;
 
         ssParseBody(async body => {
-          const { provider, serverUrl, platforms, tokens, stapeApiKey } = body;
+          const {
+            provider, serverUrl, platforms, tokens, stapeApiKey,
+            pixelIds, ecommPlatform, metaTec,
+            ga4MeasurementId, ga4Events, googleAdsEvents, ssEvents,
+          } = body;
           if (!provider) return sendJSON(res, 400, { error: 'حقل provider مطلوب' });
           if (!serverUrl && provider !== 'gcloud') return sendJSON(res, 400, { error: 'حقل serverUrl مطلوب' });
 
@@ -1468,13 +1472,28 @@ http.createServer((req, res) => {
               ? cryptoVault.encryptToken(stapeApiKey, clientId + ':stape')
               : (existing && existing.stapeApiKey) || null;
 
+            // Merge pixel IDs (only overwrite non-null values so partial updates work)
+            const mergedPixelIds = Object.assign(
+              {},
+              (existing && existing.pixelIds) || {},
+              pixelIds && typeof pixelIds === 'object' ? pixelIds : {}
+            );
+
             await firestoreService.saveSSConfig(clientId, {
               provider,
-              serverUrl:        serverUrl   || '',
-              platforms:        Array.isArray(platforms) ? platforms : [],
-              encryptedTokens:  mergedTokens,
-              stapeApiKey:      mergedStapeKey,
-              stapeContainerId: body.stapeContainerId || (existing && existing.stapeContainerId) || null,
+              serverUrl:          serverUrl   || '',
+              platforms:          Array.isArray(platforms) ? platforms : [],
+              encryptedTokens:    mergedTokens,
+              stapeApiKey:        mergedStapeKey,
+              stapeContainerId:   body.stapeContainerId || (existing && existing.stapeContainerId) || null,
+              // Extended SS wizard fields — persisted for ss_loadConfig() restoration
+              pixelIds:           mergedPixelIds,
+              ecommPlatform:      ecommPlatform      || (existing && existing.ecommPlatform)      || '',
+              metaTec:            metaTec            || (existing && existing.metaTec)            || '',
+              ga4MeasurementId:   ga4MeasurementId   || (existing && existing.ga4MeasurementId)   || '',
+              ga4Events:          Array.isArray(ga4Events)        ? ga4Events        : ((existing && existing.ga4Events)        || []),
+              googleAdsEvents:    Array.isArray(googleAdsEvents)  ? googleAdsEvents  : ((existing && existing.googleAdsEvents)  || []),
+              ssEvents:           Array.isArray(ssEvents)         ? ssEvents         : ((existing && existing.ssEvents)         || []),
             });
 
             sendJSON(res, 200, { ok: true, message: 'تم حفظ الإعدادات بنجاح' });
@@ -1611,6 +1630,129 @@ http.createServer((req, res) => {
     }
 
     // ────────────────────────────────────────────────────────────────────────
+    // POST /api/ss/populate-containers
+    // Builds complete Variable + Trigger + Tag configs from the user's wizard
+    // selections and imports them into the already-created web + server GTM
+    // containers. Called from ss_confirmSetup() after all 6 input steps are done.
+    //
+    // Body: { ga4MeasurementId, sgtmUrl, pixelIds, events,
+    //         ecommPlatform, platforms }
+    //
+    // Why a separate endpoint instead of doing this at create-containers time?
+    // The containers are created at Step 1 (before GA4 ID / pixels / events are
+    // entered). By Step 8 we have everything, so we populate here.
+    // ────────────────────────────────────────────────────────────────────────
+    if (req.method === 'POST' && ssPath === '/api/ss/populate-containers') {
+      (async () => {
+        const auth = await ssAuthAndRate();
+        if (!auth) return;
+        const { clientId } = auth;
+        if (!ssRequireFirestore()) return;
+
+        if (!gtmService.isConfigured()) {
+          return sendJSON(res, 503, {
+            error: 'GTM غير مُهيَّأ على هذا الخادم',
+            hint:  'اضبط GTM_SA_KEY_JSON و GTM_ACCOUNT_ID في .env',
+          });
+        }
+
+        ssParseBody(async body => {
+          try {
+            const {
+              ga4MeasurementId, sgtmUrl,
+              pixelIds, events, ecommPlatform, platforms,
+            } = body;
+
+            // Load the user's existing container IDs from Firestore
+            const ssConfig = await firestoreService.getSSConfig(clientId).catch(() => null);
+            if (!ssConfig || !ssConfig.webContainerId) {
+              return sendJSON(res, 400, {
+                error: 'لم يتم إنشاء الـ Containers بعد — اتبع الخطوة 1 أولاً',
+              });
+            }
+
+            const webContainerId   = ssConfig.webContainerId;
+            const webWorkspaceId   = ssConfig.webWorkspaceId;
+            const serverContainerId = ssConfig.serverContainerId || null;
+            const serverWorkspaceId = ssConfig.serverWorkspaceId || null;
+
+            // Fall back to stored values if caller didn't supply them
+            const ga4Id       = (ga4MeasurementId || ssConfig.ga4MeasurementId || '').trim();
+            const sgtm        = (sgtmUrl          || ssConfig.serverUrl         || '').trim();
+            const pxIds       = pixelIds           || {};
+            const evList      = Array.isArray(events)    ? events    : (ssConfig.ssEvents   || []);
+            const ecomm       = ecommPlatform      || ssConfig.ecommPlatform   || '';
+            const platList    = Array.isArray(platforms) ? platforms : (ssConfig.platforms  || []);
+
+            const { buildWebConfig, buildServerConfig } = require('./lib/gtm-config-builder');
+
+            // ── Web container ─────────────────────────────────────────────
+            const webConfig = buildWebConfig({
+              ga4MeasurementId: ga4Id,
+              sgtmUrl:          sgtm,
+              pixelIds:         pxIds,
+              events:           evList,
+              ecommPlatform:    ecomm,
+            });
+
+            const webImport = await gtmService.importContainerJSON(
+              webContainerId, webWorkspaceId, webConfig, null, null,
+            );
+            console.log('[ss/populate-containers] web import:', webImport);
+
+            // Create version + publish web container
+            const webVer = await gtmService.createVersion(
+              webContainerId, webWorkspaceId,
+              'EasyTrac full config — ' + new Date().toISOString().split('T')[0],
+            );
+            const webVersionId = webVer.containerVersion && webVer.containerVersion.containerVersionId;
+            if (webVersionId) {
+              await gtmService.publishVersion(webContainerId, webVersionId).catch(e => {
+                console.warn('[ss/populate-containers] web publish non-fatal:', e.message);
+              });
+            }
+
+            // ── Server container (optional) ───────────────────────────────
+            let serverImport = null;
+            if (serverContainerId && serverWorkspaceId) {
+              const serverConfig = buildServerConfig({
+                ga4MeasurementId: ga4Id,
+                sgtmUrl:          sgtm,
+                platforms:        platList,
+                events:           evList,
+              });
+
+              serverImport = await gtmService.importContainerJSON(
+                serverContainerId, serverWorkspaceId, serverConfig, null, null,
+              );
+              console.log('[ss/populate-containers] server import:', serverImport);
+
+              const serverVer = await gtmService.createVersion(
+                serverContainerId, serverWorkspaceId,
+                'EasyTrac full config — ' + new Date().toISOString().split('T')[0],
+              );
+              const serverVersionId = serverVer.containerVersion && serverVer.containerVersion.containerVersionId;
+              if (serverVersionId) {
+                await gtmService.publishVersion(serverContainerId, serverVersionId).catch(e => {
+                  console.warn('[ss/populate-containers] server publish non-fatal:', e.message);
+                });
+              }
+            }
+
+            sendJSON(res, 200, {
+              ok:     true,
+              web:    webImport    || {},
+              server: serverImport || {},
+            });
+          } catch (e) {
+            console.error('[ss/populate-containers]', e);
+            sendJSON(res, e.status || 500, { error: e.message });
+          }
+        });
+      })();
+      return;
+    }
+
     // ────────────────────────────────────────────────────────────────────────
     // POST /api/ss/wire-transport — patch web container's GA4 tag with sGTM URL
     // Body: { sgtmUrl }   (web container ids come from the user's ss_configs)
@@ -1777,164 +1919,4 @@ http.createServer((req, res) => {
                 snippetHead:    web.snippetHead,
                 snippetBody:    web.snippetBody,
                 mode:           'client_server',
-                serverContainerPublicId: server ? server.publicId : null,
-              });
-
-              // Persist SS config with step-1 results (no URL yet)
-              try {
-                const existing = await firestoreService.getSSConfig(clientId).catch(() => null);
-                await firestoreService.saveSSConfig(clientId, {
-                  provider:           'pending',
-                  serverUrl:          '',
-                  platforms:          ssPlatforms   || [],
-                  encryptedTokens:    (existing && existing.encryptedTokens) || {},
-                  stapeApiKey:        null,
-                  stapeContainerId:   null,
-                  mode:               'client_server',
-                  webContainerId:     web.gtmContainerId,
-                  webPublicId:        web.gtmPublicId,
-                  webWorkspaceId:     web.gtmWorkspaceId,
-                  serverContainerId:  server ? server.containerId  : null,
-                  serverPublicId:     server ? server.publicId     : null,
-                  serverWorkspaceId:  server ? server.workspaceId  : null,
-                  serverVersionId:    server ? server.versionId    : null,
-                  containerConfig:    server ? (server.containerConfig || null) : null,
-                  transportUrlWired:  false,
-                  ga4MeasurementId:   ga4MeasurementId || null,
-                  ga4Events:          ga4Events        || [],
-                  googleAdsEvents:    googleAdsEvents  || [],
-                  ssEvents:           ssEvents         || [],
-                });
-              } catch (saveErr) {
-                console.warn('[ss/create-containers] saveSSConfig failed (non-fatal):', saveErr.message);
-              }
-
-              _setJob(jobId, {
-                status:    'completed',
-                stage:     'done',
-                result:    { ok: true, mode: 'client_server', ...web, server },
-                finishedAt: Date.now(),
-              });
-              _scheduleJobCleanup(jobId);
-            } catch (e) {
-              console.error('[ss/create-containers][job ' + jobId + ']', e);
-              _setJob(jobId, {
-                status:    'failed',
-                stage:     'error',
-                error:     e.message,
-                code:      e.code    || null,
-                httpStatus: (e.status >= 400 && e.status < 600) ? e.status : 502,
-                finishedAt: Date.now(),
-              });
-              _scheduleJobCleanup(jobId);
-            }
-          })();
-
-          sendJSON(res, 202, { ok: true, jobId });
-        });
-      })();
-      return;
-    }
-
-    // ────────────────────────────────────────────────────────────────────────
-    // GET /api/ss/full-status
-    // Returns combined container + SS config data for the Overview section.
-    // Tokens are always redacted. Container snippets are included.
-    // ────────────────────────────────────────────────────────────────────────
-    if (req.method === 'GET' && ssPath === '/api/ss/full-status') {
-      (async () => {
-        const auth = await ssAuthAndRate();
-        if (!auth) return;
-        const { clientId } = auth;
-        if (!ssRequireFirestore()) return;
-        try {
-          const [ssCfg, containers] = await Promise.all([
-            firestoreService.getSSConfigPublic(clientId).catch(() => null),
-            firestoreService.listContainersByClient(clientId).catch(() => []),
-          ]);
-
-          // Prefer the client_server container; fallback to most-recent
-          const sorted = (containers || []).sort((a, b) => {
-            const ta = (a.updatedAt && a.updatedAt.toMillis) ? a.updatedAt.toMillis() : 0;
-            const tb = (b.updatedAt && b.updatedAt.toMillis) ? b.updatedAt.toMillis() : 0;
-            return tb - ta;
-          });
-          const csContainer = sorted.find(c => c.mode === 'client_server') || sorted[0] || null;
-
-          sendJSON(res, 200, {
-            ok: true,
-            ss: ssCfg || null,
-            container: csContainer ? {
-              webGtmId:    csContainer.gtmPublicId              || null,
-              serverGtmId: csContainer.serverContainerPublicId  || null,
-              snippetHead: csContainer.snippetHead              || null,
-              snippetBody: csContainer.snippetBody              || null,
-              platforms:   csContainer.platforms                || [],
-              events:      csContainer.events                   || [],
-              published:   csContainer.published                || false,
-              mode:        csContainer.mode                     || 'client',
-            } : null,
-          });
-        } catch (e) { sendJSON(res, 500, { error: e.message }); }
-      })();
-      return;
-    }
-
-    // Unknown /api/ss/* path
-    sendJSON(res, 404, { error: 'SS endpoint غير موجود: ' + ssPath });
-    return;
-  }
-
-  // ── Static File Server ────────────────────────────────────────
-  let urlPath;
-  try {
-    urlPath = decodeURIComponent(req.url.split('?')[0]);
-  } catch (_) {
-    res.writeHead(400, securityHeaders()); res.end('Bad Request'); return;
-  }
-
-  // Default root → tool.html (the app's single-page entry)
-  const requestedPath = urlPath === '/' ? '/tool.html' : urlPath;
-  const filePath      = path.normalize(path.join(ROOT, requestedPath));
-
-  // Path traversal guard — filePath MUST stay within ROOT
-  if (filePath !== ROOT && !filePath.startsWith(ROOT + path.sep)) {
-    res.writeHead(403, securityHeaders()); res.end('Forbidden'); return;
-  }
-
-  // Dotfile/dotdir guard (.env, .git/, .DS_Store, ...)
-  if (filePath.split(path.sep).some(seg => seg.startsWith('.') && seg !== '.' && seg !== '..')) {
-    res.writeHead(403, securityHeaders()); res.end('Forbidden'); return;
-  }
-
-  function serveFile(fp, triedFallback) {
-    fs.readFile(fp, (err, data) => {
-      if (err) {
-        // Extensionless URLs (e.g. /tool) → try <name>.html once
-        if (!triedFallback && !path.extname(fp)) return serveFile(fp + '.html', true);
-        res.writeHead(404, securityHeaders()); res.end('Not found');
-        return;
-      }
-      const ext    = path.extname(fp).toLowerCase();
-
-      // Extension allowlist — blocks server.js / package.json / Dockerfile / etc.
-      if (!STATIC_ALLOW_EXT.has(ext)) {
-        res.writeHead(403, securityHeaders()); res.end('Forbidden');
-        return;
-      }
-
-      const isHtml = ext === '.html';
-      res.writeHead(200, {
-        'Content-Type': mime[ext] || 'text/plain',
-        ...securityHeaders({ html: isHtml }),
-      });
-      res.end(data);
-    });
-  }
-  serveFile(filePath);
-
-}).listen(PORT, '0.0.0.0', () => {
-  const mode = puppeteer ? '\U0001f7e2 Puppeteer (headless Chrome)' : '\U0001f7e1 HTTP fallback (install puppeteer for full analysis)';
-  console.log(`Easy Track server running at http://0.0.0.0:${PORT}`);
-  console.log(`Scanner mode: ${mode}`);
-});
+                serverContainerPublicId: server ? se
