@@ -3490,10 +3490,6 @@
           <span class="material-symbols-outlined" style="font-size:18px;">folder_open</span>
           <span>My Projects</span>
         </button>
-        <button class="sb-link" id="sbServerSide" type="button" onclick="switchAppView('serverside',this)">
-          <span class="material-symbols-outlined" style="font-size:18px;">dns</span>
-          <span>Server-Side Tracking</span>
-        </button>
         <button class="sb-link" type="button" onclick="toggleSettings()">
           <span class="material-symbols-outlined" style="font-size:18px;">settings</span>
           <span>Settings</span>
@@ -3660,7 +3656,6 @@
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
             <span class="material-symbols-outlined" style="font-size:17px;color:var(--acc);">code_blocks</span>
             <span style="font-family:var(--font-display);font-size:14px;font-weight:800;color:var(--wht);">GTM Snippets</span>
-            <button onclick="switchAppView('serverside',document.getElementById('sbServerSide'))" style="margin-right:auto;background:rgba(70,241,197,.08);border:1px solid rgba(70,241,197,.2);border-radius:8px;padding:3px 10px;font-size:11px;font-weight:700;color:var(--acc);cursor:pointer;font-family:var(--font-ui);">إعداد ←</button>
           </div>
           <!-- Web + Server GTM IDs -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
@@ -3692,7 +3687,7 @@
           <div id="ovGtmPlaceholder" style="text-align:center;padding:16px 0;color:var(--mut);font-size:12px;">
             <span class="material-symbols-outlined" style="font-size:28px;display:block;margin-bottom:6px;opacity:.4;">dns</span>
             لم يتم إعداد أي GTM Container بعد —
-            <button onclick="switchAppView('serverside',document.getElementById('sbServerSide'))" style="background:none;border:none;color:var(--acc);cursor:pointer;font-size:12px;font-family:var(--font-ui);font-weight:700;padding:0 4px;">ابدأ الإعداد ←</button>
+            
           </div>
         </div>
 
@@ -3723,6 +3718,70 @@
 
       <!-- ══════ PIXEL CONFIG VIEW ══════ -->
       <div class="app-view" id="view-pixels">
+
+        <!-- ── Server Side Config Card ── -->
+        <div class="pc-ss-card" id="pc-ss-card">
+          <div class="pc-ss-header">
+            <span class="pc-ss-icon">🖥️</span>
+            <div class="pc-ss-title-wrap">
+              <div class="pc-ss-title">Server Side</div>
+              <div class="pc-ss-sub">يتفعّل لو الزبون عنده سيرفر — يدعم CAPI لكل المنصات بدون ad blockers</div>
+            </div>
+            <button class="pc-ss-toggle" id="pc-ss-toggle-btn" type="button" onclick="pcSS_toggle()" aria-label="تفعيل Server Side"></button>
+            <span class="pc-ss-toggle-lbl" id="pc-ss-toggle-lbl">OFF</span>
+          </div>
+          <div class="pc-ss-body" id="pc-ss-body">
+
+            <!-- 1. Server URL -->
+            <div class="pc-ss-section">
+              <div class="pc-ss-sec-label">رابط السيرفر (sGTM URL)</div>
+              <input class="pc-ss-input" id="pc-ss-url" type="url" placeholder="https://gtm.yourstore.com" dir="ltr" oninput="pcSS_validateUrl()" autocomplete="off">
+              <div class="pc-ss-valid" id="pc-ss-url-valid"></div>
+              <div class="pc-ss-hint">💡 مثال: https://gtm.yourstore.com — لازم يبدأ بـ https://</div>
+            </div>
+
+            <!-- 2. GA4 ID -->
+            <div class="pc-ss-section">
+              <div class="pc-ss-sec-label">GA4 Measurement ID (من الـ Client Side)</div>
+              <div id="pc-ss-ga4-display"></div>
+            </div>
+
+            <!-- 3. Platform Selection -->
+            <div class="pc-ss-section">
+              <div class="pc-ss-sec-label">منصات الإعلانات على السيرفر</div>
+              <div class="pc-ss-plat-grid" id="pc-ss-plat-grid">
+                <button class="cbtn" data-ss-plat="meta" onclick="pcSS_togglePlatform('meta')">
+                  <div class="cchk">✓</div>
+                  <span class="cicon"><svg viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:22px;height:22px;"><path d="M5 25c0-5.8 1.3-10.2 3.2-13.1C10.1 9 12.5 7.5 15 7.5c2 0 3.8.8 5.5 2.4 1.2 1.1 2.5 2.9 4.5 6.1 2-3.2 3.3-5 4.5-6.1 1.7-1.6 3.5-2.4 5.5-2.4 2.5 0 4.9 1.5 6.8 4.4C43.7 14.8 45 19.2 45 25c0 3.8-.7 7-2 9.4-1.6 2.9-3.9 4.6-6.3 4.6-1.5 0-2.9-.5-4.4-1.5-1.9-1.3-3.8-3.4-6.6-7.6-2.8 4.2-4.7 6.3-6.6 7.6-1.5 1-2.9 1.5-4.4 1.5-2.4 0-4.7-1.7-6.3-4.6C5.7 32 5 28.8 5 25z" fill="#1877F2"/></svg></span>
+                  Meta CAPI
+                </button>
+                <button class="cbtn" data-ss-plat="gads" onclick="pcSS_togglePlatform('gads')">
+                  <div class="cchk">✓</div>
+                  <span class="cicon"><svg viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:22px;height:22px;"><path d="M25 8A17 17 0 1 0 25 42A17 17 0 1 0 25 8Z" fill="white"/><path d="M33.5 20H25v5h4.9c-.4 2.5-2.6 4.3-4.9 4.3a5.8 5.8 0 0 1 0-11.6c1.4 0 2.7.5 3.7 1.4l3.5-3.5A10.5 10.5 0 0 0 25 12.5a12.5 12.5 0 0 0 0 25c7 0 11.5-4.9 11.5-12 0-.8-.1-1.7-.2-2.5H33.5z" fill="#4285F4"/><path d="M14.3 27.9l-4 3.1A12.5 12.5 0 0 0 25 37.5v-5c-4.1 0-7.7-2.3-9.4-5.8l-.3.2z" fill="#34A853"/><path d="M10.3 18.6A12.5 12.5 0 0 0 12.5 31l4-3.1c-.7-1.4-1-3-1-4.9 0-2 .4-3.8 1.1-5.4l-4.1-3.2a12.4 12.4 0 0 0-2.2 4.2z" fill="#FBBC05"/><path d="M25 12.5c2.7 0 5.1 1 6.9 2.5l3.6-3.6A12.4 12.4 0 0 0 25 8a12.5 12.5 0 0 0-10.7 6l4.1 3.2A7.5 7.5 0 0 1 25 12.5z" fill="#EA4335"/></svg></span>
+                  Google Ads
+                </button>
+                <button class="cbtn" data-ss-plat="snap" onclick="pcSS_togglePlatform('snap')">
+                  <div class="cchk">✓</div>
+                  <span class="cicon"><svg viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:22px;height:22px;"><rect width="50" height="50" rx="12" fill="#FFFC00"/><path d="M25 8c-5.6 0-9.5 3.8-9.5 9.3v1.5c-.6.3-1.4.4-2.1.2-.3 0-.4.1-.4.4 0 1.2 2.1 1.7 2.5 1.8.4 1.3 1.2 2.4 2.2 3.2-1.6.8-3.9 1.2-4.2 2.3 0 .2.2.4.4.4 2 .3 3.7 1.1 4.9 2.7.1.2.1.3-.1.4-1.5.6-3 .6-3 1.4 0 .5.7.7 1.3.7.9 0 1.8-.3 2.6-.6.5-.2.9-.2 1.3.1.8.6 1 1.7 1 2.7 0 .2.1.4.3.4 1 .1 2.1.1 2.8.1s1.8 0 2.8-.1c.2 0 .3-.2.3-.4 0-1 .2-2.1 1-2.7.4-.3.8-.3 1.3-.1.8.3 1.7.6 2.6.6.6 0 1.3-.2 1.3-.7 0-.8-1.5-.8-3-1.4-.2-.1-.2-.2-.1-.4 1.2-1.6 2.9-2.4 4.9-2.7.2 0 .4-.2.4-.4-.3-1.1-2.6-1.5-4.2-2.3 1-.8 1.8-1.9 2.2-3.2.4-.1 2.5-.6 2.5-1.8 0-.3-.1-.4-.4-.4-.7.2-1.5.1-2.1-.2v-1.5C34.5 11.8 30.6 8 25 8z" fill="#333"/></svg></span>
+                  Snapchat CAPI
+                </button>
+                <button class="cbtn" data-ss-plat="tiktok" onclick="pcSS_togglePlatform('tiktok')">
+                  <div class="cchk">✓</div>
+                  <span class="cicon"><svg viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:22px;height:22px;"><rect width="50" height="50" rx="12" fill="#010101"/><path d="M34.5 14.5a7.5 7.5 0 01-7.5-7.5h-5v22.3c0 2.1-1.7 3.7-3.8 3.7a3.75 3.75 0 01-3.7-3.7c0-2.1 1.7-3.7 3.7-3.7.4 0 .7.1 1 .2V20a8.9 8.9 0 00-1-.1c-4.8 0-8.7 3.9-8.7 8.7s3.9 8.7 8.7 8.7 8.7-3.9 8.7-8.7V21.4a12.6 12.6 0 007.5 2.4v-5a7.4 7.4 0 01-4.9-4.3h4.9V14.5z" fill="white"/></svg></span>
+                  TikTok Events API
+                </button>
+              </div>
+            </div>
+
+            <!-- 4. Per-platform Accordions (events + credentials) -->
+            <div class="pc-ss-section" id="pc-ss-acc-wrap" style="display:none;">
+              <div class="pc-ss-sec-label">إعدادات كل منصة — Events + Credentials</div>
+              <div id="pc-ss-accordions"></div>
+            </div>
+
+          </div>
+        </div>
+        <!-- END SS Card -->
 
         <div class="ptrack" id="ptrack">
           <div class="pstep">
@@ -3811,6 +3870,11 @@
           </div>
           <div class="cgrid" id="platGrid">
 
+            <!-- ── Advertising Platforms ── -->
+            <div class="pc-plat-group">
+              <div class="pc-plat-group-lbl">منصات الإعلانات</div>
+            </div>
+
             <!-- Meta -->
             <button class="cbtn" data-val="meta">
               <div class="cchk">✓</div>
@@ -3878,6 +3942,11 @@
               </span>
               Google Ads
             </button>
+
+            <!-- ── Analytics Platforms ── -->
+            <div class="pc-plat-group">
+              <div class="pc-plat-group-lbl">منصات التحليل</div>
+            </div>
 
             <!-- GA4 -->
             <button class="cbtn" data-val="ga4">
@@ -3950,6 +4019,12 @@
             </button>
 
 
+            <button class="otab" id="tabSsGtm" onclick="oTab('ss-gtm',this)" style="display:none;">
+              <span class="material-symbols-outlined"
+                style="font-size:15px;font-variation-settings:'FILL' 1;">dns</span>
+              🖥️ Server Container
+            </button>
+
             <button class="otab" id="tabGuide" onclick="oTab('guide',this)">
               <span class="material-symbols-outlined"
                 style="font-size:15px;font-variation-settings:'FILL' 1;">auto_stories</span>
@@ -3960,6 +4035,46 @@
                 style="font-size:15px;font-variation-settings:'FILL' 1;">table_chart</span>
               Tracking Plan
             </button>
+          </div>
+
+          <!-- pane-ss-gtm: Server Container output (visible only when SS enabled) -->
+          <div class="opane" id="pane-ss-gtm" style="display:none;">
+            <div class="pc-ss-out-banner">
+              <span class="pc-ss-out-icon">🖥️</span>
+              <div style="flex:1;">
+                <div style="font-family:var(--font-display);font-weight:700;font-size:14px;color:var(--wht);margin-bottom:3px;">Server Container — sGTM</div>
+                <div style="font-size:11px;color:var(--mut);">استورد الـ JSON ده في GTM → Admin → Import Container — ثم انسخ الـ Container Config لـ Stape/Cloud Run</div>
+              </div>
+            </div>
+            <div class="cwrap">
+              <div class="ctbar">
+                <div class="ctdots">
+                  <div class="ctdot" style="background:#ff5f57"></div>
+                  <div class="ctdot" style="background:#febc2e"></div>
+                  <div class="ctdot" style="background:#28c840"></div>
+                </div>
+                <span class="clang">sgtm-container.json</span>
+                <div class="ctacts">
+                  <button class="dlbtn" id="dlSsGtm">⬇️ تحميل</button>
+                  <button class="cpybtn" id="cpySsGtm">نسخ</button>
+                </div>
+              </div>
+              <div class="cbody" id="ssGtmBody"></div>
+            </div>
+            <!-- Container Config section -->
+            <div class="pc-ss-config-section" id="pc-ss-config-section">
+              <div class="pc-ss-config-header">
+                <span class="material-symbols-outlined" style="font-size:16px;color:var(--acc);">key</span>
+                <span style="font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--wht);flex:1;">Container Config — للـ Stape / Cloud Run</span>
+                <button class="cpybtn" id="cpySsConfig">نسخ</button>
+              </div>
+              <div class="pc-ss-config-box" id="pc-ss-config-box">
+                <span style="color:var(--mut);">سيظهر هنا بعد توليد الـ Container…</span>
+              </div>
+              <div style="padding:10px 16px;font-size:11px;color:var(--mut);border-top:1px solid var(--bdr2);">
+                💡 افتح <strong style="color:var(--wht2);">Stape.io</strong> → New Container → Server GTM → الصق الـ Config هنا
+              </div>
+            </div>
           </div>
 
           <!-- pane-json hidden (download only, no tab) -->
@@ -4197,442 +4312,6 @@
         </div>
       </div>
       <!-- END MY PROJECTS VIEW -->
-
-
-
-      <!-- ══════ SERVER-SIDE VIEW ══════ -->
-      <div class="app-view" id="view-serverside">
-
-        <div class="page-hdr">
-          <div>
-            <h2 class="page-title">
-              <span class="material-symbols-outlined" style="color:var(--acc);">dns</span>
-              Server-Side Tracking
-            </h2>
-            <p class="page-sub">إعداد شامل — ينشئ Web + Server GTM Containers ويربطهم تلقائياً</p>
-          </div>
-          <button class="btn-ghost-sm" id="ss-hdr-reset-btn" onclick="ss_resetConfig()" style="display:none;color:#f87171;border-color:rgba(248,113,113,.3);">
-            <span class="material-symbols-outlined" style="font-size:14px;">delete</span>
-            إعادة ضبط
-          </button>
-        </div>
-
-        <!-- ── Completed Banner ── -->
-        <div id="ss-done-banner" style="display:none;margin-bottom:20px;padding:16px 20px;border-radius:14px;background:rgba(70,241,197,.08);border:1px solid rgba(70,241,197,.25);align-items:center;gap:12px;">
-          <span class="material-symbols-outlined" style="color:var(--acc);font-size:22px;flex-shrink:0;">check_circle</span>
-          <div style="flex:1;">
-            <div style="font-size:14px;font-weight:700;color:var(--acc);">Server-Side Tracking مفعّل ✓</div>
-            <div id="ss-done-url" style="font-size:11px;color:var(--mut);font-family:var(--font-mono);margin-top:2px;"></div>
-          </div>
-          <button class="btn-ghost-sm" onclick="ss_editSetup()" style="font-size:11px;flex-shrink:0;">تعديل</button>
-        </div>
-
-        <!-- ── Step Indicator (8 steps) ── -->
-        <div class="ss-wizard-bar" id="ss-step-bar">
-          <div class="ss-wstep active" id="ss-step-ind-1" onclick="ss_goToStep(1)" title="GA4 Measurement ID">
-            <span class="ss-wstep-num">1</span>
-            <span class="ss-wstep-label">GA4</span>
-          </div>
-          <div class="ss-wstep-sep"></div>
-          <div class="ss-wstep" id="ss-step-ind-2" onclick="ss_goToStep(2)" title="منصة التجارة">
-            <span class="ss-wstep-num">2</span>
-            <span class="ss-wstep-label">المنصة</span>
-          </div>
-          <div class="ss-wstep-sep"></div>
-          <div class="ss-wstep" id="ss-step-ind-3" onclick="ss_goToStep(3)" title="Pixels + Tokens">
-            <span class="ss-wstep-num">3</span>
-            <span class="ss-wstep-label">Pixels</span>
-          </div>
-          <div class="ss-wstep-sep"></div>
-          <div class="ss-wstep" id="ss-step-ind-4" onclick="ss_goToStep(4)" title="Events">
-            <span class="ss-wstep-num">4</span>
-            <span class="ss-wstep-label">Events</span>
-          </div>
-          <div class="ss-wstep-sep"></div>
-          <div class="ss-wstep" id="ss-step-ind-5" onclick="ss_goToStep(5)" title="إنشاء Containers">
-            <span class="ss-wstep-num">5</span>
-            <span class="ss-wstep-label">إنشاء</span>
-          </div>
-          <div class="ss-wstep-sep"></div>
-          <div class="ss-wstep" id="ss-step-ind-6" onclick="ss_goToStep(6)" title="نشر السيرفر">
-            <span class="ss-wstep-num">6</span>
-            <span class="ss-wstep-label">السيرفر</span>
-          </div>
-          <div class="ss-wstep-sep"></div>
-          <div class="ss-wstep" id="ss-step-ind-7" onclick="ss_goToStep(7)" title="ربط URL الخادم">
-            <span class="ss-wstep-num">7</span>
-            <span class="ss-wstep-label">ربط URL</span>
-          </div>
-          <div class="ss-wstep-sep"></div>
-          <div class="ss-wstep" id="ss-step-ind-8" onclick="ss_goToStep(8)" title="تم">
-            <span class="ss-wstep-num">8</span>
-            <span class="ss-wstep-label">تم ✅</span>
-          </div>
-        </div>
-
-        <!-- ════ STEP 1: GA4 ════ -->
-        <div class="ss-wizard-panel" id="ss-panel-1">
-          <div class="ss-panel-title">Google Analytics 4</div>
-          <div class="ss-panel-sub">أدخل الـ Measurement ID — سيُربط الـ Web Container بالـ Server Container عبر transport_url</div>
-          <div style="margin-bottom:20px;">
-            <label class="ss-px-label">GA4 Measurement ID</label>
-            <input type="text" id="ss-p1-ga4-id" class="ss-url-input" placeholder="G-XXXXXXXXXX"
-              oninput="ss_onGa4Input()" autocomplete="off" style="letter-spacing:.05em;">
-            <div id="ss-p1-ga4-hint" style="font-size:11px;color:var(--mut);margin-top:8px;line-height:1.5;"></div>
-          </div>
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-            <button class="btn-acc-sm" onclick="ss_goToStep(2)">التالي ←</button>
-            <div style="font-size:11px;color:var(--mut);">يمكنك تخطيه وإضافته لاحقاً</div>
-          </div>
-        </div>
-
-        <!-- ════ STEP 2: E-Commerce Platform ════ -->
-        <div class="ss-wizard-panel" id="ss-panel-2" style="display:none;">
-          <div class="ss-panel-title">منصة التجارة الإلكترونية</div>
-          <div class="ss-panel-sub">حدد المنصة — سيُولَّد DataLayer Code مخصص لها</div>
-          <div id="ss-p2-ecomm-list" style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;"></div>
-          <div style="display:flex;gap:10px;align-items:center;">
-            <button class="btn-ghost-sm" onclick="ss_goToStep(1)">← السابق</button>
-            <button class="btn-acc-sm" onclick="ss_goToStep(3)">التالي ←</button>
-          </div>
-        </div>
-
-        <!-- ════ STEP 3: Pixels + Tokens ════ -->
-        <div class="ss-wizard-panel" id="ss-panel-3" style="display:none;">
-          <div class="ss-panel-title">Pixels + Access Tokens</div>
-          <div class="ss-panel-sub">أدخل الـ Pixel IDs والـ CAPI Tokens — تُحفظ مشفّرة AES-256-GCM ولا تُرسل للمتصفح</div>
-          <div id="ss-p3-px-cards" style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;"></div>
-          <div style="display:flex;gap:10px;align-items:center;">
-            <button class="btn-ghost-sm" onclick="ss_goToStep(2)">← السابق</button>
-            <button class="btn-acc-sm" onclick="ss_goToStep(4)">التالي ←</button>
-          </div>
-        </div>
-
-        <!-- ════ STEP 4: Events ════ -->
-        <div class="ss-wizard-panel" id="ss-panel-4" style="display:none;">
-          <div class="ss-panel-title">اختر الأحداث</div>
-          <div class="ss-panel-sub">اختر Events التي تريد تتبعها — الموصى بها مُفعَّلة تلقائياً</div>
-          <div id="ss-p4-events-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;"></div>
-          <div style="padding:10px 14px;border-radius:10px;background:rgba(70,241,197,.05);border:1px solid rgba(70,241,197,.15);font-size:11px;color:var(--mut);margin-bottom:16px;line-height:1.6;">
-            ⚡ <strong style="color:var(--acc);">Deduplication:</strong> كل حدث يحصل على <code>event_id = order_id + "_" + timestamp</code> لمنع التكرار
-          </div>
-          <div style="display:flex;gap:10px;align-items:center;">
-            <button class="btn-ghost-sm" onclick="ss_goToStep(3)">← السابق</button>
-            <button class="btn-acc-sm" onclick="ss_goToStep(5)">التالي — مراجعة ←</button>
-          </div>
-        </div>
-
-        <!-- ════ STEP 5: Review + Create Containers ════ -->
-        <div class="ss-wizard-panel" id="ss-panel-5" style="display:none;">
-          <div class="ss-panel-title">مراجعة وإنشاء Containers</div>
-          <div class="ss-panel-sub">راجع الإعدادات ثم اضغط إنشاء — سيتم بناء Web Container وServer Container بكل الداتا</div>
-
-          <!-- Review Summary -->
-          <div id="ss-p5-review" style="margin-bottom:20px;"></div>
-
-          <!-- Progress -->
-          <div id="ss-p5-progress" style="display:none;margin-bottom:20px;">
-            <div style="font-size:12px;color:var(--mut);margin-bottom:8px;display:flex;justify-content:space-between;">
-              <span id="ss-p5-stage-msg">جارٍ الإنشاء...</span>
-              <span id="ss-p5-pct">0%</span>
-            </div>
-            <div style="height:6px;background:var(--bdr2);border-radius:3px;overflow:hidden;">
-              <div id="ss-p5-bar" style="height:100%;background:var(--acc);transition:width .4s;width:5%;border-radius:3px;"></div>
-            </div>
-          </div>
-
-          <!-- Result (hidden until done) -->
-          <div id="ss-p5-result" style="display:none;margin-bottom:20px;">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-              <div style="background:var(--sur2);border:1px solid var(--bdr2);border-radius:10px;padding:12px 14px;">
-                <div style="font-size:10px;color:var(--mut);margin-bottom:4px;">Web Container</div>
-                <div id="ss-p5-web-id" style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--wht);">—</div>
-              </div>
-              <div style="background:var(--sur2);border:1px solid var(--bdr2);border-radius:10px;padding:12px 14px;">
-                <div style="font-size:10px;color:var(--mut);margin-bottom:4px;">Server Container</div>
-                <div id="ss-p5-server-id" style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--wht);">—</div>
-              </div>
-            </div>
-            <div style="font-size:11px;color:var(--acc);padding:8px 12px;border-radius:8px;background:rgba(70,241,197,.07);border:1px solid rgba(70,241,197,.2);">
-              ✅ تم إنشاء الـ Containers بنجاح مع كل Variables و Tags و Triggers
-            </div>
-          </div>
-
-          <div id="ss-p5-error" style="display:none;padding:12px 14px;border-radius:10px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);font-size:12px;color:#f87171;margin-bottom:16px;"></div>
-
-          <div id="ss-p5-btn-wrap" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-            <button class="btn-ghost-sm" onclick="ss_goToStep(4)">← السابق</button>
-            <button class="btn-acc-sm" id="ss-p5-create-btn" onclick="ss_createContainers()">
-              <span class="material-symbols-outlined" style="font-size:14px;">add_circle</span>
-              إنشاء Web + Server Containers
-            </button>
-            <div style="font-size:11px;color:var(--mut);">⏱️ 60-120 ثانية</div>
-          </div>
-          <div id="ss-p5-next-wrap" style="display:none;margin-top:12px;">
-            <button class="btn-acc-sm" onclick="ss_goToStep(6)">التالي — نشر السيرفر ←</button>
-          </div>
-        </div>
-
-        <!-- ════ STEP 6: Deploy Server Container ════ -->
-        <div class="ss-wizard-panel" id="ss-panel-6" style="display:none;">
-          <div class="ss-panel-title">نشر Server Container</div>
-          <div class="ss-panel-sub">انسخ الـ Container Config وانشره على Stape أو Cloud Run أو Docker</div>
-
-          <!-- containerConfig block -->
-          <div style="margin-bottom:16px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-              <label class="ss-px-label" style="margin:0;">Container Config</label>
-              <button class="btn-ghost-sm" onclick="ss_copyContainerConfig()" style="font-size:11px;padding:4px 10px;">
-                <span class="material-symbols-outlined" style="font-size:12px;vertical-align:middle;">content_copy</span> نسخ
-              </button>
-            </div>
-            <pre id="ss-p6-config-blob" style="background:#080b10;border:1px solid var(--bdr);border-radius:10px;padding:14px;font-size:9px;color:#a8d8a8;overflow-x:auto;max-height:120px;overflow-y:auto;margin:0;white-space:pre-wrap;word-break:break-all;font-family:var(--font-mono);"></pre>
-          </div>
-
-          <!-- Deploy options -->
-          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;">
-            <div style="padding:12px 14px;border-radius:10px;background:var(--sur2);border:1px solid var(--bdr2);font-size:12px;color:var(--wht2);">
-              <div style="font-weight:700;color:var(--wht);margin-bottom:6px;">🚀 Stape.io (الأسهل)</div>
-              <ol style="margin:0;padding-right:16px;line-height:1.9;color:var(--mut);">
-                <li>افتح <a href="https://stape.io" target="_blank" style="color:var(--acc);">stape.io</a> وأنشئ Server Container</li>
-                <li>الصق الـ Container Config في حقل "Container Config"</li>
-                <li>انسخ الـ Server URL وارجع للخطوة التالية</li>
-              </ol>
-            </div>
-            <div style="padding:12px 14px;border-radius:10px;background:var(--sur2);border:1px solid var(--bdr2);font-size:12px;color:var(--wht2);">
-              <div style="font-weight:700;color:var(--wht);margin-bottom:6px;">☁️ Google Cloud Run</div>
-              <div style="color:var(--mut);line-height:1.7;">انشر الـ Docker image الرسمي لـ sGTM مع <code>CONTAINER_CONFIG</code> كـ env var</div>
-            </div>
-          </div>
-
-          <div style="display:flex;gap:10px;align-items:center;">
-            <button class="btn-ghost-sm" onclick="ss_goToStep(5)">← السابق</button>
-            <button class="btn-acc-sm" onclick="ss_goToStep(7)">نشرت — التالي ←</button>
-          </div>
-        </div>
-
-        <!-- ════ STEP 7: Enter Server URL + Wire ════ -->
-        <div class="ss-wizard-panel" id="ss-panel-7" style="display:none;">
-          <div class="ss-panel-title">ربط URL الخادم</div>
-          <div class="ss-panel-sub">أدخل URL الخادم بعد النشر — سيتم ربطه في GA4 Config Tag (transport_url) وفي Server Container</div>
-
-          <div style="margin-bottom:16px;">
-            <label class="ss-px-label">Server URL</label>
-            <div style="display:flex;gap:8px;align-items:center;">
-              <input type="url" id="ss-p7-url" class="ss-url-input"
-                placeholder="https://gtm.yourdomain.com" autocomplete="off"
-                onkeydown="if(event.key==='Enter') ss_validateUrl()"
-                style="flex:1;">
-              <button class="btn-ghost-sm" onclick="ss_validateUrl()" id="ss-p7-validate-btn"
-                style="white-space:nowrap;flex-shrink:0;">
-                <span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle;">wifi_tethering</span>
-                تحقق
-              </button>
-            </div>
-            <div id="ss-p7-status" style="margin-top:8px;font-size:12px;color:var(--mut);font-family:var(--font-mono);"></div>
-          </div>
-
-          <!-- Wire button (shows after validation) -->
-          <div id="ss-p7-wire-wrap" style="display:none;margin-bottom:16px;">
-            <div style="padding:10px 14px;border-radius:10px;background:rgba(70,241,197,.05);border:1px solid rgba(70,241,197,.15);font-size:12px;color:var(--wht2);margin-bottom:12px;line-height:1.6;">
-              ✅ الخادم يستجيب — جاهز للربط<br>
-              <span style="color:var(--mut);font-size:11px;">سيتم: إضافة transport_url للـ Web Container + إضافة URL للـ Server Container + نشر كلاهما</span>
-            </div>
-            <button class="btn-acc-sm" id="ss-p7-wire-btn" onclick="ss_wireUrl()">
-              <span class="material-symbols-outlined" style="font-size:14px;">cable</span>
-              ربط ونشر الـ Containers
-            </button>
-          </div>
-
-          <div id="ss-p7-error" style="display:none;padding:10px 14px;border-radius:10px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);font-size:12px;color:#f87171;margin-bottom:12px;"></div>
-
-          <div style="display:flex;gap:10px;align-items:center;">
-            <button class="btn-ghost-sm" onclick="ss_goToStep(6)">← السابق</button>
-          </div>
-        </div>
-
-        <!-- ════ STEP 8: Done ════ -->
-        <div class="ss-wizard-panel" id="ss-panel-8" style="display:none;">
-          <div class="ss-panel-title">تم الإعداد بالكامل ✅</div>
-          <div class="ss-panel-sub">Server-Side Tracking جاهز — الصق الكود أدناه في موقعك</div>
-
-          <!-- GTM Snippet -->
-          <div style="margin-bottom:16px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-              <label class="ss-px-label" style="margin:0;">GTM Snippet — &lt;head&gt;</label>
-              <button class="btn-ghost-sm" onclick="ss_copySnippet('head')" style="font-size:11px;padding:4px 10px;">
-                <span class="material-symbols-outlined" style="font-size:12px;vertical-align:middle;">content_copy</span> نسخ
-              </button>
-            </div>
-            <pre id="ss-p8-snippet-head" style="background:#080b10;border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;font-size:10px;color:#a8c8d8;overflow-x:auto;max-height:100px;overflow-y:auto;margin:0;white-space:pre;font-family:var(--font-mono);"></pre>
-          </div>
-
-          <div style="margin-bottom:16px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-              <label class="ss-px-label" style="margin:0;">GTM Snippet — &lt;body&gt;</label>
-              <button class="btn-ghost-sm" onclick="ss_copySnippet('body')" style="font-size:11px;padding:4px 10px;">
-                <span class="material-symbols-outlined" style="font-size:12px;vertical-align:middle;">content_copy</span> نسخ
-              </button>
-            </div>
-            <pre id="ss-p8-snippet-body" style="background:#080b10;border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;font-size:10px;color:#a8c8d8;overflow-x:auto;max-height:80px;overflow-y:auto;margin:0;white-space:pre;font-family:var(--font-mono);"></pre>
-          </div>
-
-          <!-- DataLayer Code -->
-          <div style="margin-bottom:20px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-              <label class="ss-px-label" style="margin:0;" id="ss-p8-dl-label">DataLayer Code</label>
-              <button class="btn-ghost-sm" onclick="ss_copyCode('datalayer')" style="font-size:11px;padding:4px 10px;">
-                <span class="material-symbols-outlined" style="font-size:12px;vertical-align:middle;">content_copy</span> نسخ
-              </button>
-            </div>
-            <pre id="ss-p8-datalayer-code" style="background:#080b10;border:1px solid var(--bdr);border-radius:10px;padding:14px;font-size:10px;color:#a8d8c8;overflow-x:auto;max-height:220px;overflow-y:auto;margin:0;white-space:pre;line-height:1.6;font-family:var(--font-mono);"></pre>
-          </div>
-
-          <!-- Summary -->
-          <div id="ss-p8-summary" style="padding:12px 14px;border-radius:10px;background:var(--sur2);border:1px solid var(--bdr2);font-size:11px;color:var(--wht2);line-height:1.8;margin-bottom:16px;"></div>
-
-          <div style="display:flex;gap:10px;align-items:center;">
-            <button class="btn-ghost-sm" onclick="ss_goToStep(7)">← السابق</button>
-            <button class="btn-acc-sm" onclick="ss_confirmSetup()">
-              <span class="material-symbols-outlined" style="font-size:14px;">check_circle</span>
-              حفظ وإنهاء
-            </button>
-          </div>
-          <div id="ss-p8-status" style="font-size:12px;color:var(--mut);font-family:var(--font-mono);margin-top:10px;"></div>
-        </div>
-
-      </div>
-
-      <!-- ── Server-Side Wizard CSS ── -->
-      <style>
-        .ss-wizard-bar {
-          display: flex; align-items: center; gap: 0;
-          margin-bottom: 24px;
-          background: var(--sur2); border: 1px solid var(--bdr2); border-radius: 14px;
-          padding: 14px 16px; flex-wrap: nowrap; overflow-x: auto;
-        }
-        .ss-wstep {
-          display: flex; flex-direction: column; align-items: center; gap: 4px;
-          cursor: pointer; min-width: 48px;
-        }
-        .ss-wstep-num {
-          width: 26px; height: 26px; border-radius: 50%;
-          background: var(--sur); border: 2px solid var(--bdr2);
-          color: var(--mut); font-family: var(--font-display); font-weight: 800;
-          font-size: 11px; display: flex; align-items: center; justify-content: center;
-          transition: all .2s;
-        }
-        .ss-wstep.active .ss-wstep-num {
-          background: var(--acc); border-color: var(--acc); color: #00382b;
-          box-shadow: 0 0 0 3px rgba(70,241,197,.2);
-        }
-        .ss-wstep.done .ss-wstep-num { background: rgba(70,241,197,.15); border-color: var(--acc); color: var(--acc); }
-        .ss-wstep-label { font-size: 9px; color: var(--mut); font-family: var(--font-ui); font-weight: 600; white-space: nowrap; }
-        .ss-wstep.active .ss-wstep-label { color: var(--acc); }
-        .ss-wstep-line { flex: 1; height: 2px; background: var(--bdr2); margin-bottom: 12px; transition: background .3s; min-width: 10px; }
-        .ss-wstep-line.done { background: var(--acc); }
-        .ss-wizard-panel {
-          background: var(--sur2); border: 1px solid var(--bdr2); border-radius: 16px; padding: 24px;
-        }
-        .ss-panel-title { font-family: var(--font-display); font-size: 17px; font-weight: 800; color: var(--wht); margin-bottom: 6px; }
-        .ss-panel-sub { font-size: 12px; color: var(--mut); margin-bottom: 20px; }
-        .ss-wizard-nav {
-          display: flex; justify-content: space-between; align-items: center;
-          margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--bdr2);
-        }
-        /* URL input */
-        .ss-url-input {
-          flex: 1; min-width: 180px; background: var(--sur); border: 1.5px solid var(--bdr2);
-          border-radius: 10px; padding: 9px 14px; font-family: var(--font-mono); font-size: 12px;
-          color: var(--wht); outline: none; transition: border-color .15s; box-sizing: border-box;
-        }
-        .ss-url-input:focus { border-color: var(--acc); }
-        .ss-url-status { font-size: 12px; font-family: var(--font-mono); padding: 6px 10px; border-radius: 8px; display: none; }
-        .ss-url-status.ok  { color: #34d399; background: rgba(52,211,153,.08); border: 1px solid rgba(52,211,153,.2); display: block; }
-        .ss-url-status.err { color: #f87171; background: rgba(248,113,113,.08); border: 1px solid rgba(248,113,113,.2); display: block; }
-        .ss-url-status.testing { color: var(--acc); background: rgba(70,241,197,.06); border: 1px solid rgba(70,241,197,.15); display: block; }
-        /* Plat / event row */
-        .ss-sel-row {
-          display: flex; align-items: center; gap: 12px;
-          background: var(--sur); border: 1.5px solid var(--bdr2); border-radius: 12px;
-          padding: 10px 14px; cursor: pointer; transition: border-color .15s;
-        }
-        .ss-sel-row:hover { border-color: rgba(70,241,197,.3); }
-        .ss-sel-row.selected { border-color: var(--acc); background: rgba(70,241,197,.04); }
-        .ss-sel-ico { font-size: 20px; width: 32px; text-align: center; flex-shrink: 0; }
-        .ss-sel-info { flex: 1; min-width: 0; }
-        .ss-sel-name { font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--wht); }
-        .ss-sel-sub  { font-size: 11px; color: var(--mut); }
-        .ss-sel-badge { font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 4px; font-family: var(--font-display); flex-shrink: 0; }
-        .ss-sel-badge.rec { background: rgba(70,241,197,.15); color: var(--acc); border: 1px solid rgba(70,241,197,.25); }
-        .ss-sel-badge.warn { background: rgba(248,113,113,.1); color: #f87171; border: 1px solid rgba(248,113,113,.2); }
-        /* Event checkbox row (small) */
-        .ss-ev-row {
-          display: flex; align-items: center; gap: 8px;
-          padding: 6px 10px; border-radius: 8px; border: 1px solid var(--bdr2);
-          background: var(--sur); cursor: pointer; transition: border-color .15s;
-        }
-        .ss-ev-row:hover { border-color: rgba(70,241,197,.25); }
-        .ss-ev-row.checked { border-color: rgba(70,241,197,.3); background: rgba(70,241,197,.03); }
-        .ss-ev-row input[type=checkbox] { accent-color: var(--acc); flex-shrink: 0; }
-        .ss-ev-row-label { font-size: 12px; color: var(--wht2); font-family: var(--font-ui); font-weight: 600; }
-        /* Token input */
-        .ss-tok-input {
-          width: 100%; box-sizing: border-box; background: var(--sur2);
-          border: 1px solid var(--bdr2); border-radius: 8px; padding: 7px 10px;
-          font-family: var(--font-mono); font-size: 11px; color: var(--wht); outline: none;
-          transition: border-color .15s; margin-top: 6px;
-        }
-        .ss-tok-input:focus { border-color: var(--acc); }
-        /* Spinner */
-        .ss-spin {
-          width: 18px; height: 18px; border-radius: 50%;
-          border: 2px solid rgba(70,241,197,.2); border-top-color: var(--acc);
-          animation: ss-rotate 0.7s linear infinite; flex-shrink: 0;
-        }
-        @keyframes ss-rotate { to { transform: rotate(360deg); } }
-        /* Summary table */
-        .ss-summary-block { background: var(--sur); border: 1px solid var(--bdr2); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
-        .ss-summary-label { font-size: 10px; color: var(--mut); font-family: var(--font-mono); letter-spacing: .8px; text-transform: uppercase; margin-bottom: 6px; }
-        .ss-summary-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--bdr); }
-        .ss-summary-row:last-child { border-bottom: none; }
-        .ss-summary-key { font-size: 12px; color: var(--mut); }
-        .ss-summary-val { font-size: 12px; color: var(--wht); font-weight: 600; font-family: var(--font-ui); text-align: left; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        /* Active banner */
-        #ss-active-banner { display: none; }
-        /* Pixel cards (step 5) */
-        .ss-px-card {
-          background: var(--sur); border: 1.5px solid var(--bdr2); border-radius: 12px;
-          margin-bottom: 8px; overflow: hidden; transition: border-color .15s;
-        }
-        .ss-px-card.active { border-color: rgba(70,241,197,.4); }
-        .ss-px-header {
-          display: flex; align-items: center; gap: 10px;
-          padding: 12px 14px; cursor: pointer; user-select: none;
-        }
-        .ss-px-name { font-size: 13px; font-weight: 700; color: var(--wht); }
-        .ss-px-sub  { font-size: 11px; color: var(--mut); }
-        .ss-px-toggle {
-          width: 36px; height: 20px; border-radius: 20px; background: var(--sur3);
-          border: 1.5px solid var(--bdr2); position: relative; transition: all .2s; flex-shrink: 0;
-        }
-        .ss-px-toggle::after {
-          content:''; position:absolute; width:14px; height:14px; border-radius:50%;
-          background: var(--mut); top: 1px; right: 1px; transition: all .2s;
-        }
-        .ss-px-card.active .ss-px-toggle {
-          background: rgba(70,241,197,.2); border-color: var(--acc);
-        }
-        .ss-px-card.active .ss-px-toggle::after {
-          background: var(--acc); transform: translateX(-16px);
-        }
-        .ss-px-body { padding: 0 14px 14px; }
-        .ss-px-label {
-          font-size: 10px; font-weight: 700; color: var(--mut); display: block;
-          margin-bottom: 4px; font-family: var(--font-ui); letter-spacing: .5px; text-transform: uppercase;
-        }
-      </style>
-      <!-- END SERVER-SIDE VIEW -->
 
     </div>
   </div>
@@ -5497,8 +5176,42 @@
     // ===== STATE =====
     var S = { cms: null, platforms: [], events: [], platformEvents: {}, pixelIds: {}, lead: {} };
 
+    // ===== SERVER SIDE CONFIG STATE =====
+    var _pcSS = {
+      enabled:    false,           // toggle ON/OFF
+      serverUrl:  '',              // sGTM URL
+      ga4Id:      '',              // GA4 Measurement ID (auto from S or manual)
+      platforms:  [],              // ['meta','gads','snap','tiktok']
+      events:     {},              // { meta:['purchase','lead'], gads:['purchase'], ... }
+      pixelIds:   {},              // { meta:'XXXXXX', snap:'UUID', tiktok:'CXXX' }
+      tokens:     {},              // { meta:'EAAxx', snap:'eyJ', tiktok:'XXX' }
+      gadsConvId: '',              // AW-XXXXXXXXXX
+      gadsLabels: {},              // { purchase:'AbCd_xxx', lead:'XyZw_xxx' }
+      _pxOpen:    {}               // accordion open state per platform key
+    };
+
+    // SS platform definitions
+    var _pcSS_PLATS = {
+      meta:   { label:'Meta CAPI',         icon:'💙', idLabel:'Pixel ID',      tokLabel:'CAPI Access Token',       idPh:'1234567890123456', tokPh:'EAAxxxxx...',    hasToken:true  },
+      gads:   { label:'Google Ads',         icon:'🎯', idLabel:'Conversion ID', tokLabel:'',                        idPh:'AW-1234567890',    tokPh:'',               hasToken:false },
+      snap:   { label:'Snapchat CAPI',      icon:'👻', idLabel:'Pixel ID',      tokLabel:'CAPI Token',              idPh:'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx', tokPh:'eyJhbGci...', hasToken:true },
+      tiktok: { label:'TikTok Events API',  icon:'🎵', idLabel:'Pixel ID',      tokLabel:'Events API Access Token', idPh:'CXXXXXXXXXXXXXXXX', tokPh:'xxxxxxxx...', hasToken:true }
+    };
+
+    // SS event definitions
+    var _pcSS_EVENTS = [
+      { key:'purchase',          label:'Purchase',          icon:'💰', forced:true  },
+      { key:'add_to_cart',       label:'Add to Cart',       icon:'🛒', forced:false },
+      { key:'initiate_checkout', label:'Initiate Checkout', icon:'💳', forced:false },
+      { key:'view_content',      label:'View Content',      icon:'👁️', forced:false },
+      { key:'page_view',         label:'Page View',         icon:'📄', forced:false },
+      { key:'lead',              label:'Lead',              icon:'📋', forced:false },
+      { key:'sign_up',           label:'Sign Up',           icon:'✍️', forced:false },
+      { key:'search',            label:'Search',            icon:'🔍', forced:false }
+    ];
+
     // ===== APP VIEW SWITCHING =====
-    var APP_VIEWS = { overview: 'view-overview', pixels: 'view-pixels', gtmview: 'view-gtmview', projects: 'view-projects', serverside: 'view-serverside' };
+    var APP_VIEWS = { overview: 'view-overview', pixels: 'view-pixels', gtmview: 'view-gtmview', projects: 'view-projects' };
 
     // Cached GTM JSON string for sidebar view
     var _cachedGtmStr = null;
@@ -6072,7 +5785,9 @@
       document.getElementById('outWrap').classList.remove('on');
       if (n <= 4) document.getElementById('s' + n).classList.add('on');
       updateProg(n);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      var ptrack = document.getElementById('ptrack');
+      if (ptrack) ptrack.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      else window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function updateProg(cur) {
@@ -6240,11 +5955,12 @@
           html += '<div class="pixhint">💡 Google Ads → Tools → Conversions → Settings → Conversion ID</div>';
           html += '</div>';
 
-          // Conversion Label per event
+          // Conversion Label per event (only events selected for Google Ads)
           html += '<div class="pixrow" style="margin-top:16px;">';
           html += '<label class="pixlabel">Conversion Label <span class="pixlabel-hint">لكل event منفصل</span></label>';
-          for (var ei = 0; ei < S.events.length; ei++) {
-            var ev = S.events[ei];
+          var _gadsEvs = (S.platformEvents && S.platformEvents['google'] && S.platformEvents['google'].length) ? S.platformEvents['google'] : S.events;
+          for (var ei = 0; ei < _gadsEvs.length; ei++) {
+            var ev = _gadsEvs[ei];
             var evLabel = GA4[ev] ? GA4[ev].label : ev;
             html += '<div class="pix-ev-row">';
             html += '<span class="pix-ev-name">' + evLabel + '</span>';
@@ -6338,6 +6054,201 @@
       };
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // ===== SERVER SIDE CONFIG — UI Functions =====
+    // ═══════════════════════════════════════════════════════════
+
+    function pcSS_toggle() {
+      _pcSS.enabled = !_pcSS.enabled;
+      var btn = document.getElementById('pc-ss-toggle-btn');
+      var lbl = document.getElementById('pc-ss-toggle-lbl');
+      var body = document.getElementById('pc-ss-body');
+      if (btn) btn.classList.toggle('on', _pcSS.enabled);
+      if (lbl) lbl.textContent = _pcSS.enabled ? 'ON' : 'OFF';
+      if (body) body.classList.toggle('open', _pcSS.enabled);
+      if (_pcSS.enabled) pcSS_refreshGA4Display();
+    }
+
+    function pcSS_validateUrl() {
+      var inp = document.getElementById('pc-ss-url');
+      var valid = document.getElementById('pc-ss-url-valid');
+      if (!inp || !valid) return;
+      var v = inp.value.trim();
+      _pcSS.serverUrl = v;
+      if (!v) { valid.textContent = ''; return; }
+      var ok = /^https:\/\/[A-Za-z0-9.\-]+(:\d+)?(\/[A-Za-z0-9._~%\-\/]*)?$/.test(v);
+      valid.textContent = ok ? '✅ رابط صحيح' : '❌ لازم يبدأ بـ https:// ويحتوي على domain صحيح';
+      valid.style.color = ok ? '#34d399' : '#f87171';
+    }
+
+    function pcSS_refreshGA4Display() {
+      var el = document.getElementById('pc-ss-ga4-display');
+      if (!el) return;
+      var id = (S.pixelIds && S.pixelIds['ga4']) ? S.pixelIds['ga4'] : _pcSS.ga4Id;
+      if (id) {
+        _pcSS.ga4Id = id;
+        el.innerHTML = '<div class="pc-ss-ga4-row">'
+          + '<span class="pc-ss-ga4-badge">GA4</span>'
+          + '<span class="pc-ss-ga4-val">' + id + '</span>'
+          + '<button class="pc-ss-ga4-edit" onclick="pcSS_editGA4()">تعديل</button>'
+          + '</div>';
+      } else {
+        el.innerHTML = '<input class="pc-ss-input" id="pc-ss-ga4-manual" type="text" placeholder="G-XXXXXXXXXX" dir="ltr" oninput="pcSS_onGA4Input()" autocomplete="off">'
+          + '<div class="pc-ss-hint">💡 GA4 Measurement ID — أضف GA4 في Step 2 أولاً أو اكتبه هنا يدوياً</div>';
+      }
+    }
+
+    window.pcSS_editGA4 = function() {
+      var el = document.getElementById('pc-ss-ga4-display');
+      if (!el) return;
+      el.innerHTML = '<input class="pc-ss-input" id="pc-ss-ga4-manual" type="text" placeholder="G-XXXXXXXXXX" dir="ltr" value="' + (_pcSS.ga4Id || '') + '" oninput="pcSS_onGA4Input()" autocomplete="off">';
+    };
+
+    window.pcSS_onGA4Input = function() {
+      var inp = document.getElementById('pc-ss-ga4-manual');
+      if (inp) _pcSS.ga4Id = inp.value.trim();
+    };
+
+    function pcSS_togglePlatform(key) {
+      var btn = document.querySelector('[data-ss-plat="' + key + '"]');
+      var idx = _pcSS.platforms.indexOf(key);
+      if (idx === -1) {
+        _pcSS.platforms.push(key);
+        if (btn) btn.classList.add('on');
+        if (!_pcSS.events[key]) {
+          _pcSS.events[key] = ['purchase']; // purchase forced by default
+        }
+      } else {
+        _pcSS.platforms.splice(idx, 1);
+        if (btn) btn.classList.remove('on');
+        delete _pcSS._pxOpen[key];
+      }
+      pcSS_renderAccordions();
+    }
+
+    function pcSS_renderAccordions() {
+      var wrap = document.getElementById('pc-ss-acc-wrap');
+      var container = document.getElementById('pc-ss-accordions');
+      if (!wrap || !container) return;
+      if (!_pcSS.platforms.length) { wrap.style.display = 'none'; return; }
+      wrap.style.display = '';
+      container.innerHTML = '';
+      _pcSS.platforms.forEach(function(key) {
+        var pd = _pcSS_PLATS[key];
+        if (!pd) return;
+        var isOpen = !!_pcSS._pxOpen[key];
+        var acc = document.createElement('div');
+        acc.className = 'pc-ss-acc' + (isOpen ? ' open' : '');
+        acc.id = 'pc-ss-acc-' + key;
+
+        // Build events chips HTML
+        var evChips = _pcSS_EVENTS.map(function(ev) {
+          var sel = (_pcSS.events[key] || []).indexOf(ev.key) !== -1;
+          return '<span class="pc-ss-ev-chip' + (sel ? ' on' : '') + (ev.forced ? ' forced' : '') + '" '
+            + 'onclick="pcSS_toggleEvent(\'' + key + '\',\'' + ev.key + '\')" '
+            + 'title="' + ev.label + '">'
+            + ev.icon + ' ' + ev.key + '</span>';
+        }).join('');
+
+        // Build credentials HTML
+        var credsHtml = '';
+        if (key === 'gads') {
+          // Google Ads: Conversion ID + Labels per event
+          credsHtml += '<div class="pc-ss-px-row">'
+            + '<div class="pc-ss-px-lbl">Conversion ID <span style="color:var(--mut);font-weight:400;">(مشترك لكل الـ events)</span></div>'
+            + '<input class="pc-ss-input" id="pc-ss-px-gads-id" type="text" placeholder="AW-1234567890" dir="ltr" value="' + (_pcSS.gadsConvId||'') + '" oninput="_pcSS.gadsConvId=this.value.trim()" autocomplete="off">'
+            + '</div>';
+          credsHtml += '<div class="pc-ss-px-row" id="pc-ss-gads-labels-wrap">'
+            + '<div class="pc-ss-px-lbl">Conversion Labels <span style="color:var(--mut);font-weight:400;">(لكل event)</span></div>'
+            + (_pcSS.events['gads'] || ['purchase']).map(function(ev) {
+                return '<div class="pc-ss-label-row">'
+                  + '<span class="pc-ss-label-ev">' + ev + '</span>'
+                  + '<input class="pc-ss-input" style="flex:1;" id="pc-ss-gads-lbl-' + ev + '" type="text" placeholder="AbCd_xxxxxxxx" dir="ltr" value="' + (_pcSS.gadsLabels[ev]||'') + '" oninput="_pcSS.gadsLabels[\'' + ev + '\']=this.value.trim()" autocomplete="off">'
+                  + '</div>';
+              }).join('');
+          credsHtml += '</div>';
+        } else {
+          // Meta, Snap, TikTok: Pixel ID + Token
+          credsHtml += '<div class="pc-ss-px-row">'
+            + '<div class="pc-ss-px-lbl">' + pd.idLabel + '</div>'
+            + '<input class="pc-ss-input" id="pc-ss-px-id-' + key + '" type="text" placeholder="' + pd.idPh + '" dir="ltr" value="' + (_pcSS.pixelIds[key]||'') + '" oninput="_pcSS.pixelIds[\'' + key + '\']=this.value.trim()" autocomplete="off">'
+            + '</div>';
+          if (pd.hasToken) {
+            credsHtml += '<div class="pc-ss-px-row">'
+              + '<div class="pc-ss-px-lbl">' + pd.tokLabel + '</div>'
+              + '<div class="pc-ss-pw-wrap">'
+              + '<input class="pc-ss-input" id="pc-ss-px-tok-' + key + '" type="password" placeholder="' + pd.tokPh + '" dir="ltr" value="' + (_pcSS.tokens[key]||'') + '" oninput="_pcSS.tokens[\'' + key + '\']=this.value.trim()" autocomplete="new-password">'
+              + '<span class="material-symbols-outlined pc-ss-eye" id="pc-ss-eye-' + key + '" onclick="pcSS_toggleEye(\'' + key + '\')">visibility</span>'
+              + '</div></div>';
+          }
+        }
+
+        acc.innerHTML = '<div class="pc-ss-acc-hdr" onclick="pcSS_toggleAccordion(\'' + key + '\')">'
+          + '<span style="font-size:18px;">' + pd.icon + '</span>'
+          + '<span class="pc-ss-acc-name">' + pd.label + '</span>'
+          + '<span class="pc-ss-acc-arr">▶</span>'
+          + '</div>'
+          + '<div class="pc-ss-acc-body">'
+          + '<div style="font-size:11px;color:var(--mut);margin-bottom:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Events</div>'
+          + '<div class="pc-ss-ev-chips">' + evChips + '</div>'
+          + '<div style="font-size:11px;color:var(--mut);margin-bottom:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Credentials</div>'
+          + credsHtml
+          + '</div>';
+
+        container.appendChild(acc);
+      });
+    }
+
+    window.pcSS_toggleAccordion = function(key) {
+      _pcSS._pxOpen[key] = !_pcSS._pxOpen[key];
+      var acc = document.getElementById('pc-ss-acc-' + key);
+      if (acc) acc.classList.toggle('open', _pcSS._pxOpen[key]);
+    };
+
+    window.pcSS_toggleEvent = function(plat, evKey) {
+      var pd = _pcSS_EVENTS.find(function(e){ return e.key === evKey; });
+      if (pd && pd.forced) return; // purchase always on
+      if (!_pcSS.events[plat]) _pcSS.events[plat] = ['purchase'];
+      var arr = _pcSS.events[plat];
+      var idx = arr.indexOf(evKey);
+      if (idx === -1) arr.push(evKey);
+      else arr.splice(idx, 1);
+      // Re-render accordion to refresh chips + gads labels
+      pcSS_renderAccordions();
+      // Re-open the accordion
+      _pcSS._pxOpen[plat] = true;
+      var acc = document.getElementById('pc-ss-acc-' + plat);
+      if (acc) acc.classList.add('open');
+    };
+
+    window.pcSS_toggleEye = function(key) {
+      var inp = document.getElementById('pc-ss-px-tok-' + key);
+      var eye = document.getElementById('pc-ss-eye-' + key);
+      if (!inp) return;
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+      if (eye) eye.textContent = inp.type === 'password' ? 'visibility' : 'visibility_off';
+    };
+
+    function pcSS_collect() {
+      // URL
+      var urlInp = document.getElementById('pc-ss-url');
+      if (urlInp) _pcSS.serverUrl = urlInp.value.trim();
+      // GA4 ID — prefer S state, then manual input
+      var ga4Auto = (S.pixelIds && S.pixelIds['ga4']) ? S.pixelIds['ga4'] : '';
+      var ga4Manual = document.getElementById('pc-ss-ga4-manual');
+      _pcSS.ga4Id = ga4Auto || (ga4Manual ? ga4Manual.value.trim() : _pcSS.ga4Id);
+      // Pixel IDs + tokens — already wired via oninput on each input field
+      // Google Ads conv ID
+      var gadsIdInp = document.getElementById('pc-ss-px-gads-id');
+      if (gadsIdInp) _pcSS.gadsConvId = gadsIdInp.value.trim();
+      // Google Ads labels
+      (_pcSS.events['gads'] || []).forEach(function(ev) {
+        var inp = document.getElementById('pc-ss-gads-lbl-' + ev);
+        if (inp) _pcSS.gadsLabels[ev] = inp.value.trim();
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════
     // ===== GENERATE =====
     function generate() {
       try {
@@ -6349,10 +6260,11 @@
             var gRmk = document.getElementById('pf-google-rmk');
             S.pixelIds['google'] = gId ? gId.value.trim() : '';
             S.pixelIds['google_rmk'] = gRmk ? gRmk.value.trim() : '';
-            // Collect per-event conversion labels
+            // Collect per-event conversion labels (only Google Ads events)
             S.pixelIds['google_labels'] = {};
-            for (var ei = 0; ei < S.events.length; ei++) {
-              var ev = S.events[ei];
+            var _gadsCollEvs = (S.platformEvents && S.platformEvents['google'] && S.platformEvents['google'].length) ? S.platformEvents['google'] : S.events;
+            for (var ei = 0; ei < _gadsCollEvs.length; ei++) {
+              var ev = _gadsCollEvs[ei];
               var labelEl = document.getElementById('pf-google-label-' + ev);
               if (labelEl) S.pixelIds['google_labels'][ev] = labelEl.value.trim();
             }
@@ -6362,6 +6274,15 @@
           }
         }
 
+        // ── Step 1b: Collect SS config + set window.ET flags ──
+        try { pcSS_collect(); } catch(e) { console.warn('pcSS_collect error:', e); }
+        window.ET = window.ET || {};
+        window.ET.ssEnabled = _pcSS.enabled && !!_pcSS.serverUrl && /^https:\/\//.test(_pcSS.serverUrl);
+        window.ET.ssUrl     = _pcSS.serverUrl;
+        window.ET.ssGa4Id   = _pcSS.ga4Id;
+        window.ET.ssPlats   = _pcSS.platforms;
+        window.ET.ssEvents  = _pcSS.events;
+
         // ── Step 2: Show output panel & wire buttons FIRST so UI never stays blank ──
         for (var i = 1; i <= 4; i++) document.getElementById('s' + i).classList.remove('on');
         document.getElementById('outWrap').classList.add('on');
@@ -6369,11 +6290,48 @@
         if (gtmEmpty) gtmEmpty.style.display = 'none';
         updateProg(5);
         window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        // ── Show/hide Server Container tab ──
+        var tabSsEl = document.getElementById('tabSsGtm');
+        var paneSsEl = document.getElementById('pane-ss-gtm');
+        if (tabSsEl) tabSsEl.style.display = window.ET.ssEnabled ? '' : 'none';
+        if (paneSsEl) paneSsEl.style.display = window.ET.ssEnabled ? '' : 'none';
+
         bindDownloads(); // wire early so buttons are always ready
 
         // ── Step 3: Build each output panel individually — one crash won't block the rest ──
         try { document.getElementById('jsonBody').textContent = JSON.stringify(buildJSON(), null, 2); }
         catch (e) { console.error('buildJSON error:', e); }
+
+        // ── Build Server Container JSON if SS enabled ──
+        if (window.ET.ssEnabled) {
+          try {
+            var ssContainerResult = buildSSContainer();
+            var ssContainerStr = JSON.stringify(ssContainerResult, null, 2);
+            var ssBody = document.getElementById('ssGtmBody');
+            if (ssBody) ssBody.textContent = ssContainerStr;
+            // Container Config: compact version for Stape
+            var ssConfigBox = document.getElementById('pc-ss-config-box');
+            if (ssConfigBox) ssConfigBox.textContent = JSON.stringify(ssContainerResult);
+            // Wire download button
+            var dlSsBtn = document.getElementById('dlSsGtm');
+            if (dlSsBtn) {
+              dlSsBtn.onclick = function() {
+                var blob = new Blob([ssContainerStr], { type: 'application/json' });
+                var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+                a.download = 'sgtm-container.json'; a.click();
+              };
+            }
+            var cpySsBtn = document.getElementById('cpySsGtm');
+            if (cpySsBtn) cpySsBtn.onclick = function() { navigator.clipboard.writeText(ssContainerStr).catch(function(){}); };
+            var cpyCfgBtn = document.getElementById('cpySsConfig');
+            if (cpyCfgBtn) cpyCfgBtn.onclick = function() { navigator.clipboard.writeText(JSON.stringify(ssContainerResult)).catch(function(){}); };
+          } catch(e) {
+            console.error('buildSSContainer error:', e);
+            var ssBody2 = document.getElementById('ssGtmBody');
+            if (ssBody2) ssBody2.innerHTML = '<div style="padding:20px;color:#f87171;font-size:12px;font-family:monospace;">⚠️ خطأ في بناء Server Container: ' + (e.message||String(e)) + '</div>';
+          }
+        }
 
         try { document.getElementById('dlBody').textContent = buildDL(); }
         catch (e) { console.error('buildDL error:', e); }
@@ -6471,12 +6429,28 @@
         }
         platforms[p] = { platform_name: PM[p].name, pixel_id: S.pixelIds[p] || 'YOUR_PIXEL_ID', events: evList };
       }
-      return {
-        generated_by: 'Easy Track Easy Track · Pixel Config Generator',
+      var result = {
+        generated_by: 'Easy Track · Pixel Config Generator',
         generated_at: new Date().toISOString().split('T')[0],
         lead: S.lead || {}, cms: S.cms, cms_name: CMS[S.cms].name, cms_notes: CMS[S.cms].note,
         platforms: platforms
       };
+      // Append ss_config when Server Side is enabled
+      if (_pcSS.enabled) {
+        result.ss_config = {
+          enabled:    true,
+          server_url: _pcSS.serverUrl,
+          ga4_id:     _pcSS.ga4Id,
+          platforms:  _pcSS.platforms,
+          events:     _pcSS.events,
+          gads_conv_id: _pcSS.gadsConvId,
+          gads_labels:  _pcSS.gadsLabels
+          // tokens ommitted intentionally — sensitive
+        };
+      } else {
+        result.ss_config = { enabled: false };
+      }
+      return result;
     }
 
     // ── H3: Server-Side Relay Tag builder ──────────────────────────────────────
@@ -6535,6 +6509,332 @@
       return html.replace(/\[S\]/g, '<scr' + 'ipt>').replace(/\[\/S\]/g, '<\/scr' + 'ipt>');
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // ===== BUILD SERVER CONTAINER (sGTM) =====
+    // ═══════════════════════════════════════════════════════════════
+    function buildSSContainer() {
+      if (!_pcSS.enabled) return null;
+
+      var ts = Date.now();
+      function fp(id) { return String(ts + id * 7 + 1000000); }
+      function safeName(s) { return String(s).replace(/[:\/\\?*\[\]|<>]/g,'-').trim(); }
+
+      var varId = 1, tagId = 1, triggerId = 1, clientId = 1;
+      var variables = [], tags = [], triggers = [], clients = [];
+
+      // ── Helper: Event Data variable ─────────────────────────────
+      function evDataVar(name, key) {
+        variables.push({
+          accountId:'000000000', containerId:'00000000', variableId: varId,
+          name: name, type:'gtes',
+          parameter:[{ type:'TEMPLATE', key:'varType', value:'event_data' },
+                     { type:'TEMPLATE', key:'varName', value: key }],
+          fingerprint: fp(varId)
+        });
+        return varId++;
+      }
+
+      // ── Helper: HTTP Request variable ───────────────────────────
+      function httpVar(name, key) {
+        variables.push({
+          accountId:'000000000', containerId:'00000000', variableId: varId,
+          name: name, type:'gtes',
+          parameter:[{ type:'TEMPLATE', key:'varType', value:'request_header' },
+                     { type:'TEMPLATE', key:'varName', value: key }],
+          fingerprint: fp(varId)
+        });
+        return varId++;
+      }
+
+      // ── Helper: Query Param variable ─────────────────────────────
+      function queryVar(name, key) {
+        variables.push({
+          accountId:'000000000', containerId:'00000000', variableId: varId,
+          name: name, type:'gtes',
+          parameter:[{ type:'TEMPLATE', key:'varType', value:'query_parameter' },
+                     { type:'TEMPLATE', key:'varName', value: key }],
+          fingerprint: fp(varId)
+        });
+        return varId++;
+      }
+
+      // ── 1. GA4 Client ────────────────────────────────────────────
+      clients.push({
+        accountId:'000000000', containerId:'00000000', clientId: clientId,
+        name: 'GA4 Client',
+        type: 'google-ga4',
+        parameter:[{ type:'TEMPLATE', key:'activationPage', value:'/' }],
+        priority: 0,
+        fingerprint: fp(clientId)
+      });
+      clientId++;
+
+      // ── 2. Variables — Event Data ────────────────────────────────
+      var vEventName      = evDataVar('SS - event_name',      'event_name');
+      var vTransId        = evDataVar('SS - transaction_id',   'transaction_id');
+      var vValue          = evDataVar('SS - value',            'value');
+      var vCurrency       = evDataVar('SS - currency',         'currency');
+      var vEventId        = evDataVar('SS - event_id',         'event_id');
+      var vContentIds     = evDataVar('SS - content_ids',      'content_ids');
+      var vContentType    = evDataVar('SS - content_type',     'content_type');
+      var vNumItems       = evDataVar('SS - num_items',        'num_items');
+      var vItems          = evDataVar('SS - items',            'items');
+      // User data (forwarded from web as GA4 user_properties)
+      var vEm             = evDataVar('SS - user.email_hashed',  'up.em');
+      var vPh             = evDataVar('SS - user.phone_hashed',  'up.ph');
+      var vFn             = evDataVar('SS - user.first_name',    'up.fn');
+      var vLn             = evDataVar('SS - user.last_name',     'up.ln');
+      var vExtId          = evDataVar('SS - user.external_id',   'up.external_id');
+      // Click IDs & cookies (forwarded as event params)
+      var vFbp            = evDataVar('SS - user.fbp',           'up.fbp');
+      var vFbc            = evDataVar('SS - user.fbc',           'up.fbc');
+      var vFbclid         = evDataVar('SS - fbclid',             'ep.fbclid');
+      var vGclid          = evDataVar('SS - gclid',              'ep.gclid');
+      var vWbraid         = evDataVar('SS - wbraid',             'ep.wbraid');
+      var vGbraid         = evDataVar('SS - gbraid',             'ep.gbraid');
+      var vTtp            = evDataVar('SS - user.ttp',           'up.ttp');
+      var vTtclid         = evDataVar('SS - ttclid',             'ep.ttclid');
+      var vScid           = evDataVar('SS - user.scid',          'up.scid');
+      var vScCid          = evDataVar('SS - ScCid',              'ep.sccid');
+      var vPageUrl        = evDataVar('SS - page_url',           'page_location');
+      var vPageRef        = evDataVar('SS - page_referrer',      'page_referrer');
+
+      // HTTP variables
+      var vIp             = httpVar('SS - client_ip',            'X-Forwarded-For');
+      var vUa             = httpVar('SS - user_agent',           'User-Agent');
+
+      // ── 3. Triggers — one per selected event (across all platforms) ──
+      var allSsEvents = {};
+      _pcSS.platforms.forEach(function(plat) {
+        (_pcSS.events[plat] || []).forEach(function(ev) { allSsEvents[ev] = true; });
+      });
+
+      // Map SS event key → GA4 event name (salla/zid aware)
+      var cmsEvMap = (CMS_DL_MAP[S.cms] && CMS_DL_MAP[S.cms].eventNames) || {};
+      var ssEvTrigMap = {}; // { ev_key: triggerId }
+
+      // Always add All Events trigger
+      var allEvTrigId = triggerId;
+      triggers.push({
+        accountId:'000000000', containerId:'00000000', triggerId: triggerId,
+        name:'All Events', type:'always',
+        fingerprint: fp(triggerId)
+      });
+      triggerId++;
+
+      Object.keys(allSsEvents).forEach(function(evKey) {
+        // Map event key to actual GA4 event name in the data layer
+        var ga4EvName = cmsEvMap[evKey] || evKey;
+        // For Salla, certain events have different names
+        // purchase stays as 'purchase', add_to_cart='addToCart', etc.
+        // initiate_checkout → 'cart::submitted', view_content → 'Product Viewed' on salla
+        var ssEvNameMap = {
+          initiate_checkout: S.cms === 'salla' ? 'cart::submitted' : 'begin_checkout',
+          view_content:      S.cms === 'salla' ? 'Product Viewed'  : 'view_item',
+          page_view:         'page_view',
+          sign_up:           'sign_up',
+          lead:              'generate_lead'
+        };
+        var finalEvName = ssEvNameMap[evKey] || ga4EvName || evKey;
+        ssEvTrigMap[evKey] = triggerId;
+        triggers.push({
+          accountId:'000000000', containerId:'00000000', triggerId: triggerId,
+          name: safeName('SS Event — ' + evKey),
+          type: 'always',
+          filter:[{
+            type:'EQUALS',
+            parameter:[
+              { type:'TEMPLATE', key:'arg0', value:'{{SS - event_name}}' },
+              { type:'TEMPLATE', key:'arg1', value: finalEvName }
+            ]
+          }],
+          fingerprint: fp(triggerId)
+        });
+        triggerId++;
+      });
+
+      // ── 4. Tags — per enabled SS platform ───────────────────────
+      _pcSS.platforms.forEach(function(plat) {
+        var platEvents = _pcSS.events[plat] || [];
+        var platTrigIds = platEvents.map(function(ev) {
+          return ssEvTrigMap[ev] || allEvTrigId;
+        });
+        if (!platTrigIds.length) platTrigIds = [allEvTrigId];
+        // Deduplicate trigger IDs
+        platTrigIds = platTrigIds.filter(function(v,i,a){ return a.indexOf(v)===i; });
+
+        if (plat === 'meta') {
+          var pixId  = _pcSS.pixelIds['meta'] || 'YOUR_META_PIXEL_ID';
+          var token  = _pcSS.tokens['meta']   || 'YOUR_CAPI_ACCESS_TOKEN';
+          platEvents.forEach(function(evKey) {
+            var metaEvMap = {
+              purchase:'Purchase', add_to_cart:'AddToCart', initiate_checkout:'InitiateCheckout',
+              view_content:'ViewContent', page_view:'PageView', lead:'Lead', sign_up:'CompleteRegistration',
+              search:'Search'
+            };
+            tags.push({
+              accountId:'000000000', containerId:'00000000', tagId: tagId,
+              name: safeName('Meta CAPI | ' + evKey),
+              type:'siwt', // Custom Tag — using Custom Template slot for CAPI
+              parameter:[
+                { type:'TEMPLATE', key:'pixelId',      value: pixId   },
+                { type:'TEMPLATE', key:'accessToken',  value: token   },
+                { type:'TEMPLATE', key:'eventName',    value: metaEvMap[evKey] || 'CustomEvent' },
+                { type:'TEMPLATE', key:'eventId',      value:'{{SS - event_id}}' },
+                { type:'TEMPLATE', key:'value',        value:'{{SS - value}}' },
+                { type:'TEMPLATE', key:'currency',     value:'{{SS - currency}}' },
+                { type:'TEMPLATE', key:'contentIds',   value:'{{SS - content_ids}}' },
+                { type:'TEMPLATE', key:'contentType',  value:'{{SS - content_type}}' },
+                { type:'TEMPLATE', key:'orderId',      value:'{{SS - transaction_id}}' },
+                { type:'TEMPLATE', key:'numItems',     value:'{{SS - num_items}}' },
+                { type:'TEMPLATE', key:'email',        value:'{{SS - user.email_hashed}}' },
+                { type:'TEMPLATE', key:'phone',        value:'{{SS - user.phone_hashed}}' },
+                { type:'TEMPLATE', key:'firstName',    value:'{{SS - user.first_name}}' },
+                { type:'TEMPLATE', key:'lastName',     value:'{{SS - user.last_name}}' },
+                { type:'TEMPLATE', key:'externalId',   value:'{{SS - user.external_id}}' },
+                { type:'TEMPLATE', key:'fbp',          value:'{{SS - user.fbp}}' },
+                { type:'TEMPLATE', key:'fbc',          value:'{{SS - user.fbc}}' },
+                { type:'TEMPLATE', key:'fbclid',       value:'{{SS - fbclid}}' },
+                { type:'TEMPLATE', key:'clientIp',     value:'{{SS - client_ip}}' },
+                { type:'TEMPLATE', key:'userAgent',    value:'{{SS - user_agent}}' },
+                { type:'TEMPLATE', key:'pageUrl',      value:'{{SS - page_url}}' },
+                { type:'TEMPLATE', key:'actionSource', value:'website' }
+              ],
+              firingTriggerId: [ ssEvTrigMap[evKey] || allEvTrigId ],
+              notes: 'Meta CAPI — ' + evKey + ' | Pixel: ' + pixId + ' | Generated by Easy Track',
+              fingerprint: fp(tagId)
+            });
+            tagId++;
+          });
+
+        } else if (plat === 'gads') {
+          var convId = (_pcSS.gadsConvId || 'AW-XXXXXXXXXX').replace('AW-','');
+          platEvents.forEach(function(evKey) {
+            var label = _pcSS.gadsLabels[evKey] || ('LABEL_' + evKey.toUpperCase());
+            tags.push({
+              accountId:'000000000', containerId:'00000000', tagId: tagId,
+              name: safeName('Google Ads SS | ' + evKey),
+              type:'siwt',
+              parameter:[
+                { type:'TEMPLATE', key:'conversionId',    value: convId  },
+                { type:'TEMPLATE', key:'conversionLabel', value: label   },
+                { type:'TEMPLATE', key:'value',           value:'{{SS - value}}' },
+                { type:'TEMPLATE', key:'currency',        value:'{{SS - currency}}' },
+                { type:'TEMPLATE', key:'orderId',         value:'{{SS - transaction_id}}' },
+                { type:'TEMPLATE', key:'gclid',           value:'{{SS - gclid}}' },
+                { type:'TEMPLATE', key:'wbraid',          value:'{{SS - wbraid}}' },
+                { type:'TEMPLATE', key:'gbraid',          value:'{{SS - gbraid}}' },
+                { type:'TEMPLATE', key:'email',           value:'{{SS - user.email_hashed}}' },
+                { type:'TEMPLATE', key:'phone',           value:'{{SS - user.phone_hashed}}' },
+                { type:'TEMPLATE', key:'clientIp',        value:'{{SS - client_ip}}' },
+                { type:'TEMPLATE', key:'userAgent',       value:'{{SS - user_agent}}' }
+              ],
+              firingTriggerId: [ ssEvTrigMap[evKey] || allEvTrigId ],
+              notes: 'Google Ads SS — ' + evKey + ' | Conv ID: AW-' + convId + ' | Label: ' + label + ' | Generated by Easy Track',
+              fingerprint: fp(tagId)
+            });
+            tagId++;
+          });
+
+        } else if (plat === 'snap') {
+          var snapId  = _pcSS.pixelIds['snap']  || 'YOUR_SNAP_PIXEL_ID';
+          var snapTok = _pcSS.tokens['snap']    || 'YOUR_SNAP_CAPI_TOKEN';
+          var snapEvMap = {
+            purchase:'PURCHASE', add_to_cart:'ADD_CART', initiate_checkout:'START_CHECKOUT',
+            view_content:'VIEW_CONTENT', page_view:'PAGE_VIEW', sign_up:'SIGN_UP',
+            lead:'SIGN_UP', search:'SEARCH'
+          };
+          platEvents.forEach(function(evKey) {
+            tags.push({
+              accountId:'000000000', containerId:'00000000', tagId: tagId,
+              name: safeName('Snapchat CAPI | ' + evKey),
+              type:'siwt',
+              parameter:[
+                { type:'TEMPLATE', key:'pixelId',     value: snapId   },
+                { type:'TEMPLATE', key:'apiToken',    value: snapTok  },
+                { type:'TEMPLATE', key:'eventType',   value: snapEvMap[evKey] || 'CUSTOM' },
+                { type:'TEMPLATE', key:'eventId',     value:'{{SS - event_id}}' },
+                { type:'TEMPLATE', key:'price',       value:'{{SS - value}}' },
+                { type:'TEMPLATE', key:'currency',    value:'{{SS - currency}}' },
+                { type:'TEMPLATE', key:'transId',     value:'{{SS - transaction_id}}' },
+                { type:'TEMPLATE', key:'contentIds',  value:'{{SS - content_ids}}' },
+                { type:'TEMPLATE', key:'email',       value:'{{SS - user.email_hashed}}' },
+                { type:'TEMPLATE', key:'phone',       value:'{{SS - user.phone_hashed}}' },
+                { type:'TEMPLATE', key:'externalId',  value:'{{SS - user.external_id}}' },
+                { type:'TEMPLATE', key:'scClickId',   value:'{{SS - ScCid}}' },
+                { type:'TEMPLATE', key:'uuidC1',      value:'{{SS - user.scid}}' },
+                { type:'TEMPLATE', key:'clientIp',    value:'{{SS - client_ip}}' },
+                { type:'TEMPLATE', key:'userAgent',   value:'{{SS - user_agent}}' },
+                { type:'TEMPLATE', key:'pageUrl',     value:'{{SS - page_url}}' }
+              ],
+              firingTriggerId: [ ssEvTrigMap[evKey] || allEvTrigId ],
+              notes: 'Snapchat CAPI — ' + evKey + ' | Pixel: ' + snapId + ' | Generated by Easy Track',
+              fingerprint: fp(tagId)
+            });
+            tagId++;
+          });
+
+        } else if (plat === 'tiktok') {
+          var ttId  = _pcSS.pixelIds['tiktok']  || 'YOUR_TIKTOK_PIXEL_ID';
+          var ttTok = _pcSS.tokens['tiktok']    || 'YOUR_TIKTOK_API_TOKEN';
+          var ttEvMap = {
+            purchase:'CompletePayment', add_to_cart:'AddToCart', initiate_checkout:'InitiateCheckout',
+            view_content:'ViewContent', page_view:'Pageview', lead:'SubmitForm',
+            sign_up:'CompleteRegistration', search:'Search'
+          };
+          platEvents.forEach(function(evKey) {
+            tags.push({
+              accountId:'000000000', containerId:'00000000', tagId: tagId,
+              name: safeName('TikTok Events API | ' + evKey),
+              type:'siwt',
+              parameter:[
+                { type:'TEMPLATE', key:'pixelCode',   value: ttId    },
+                { type:'TEMPLATE', key:'accessToken', value: ttTok   },
+                { type:'TEMPLATE', key:'eventName',   value: ttEvMap[evKey] || 'CustomEvent' },
+                { type:'TEMPLATE', key:'eventId',     value:'{{SS - event_id}}' },
+                { type:'TEMPLATE', key:'value',       value:'{{SS - value}}' },
+                { type:'TEMPLATE', key:'currency',    value:'{{SS - currency}}' },
+                { type:'TEMPLATE', key:'contentId',   value:'{{SS - content_ids}}' },
+                { type:'TEMPLATE', key:'contentType', value:'{{SS - content_type}}' },
+                { type:'TEMPLATE', key:'email',       value:'{{SS - user.email_hashed}}' },
+                { type:'TEMPLATE', key:'phone',       value:'{{SS - user.phone_hashed}}' },
+                { type:'TEMPLATE', key:'externalId',  value:'{{SS - user.external_id}}' },
+                { type:'TEMPLATE', key:'ttclid',      value:'{{SS - ttclid}}' },
+                { type:'TEMPLATE', key:'ttp',         value:'{{SS - user.ttp}}' },
+                { type:'TEMPLATE', key:'clientIp',    value:'{{SS - client_ip}}' },
+                { type:'TEMPLATE', key:'userAgent',   value:'{{SS - user_agent}}' },
+                { type:'TEMPLATE', key:'pageUrl',     value:'{{SS - page_url}}' }
+              ],
+              firingTriggerId: [ ssEvTrigMap[evKey] || allEvTrigId ],
+              notes: 'TikTok Events API — ' + evKey + ' | Pixel: ' + ttId + ' | Generated by Easy Track',
+              fingerprint: fp(tagId)
+            });
+            tagId++;
+          });
+        }
+      });
+
+      return {
+        exportFormatVersion: 2,
+        exportTime: new Date().toISOString(),
+        containerVersion: {
+          containerVersionId: '0',
+          container: {
+            accountId:    '000000000',
+            containerId:  '00000000',
+            name:         'Easy Track — Server Container (sGTM)',
+            publicId:     'GTM-SS000000',
+            usageContext: ['server'],
+            notes:        'Generated by Easy Track | sGTM URL: ' + (_pcSS.serverUrl||'') + ' | CMS: ' + (S.cms||'') + ' | Platforms: ' + _pcSS.platforms.join(', ')
+          },
+          variable: variables,
+          trigger:  triggers,
+          tag:      tags,
+          client:   clients
+        }
+      };
+    }
+
     // ===== BUILD GTM CONTAINER =====
     // ===== BUILD GTM CONTAINER =====
     function buildGTMContainer() {
@@ -6570,7 +6870,8 @@
       ];
       if (S.platforms.indexOf('google') !== -1) {
         dlKeys.push('google_conversion_id');
-        for (var gi = 0; gi < S.events.length; gi++) dlKeys.push('google_label_' + S.events[gi]);
+        var _gadsKeys = (S.platformEvents && S.platformEvents['google'] && S.platformEvents['google'].length) ? S.platformEvents['google'] : S.events;
+        for (var gi = 0; gi < _gadsKeys.length; gi++) dlKeys.push('google_label_' + _gadsKeys[gi]);
       }
       if (S.platforms.indexOf('ga4') !== -1) dlKeys.push('user_id');
 
@@ -6933,6 +7234,147 @@
         });
         varId++;
       }
+
+      // ── SS: Cookie + URL + Click-ID Variables (when SS enabled) ──────────────
+      if (window.ET && window.ET.ssEnabled) {
+
+        // ── Cookie Variables ──
+        var ssCookieVars = [
+          { name:'Cookie - _fbp',       cn:'_fbp'       },
+          { name:'Cookie - _fbc',       cn:'_fbc'       },
+          { name:'Cookie - _ttp',       cn:'_ttp'       },
+          { name:'Cookie - _scid',      cn:'_scid'      },
+          { name:'Cookie - _ttclid',    cn:'_ttclid'    },
+          { name:'Cookie - _ScCid',     cn:'_ScCid'     },
+          { name:'Cookie - _gclid',     cn:'_gclid'     },
+          { name:'Cookie - _wbraid',    cn:'_wbraid'    },
+          { name:'Cookie - _gbraid',    cn:'_gbraid'    },
+          { name:'Cookie - external_id',cn:'external_id'},
+          { name:'Cookie - et_em',      cn:'et_em'      },
+          { name:'Cookie - et_ph',      cn:'et_ph'      }
+        ];
+        ssCookieVars.forEach(function(cv) {
+          variables.push({
+            accountId:'000000000', containerId:'00000000', variableId: varId,
+            name: cv.name, type:'k',
+            parameter:[{ type:'TEMPLATE', key:'name', value: cv.cn }],
+            fingerprint: fp(varId)
+          });
+          varId++;
+        });
+
+        // ── URL Query-Param Variables (Click IDs) ──
+        var ssUrlVars = [
+          { name:'URL - fbclid',  param:'fbclid'  },
+          { name:'URL - gclid',   param:'gclid'   },
+          { name:'URL - wbraid',  param:'wbraid'  },
+          { name:'URL - gbraid',  param:'gbraid'  },
+          { name:'URL - ttclid',  param:'ttclid'  },
+          { name:'URL - ScCid',   param:'ScCid'   }
+        ];
+        ssUrlVars.forEach(function(uv) {
+          variables.push({
+            accountId:'000000000', containerId:'00000000', variableId: varId,
+            name: uv.name, type:'u',
+            parameter:[
+              { type:'TEMPLATE', key:'queryKey', value: uv.param },
+              { type:'TEMPLATE', key:'defaultPages', value:'specific' },
+              { type:'TEMPLATE', key:'customUrlSource', value:'URL' }
+            ],
+            fingerprint: fp(varId)
+          });
+          varId++;
+        });
+
+        // ── Customer DL Variables (Salla: hashed from customer.*, Zid: from customer.*) ──
+        if (S.cms === 'salla') {
+          // Salla passes customer data on purchase event via customer.email_hashed etc.
+          var ssExtraSalla = [
+            { name:'DL - ss.email_hashed', path:'customer.email_hashed' },
+            { name:'DL - ss.phone_hashed', path:'customer.phone_hashed' },
+            { name:'DL - ss.first_name',   path:'customer.first_name'   },
+            { name:'DL - ss.last_name',    path:'customer.last_name'    }
+          ];
+          ssExtraSalla.forEach(function(v) {
+            variables.push({
+              accountId:'000000000', containerId:'00000000', variableId: varId,
+              name: v.name, type:'v',
+              parameter:[
+                { type:'INTEGER', key:'dataLayerVersion', value:'2' },
+                { type:'BOOLEAN', key:'setDefaultValue', value:'false' },
+                { type:'TEMPLATE', key:'name', value: v.path }
+              ],
+              fingerprint: fp(varId)
+            });
+            varId++;
+          });
+        } else if (S.cms === 'zid') {
+          // Zid passes customer on all events via customer.*
+          var ssExtraZid = [
+            { name:'DL - ss.email_hashed',  path:'customer.email_hashed'  },
+            { name:'DL - ss.phone_hashed',  path:'customer.mobile_hashed' },
+            { name:'DL - ss.external_id',   path:'customer.external_id'   }
+          ];
+          ssExtraZid.forEach(function(v) {
+            variables.push({
+              accountId:'000000000', containerId:'00000000', variableId: varId,
+              name: v.name, type:'v',
+              parameter:[
+                { type:'INTEGER', key:'dataLayerVersion', value:'2' },
+                { type:'BOOLEAN', key:'setDefaultValue', value:'false' },
+                { type:'TEMPLATE', key:'name', value: v.path }
+              ],
+              fingerprint: fp(varId)
+            });
+            varId++;
+          });
+        }
+
+        // ── JS Variable: event_id generator ──
+        variables.push({
+          accountId:'000000000', containerId:'00000000', variableId: varId,
+          name:'JS - event_id_generator', type:'jsm',
+          parameter:[{ type:'TEMPLATE', key:'javascript', value:
+            'function() {\n' +
+            '  try {\n' +
+            '    var d = window.dataLayer || [];\n' +
+            '    for (var i = d.length-1; i >= 0; i--) {\n' +
+            '      if (d[i] && (d[i].event_id || (d[i].ecommerce && d[i].ecommerce.event_id))) {\n' +
+            '        return String(d[i].event_id || d[i].ecommerce.event_id);\n' +
+            '      }\n' +
+            '    }\n' +
+            '  } catch(e) {}\n' +
+            '  return window._et_eid || (window._et_eid = "ET-" + Date.now().toString(36).toUpperCase());\n' +
+            '}'
+          }],
+          fingerprint: fp(varId)
+        });
+        varId++;
+
+        // ── JS Variable: items as JSON (for CAPI content_ids) ──
+        var ssItemsPath = S.cms === 'salla' ? 'ecommerce.items' : 'ecommerce.items';
+        variables.push({
+          accountId:'000000000', containerId:'00000000', variableId: varId,
+          name:'JS - content_ids', type:'jsm',
+          parameter:[{ type:'TEMPLATE', key:'javascript', value:
+            'function() {\n' +
+            '  try {\n' +
+            '    var d = window.dataLayer || [];\n' +
+            '    for (var i = d.length-1; i >= 0; i--) {\n' +
+            '      var ec = d[i] && d[i].ecommerce;\n' +
+            '      if (!ec) continue;\n' +
+            '      var items = ec.items || (ec.add && ec.add.products) || (ec.purchase && ec.purchase.products) || [];\n' +
+            '      if (items.length) return items.map(function(it){ return String(it.item_id || it.id || ""); }).join(",");\n' +
+            '    }\n' +
+            '  } catch(e) {}\n' +
+            '  return "";\n' +
+            '}'
+          }],
+          fingerprint: fp(varId)
+        });
+        varId++;
+
+      } // end SS variables block
 
       // ── 2. BASE CODE TAGS (All Pages) ────────────────────────
       var META_BASE = function (id) {
@@ -7308,6 +7750,105 @@
         });
         tagId++;
       }
+
+      // ── SS: Click ID Capture Tag + Per-Platform Relay Tags ─────────────────
+      if (window.ET && window.ET.ssEnabled) {
+
+        // ① Click ID Capture — All Pages, captures fbclid/gclid/ttclid/ScCid into cookies
+        var clickIdHtml = '<script>\n'
+          + '(function(){\n'
+          + '  try {\n'
+          + '    var p = new URLSearchParams(location.search);\n'
+          + '    var maxAge = ";max-age=7776000;path=/;SameSite=Lax";\n'
+          + '    var ids = { fbclid:"_fbp_clid", gclid:"_gclid", ttclid:"_ttclid", ScCid:"_ScCid", wbraid:"_wbraid", gbraid:"_gbraid" };\n'
+          + '    Object.keys(ids).forEach(function(k){\n'
+          + '      var v = p.get(k); if(v) document.cookie = ids[k]+"="+v+maxAge;\n'
+          + '    });\n'
+          + '    // Build _fbc from fbclid (Meta standard format)\n'
+          + '    var fbclid = p.get("fbclid");\n'
+          + '    if (fbclid) document.cookie = "_fbc=fb.1."+Date.now()+"."+fbclid+maxAge;\n'
+          + '    // Capture user_data from dataLayer for SS forwarding\n'
+          + '    var d = window.dataLayer || [];\n'
+          + '    for (var i = d.length-1; i >= 0; i--) {\n'
+          + '      var c = d[i] && d[i].customer;\n'
+          + '      if (!c) continue;\n'
+          + '      var em = c.email_hashed || c.emailHashed || "";\n'
+          + '      var ph = c.phone_hashed || c.mobile_hashed || c.phoneHashed || "";\n'
+          + '      var extId = c.external_id || c.externalId || "";\n'
+          + '      if (em) document.cookie = "et_em="+em+maxAge;\n'
+          + '      if (ph) document.cookie = "et_ph="+ph+maxAge;\n'
+          + '      if (extId) document.cookie = "external_id="+extId+maxAge;\n'
+          + '      break;\n'
+          + '    }\n'
+          + '  } catch(e){}\n'
+          + '})();\n'
+          + '<\/script>';
+
+        tags.push({
+          accountId:'000000000', containerId:'00000000', tagId: tagId,
+          name: 'SS | Click ID Capture + Cookie Builder',
+          type: 'html',
+          parameter:[
+            { type:'TEMPLATE', key:'html', value: clickIdHtml },
+            { type:'BOOLEAN',  key:'supportDocumentWrite', value:'false' }
+          ],
+          firingTriggerId: [allPagesTrigId],
+          notes: 'SS — captures fbclid→_fbc, gclid, ttclid, ScCid, wbraid, gbraid into cookies. Also captures customer hashed data from dataLayer. | Generated by Easy Track',
+          fingerprint: fp(tagId)
+        });
+        tagId++;
+
+        // ② GA4 user_properties forwarding — enriches GA4 hits with SS data before they reach sGTM
+        // Injects user_properties on every event so sGTM can read em/ph/fbp/fbc/ttp/scid/click-ids
+        var ga4UserPropsHtml = '<script>\n'
+          + '(function(){\n'
+          + '  try {\n'
+          + '    function getCookie(n){var m=("; "+document.cookie).split("; "+n+"=");return m.length===2?m.pop().split(";")[0]:""}\n'
+          + '    function getLastDLCustomer(){\n'
+          + '      var d=window.dataLayer||[]; var c={};\n'
+          + '      for(var i=d.length-1;i>=0;i--){if(d[i]&&d[i].customer){c=d[i].customer;break;}} return c;\n'
+          + '    }\n'
+          + '    var c = getLastDLCustomer();\n'
+          + '    var props = {\n'
+          + '      em:        c.email_hashed||c.emailHashed||getCookie("et_em")||"",\n'
+          + '      ph:        c.phone_hashed||c.mobile_hashed||c.phoneHashed||getCookie("et_ph")||"",\n'
+          + '      fn:        c.first_name||c.firstName||"",\n'
+          + '      ln:        c.last_name||c.lastName||"",\n'
+          + '      external_id: c.external_id||c.externalId||getCookie("external_id")||"",\n'
+          + '      fbp:       getCookie("_fbp")||"",\n'
+          + '      fbc:       getCookie("_fbc")||"",\n'
+          + '      ttp:       getCookie("_ttp")||"",\n'
+          + '      scid:      getCookie("_scid")||"",\n'
+          + '      gclid:     getCookie("_gclid")||"",\n'
+          + '      wbraid:    getCookie("_wbraid")||"",\n'
+          + '      gbraid:    getCookie("_gbraid")||"",\n'
+          + '      ttclid:    getCookie("_ttclid")||"",\n'
+          + '      sccid:     getCookie("_ScCid")||""\n'
+          + '    };\n'
+          + '    // Only non-empty props\n'
+          + '    var up = {}; Object.keys(props).forEach(function(k){if(props[k])up[k]=props[k];});\n'
+          + '    if (Object.keys(up).length && window.gtag) {\n'
+          + '      window.gtag("set","user_properties", up);\n'
+          + '    }\n'
+          + '  } catch(e){}\n'
+          + '})();\n'
+          + '<\/script>';
+
+        tags.push({
+          accountId:'000000000', containerId:'00000000', tagId: tagId,
+          name: 'SS | User Properties Enrichment (GA4 → sGTM)',
+          type: 'html',
+          parameter:[
+            { type:'TEMPLATE', key:'html', value: ga4UserPropsHtml },
+            { type:'BOOLEAN',  key:'supportDocumentWrite', value:'false' }
+          ],
+          firingTriggerId: [allPagesTrigId],
+          notes: 'SS — enriches GA4 hits with user_properties (em, ph, fn, ln, external_id, fbp, fbc, ttp, scid, click IDs) so sGTM can read them. Reads from dataLayer.customer (Salla/Zid) + cookies. | Generated by Easy Track',
+          fingerprint: fp(tagId)
+        });
+        tagId++;
+
+      } // end SS base tags block
 
       // ── 3. EVENT TRIGGERS ────────────────────────────────────
       var cmsEvMap = CMS_DL_MAP[S.cms] && CMS_DL_MAP[S.cms].eventNames;
@@ -7749,6 +8290,163 @@
 
       // Assign variables to vars folder
       variables.forEach(function (v) { v.parentFolderId = folderMap['vars']; });
+
+      // ── SS: Per-Platform × Per-Event Relay Tags ──────────────────────────────
+      if (window.ET && window.ET.ssEnabled) {
+        var ssUrl = window.ET.ssUrl.replace(/\/$/, '');
+
+        // Helper: build relay payload script for a specific platform+event
+        // Reads full user_data from cookies + dataLayer.customer (Salla/Zid aware)
+        function buildRelayPayload(plat, ga4EvName, platEvName) {
+          // CMS-specific value/currency/transId paths
+          var valExpr, curExpr, txExpr, itemsExpr;
+          if (S.cms === 'salla') {
+            var sallaValMap = {
+              purchase:'(ec.purchase&&ec.purchase.actionField&&ec.purchase.actionField.total)||0',
+              add_to_cart:'(ec.add&&ec.add.products&&ec.add.products[0]&&ec.add.products[0].price)||0',
+              view_item:'(obj&&obj.price)||0',
+              initiate_checkout:'0',view_content:'(obj&&obj.price)||0',
+              page_view:'0',lead:'0',sign_up:'0',search:'0'
+            };
+            var sallaCurMap = {
+              purchase:'(ec.currencyCode)||"SAR"',
+              add_to_cart:'(ec.currencyCode)||"SAR"',
+              default:'"SAR"'
+            };
+            var sallaTxMap = {
+              purchase:'(ec.purchase&&ec.purchase.actionField&&ec.purchase.actionField.id)||""'
+            };
+            var sallaItemsMap = {
+              purchase:'JSON.stringify((ec.purchase&&ec.purchase.products)||[])',
+              add_to_cart:'JSON.stringify((ec.add&&ec.add.products)||[])',
+              default:'JSON.stringify([])'
+            };
+            valExpr   = sallaValMap[ga4EvName]   || sallaValMap[plat]   || '0';
+            curExpr   = sallaCurMap[ga4EvName]   || sallaCurMap['default'];
+            txExpr    = sallaTxMap[ga4EvName]    || '""';
+            itemsExpr = sallaItemsMap[ga4EvName] || sallaItemsMap['default'];
+          } else {
+            // Zid / generic GA4 schema
+            valExpr   = '(ec.value)||0';
+            curExpr   = '(ec.currency)||"SAR"';
+            txExpr    = '(ec.transaction_id)||""';
+            itemsExpr = 'JSON.stringify((ec.items)||[])';
+          }
+
+          return '<script>\n'
+            + '(function(){\n'
+            + '  try {\n'
+            + '    function getCk(n){var m=("; "+document.cookie).split("; "+n+"=");return m.length===2?m.pop().split(";")[0]:""}\n'
+            + '    var d=window.dataLayer||[]; var ec={}; var cust={}; var obj={};\n'
+            + '    for(var i=d.length-1;i>=0;i--){\n'
+            + '      if(d[i]&&d[i].ecommerce&&!ec.currency&&!ec.value){ec=d[i].ecommerce;}\n'
+            + '      if(d[i]&&d[i].customer&&!cust.email_hashed){cust=d[i].customer;}\n'
+            + '      if(d[i]&&d[i][0]&&!obj.price){obj=d[i][0];}\n'
+            + '    }\n'
+            + '    var em  = cust.email_hashed||cust.emailHashed||getCk("et_em")||"";\n'
+            + '    var ph  = cust.phone_hashed||cust.mobile_hashed||cust.phoneHashed||getCk("et_ph")||"";\n'
+            + '    var fn  = cust.first_name||cust.firstName||"";\n'
+            + '    var ln  = cust.last_name||cust.lastName||"";\n'
+            + '    var xid = cust.external_id||cust.externalId||getCk("external_id")||"";\n'
+            + '    var eid = (function(){\n'
+            + '      for(var i=d.length-1;i>=0;i--){\n'
+            + '        if(d[i]&&(d[i].event_id||(d[i].ecommerce&&d[i].ecommerce.event_id)))\n'
+            + '          return String(d[i].event_id||d[i].ecommerce.event_id);\n'
+            + '      } return "ET-"+Date.now().toString(36).toUpperCase();\n'
+            + '    })();\n'
+            + '    var items = (function(){try{return ' + itemsExpr + ';}catch(e){return "[]";}}());\n'
+            + '    var contentIds = (function(){\n'
+            + '      try{var arr=JSON.parse(items);return arr.map(function(x){return x.item_id||x.id||"";}).join(",");}\n'
+            + '      catch(e){return "";}\n'
+            + '    })();\n'
+            + '    var payload = {\n'
+            + '      "v":"2","en":"' + ga4EvName + '","ep_platform":"' + plat + '","ep_platform_event":"' + platEvName + '",\n'
+            + '      "ep_event_id":eid,\n'
+            + '      "epn_value":String(' + valExpr + '),\n'
+            + '      "ep_currency":' + curExpr + ',\n'
+            + '      "ep_transaction_id":' + txExpr + ',\n'
+            + '      "ep_content_ids":contentIds,\n'
+            + '      "ep_fbclid":getCk("_fbp_clid")||"","ep_gclid":getCk("_gclid")||"",\n'
+            + '      "ep_ttclid":getCk("_ttclid")||"","ep_sccid":getCk("_ScCid")||"",\n'
+            + '      "ep_wbraid":getCk("_wbraid")||"","ep_gbraid":getCk("_gbraid")||"",\n'
+            + '      "up_em":em,"up_ph":ph,"up_fn":fn,"up_ln":ln,"up_external_id":xid,\n'
+            + '      "up_fbp":getCk("_fbp")||"","up_fbc":getCk("_fbc")||"",\n'
+            + '      "up_ttp":getCk("_ttp")||"","up_scid":getCk("_scid")||""\n'
+            + '    };\n'
+            + '    var qs = Object.keys(payload).filter(function(k){return payload[k]!=="";}).map(function(k){\n'
+            + '      return encodeURIComponent(k)+"="+encodeURIComponent(payload[k]);\n'
+            + '    }).join("&");\n'
+            + '    var endpoint = "' + ssUrl + '/g/collect";\n'
+            + '    if(navigator.sendBeacon){navigator.sendBeacon(endpoint+"?"+qs);}\n'
+            + '    else{fetch(endpoint+"?"+qs,{method:"POST",keepalive:true}).catch(function(){});}\n'
+            + '  }catch(e){}\n'
+            + '})();\n'
+            + '<\/script>';
+        }
+
+        // SS relay event name map (GA4 event → CMS data layer event name)
+        var ssRelayEvMap = {
+          salla: {
+            purchase: 'purchase', add_to_cart: 'addToCart',
+            initiate_checkout: 'cart::submitted', view_content: 'Product Viewed',
+            page_view: 'page_view', lead: 'generate_lead',
+            sign_up: 'sign_up', search: 'search'
+          },
+          zid: {
+            purchase: 'purchase', add_to_cart: 'add_to_cart',
+            initiate_checkout: 'begin_checkout', view_content: 'view_item',
+            page_view: 'page_view', lead: 'generate_lead',
+            sign_up: 'sign_up', search: 'search'
+          }
+        };
+        var ssEvNameForCms = ssRelayEvMap[S.cms] || ssRelayEvMap['zid'];
+
+        // Platform event name map (SS event key → platform-specific name)
+        var ssPlEv = {
+          meta:   { purchase:'Purchase', add_to_cart:'AddToCart', initiate_checkout:'InitiateCheckout', view_content:'ViewContent', page_view:'PageView', lead:'Lead', sign_up:'CompleteRegistration', search:'Search' },
+          gads:   { purchase:'conversion', add_to_cart:'conversion', initiate_checkout:'conversion', view_content:'conversion', lead:'conversion', sign_up:'conversion' },
+          snap:   { purchase:'PURCHASE', add_to_cart:'ADD_CART', initiate_checkout:'START_CHECKOUT', view_content:'VIEW_CONTENT', page_view:'PAGE_VIEW', lead:'SIGN_UP', sign_up:'SIGN_UP', search:'SEARCH' },
+          tiktok: { purchase:'CompletePayment', add_to_cart:'AddToCart', initiate_checkout:'InitiateCheckout', view_content:'ViewContent', page_view:'Pageview', lead:'SubmitForm', sign_up:'CompleteRegistration', search:'Search' }
+        };
+
+        // Build relay tag for each SS platform × event
+        _pcSS.platforms.forEach(function(plat) {
+          var platEvs = _pcSS.events[plat] || [];
+          platEvs.forEach(function(evKey) {
+            var ga4Name  = ssEvNameForCms[evKey] || evKey;
+            var platName = (ssPlEv[plat] && ssPlEv[plat][evKey]) || evKey;
+
+            // Find matching trigger in trigMap (web container event triggers)
+            // trigMap keys are GA4 event keys — match by evKey
+            var relayTrigId = trigMap[evKey];
+            // If no matching trigger (e.g. view_content / initiate_checkout mapped differently), fall back to all pages
+            if (!relayTrigId) {
+              // Try view_item for view_content, begin_checkout for initiate_checkout
+              var fallback = { view_content:'view_item', initiate_checkout:'begin_checkout', sign_up:'sign_up', lead:'lead', page_view:'page_view' };
+              relayTrigId = trigMap[fallback[evKey]] || allPagesTrigId;
+            }
+
+            var relayHtml = buildRelayPayload(plat, ga4Name, platName);
+            tags.push({
+              accountId:'000000000', containerId:'00000000', tagId: tagId,
+              name: safeName(
+                (plat === 'meta' ? 'Meta' : plat === 'gads' ? 'Google Ads' : plat === 'snap' ? 'Snapchat' : 'TikTok')
+                + ' | SS Relay | ' + evKey
+              ),
+              type: 'html',
+              parameter:[
+                { type:'TEMPLATE', key:'html', value: relayHtml },
+                { type:'BOOLEAN',  key:'supportDocumentWrite', value:'false' }
+              ],
+              firingTriggerId: [ relayTrigId ],
+              notes: plat.toUpperCase() + ' SS Relay — fires on "' + ga4Name + '" → sends to sGTM (' + ssUrl + '). Platform event: ' + platName + ' | CMS: ' + (S.cms||'') + ' | Generated by Easy Track',
+              fingerprint: fp(tagId)
+            });
+            tagId++;
+          });
+        });
+
+      } // end SS relay tags block
 
       // ═══════════════════════════════════════════════════════════════
       // POST-PROCESS: normalize everything for GTM UI Import compatibility
@@ -9669,6 +10367,31 @@
         }
         box.appendChild(serverBlock);
       }
+    }
+
+    // ── Authenticated helper for /api/ss/* endpoints ──────────────────────────
+    // _ssApi(method, path, body, callback)
+    // Gets a fresh Firebase ID token, calls the server endpoint, and invokes
+    // callback(err, { ok, status, data }) — mirrors the old SS wizard helper.
+    function _ssApi(method, path, body, cb) {
+      try {
+        var user = firebase.auth().currentUser;
+        if (!user) { cb(new Error('يجب تسجيل الدخول أولاً')); return; }
+        user.getIdToken(false).then(function (token) {
+          var opts = {
+            method:  method,
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+          };
+          if (body && method !== 'GET') opts.body = JSON.stringify(body);
+          return fetch(path, opts);
+        }).then(function (r) {
+          return r.text().then(function (txt) {
+            var data = null;
+            try { data = JSON.parse(txt); } catch (_) {}
+            cb(null, { ok: r.ok, status: r.status, data: data });
+          });
+        }).catch(function (err) { cb(err); });
+      } catch (e) { cb(e); }
     }
 
     // ── Wire the web container's GA4 transport_url to the deployed sGTM URL ──
@@ -13784,1097 +14507,4 @@
         var items = [];
         if (ec.items && Array.isArray(ec.items)) {
           items = normalizeZidItems(ec.items);
-        } else if (ec.products && Array.isArray(ec.products)) {
-          items = normalizeZidItems(ec.products);
-        } else if (raw.items && Array.isArray(raw.items)) {
-          items = normalizeZidItems(raw.items);
-        }
-
-        var currency = ec.currency || ec.currencyCode || raw.currency || 'SAR';
-
-        // Per-event monetary field: purchase → value; all other ecommerce events → price.
-        var ecBlock = { currency: currency, items: items };
-        var sumQtyZ = items.reduce(function (s, it) { return s + (parseInt(it.quantity, 10) || 0); }, 0);
-        if (ga4Ev === 'purchase') {
-          ecBlock.value     = extractValue('purchase', items, ec, raw);
-          ecBlock.num_items = sumQtyZ;
-        } else if (ga4Ev === 'view_item' || ga4Ev === 'add_to_wishlist') {
-          ecBlock.price     = extractValue(ga4Ev, items, ec, raw);
-          ecBlock.num_items = items.length ? (parseInt(items[0].quantity, 10) || 1) : 0;
-        } else if (ga4Ev === 'add_to_cart' || ga4Ev === 'remove_from_cart' ||
-                   ga4Ev === 'view_cart'   || ga4Ev === 'begin_checkout') {
-          ecBlock.price     = extractValue(ga4Ev, items, ec, raw);
-          ecBlock.num_items = sumQtyZ;
-        }
-
-        var payload = {
-          event: ga4Ev,
-          event_id: generateEventId(raw, ga4Ev),
-          ecommerce: ecBlock
-        };
-
-        if (ga4Ev === 'purchase') {
-          payload.ecommerce.transaction_id = String(ec.transaction_id || ec.order_id || raw.order_id || payload.event_id);
-          // Remove duplicate purchase block if present
-          delete payload.ecommerce.purchase;
-        }
-        if (ga4Ev === 'search') { payload.search_term = raw.search_term || ec.search_term || ''; delete payload.ecommerce; }
-        if (ga4Ev === 'login') { delete payload.ecommerce; payload.method = 'zid'; }
-        if (ga4Ev === 'sign_up') { delete payload.ecommerce; payload.method = 'zid'; }
-
-        return payload;
-      }
-
-      // ══════════════════════════════════════════════════════
-      // 3. UNIQUE EVENT ID (Deduplication) — Meta / TikTok / CAPI
-      // ══════════════════════════════════════════════════════
-      // Priority: reuse existing id  →  order_id + ts  →  random ts.
-      // This id is sent on BOTH browser pixel & server CAPI so duplicates merge.
-      function generateEventId(raw, mapped) {
-        if (raw && typeof raw === 'object') {
-          var ec = raw.ecommerce || {};
-          if (ec.event_id)  return String(ec.event_id);
-          if (raw.event_id) return String(raw.event_id);
-          var af = (ec.purchase && ec.purchase.actionField) || {};
-          if (af.id)        return String(af.id) + '_' + Date.now();
-          if (raw.order_id) return String(raw.order_id) + '_' + Date.now();
-        }
-        var ts = Date.now().toString(36).toUpperCase();
-        var rand = Math.random().toString(36).slice(2, 8).toUpperCase();
-        return 'ET-' + (mapped ? String(mapped).toUpperCase() + '-' : '') + ts + '-' + rand;
-      }
-
-      // ══════════════════════════════════════════════════════
-      // 4. CLICK ID ATTRIBUTION
-      // ══════════════════════════════════════════════════════
-      var CLICK_ID_KEYS = ['gclid', 'fbclid', 'ttclid', 'scclid'];
-      var _clickIds = {};
-
-      function getCookie(name) {
-        var m = document.cookie.match('(^|;)\\s*et_' + name + '\\s*=\\s*([^;]+)');
-        return m ? decodeURIComponent(m[2]) : '';
-      }
-      function setCookie(name, val, days) {
-        var exp = new Date(Date.now() + days * 864e5).toUTCString();
-        document.cookie = 'et_' + name + '=' + encodeURIComponent(val) + ';expires=' + exp + ';path=/;SameSite=Lax';
-      }
-
-      function captureClickIds() {
-        var params = new URLSearchParams(window.location.search);
-        CLICK_ID_KEYS.forEach(function (k) {
-          var v = params.get(k);
-          if (v) {
-            _clickIds[k] = v;
-            setCookie(k, v, 90);
-          } else {
-            var cv = getCookie(k);
-            if (cv) _clickIds[k] = cv;
-          }
-        });
-      }
-
-      function getClickIds() {
-        var ids = {};
-        CLICK_ID_KEYS.forEach(function (k) {
-          var v = _clickIds[k] || getCookie(k);
-          if (v) ids[k] = v;
-        });
-        return ids;
-      }
-
-      // ══════════════════════════════════════════════════════
-      // 5. USER IDENTITY + SHA-256 HASHING
-      // ──────────────────────────────────────────────────────
-      // ⚠️ external_id : معرف خارجي ثابت من المنصة (سلة/زد)
-      //                  يُستخدم للـ identify على كل المنصات الـ ad/analytics
-      //                  ويُحفظ في cookie `external_id` للـ Server-Side
-      // ⚠️ user_id     : معرف داخلي للتطبيق (لو موجود) — منفصل تماماً
-      // ⚠️ كل PII (email, phone, first_name, last_name) بيتم هاش بـ SHA-256
-      //    قبل أي إرسال — لا يخرج plain text لأي منصة
-      // ══════════════════════════════════════════════════════
-      var _userIdentity = {
-        user_id: '',          // internal app user ID (separate from external_id)
-        external_id: '',      // external persistent ID from CMS (Salla / Zid)
-        email: '',            // raw — kept locally only, never sent
-        phone: '',            // raw — kept locally only, never sent
-        first_name: '',       // raw — kept locally only, never sent
-        last_name: '',        // raw — kept locally only, never sent
-        email_hashed: '',
-        phone_hashed: '',
-        first_name_hashed: '',
-        last_name_hashed: ''
-      };
-
-      async function sha256(str) {
-        if (!str) return '';
-        if (typeof crypto === 'undefined' || !crypto.subtle) return '';
-        var normalized = String(str).trim().toLowerCase();
-        if (!normalized) return '';
-        try {
-          var buf = new TextEncoder().encode(normalized);
-          var hash = await crypto.subtle.digest('SHA-256', buf);
-          return Array.from(new Uint8Array(hash)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
-        } catch (e) {
-          // Graceful fallback when SubtleCrypto isn't available (HTTP, old browsers)
-          if (typeof console !== 'undefined') console.warn('[ET] sha256 failed:', e && e.message);
-          return '';
-        }
-      }
-
-      // Normalize phone numbers: strip non-digits + leading zeros, prepend `+` if E.164 already
-      function normalizePhone(p) {
-        if (!p) return '';
-        var s = String(p).replace(/[^0-9+]/g, '');
-        if (s.charAt(0) === '+') return s;
-        return s.replace(/^0+/, '');
-      }
-
-      // Accepts an object so additional PII fields don't break older callers.
-      // Backward-compatible: still accepts (userId, externalId, email, phone) positional args.
-      async function updateUserIdentity(arg1, externalId, email, phone) {
-        var p = (arg1 && typeof arg1 === 'object') ? arg1 : {
-          user_id: arg1, external_id: externalId, email: email, phone: phone
-        };
-        _userIdentity.user_id = p.user_id || '';
-        _userIdentity.external_id = p.external_id || '';
-        _userIdentity.email = p.email || '';
-        _userIdentity.phone = p.phone || '';
-        _userIdentity.first_name = p.first_name || '';
-        _userIdentity.last_name = p.last_name || '';
-
-        var phNorm = normalizePhone(_userIdentity.phone);
-        _userIdentity.email_hashed      = _userIdentity.email      ? await sha256(_userIdentity.email)      : '';
-        _userIdentity.phone_hashed      = phNorm                   ? await sha256(phNorm)                   : '';
-        _userIdentity.first_name_hashed = _userIdentity.first_name ? await sha256(_userIdentity.first_name) : '';
-        _userIdentity.last_name_hashed  = _userIdentity.last_name  ? await sha256(_userIdentity.last_name)  : '';
-
-        try { localStorage.setItem('et_identity', JSON.stringify(_userIdentity)); } catch (e) { }
-      }
-
-      // Returns ONLY hashed PII + IDs, never raw values.
-      // external_id is always the primary external user identifier.
-      function getUserData() {
-        var d = {};
-        if (_userIdentity.external_id)      d.external_id = _userIdentity.external_id;
-        if (_userIdentity.user_id)          d.user_id     = _userIdentity.user_id;
-        if (_userIdentity.email_hashed)     d.email       = _userIdentity.email_hashed;
-        if (_userIdentity.phone_hashed)     d.phone       = _userIdentity.phone_hashed;
-        if (_userIdentity.first_name_hashed) d.first_name = _userIdentity.first_name_hashed;
-        if (_userIdentity.last_name_hashed)  d.last_name  = _userIdentity.last_name_hashed;
-        return Object.keys(d).length ? d : null;
-      }
-
-      // ══════════════════════════════════════════════════════
-      // 6. PLATFORM PARAMETER MAPPING
-      // ══════════════════════════════════════════════════════
-      function buildPlatformPayload(platform, ga4Payload) {
-        var ev = ga4Payload.event;
-        var ec = ga4Payload.ecommerce || {};
-        var items = ec.items || [];
-        var clickIds = getClickIds();
-        var ud = getUserData();
-
-        var base = {
-          event_id: ga4Payload.event_id,
-          event_time: Math.floor(Date.now() / 1000)
-        };
-        if (clickIds[platform === 'google' ? 'gclid' : platform === 'meta' ? 'fbclid' :
-          platform === 'tiktok' ? 'ttclid' : platform === 'snapchat' ? 'scclid' : '']) {
-          base.click_id = clickIds[platform === 'google' ? 'gclid' :
-            platform === 'meta' ? 'fbclid' : platform === 'tiktok' ? 'ttclid' : 'scclid'];
-        }
-
-        switch (platform) {
-          case 'ga4':
-            return Object.assign({}, ga4Payload);
-
-          case 'meta':
-            var metaPayload = Object.assign({}, base, {
-              event_name: ET_EVENT_MAP.meta[ev] || ev,
-              custom_data: {
-                currency: ec.currency || 'SAR',
-                value: ec.value || 0,
-                content_ids: items.map(function (i) { return i.item_id; }),
-                content_type: 'product',
-                num_items: items.length
-              }
-            });
-            if (ud) { metaPayload.user_data = { external_id: ud.external_id, em: ud.email, ph: ud.phone }; }
-            if (clickIds.fbclid) metaPayload.user_data = Object.assign(metaPayload.user_data || {}, { fbc: 'fb.1.' + Date.now() + '.' + clickIds.fbclid });
-            return metaPayload;
-
-          case 'tiktok':
-            return Object.assign({}, base, {
-              event: ET_EVENT_MAP.tiktok[ev] || ev,
-              properties: {
-                currency: ec.currency || 'SAR',
-                value: ec.value || 0,
-                contents: items.map(function (i) { return { content_id: i.item_id, content_name: i.item_name, quantity: i.quantity, price: i.price }; }),
-                content_type: 'product'
-              },
-              user: ud ? { external_id: ud.external_id, email: ud.email, phone_number: ud.phone } : {}
-            });
-
-          case 'snapchat':
-            return Object.assign({}, base, {
-              event_type: ET_EVENT_MAP.snapchat[ev] || ev,
-              event_conversion_type: 'WEB',
-              price: ec.value || 0,
-              currency: ec.currency || 'SAR',
-              item_ids: items.map(function (i) { return i.item_id; }),
-              user_data: ud ? { external_id: ud.external_id } : {}
-            });
-
-          case 'google':
-            return Object.assign({}, base, {
-              event_type: ET_EVENT_MAP.google[ev] || ev,
-              value: ec.value || 0,
-              currency: ec.currency || 'SAR',
-              transaction_id: ec.transaction_id || '',
-              gclid: clickIds.gclid || ''
-            });
-
-          case 'mixpanel':
-            // ── Mixpanel: external_id is the canonical distinct_id ──
-            // user_id (internal app id) is sent as a SEPARATE custom prop
-            // PII is sent ONLY as hashed values via people.set
-            var mxDistinct = _userIdentity.external_id || _userIdentity.user_id || '';
-            var mxProps = {
-              currency: ec.currency || 'SAR',
-              revenue: ec.value || 0,
-              value: ec.value || 0,
-              transaction_id: ec.transaction_id || '',
-              num_items: items.length,
-              products: items,
-              distinct_id: mxDistinct,
-              $insert_id: ga4Payload.event_id  // dedup across client/server hybrid
-            };
-            if (_userIdentity.user_id) mxProps.user_id = _userIdentity.user_id;
-
-            var mxPeople = null;
-            if (ud) {
-              mxPeople = {};
-              if (ud.email)      mxPeople.$email             = ud.email;       // hashed
-              if (ud.phone)      mxPeople.$phone             = ud.phone;       // hashed
-              if (ud.first_name) mxPeople.$first_name_hashed = ud.first_name;  // hashed
-              if (ud.last_name)  mxPeople.$last_name_hashed  = ud.last_name;   // hashed
-              if (_userIdentity.user_id) mxPeople.user_id = _userIdentity.user_id;
-              mxPeople.external_id = mxDistinct;
-            }
-
-            return Object.assign({}, base, {
-              event: ET_EVENT_MAP.mixpanel[ev] || ev,
-              external_id: mxDistinct,
-              identify: { distinct_id: mxDistinct },
-              people_set: mxPeople,
-              properties: mxProps
-            });
-
-          default:
-            return Object.assign({}, base, ga4Payload);
-        }
-      }
-
-      // ── A3: Augment payload with SS routing fields when ssEnabled ─────────
-      // Wraps buildPlatformPayload to append transport_url + ss_user_data.
-      var _origBuildPlatformPayload = buildPlatformPayload;
-      buildPlatformPayload = function (platform, ga4Payload) {
-        var payload = _origBuildPlatformPayload(platform, ga4Payload);
-        if (window.ET && window.ET.ssEnabled && window.ET.ssUrl) {
-          payload.transport_url = window.ET.ssUrl + '/g/collect';
-          var ud = getUserData();
-          if (ud) payload.ss_user_data = ud;
-        }
-        return payload;
-      };
-
-      // ══════════════════════════════════════════════════════
-      // 7. PLATFORM ISOLATION DISPATCHER
-      // ══════════════════════════════════════════════════════
-      var _activePlatforms = ['ga4']; // defaults; updated from S.platforms when available
-
-      function dispatch(ga4Payload, activePlatforms) {
-        var plats = activePlatforms || _activePlatforms;
-        var results = {};
-        plats.forEach(function (p) {
-          try {
-            var mapped = buildPlatformPayload(p, ga4Payload);
-            results[p] = { status: 'ok', payload: mapped };
-          } catch (e) {
-            results[p] = { status: 'error', error: e.message };
-          }
-        });
-        return results;
-      }
-
-      // ══════════════════════════════════════════════════════
-      // 8. GLOBAL ENGINE STATE
-      // ══════════════════════════════════════════════════════
-      var ET = window.ET = {
-        cms: 'salla',
-        platforms: ['ga4'],
-        events: [],
-        clickIds: _clickIds,
-        identity: _userIdentity,
-        normalize: function (raw, cms) { return (cms || ET.cms) === 'salla' ? normalizeSalla(raw) : normalizeZid(raw); },
-        dispatch: dispatch,
-        generateId: generateEventId,
-        captureClickIds: captureClickIds,
-        sha256: sha256,
-        getUserData: getUserData,
-        // H4: Server-Side Tracking state — populated by the SS wizard on save
-        ssEnabled:   false,
-        ssUrl:       '',
-        ssPlatforms: {}   // { meta: true, tiktok: true, ... } — only enabled platforms
-      };
-
-      // Boot: capture click IDs immediately
-      captureClickIds();
-
-      // Load saved identity
-      try {
-        var saved = JSON.parse(localStorage.getItem('et_identity') || '{}');
-        if (saved.user_id) _userIdentity.user_id = saved.user_id;
-        if (saved.external_id) _userIdentity.external_id = saved.external_id;
-        if (saved.email) _userIdentity.email = saved.email;
-        if (saved.phone) _userIdentity.phone = saved.phone;
-        if (saved.email_hashed) _userIdentity.email_hashed = saved.email_hashed;
-        if (saved.phone_hashed) _userIdentity.phone_hashed = saved.phone_hashed;
-      } catch (e) { }
-
-
-
-
-
-      // ══════════════════════════════════════════════════════
-      // 11. SERVER-SIDE WIZARD — Hybrid Flow v4
-      //     Steps: GA4 → Platform → Pixels → Events →
-      //            Create Containers → Deploy Server →
-      //            Wire URL → Done
-      // ══════════════════════════════════════════════════════
-
-      // ── State ────────────────────────────────────────────
-      var _ssStep           = 1;
-      var _ssGa4Id          = '';
-      var _ssEcommPlatform  = '';
-      var _ssPixelIds       = {};
-      var _ssTokens         = {};
-      var _ssSsEvents       = ['purchase','add_to_cart','initiate_checkout','view_content'];
-      var _ssEnabledPlats   = [];
-      var _ssContainerConfig= '';
-      var _ssWebSnippetHead = '';
-      var _ssWebSnippetBody = '';
-      var _ssWebGtmId       = '';
-      var _ssServerGtmId    = '';
-      var _ssContainersReady= false;
-      var _ssServerUrl      = '';
-      var _ssUrlValidated   = false;
-      var _ssJobId          = null;
-      var _ssPxOpen         = { meta: false, gads: false, snap: false, tiktok: false };
-      var _ssInit           = false;
-
-      var _ssEcommDefs = [
-        { key: 'salla', name: 'سلة', nameEn: 'Salla', icon: '🛒', color: '#7C3AED', sub: 'منصة سلة للتجارة الإلكترونية' },
-        { key: 'zid',   name: 'زد',  nameEn: 'Zid',   icon: '🏪', color: '#059669', sub: 'منصة زد للتجارة الإلكترونية' },
-        { key: 'other', name: 'أخرى', nameEn: 'Other', icon: '🌐', color: '#0284C7', sub: 'منصة أخرى أو custom' },
-      ];
-
-      var _ssPxDefs = [
-        { key: 'meta',   label: 'Meta Pixel',      idLabel: 'Pixel ID',          tokLabel: 'CAPI Access Token',      idPh: '1234567890123456',  tokPh: 'EAAxxxxx...' },
-        { key: 'gads',   label: 'Google Ads',       idLabel: 'Conversion ID',     tokLabel: 'Conversion Label',       idPh: 'AW-1234567890',     tokPh: 'AbCd_xxxxx' },
-        { key: 'snap',   label: 'Snapchat Pixel',   idLabel: 'Pixel ID',          tokLabel: 'CAPI Token',             idPh: 'xxxxxxxx-xxxx-...',  tokPh: 'eyJhbGci...' },
-        { key: 'tiktok', label: 'TikTok Pixel',     idLabel: 'Pixel ID',          tokLabel: 'Events API Access Token',idPh: 'CXXXXXXXXXXXXXXXX',  tokPh: 'xxxxxxxx...' },
-      ];
-
-      var _ssSsEventDefs = [
-        { key: 'purchase',          label: 'Purchase',          icon: '💰' },
-        { key: 'add_to_cart',       label: 'Add to Cart',       icon: '🛒' },
-        { key: 'initiate_checkout', label: 'Initiate Checkout', icon: '💳' },
-        { key: 'view_content',      label: 'View Content',      icon: '👁️' },
-        { key: 'page_view',         label: 'Page View',         icon: '📄' },
-        { key: 'lead',              label: 'Lead',              icon: '📋' },
-        { key: 'sign_up',           label: 'Sign Up',           icon: '✍️' },
-        { key: 'search',            label: 'Search',            icon: '🔍' },
-      ];
-
-      // ── Navigation ───────────────────────────────────────
-      window.ss_goToStep = function (n) {
-        for (var i = 1; i <= 8; i++) {
-          var panel = document.getElementById('ss-panel-' + i);
-          var ind   = document.getElementById('ss-step-ind-' + i);
-          if (panel) panel.style.display = (i === n) ? '' : 'none';
-          if (ind)   ind.classList.toggle('active', i === n);
-          if (ind)   ind.classList.toggle('done', i < n);
-        }
-        _ssStep = n;
-        if (n === 2) ss_renderEcommStep();
-        if (n === 3) ss_renderPixelsStep();
-        if (n === 4) ss_renderEventsStep();
-        if (n === 5) ss_renderReviewStep();
-        if (n === 8) ss_renderDoneStep();
-      };
-
-      // ── STEP 1: GA4 input handler ─────────────────────────
-      window.ss_onGa4Input = function () {
-        var inp = document.getElementById('ss-p1-ga4-id');
-        if (!inp) return;
-        var v = inp.value.trim();
-        _ssGa4Id = v;
-        var hint = document.getElementById('ss-p1-ga4-hint');
-        if (!hint) return;
-        if (!v) { hint.textContent = ''; return; }
-        if (/^G-[A-Z0-9]{4,}$/i.test(v)) {
-          hint.innerHTML = '<span style="color:var(--acc);">✅ صحيح</span>';
-        } else {
-          hint.innerHTML = '<span style="color:#fbbf24;">⚠️ الصيغة المتوقعة: G-XXXXXXXXXX</span>';
-        }
-      };
-
-      // ── STEP 2: E-Commerce ────────────────────────────────
-      function ss_renderEcommStep() {
-        var el = document.getElementById('ss-p2-ecomm-list');
-        if (!el) return;
-        el.innerHTML = _ssEcommDefs.map(function (d) {
-          var sel = _ssEcommPlatform === d.key;
-          return '<div onclick="ss_selectEcomm(\'' + d.key + '\')" style="cursor:pointer;padding:14px 16px;border-radius:12px;background:' +
-            (sel ? 'rgba(70,241,197,.08)' : 'var(--sur2)') + ';border:1.5px solid ' +
-            (sel ? 'var(--acc)' : 'var(--bdr2)') + ';display:flex;align-items:center;gap:12px;transition:all .15s;">' +
-            '<span style="font-size:22px;">' + d.icon + '</span>' +
-            '<div><div style="font-size:13px;font-weight:700;color:var(--wht);">' + d.name + ' <span style="color:var(--mut);font-weight:400;font-size:11px;">(' + d.nameEn + ')</span></div>' +
-            '<div style="font-size:11px;color:var(--mut);">' + d.sub + '</div></div>' +
-            (sel ? '<span class="material-symbols-outlined" style="margin-right:auto;color:var(--acc);font-size:18px;">check_circle</span>' : '') +
-            '</div>';
-        }).join('');
-      }
-
-      window.ss_selectEcomm = function (key) {
-        _ssEcommPlatform = key;
-        ss_renderEcommStep();
-      };
-
-      // ── STEP 3: Pixels ────────────────────────────────────
-      function ss_renderPixelsStep() {
-        var el = document.getElementById('ss-p3-px-cards');
-        if (!el) return;
-        el.innerHTML = _ssPxDefs.map(function (d) {
-          var open = !!_ssPxOpen[d.key];
-          var pxVal  = (_ssPixelIds[d.key]            || '');
-          var tokVal = (d.key === 'gads'
-            ? (_ssPixelIds['gads_label'] || '')
-            : (_ssTokens[d.key]         || ''));
-          return '<div class="ss-px-card' + (open ? ' active' : '') + '" id="ss-pxcard-' + d.key + '">' +
-            '<div class="ss-px-header" onclick="ss_togglePxCard(\'' + d.key + '\')">' +
-            '<span style="font-size:13px;font-weight:700;color:var(--wht);">' + d.label + '</span>' +
-            '<span class="ss-px-toggle material-symbols-outlined">' + (open ? 'expand_less' : 'expand_more') + '</span>' +
-            '</div>' +
-            '<div class="ss-px-body" style="' + (open ? '' : 'display:none;') + '">' +
-            '<div style="margin-bottom:10px;"><label class="ss-px-label">' + d.idLabel + '</label>' +
-            '<input type="text" id="ss-px-id-' + d.key + '" class="ss-url-input" placeholder="' + d.idPh + '" value="' + pxVal + '" autocomplete="off"></div>' +
-            '<div><label class="ss-px-label">' + d.tokLabel + '</label>' +
-            '<div style="position:relative;">' +
-            '<input type="password" id="ss-px-tok-' + d.key + '" class="ss-url-input" placeholder="' + d.tokPh + '" value="' + tokVal + '" autocomplete="new-password" style="padding-left:36px;">' +
-            '<span class="material-symbols-outlined" onclick="ss_toggleTokVis(\'' + d.key + '\')" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--mut);cursor:pointer;" id="ss-tok-eye-' + d.key + '">visibility</span>' +
-            '</div></div></div></div>';
-        }).join('');
-      }
-
-      window.ss_togglePxCard = function (key) {
-        _ssPxOpen[key] = !_ssPxOpen[key];
-        ss_renderPixelsStep();
-      };
-
-      window.ss_toggleTokVis = function (key) {
-        var inp = document.getElementById('ss-px-tok-' + key);
-        var eye = document.getElementById('ss-tok-eye-' + key);
-        if (!inp) return;
-        inp.type = inp.type === 'password' ? 'text' : 'password';
-        if (eye) eye.textContent = inp.type === 'password' ? 'visibility' : 'visibility_off';
-      };
-
-      function ss_collectPixelData() {
-        _ssPixelIds = {}; _ssEnabledPlats = [];
-        _ssPxDefs.forEach(function (d) {
-          var idInp  = document.getElementById('ss-px-id-' + d.key);
-          var tokInp = document.getElementById('ss-px-tok-' + d.key);
-          var idVal  = idInp  ? idInp.value.trim()  : '';
-          var tokVal = tokInp ? tokInp.value.trim()  : '';
-          if (idVal) {
-            if (d.key === 'gads') {
-              _ssPixelIds['gads']       = idVal;
-              _ssPixelIds['gads_label'] = tokVal;
-            } else {
-              _ssPixelIds[d.key] = idVal;
-              if (tokVal) _ssTokens[d.key] = tokVal;
-            }
-            _ssEnabledPlats.push(d.key);
-          }
-        });
-      }
-
-      // ── STEP 4: Events ────────────────────────────────────
-      function ss_renderEventsStep() {
-        var el = document.getElementById('ss-p4-events-list');
-        if (!el) return;
-        el.innerHTML = _ssSsEventDefs.map(function (d) {
-          var on = _ssSsEvents.indexOf(d.key) >= 0;
-          return '<label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;background:' +
-            (on ? 'rgba(70,241,197,.06)' : 'var(--sur2)') + ';border:1px solid ' +
-            (on ? 'rgba(70,241,197,.25)' : 'var(--bdr2)') + ';cursor:pointer;transition:all .15s;">' +
-            '<input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="ss_toggleEvent(\'' + d.key + '\')" style="accent-color:var(--acc);width:15px;height:15px;cursor:pointer;">' +
-            '<span style="font-size:15px;">' + d.icon + '</span>' +
-            '<span style="font-size:13px;font-weight:600;color:var(--wht);">' + d.label + '</span>' +
-            '<span style="font-size:11px;color:var(--mut);font-family:var(--font-mono);">' + d.key + '</span>' +
-            '</label>';
-        }).join('');
-      }
-
-      window.ss_toggleEvent = function (key) {
-        var idx = _ssSsEvents.indexOf(key);
-        if (idx >= 0) _ssSsEvents.splice(idx, 1);
-        else           _ssSsEvents.push(key);
-        ss_renderEventsStep();
-      };
-
-      // ── STEP 5: Review + Create ───────────────────────────
-      function ss_renderReviewStep() {
-        ss_collectPixelData();
-        var el = document.getElementById('ss-p5-review');
-        if (!el) return;
-        var rows = [
-          ['GA4 ID',      _ssGa4Id        || '<span style="color:var(--mut);">غير محدد</span>'],
-          ['المنصة',       _ssEcommPlatform || '<span style="color:var(--mut);">غير محددة</span>'],
-          ['Pixels',      _ssEnabledPlats.length ? _ssEnabledPlats.join(', ') : '<span style="color:var(--mut);">لا يوجد</span>'],
-          ['Events',      _ssSsEvents.join(', ') || '<span style="color:var(--mut);">لا يوجد</span>'],
-        ];
-        el.innerHTML = '<div style="border:1px solid var(--bdr2);border-radius:12px;overflow:hidden;">' +
-          rows.map(function (r, i) {
-            return '<div style="display:flex;gap:12px;padding:10px 14px;' +
-              (i < rows.length-1 ? 'border-bottom:1px solid var(--bdr2);' : '') +
-              'background:var(--sur2);">' +
-              '<span style="font-size:12px;color:var(--mut);min-width:70px;">' + r[0] + '</span>' +
-              '<span style="font-size:12px;color:var(--wht);font-family:var(--font-mono);">' + r[1] + '</span></div>';
-          }).join('') + '</div>';
-        if (_ssContainersReady) {
-          document.getElementById('ss-p5-result') && (document.getElementById('ss-p5-result').style.display = '');
-          document.getElementById('ss-p5-next-wrap') && (document.getElementById('ss-p5-next-wrap').style.display = '');
-          document.getElementById('ss-p5-btn-wrap') && (document.getElementById('ss-p5-btn-wrap').style.display = 'none');
-        }
-      }
-
-      window.ss_createContainers = function () {
-        ss_collectPixelData();
-        var ga4Inp = document.getElementById('ss-p1-ga4-id');
-        if (ga4Inp && ga4Inp.value.trim()) _ssGa4Id = ga4Inp.value.trim();
-
-        var createBtn  = document.getElementById('ss-p5-create-btn');
-        var progressEl = document.getElementById('ss-p5-progress');
-        var resultEl   = document.getElementById('ss-p5-result');
-        var errorEl    = document.getElementById('ss-p5-error');
-        var btnWrap    = document.getElementById('ss-p5-btn-wrap');
-        var nextWrap   = document.getElementById('ss-p5-next-wrap');
-
-        if (errorEl)   errorEl.style.display = 'none';
-        if (createBtn) { createBtn.disabled = true; createBtn.style.opacity = '.5'; }
-        if (progressEl) progressEl.style.display = '';
-        if (resultEl)   resultEl.style.display = 'none';
-        if (nextWrap)   nextWrap.style.display = 'none';
-
-        var payload = {
-          projectName:      (window.S && S.lead && S.lead.name)
-                            ? S.lead.name + ' — SS'
-                            : ((window.currentUser && currentUser.email) || 'Client') + ' — SS',
-          ga4MeasurementId: _ssGa4Id          || '',
-          pixelIds:         _ssPixelIds,
-          events:           _ssSsEvents,
-          ecommPlatform:    _ssEcommPlatform   || '',
-          ssPlatforms:      _ssEnabledPlats,
-          ssEvents:         _ssSsEvents,
-        };
-
-        _ssApi('POST', '/api/ss/create-containers', payload, function (err, res) {
-          if (err || !res || !res.ok || !res.data || !res.data.ok) {
-            if (createBtn)  { createBtn.disabled = false; createBtn.style.opacity = '1'; }
-            if (progressEl)   progressEl.style.display = 'none';
-            var msg = (res && res.data && res.data.error) || (err && err.message) || 'فشل الإنشاء';
-            if (errorEl) { errorEl.style.display = ''; errorEl.textContent = '❌ ' + msg; }
-            return;
-          }
-          _ssJobId = res.data.jobId;
-          ss_pollJob(_ssJobId);
-        });
-      };
-
-      function ss_pollJob(jobId) {
-        if (!jobId) return;
-        var progressEl  = document.getElementById('ss-p5-progress');
-        var stageEl     = document.getElementById('ss-p5-stage-msg');
-        var pctEl       = document.getElementById('ss-p5-pct');
-        var barEl       = document.getElementById('ss-p5-bar');
-        var createBtn   = document.getElementById('ss-p5-create-btn');
-        var resultEl    = document.getElementById('ss-p5-result');
-        var errorEl     = document.getElementById('ss-p5-error');
-        var btnWrap     = document.getElementById('ss-p5-btn-wrap');
-        var nextWrap    = document.getElementById('ss-p5-next-wrap');
-        var startedAt   = Date.now();
-        var maxWaitMs   = 15 * 60 * 1000;
-        var barPct      = 10;
-        var stageMsgs   = {
-          queued: 'في الطابور...', gtm_provisioning: 'إنشاء GTM Containers...',
-          saving: 'حفظ...', done: 'اكتمل!', error: 'حصل خطأ',
-        };
-
-        function doPoll() {
-          if (Date.now() - startedAt > maxWaitMs) {
-            if (progressEl) progressEl.style.display = 'none';
-            if (errorEl) { errorEl.style.display = ''; errorEl.textContent = '⏱️ انتهت مهلة الانتظار — حاول مرة أخرى'; }
-            if (createBtn) { createBtn.disabled = false; createBtn.style.opacity = '1'; }
-            return;
-          }
-          fetch('/api/managed/job/' + encodeURIComponent(jobId))
-            .then(function (r) { return r.json(); })
-            .then(function (d) {
-              if (d.status === 'completed' && d.result && d.result.ok) {
-                barPct = 100;
-                if (barEl)  barEl.style.width = '100%';
-                if (pctEl)  pctEl.textContent = '100%';
-                if (progressEl) progressEl.style.display = 'none';
-                if (createBtn)  { createBtn.disabled = false; createBtn.style.opacity = '1'; }
-
-                var r = d.result;
-                _ssWebGtmId       = r.gtmPublicId    || r.webGtmId    || '';
-                _ssServerGtmId    = (r.server && r.server.publicId)  || '';
-                _ssContainerConfig= (r.server && r.server.containerConfig) || '';
-                _ssWebSnippetHead = r.snippetHead || '';
-                _ssWebSnippetBody = r.snippetBody || '';
-                _ssContainersReady = true;
-
-                var webIdEl = document.getElementById('ss-p5-web-id');
-                var srvIdEl = document.getElementById('ss-p5-server-id');
-                if (webIdEl) webIdEl.textContent = _ssWebGtmId    || '—';
-                if (srvIdEl) srvIdEl.textContent = _ssServerGtmId || '—';
-
-                if (resultEl)  resultEl.style.display  = '';
-                if (btnWrap)   btnWrap.style.display    = 'none';
-                if (nextWrap)  nextWrap.style.display   = '';
-
-                // Pre-fill containerConfig in step 6
-                var cfgEl = document.getElementById('ss-p6-config-blob');
-                if (cfgEl) cfgEl.textContent = _ssContainerConfig || '(لا يوجد — يُنشأ بعد نشر الـ Server Container)';
-
-                showToast('✅ تم إنشاء الـ Containers بنجاح!');
-              } else if (d.status === 'failed') {
-                if (progressEl) progressEl.style.display = 'none';
-                if (createBtn)  { createBtn.disabled = false; createBtn.style.opacity = '1'; }
-                if (errorEl) { errorEl.style.display = ''; errorEl.textContent = '❌ ' + (d.error || 'فشل الإنشاء'); }
-              } else {
-                barPct = Math.min(barPct + 8, 90);
-                if (barEl) barEl.style.width = barPct + '%';
-                if (pctEl) pctEl.textContent = barPct + '%';
-                var sm = stageMsgs[d.stage] || d.stage || '...';
-                if (stageEl) stageEl.textContent = sm;
-                setTimeout(doPoll, 4000);
-              }
-            })
-            .catch(function () { setTimeout(doPoll, 5000); });
-        }
-        setTimeout(doPoll, 2000);
-      }
-
-      // ── STEP 6: ContainerConfig copy ─────────────────────
-      window.ss_copyContainerConfig = function () {
-        if (!_ssContainerConfig) { showToast('لا يوجد Container Config بعد'); return; }
-        navigator.clipboard.writeText(_ssContainerConfig)
-          .then(function () { showToast('✅ تم النسخ!'); })
-          .catch(function () {
-            var ta = document.createElement('textarea');
-            ta.value = _ssContainerConfig;
-            document.body.appendChild(ta); ta.select(); document.execCommand('copy');
-            document.body.removeChild(ta); showToast('✅ تم النسخ!');
-          });
-      };
-
-      // ── STEP 7: Validate URL ──────────────────────────────
-      window.ss_validateUrl = function () {
-        var inp     = document.getElementById('ss-p7-url');
-        var statusEl = document.getElementById('ss-p7-status');
-        var wireWrap = document.getElementById('ss-p7-wire-wrap');
-        var errorEl  = document.getElementById('ss-p7-error');
-        var btn      = document.getElementById('ss-p7-validate-btn');
-
-        if (!inp) return;
-        var url = inp.value.trim();
-        if (!url) { if (statusEl) statusEl.textContent = '⚠️ أدخل الـ URL أولاً'; return; }
-        if (!/^https:\/\//.test(url)) { if (statusEl) statusEl.innerHTML = '<span style="color:#fbbf24;">⚠️ يجب أن يبدأ بـ https://</span>'; return; }
-
-        if (errorEl)   errorEl.style.display = 'none';
-        if (wireWrap)  wireWrap.style.display = 'none';
-        if (statusEl)  statusEl.textContent = '⏳ جارٍ التحقق...';
-        if (btn)       { btn.disabled = true; btn.style.opacity = '.6'; }
-
-        _ssApi('POST', '/api/ss/validate-url', { url: url }, function (err, res) {
-          if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
-          if (!err && res && res.data && res.data.ok) {
-            _ssServerUrl   = url;
-            _ssUrlValidated = true;
-            if (statusEl) statusEl.innerHTML = '<span style="color:var(--acc);">✅ الخادم يستجيب (' + (res.data.latencyMs || '') + 'ms)</span>';
-            if (wireWrap)  wireWrap.style.display = '';
-          } else {
-            var m = (res && res.data && res.data.message) || (err && err.message) || 'لا يستجيب';
-            if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">❌ ' + m + '</span>';
-          }
-        });
-      };
-
-      // ── STEP 7: Wire transport_url + Server Container ─────
-      window.ss_wireUrl = function () {
-        var wireBtn  = document.getElementById('ss-p7-wire-btn');
-        var statusEl = document.getElementById('ss-p7-status');
-        var errorEl  = document.getElementById('ss-p7-error');
-
-        if (!_ssServerUrl) return;
-        if (wireBtn) { wireBtn.disabled = true; wireBtn.style.opacity = '.6'; }
-        if (statusEl) statusEl.innerHTML = '<span style="color:var(--acc);">⏳ جارٍ الربط...</span>';
-
-        _ssApi('POST', '/api/ss/wire-transport', { sgtmUrl: _ssServerUrl }, function (err, res) {
-          if (wireBtn) { wireBtn.disabled = false; wireBtn.style.opacity = '1'; }
-          if (err || !res || !res.ok || !res.data || !res.data.ok) {
-            var m = (res && res.data && res.data.error) || (err && err.message) || 'فشل الربط';
-            if (errorEl) { errorEl.style.display = ''; errorEl.textContent = '❌ ' + m; }
-            return;
-          }
-          if (statusEl) statusEl.innerHTML = '<span style="color:var(--acc);">✅ تم الربط ونشر الـ Containers</span>';
-          showToast('✅ تم ربط transport_url!');
-          setTimeout(function () { ss_goToStep(8); }, 800);
-        });
-      };
-
-      // ── STEP 8: Done ──────────────────────────────────────
-      function ss_renderDoneStep() {
-        var headEl = document.getElementById('ss-p8-snippet-head');
-        var bodyEl = document.getElementById('ss-p8-snippet-body');
-        var dlEl   = document.getElementById('ss-p8-datalayer-code');
-        var sumEl  = document.getElementById('ss-p8-summary');
-        var lblEl  = document.getElementById('ss-p8-dl-label');
-
-        if (headEl) headEl.textContent = _ssWebSnippetHead || '(اضغط على زر الإنشاء في الخطوة 5 أولاً)';
-        if (bodyEl) bodyEl.textContent = _ssWebSnippetBody || '';
-        if (dlEl)   dlEl.textContent   = ss_buildDataLayerCode();
-        if (lblEl)  lblEl.textContent  = 'DataLayer Code' + (_ssEcommPlatform ? ' — ' + _ssEcommPlatform : '');
-
-        if (sumEl) {
-          var lines = [];
-          if (_ssWebGtmId)    lines.push('🌐 Web GTM: <strong>' + _ssWebGtmId + '</strong>');
-          if (_ssServerGtmId) lines.push('🖥️ Server GTM: <strong>' + _ssServerGtmId + '</strong>');
-          if (_ssServerUrl)   lines.push('🔗 Server URL: <strong>' + _ssServerUrl + '</strong>');
-          if (_ssGa4Id)       lines.push('📊 GA4 ID: <strong>' + _ssGa4Id + '</strong>');
-          if (_ssEnabledPlats.length) lines.push('📡 Pixels: <strong>' + _ssEnabledPlats.join(', ') + '</strong>');
-          lines.push('🎯 Events: <strong>' + _ssSsEvents.join(', ') + '</strong>');
-          sumEl.innerHTML = lines.join('<br>');
-        }
-      }
-
-      function ss_buildDataLayerCode() {
-        var ecomm = _ssEcommPlatform || 'other';
-        var evts  = _ssSsEvents;
-        var hasGA4 = !!_ssGa4Id;
-        var lines = [];
-
-        lines.push('// EasyTrac DataLayer — ' + (ecomm === 'salla' ? 'Salla' : ecomm === 'zid' ? 'Zid' : 'Custom'));
-        lines.push('// Events: ' + evts.join(', '));
-        lines.push('// SHA-256 hashing is applied to email/phone before pushing');
-        lines.push('');
-        lines.push('async function sha256(str) {');
-        lines.push('  if (!str) return "";');
-        lines.push('  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str.trim().toLowerCase()));');
-        lines.push('  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");');
-        lines.push('}');
-        lines.push('');
-
-        if (ecomm === 'salla') {
-          lines.push('// Salla — purchase event');
-          lines.push('salla.event.on("order:created", async (order) => {');
-          lines.push('  const emHash = await sha256(order.customer?.email || "");');
-          lines.push('  const phHash = await sha256(order.customer?.mobile || "");');
-          lines.push('  const evId   = order.id + "_" + Math.floor(Date.now()/1000);');
-          lines.push('  window.dataLayer = window.dataLayer || [];');
-          lines.push('  window.dataLayer.push({');
-          lines.push('    event:          "purchase",');
-          lines.push('    event_id:        evId,');
-          lines.push('    transaction_id:  String(order.id),');
-          lines.push('    value:           order.amounts?.total?.amount || 0,');
-          lines.push('    currency:        "SAR",');
-          lines.push('    items:           (order.items || []).map(i => ({');
-          lines.push('      item_id:   String(i.id), item_name: i.name,');
-          lines.push('      price:     i.price?.amount || 0, quantity: i.quantity || 1');
-          lines.push('    })),');
-          lines.push('    content_ids:     (order.items || []).map(i => String(i.id)),');
-          lines.push('    external_id:     String(order.customer?.id || ""),');
-          lines.push('    user_data: { em: emHash, ph: phHash,');
-          lines.push('      fn: order.customer?.first_name || "",');
-          lines.push('      ln: order.customer?.last_name  || "" }');
-          lines.push('  });');
-          lines.push('});');
-        } else if (ecomm === 'zid') {
-          lines.push('// Zid — purchase event (after_order_created hook)');
-          lines.push('document.addEventListener("zid:order:created", async (e) => {');
-          lines.push('  const order  = e.detail || {};');
-          lines.push('  const emHash = await sha256(order.customer_email || "");');
-          lines.push('  const phHash = await sha256(order.customer_mobile || "");');
-          lines.push('  const evId   = order.order_id + "_" + Math.floor(Date.now()/1000);');
-          lines.push('  window.dataLayer = window.dataLayer || [];');
-          lines.push('  window.dataLayer.push({');
-          lines.push('    event:          "purchase",');
-          lines.push('    event_id:        evId,');
-          lines.push('    transaction_id:  String(order.order_id),');
-          lines.push('    value:           order.total_price || 0,');
-          lines.push('    currency:        order.currency || "SAR",');
-          lines.push('    external_id:     String(order.customer_id || ""),');
-          lines.push('    user_data: { em: emHash, ph: phHash }');
-          lines.push('  });');
-          lines.push('});');
-        } else {
-          lines.push('// Generic purchase push — adapt to your platform');
-          lines.push('window.dataLayer = window.dataLayer || [];');
-          lines.push('// Call this after a successful order:');
-          lines.push('async function pushPurchase(order) {');
-          lines.push('  const emHash = await sha256(order.email || "");');
-          lines.push('  const phHash = await sha256(order.phone || "");');
-          lines.push('  const evId   = order.id + "_" + Math.floor(Date.now()/1000);');
-          lines.push('  window.dataLayer.push({');
-          lines.push('    event: "purchase", event_id: evId,');
-          lines.push('    transaction_id: String(order.id),');
-          lines.push('    value: order.total, currency: order.currency || "SAR",');
-          lines.push('    user_data: { em: emHash, ph: phHash }');
-          lines.push('  });');
-          lines.push('}');
-        }
-        return lines.join('\n');
-      }
-
-      window.ss_copyCode = function (type) {
-        var code = type === 'datalayer'
-          ? (document.getElementById('ss-p8-datalayer-code') || {}).textContent
-          : null;
-        if (!code) return;
-        navigator.clipboard.writeText(code)
-          .then(function () { showToast('✅ تم النسخ!'); })
-          .catch(function () {
-            var ta = document.createElement('textarea'); ta.value = code;
-            document.body.appendChild(ta); ta.select(); document.execCommand('copy');
-            document.body.removeChild(ta); showToast('✅ تم النسخ!');
-          });
-      };
-
-      window.ss_copySnippet = function (part) {
-        var code = part === 'head' ? _ssWebSnippetHead : _ssWebSnippetBody;
-        if (!code) { showToast('لا يوجد snippet بعد'); return; }
-        navigator.clipboard.writeText(code)
-          .then(function () { showToast('✅ تم النسخ!'); })
-          .catch(function () {
-            var ta = document.createElement('textarea'); ta.value = code;
-            document.body.appendChild(ta); ta.select(); document.execCommand('copy');
-            document.body.removeChild(ta); showToast('✅ تم النسخ!');
-          });
-      };
-
-      // ── Confirm + Save ────────────────────────────────────
-      window.ss_confirmSetup = function () {
-        var btn      = document.getElementById('ss-p8-status');
-        if (btn) btn.innerHTML = '<span style="color:var(--acc);">⏳ جارٍ الحفظ...</span>';
-
-        _ssApi('POST', '/api/ss/save-config', {
-          provider:           'selfhosted',
-          serverUrl:          _ssServerUrl,
-          platforms:          _ssEnabledPlats,
-          tokens:             _ssTokens,
-          pixelIds:           _ssPixelIds,
-          ecommPlatform:      _ssEcommPlatform,
-          ga4MeasurementId:   _ssGa4Id,
-          ssEvents:           _ssSsEvents,
-        }, function (err, res) {
-          if (err || !res || !res.ok || !res.data || !res.data.ok) {
-            var m = (res && res.data && res.data.error) || (err && err.message) || 'فشل الحفظ';
-            if (btn) btn.innerHTML = '<span style="color:#f87171;">❌ ' + m + '</span>';
-            return;
-          }
-          if (btn) btn.innerHTML = '<span style="color:var(--acc);">✅ تم الحفظ</span>';
-          if (window.ET) {
-            window.ET.ssEnabled = true; window.ET.ssUrl = _ssServerUrl;
-            window.ET.ssPlatforms = {};
-            _ssEnabledPlats.forEach(function (k) { window.ET.ssPlatforms[k] = true; });
-          }
-          document.cookie = 'et_ss_url=' + encodeURIComponent(_ssServerUrl) + ';path=/;max-age=31536000;SameSite=Lax';
-          ss_showDoneBanner();
-          try { ovRefreshGtmStatus(); } catch (_) {}
-          showToast('✅ Server-Side Tracking مفعّل بالكامل!');
-        });
-      };
-
-      // ── Done banner ───────────────────────────────────────
-      function ss_showDoneBanner() {
-        var banner  = document.getElementById('ss-done-banner');
-        var urlEl   = document.getElementById('ss-done-url');
-        var resetBtn= document.getElementById('ss-hdr-reset-btn');
-        if (banner) banner.style.display = 'flex';
-        if (urlEl)  urlEl.textContent = _ssServerUrl + (_ssEcommPlatform ? ' · ' + _ssEcommPlatform : '') + ' — ' + _ssEnabledPlats.join(', ');
-        if (resetBtn) resetBtn.style.display = '';
-        var bar = document.getElementById('ss-step-bar');
-        if (bar) bar.style.display = 'none';
-        for (var i = 1; i <= 8; i++) {
-          var p = document.getElementById('ss-panel-' + i);
-          if (p) p.style.display = 'none';
-        }
-      }
-
-      window.ss_editSetup = function () {
-        var banner = document.getElementById('ss-done-banner');
-        if (banner) banner.style.display = 'none';
-        var bar = document.getElementById('ss-step-bar');
-        if (bar) bar.style.display = '';
-        ss_goToStep(_ssContainersReady ? (_ssUrlValidated ? 7 : 6) : 5);
-      };
-
-      // ── Reset ─────────────────────────────────────────────
-      window.ss_resetConfig = function () {
-        if (!confirm('حذف إعدادات Server-Side Tracking؟ لا يمكن التراجع.')) return;
-        _ssApi('DELETE', '/api/ss/config', null, function (err, res) {
-          if (err || !res || !res.ok) { showToast('❌ فشل الحذف'); return; }
-          _ssGa4Id = ''; _ssEcommPlatform = ''; _ssPixelIds = {}; _ssTokens = {};
-          _ssSsEvents = ['purchase','add_to_cart','initiate_checkout','view_content'];
-          _ssEnabledPlats = []; _ssServerUrl = ''; _ssContainerConfig = '';
-          _ssWebGtmId = ''; _ssServerGtmId = ''; _ssContainersReady = false;
-          _ssUrlValidated = false; _ssWebSnippetHead = ''; _ssWebSnippetBody = '';
-          _ssPxOpen = { meta: false, gads: false, snap: false, tiktok: false };
-          if (window.ET) { window.ET.ssEnabled = false; window.ET.ssUrl = ''; window.ET.ssPlatforms = {}; }
-          var banner = document.getElementById('ss-done-banner');
-          if (banner) banner.style.display = 'none';
-          var resetBtn = document.getElementById('ss-hdr-reset-btn');
-          if (resetBtn) resetBtn.style.display = 'none';
-          var bar = document.getElementById('ss-step-bar');
-          if (bar) bar.style.display = '';
-          ss_goToStep(1);
-          showToast('✅ تم حذف الإعدادات');
-        });
-      };
-
-      // ── Load saved config ─────────────────────────────────
-      window.ss_loadConfig = function (cb) {
-        _ssApi('GET', '/api/ss/config', null, function (err, res) {
-          if (err || !res || !res.ok || !res.data || !res.data.ok || !res.data.config) { if (cb) cb(false); return; }
-          var d = res.data.config;
-          _ssServerUrl       = d.serverUrl        || '';
-          _ssEnabledPlats    = Array.isArray(d.platforms) ? d.platforms : [];
-          _ssGa4Id           = d.ga4MeasurementId || '';
-          _ssEcommPlatform   = d.ecommPlatform     || '';
-          _ssPixelIds        = d.pixelIds          || {};
-          _ssSsEvents        = Array.isArray(d.ssEvents) ? d.ssEvents : _ssSsEvents;
-          _ssWebGtmId        = d.webPublicId       || '';
-          _ssServerGtmId     = d.serverPublicId    || '';
-          _ssContainerConfig = d.containerConfig   || '';
-          _ssContainersReady = !!(d.webContainerId || d.webPublicId);
-          _ssUrlValidated    = !!_ssServerUrl;
-          _ssTokens = {};
-          var et = d.encryptedTokens || {};
-          Object.keys(et).forEach(function (k) { if (et[k]) _ssTokens[k] = '***CONFIGURED***'; });
-          if (_ssPixelIds.meta   || _ssTokens.meta)     _ssPxOpen.meta   = true;
-          if (_ssPixelIds.gads)                          _ssPxOpen.gads   = true;
-          if (_ssPixelIds.snap   || _ssTokens.snapchat) _ssPxOpen.snap   = true;
-          if (_ssPixelIds.tiktok || _ssTokens.tiktok)   _ssPxOpen.tiktok = true;
-          // Restore snippets from saved container data if available
-          if (d.snippetHead) _ssWebSnippetHead = d.snippetHead;
-          if (d.snippetBody) _ssWebSnippetBody = d.snippetBody;
-          if (cb) cb(true);
-        });
-      };
-
-      function ss_updateConfigHint() { /* no-op in v4 */ }
-
-      // ── Init on view activation ───────────────────────────
-      function initServerSideView() {
-        if (_ssInit) return;
-        _ssInit = true;
-        ss_updateConfigHint();
-        ss_loadConfig(function (found) {
-          if (found && _ssContainersReady) {
-            // Restore UI state
-            var p1Result = document.getElementById('ss-p1-result');
-            var p1Next   = document.getElementById('ss-p1-next-btn');
-            var p1WebId  = document.getElementById('ss-p1-web-id');
-            var p1SrvId  = document.getElementById('ss-p1-server-id');
-            var p1Cfg    = document.getElementById('ss-p1-config-json');
-            if (p1Result) p1Result.style.display = '';
-            if (p1Next)   p1Next.disabled = false;
-            if (p1WebId)  p1WebId.textContent  = _ssWebGtmId    || '—';
-            if (p1SrvId)  p1SrvId.textContent  = _ssServerGtmId || '—';
-            if (p1Cfg)    p1Cfg.textContent     = '(Container already created)';
-          }
-          if (found && _ssServerUrl && _ssEnabledPlats.length) {
-            // Config complete — show done banner
-            ss_showDoneBanner();
-            var resetBtn = document.getElementById('ss-hdr-reset-btn');
-            if (resetBtn) resetBtn.style.display = '';
-          }
-          if (window.ET) {
-            window.ET.ssEnabled   = found && !!_ssServerUrl;
-            window.ET.ssUrl       = _ssServerUrl;
-            window.ET.ssPlatforms = {};
-            _ssEnabledPlats.forEach(function (k) { window.ET.ssPlatforms[k] = true; });
-          }
-        });
-      }
-
-      // ── Hook into view switcher ───────────────────────────
-      var _origSwitchAppView2 = window.switchAppView;
-      window.switchAppView = function (viewKey, btnEl) {
-        if (_origSwitchAppView2) _origSwitchAppView2(viewKey, btnEl);
-        if (viewKey === 'serverside') { setTimeout(initServerSideView, 50); }
-        if (viewKey === 'overview')   { setTimeout(function () { try { ovRefreshGtmStatus(); } catch (_) {} }, 200); }
-      };
-
-
-      // 13. TOAST HELPER
-      // ══════════════════════════════════════════════════════
-      function showToast(msg, color) {
-        var t = document.createElement('div');
-        t.textContent = msg;
-        t.style.cssText = 'position:fixed;bottom:24px;right:50%;transform:translateX(50%);background:' + (color || '#191c22') + ';border:1px solid rgba(70,241,197,.3);color:var(--acc);padding:11px 20px;border-radius:12px;font-size:13px;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,.5);pointer-events:none;animation:pin .3s ease;font-family:var(--font-display);font-weight:600;';
-        document.body.appendChild(t);
-        setTimeout(function () { t.remove(); }, 2500);
-      }
-      window.showToast = showToast;
-
-      // ══════════════════════════════════════════════════════
-      // 14. Overview page — Pixel Scanner integration
-      // ══════════════════════════════════════════════════════
-      // Sync active platforms from S whenever generate() runs
-      var _origDispatch = window.generate;
-      if (_origDispatch) {
-        var _genHook = window.generate;
-        // After generate, sync to DLM engine
-        window.generate = function () {
-          _genHook.apply(this, arguments);
-          setTimeout(function () {
-            var plats = window.S && window.S.platforms;
-            if (plats && plats.length) {
-              _activePlatforms = plats.slice();
-              ET.platforms = plats.slice();
-            }
-          }, 200);
-        };
-      }
-
-      console.log('%c[Easy Track] Full Marketing Data Infrastructure Engine v4.0 loaded ✓', 'color:#46f1c5;font-size:13px;font-weight:bold;');
-      console.log('%c  DataLayer Normalizer · Attribution · Deduplication · Multi-Platform · Server-Side', 'color:#85948d;font-size:11px;');
-    })();
-  </script>
-
-  <!-- ═════════════════════════════════════════════
-       WhatsApp Floating Button
-  ═════════════════════════════════════════════ -->
-  <a href="https://wa.me/201552388174?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D8%8C%20%D8%A3%D8%B1%D9%8A%D8%AF%20%D8%A7%D9%84%D8%A7%D8%B3%D8%AA%D9%81%D8%B3%D8%A7%D8%B1%20%D8%B9%D9%86%20Easy%20Track"
-     target="_blank"
-     id="wa-float-btn"
-     title="تواصل معنا على واتسآب"
-     style="
-       position:fixed;
-       bottom:28
+        } else if (ec.products && Array.isArray(e
