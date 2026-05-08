@@ -297,13 +297,40 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
     ...trigs.map(t => ({ kind: 'trigger', item: t })),
   ];
 
+  // Pre-fetch existing variables once so upsert can resolve duplicates without
+  // extra API calls inside the burst loop. A single GET is much cheaper than
+  // one GET per duplicate.
+  let _existingVars = null;
+  async function getExistingVars() {
+    if (_existingVars) return _existingVars;
+    const resp = await gtmRequest('GET', `${basePath}/variables`).catch(() => ({ variable: [] }));
+    _existingVars = (resp.variable || []);
+    return _existingVars;
+  }
+
   await runInBursts(varsAndTrigs, 'var/trig', async ({ kind, item }) => {
     const body = { ...item };
     if (kind === 'variable') {
       delete body.accountId; delete body.containerId; delete body.workspaceId;
       delete body.variableId; delete body.fingerprint; delete body.path;
       delete body.parentFolderId;
-      return gtmRequest('POST', `${basePath}/variables`, JSON.stringify(body));
+      try {
+        return await gtmRequest('POST', `${basePath}/variables`, JSON.stringify(body));
+      } catch (e) {
+        // GTM returns 400 "duplicate name" when the variable already exists in
+        // the workspace (e.g. from a previous failed attempt or manual setup).
+        // Upsert: find the existing variable by name and PUT instead.
+        if (e.status === 400 && /duplicate/i.test(e.message || '')) {
+          const existing = await getExistingVars();
+          const match = existing.find(v => v.name === body.name);
+          if (match) {
+            const updated = { ...match, ...body };
+            console.log(`[gtm] upsert variable (duplicate) — updating "${body.name}" (${match.variableId})`);
+            return gtmRequest('PUT', `${basePath}/variables/${match.variableId}`, JSON.stringify(updated));
+          }
+        }
+        throw e; // re-throw non-duplicate errors
+      }
     }
     // trigger
     const oldId = body.triggerId;
@@ -332,7 +359,20 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
     if (body.enablingTriggerId) {
       body.enablingTriggerId = body.enablingTriggerId.map(id => triggerMap[id] || id);
     }
-    return gtmRequest('POST', `${basePath}/tags`, JSON.stringify(body));
+    try {
+      return await gtmRequest('POST', `${basePath}/tags`, JSON.stringify(body));
+    } catch (e) {
+      if (e.status === 400 && /duplicate/i.test(e.message || '')) {
+        const tagsResp = await gtmRequest('GET', `${basePath}/tags`).catch(() => ({ tag: [] }));
+        const match = (tagsResp.tag || []).find(tg => tg.name === body.name);
+        if (match) {
+          const updated = { ...match, ...body };
+          console.log(`[gtm] upsert tag (duplicate) — updating "${body.name}" (${match.tagId})`);
+          return gtmRequest('PUT', `${basePath}/tags/${match.tagId}`, JSON.stringify(updated));
+        }
+      }
+      throw e;
+    }
   });
 
   // PHASE 3: Clients (server containers only — independent of triggers/tags)
@@ -579,9 +619,9 @@ async function upsertServerUrlVariable(serverContainerId, serverWorkspaceId, sgt
   const basePath = `/accounts/${acc}/containers/${serverContainerId}/workspaces/${serverWorkspaceId}`;
 
   // List existing variables and look for one named "ET - sGTM URL".
-  const varsResp  = await gtmRequest('GET', `${basePath}/variables`).catch(() => ({ variable: [] }));
-  const variables = varsResp.variable || [];
-  const existing  = variables.find(v => v.name === 'ET - sGTM URL');
+  const varsResp   = await gtmRequest('GET', `${basePath}/variables`).catch(() => ({ variable: [] }));
+  const variables  = varsResp.variable || [];
+  const existing   = variables.find(v => v.name === 'ET - sGTM URL');
 
   const varBody = {
     name:      'ET - sGTM URL',
@@ -592,6 +632,7 @@ async function upsertServerUrlVariable(serverContainerId, serverWorkspaceId, sgt
 
   let variable;
   if (existing) {
+    // Update in place.
     const updated = { ...existing, ...varBody };
     variable = await gtmRequest('PUT', `${basePath}/variables/${existing.variableId}`, JSON.stringify(updated));
   } else {
