@@ -215,9 +215,8 @@ async function getDefaultWorkspace(containerId) {
 }
 
 // Import our generated config JSON into the workspace.
-// GTM API v2 has no bulk import URL for new workspaces, so we recreate
-// Variables → Triggers → Tags one by one. To stay under the
-// "Queries per minute per user" quota (default ≈ 40/min), we pace each call.
+// PRIMARY: GTM Workspace Import API — one POST for all entities (~3-5 seconds).
+// FALLBACK: individual entity creates in parallel bursts if bulk endpoint fails.
 async function importContainerJSON(containerId, workspaceId, configJson, mode, onProgress) {
   const acc = getAccountId();
   const cv = configJson && configJson.containerVersion ? configJson.containerVersion : (configJson || {});
@@ -228,160 +227,121 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
   // client[] lives at the top level of the config (server containers only)
   const clients = (configJson && configJson.client) || cv.client || [];
 
+  const total = vars.length + trigs.length + tags.length + clients.length;
+
   // Empty config — nothing to import, skip quietly.
-  if (!vars.length && !trigs.length && !tags.length && !clients.length) {
+  if (!total) {
     if (typeof onProgress === 'function') onProgress({ stage: 'skip — empty config', done: 0, total: 0 });
     console.log('[gtm] importContainerJSON: empty config, skipping import');
     return { importedTagCount: 0, importedTriggerCount: 0, importedVariableCount: 0, importedClientCount: 0 };
   }
 
   const basePath = `/accounts/${acc}/containers/${containerId}/workspaces/${workspaceId}`;
-
-  // ── BATCHED PARALLEL STRATEGY ───────────────────────────────────────────────
-  // GTM's write quota is ~25 requests/minute per user.
-  // Instead of sleeping 3s between each call (sequential, slow), we fire items
-  // in PARALLEL bursts of 18 (safely under 25/min), then sleep 65s between
-  // bursts if more work remains. Small configs (<18 items) finish in seconds.
-  // Larger configs still respect the quota but progress is visible.
-  // If you raise the GTM quota in Google Cloud Console, bump BURST_SIZE
-  // to match (keeping ~5 headroom under the new limit).
-  // Quota 30/min  → BURST_SIZE = 28
-  // Quota 100/min → BURST_SIZE = 95
-  // Quota 1000/min → BURST_SIZE = 900
-  const BURST_SIZE   = 28;
-  const BURST_WAIT_MS = 65000;
-
-  const total = vars.length + trigs.length + tags.length + clients.length;
-  let done = 0;
-  const report = (stage) => {
+  const report   = (stage, done) => {
     if (typeof onProgress === 'function') {
-      try { onProgress({ stage, done, total }); } catch (_) {}
+      try { onProgress({ stage, done: done || 0, total }); } catch (_) {}
     }
-    console.log(`[gtm] import progress: ${stage} ${done}/${total}`);
+    console.log(`[gtm] ${stage} — ${done || 0}/${total}`);
   };
-  report('starting');
 
-  // Run a list of items through writeFn in parallel bursts, respecting quota.
+  // ── ATTEMPT 1: Single-call Workspace Import (GTM API v2 custom method) ────
+  // POST .../workspaces/{id}:import  with the full ContainerVersion as body.
+  // importOption=OVERWRITE merges cleanly with an empty or existing workspace.
+  report('importing', 0);
+  const importOption = (mode === 'merge') ? 'MERGE' : 'OVERWRITE';
+  const importBody = JSON.stringify({
+    ...(vars.length    ? { variable: vars }    : {}),
+    ...(trigs.length   ? { trigger:  trigs }   : {}),
+    ...(tags.length    ? { tag:      tags }     : {}),
+    ...(clients.length ? { client:   clients }  : {}),
+  });
+
+  try {
+    await gtmRequest('POST', `${basePath}:import?importOption=${importOption}`, importBody);
+    report('done', total);
+    console.log('[gtm] bulk import succeeded — 1 API call');
+    return {
+      importedVariableCount: vars.length,
+      importedTriggerCount:  trigs.length,
+      importedTagCount:      tags.length,
+      importedClientCount:   clients.length,
+    };
+  } catch (bulkErr) {
+    // Bulk endpoint doesn't exist on this GTM account/quota tier → fall through
+    // to individual entity creation.  Any error other than 404/405 is re-thrown.
+    const isMissing = bulkErr.status === 404 || bulkErr.status === 405 ||
+      /method not (found|allowed)|not implemented/i.test(bulkErr.message || '');
+    if (!isMissing) throw bulkErr;
+    console.warn('[gtm] bulk import not available (' + bulkErr.status + ') — falling back to individual calls');
+  }
+
+  // ── FALLBACK: Parallel bursts, one call per entity ────────────────────────
+  // GTM write quota: ~25 ops/min. Fire BURST_SIZE items in parallel, then wait
+  // BURST_WAIT_MS for the quota window to reset before the next burst.
+  const BURST_SIZE    = 25;
+  const BURST_WAIT_MS = 62000;
+
+  let done = 0;
+  const reportBurst = (label) => report(`${label}`, done);
+
   async function runInBursts(items, label, writeFn) {
     for (let i = 0; i < items.length; i += BURST_SIZE) {
-      const batch = items.slice(i, i + BURST_SIZE);
+      const batch     = items.slice(i, i + BURST_SIZE);
       const batchStart = Date.now();
-      // Fire all items in the burst in parallel; retry logic in gtmRequest
-      // handles any 429s that slip through.
-      const results = await Promise.all(batch.map(async (item) => {
-        const r = await writeFn(item);
+      await Promise.all(batch.map(async (item) => {
+        await writeFn(item);
         done++;
-        report(`${label} ${done}/${total}`);
-        return r;
+        reportBurst(label);
       }));
-      // If there are more items, wait for the quota window to refresh
       if (i + BURST_SIZE < items.length) {
-        const elapsed = Date.now() - batchStart;
-        const toWait = Math.max(0, BURST_WAIT_MS - elapsed);
-        if (toWait > 0) {
-          console.log(`[gtm] burst done, waiting ${toWait}ms for quota window`);
-          await sleep(toWait);
+        const wait = Math.max(0, BURST_WAIT_MS - (Date.now() - batchStart));
+        if (wait > 0) {
+          console.log(`[gtm] burst done — waiting ${wait}ms`);
+          await sleep(wait);
         }
       }
-      // No-op use to satisfy linters in case batch result is needed later
-      void results;
     }
   }
 
   const triggerMap = {};
 
-  // PHASE 1: Variables + Triggers together (neither depends on the other)
-  // Combine them so small configs finish in a single burst.
+  // Phase 1: Variables + Triggers (parallel, no dependency)
   const varsAndTrigs = [
-    ...vars.map(v => ({ kind: 'variable', item: v })),
-    ...trigs.map(t => ({ kind: 'trigger', item: t })),
+    ...vars.map(v  => ({ kind: 'variable', item: v })),
+    ...trigs.map(t => ({ kind: 'trigger',  item: t })),
   ];
-
-  // Pre-fetch existing variables once so upsert can resolve duplicates without
-  // extra API calls inside the burst loop. A single GET is much cheaper than
-  // one GET per duplicate.
-  let _existingVars = null;
-  async function getExistingVars() {
-    if (_existingVars) return _existingVars;
-    const resp = await gtmRequest('GET', `${basePath}/variables`).catch(() => ({ variable: [] }));
-    _existingVars = (resp.variable || []);
-    return _existingVars;
-  }
-
   await runInBursts(varsAndTrigs, 'var/trig', async ({ kind, item }) => {
     const body = { ...item };
-    if (kind === 'variable') {
-      delete body.accountId; delete body.containerId; delete body.workspaceId;
-      delete body.variableId; delete body.fingerprint; delete body.path;
-      delete body.parentFolderId;
-      try {
-        return await gtmRequest('POST', `${basePath}/variables`, JSON.stringify(body));
-      } catch (e) {
-        // GTM returns 400 "duplicate name" when the variable already exists in
-        // the workspace (e.g. from a previous failed attempt or manual setup).
-        // Upsert: find the existing variable by name and PUT instead.
-        if (e.status === 400 && /duplicate/i.test(e.message || '')) {
-          const existing = await getExistingVars();
-          const match = existing.find(v => v.name === body.name);
-          if (match) {
-            const updated = { ...match, ...body };
-            console.log(`[gtm] upsert variable (duplicate) — updating "${body.name}" (${match.variableId})`);
-            return gtmRequest('PUT', `${basePath}/variables/${match.variableId}`, JSON.stringify(updated));
-          }
-        }
-        throw e; // re-throw non-duplicate errors
-      }
-    }
-    // trigger
-    const oldId = body.triggerId;
     delete body.accountId; delete body.containerId; delete body.workspaceId;
-    delete body.triggerId; delete body.fingerprint; delete body.path;
-    delete body.parentFolderId;
-    const created = await gtmRequest('POST', `${basePath}/triggers`, JSON.stringify(body));
-    if (oldId && created.triggerId) {
-      triggerMap[oldId] = created.triggerId;
+    delete body.fingerprint; delete body.path; delete body.parentFolderId;
+    if (kind === 'variable') {
+      delete body.variableId;
+      return gtmRequest('POST', `${basePath}/variables`, JSON.stringify(body));
     }
+    const oldId = body.triggerId;
+    delete body.triggerId;
+    const created = await gtmRequest('POST', `${basePath}/triggers`, JSON.stringify(body));
+    if (oldId && created.triggerId) triggerMap[oldId] = created.triggerId;
     return created;
   });
 
-  // PHASE 2: Tags (depend on triggerMap from phase 1)
+  // Phase 2: Tags (depend on triggerMap from phase 1)
   await runInBursts(tags, 'tag', async (t) => {
     const body = { ...t };
     delete body.accountId; delete body.containerId; delete body.workspaceId;
-    delete body.tagId; delete body.fingerprint; delete body.path;
-    delete body.parentFolderId;
-    if (body.firingTriggerId) {
-      body.firingTriggerId = body.firingTriggerId.map(id => triggerMap[id] || id);
-    }
-    if (body.blockingTriggerId) {
-      body.blockingTriggerId = body.blockingTriggerId.map(id => triggerMap[id] || id);
-    }
-    if (body.enablingTriggerId) {
-      body.enablingTriggerId = body.enablingTriggerId.map(id => triggerMap[id] || id);
-    }
-    try {
-      return await gtmRequest('POST', `${basePath}/tags`, JSON.stringify(body));
-    } catch (e) {
-      if (e.status === 400 && /duplicate/i.test(e.message || '')) {
-        const tagsResp = await gtmRequest('GET', `${basePath}/tags`).catch(() => ({ tag: [] }));
-        const match = (tagsResp.tag || []).find(tg => tg.name === body.name);
-        if (match) {
-          const updated = { ...match, ...body };
-          console.log(`[gtm] upsert tag (duplicate) — updating "${body.name}" (${match.tagId})`);
-          return gtmRequest('PUT', `${basePath}/tags/${match.tagId}`, JSON.stringify(updated));
-        }
-      }
-      throw e;
-    }
+    delete body.tagId; delete body.fingerprint; delete body.path; delete body.parentFolderId;
+    if (body.firingTriggerId)   body.firingTriggerId   = body.firingTriggerId.map(id => triggerMap[id] || id);
+    if (body.blockingTriggerId) body.blockingTriggerId = body.blockingTriggerId.map(id => triggerMap[id] || id);
+    if (body.enablingTriggerId) body.enablingTriggerId = body.enablingTriggerId.map(id => triggerMap[id] || id);
+    return gtmRequest('POST', `${basePath}/tags`, JSON.stringify(body));
   });
 
-  // PHASE 3: Clients (server containers only — independent of triggers/tags)
+  // Phase 3: Clients (server containers only)
   if (clients.length > 0) {
     await runInBursts(clients, 'client', async (c) => {
       const body = { ...c };
       delete body.accountId; delete body.containerId; delete body.workspaceId;
-      delete body.clientId; delete body.fingerprint; delete body.path;
-      delete body.parentFolderId;
+      delete body.clientId; delete body.fingerprint; delete body.path; delete body.parentFolderId;
       return gtmRequest('POST', `${basePath}/clients`, JSON.stringify(body));
     });
   }
@@ -701,11 +661,13 @@ async function provisionForClientWithServer(opts) {
   const serverWs = await getDefaultWorkspace(serverContainerId);
   const serverWorkspaceId = serverWs.workspaceId;
 
-  // Use the caller-supplied server config if provided (built from wizard data),
-  // otherwise fall back to a minimal empty template.
-  const sgtmConfig = (opts.serverConfigJson && typeof opts.serverConfigJson === 'object')
-    ? opts.serverConfigJson
-    : { containerVersion: { variable: [], trigger: [], tag: [] } };
+  let sgtmConfig;
+  try {
+    sgtmConfig = require('./lib/sgtm-default-config.json');
+  } catch (e) {
+    sgtmConfig = { containerVersion: { variable: [], trigger: [], tag: [] } };
+    console.warn('[gtm] lib/sgtm-default-config.json missing — server container will be empty');
+  }
 
   onProgress({ stage: 'sgtm_import', done: 0, total: 1 });
   const importResult = await importContainerJSON(
@@ -718,25 +680,14 @@ async function provisionForClientWithServer(opts) {
   const verResp  = await createVersion(serverContainerId, serverWorkspaceId,
     'sGTM initial — ' + new Date().toISOString().split('T')[0]);
   const serverVersionId = verResp.containerVersion && verResp.containerVersion.containerVersionId;
-  let publishError = null;
   if (serverVersionId) {
-    try {
-      await publishVersion(serverContainerId, serverVersionId);
-    } catch (e) {
-      publishError = e.message;
-      console.warn('[gtm] publishVersion non-fatal:', e.message);
-    }
+    await publishVersion(serverContainerId, serverVersionId);
   }
   onProgress({ stage: 'sgtm_publish', done: 1, total: 1 });
 
-  // 6. Pull the live containerConfig blob — this is what the user pastes
+  // 5. Pull the live containerConfig blob — this is what the user pastes
   //    into Stape / Cloud Run / Docker as the CONTAINER_CONFIG env var.
-  //    Only available after a successful publish.
-  let containerConfig = null;
-  containerConfig = await getContainerConfig(serverContainerId).catch(e => {
-    console.warn('[gtm] getContainerConfig non-fatal:', e.message);
-    return null;
-  });
+  const containerConfig = await getContainerConfig(serverContainerId);
 
   return {
     web,                                            // existing shape from provisionForClient
@@ -769,6 +720,5 @@ module.exports = {
   createServerContainer,
   getContainerConfig,
   setGA4TransportUrl,
-  upsertServerUrlVariable,
   provisionForClientWithServer,
 };
