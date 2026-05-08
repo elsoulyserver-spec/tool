@@ -160,9 +160,10 @@ async function gtmRequest(method, path, body, attempt = 0) {
   if (attempt < MAX_RETRIES) {
     let waitMs = 0;
     if (status === 429) {
-      // 429 means we're past the minute quota — wait the full window + jitter.
-      // Schedule: 20s -> 40s -> 70s -> 90s (covers up to 2 full quota windows).
-      waitMs = [20000, 40000, 70000, 90000][attempt];
+      // 429 means we're past the minute quota — wait the full window + buffer.
+      // GTM quota is "per minute per user", so we need >= 60s to reset.
+      // Schedule: 65s -> 70s -> 80s -> 90s (always > one full quota window).
+      waitMs = [65000, 70000, 80000, 90000][attempt];
     } else if (status >= 500 && status < 600) {
       // Transient 5xx — shorter exponential backoff
       waitMs = [2000, 5000, 10000, 20000][attempt];
@@ -278,8 +279,9 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
   // ── FALLBACK: Parallel bursts, one call per entity ────────────────────────
   // GTM write quota: ~25 ops/min. Fire BURST_SIZE items in parallel, then wait
   // BURST_WAIT_MS for the quota window to reset before the next burst.
-  const BURST_SIZE    = 25;
-  const BURST_WAIT_MS = 62000;
+  // Keep BURST_SIZE at 10 to stay safely under the 25/min limit and avoid 429s.
+  const BURST_SIZE    = 10;
+  const BURST_WAIT_MS = 65000;
 
   let done = 0;
   const reportBurst = (label) => report(`${label}`, done);
