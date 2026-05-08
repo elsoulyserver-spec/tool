@@ -139,7 +139,7 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ── Generic GTM REST call wrapper with retry/backoff ────────────────────────
 // GTM quotas default to ~25 writes/minute per user, so we retry 429 with
-// long waits (≥ 60s) to let the per-minute window reset fully.
+// long waits (>= 60s) to let the per-minute window reset fully.
 async function gtmRequest(method, path, body, attempt = 0) {
   const MAX_RETRIES = 4;
 
@@ -161,7 +161,7 @@ async function gtmRequest(method, path, body, attempt = 0) {
     let waitMs = 0;
     if (status === 429) {
       // 429 means we're past the minute quota — wait the full window + jitter.
-      // Schedule: 20s → 40s → 70s → 90s (covers up to 2 full quota windows).
+      // Schedule: 20s -> 40s -> 70s -> 90s (covers up to 2 full quota windows).
       waitMs = [20000, 40000, 70000, 90000][attempt];
     } else if (status >= 500 && status < 600) {
       // Transient 5xx — shorter exponential backoff
@@ -267,7 +267,7 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
       importedClientCount:   clients.length,
     };
   } catch (bulkErr) {
-    // Bulk endpoint doesn't exist on this GTM account/quota tier → fall through
+    // Bulk endpoint doesn't exist on this GTM account/quota tier -> fall through
     // to individual entity creation.  Any error other than 404/405 is re-thrown.
     const isMissing = bulkErr.status === 404 || bulkErr.status === 405 ||
       /method not (found|allowed)|not implemented/i.test(bulkErr.message || '');
@@ -310,22 +310,80 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
     ...vars.map(v  => ({ kind: 'variable', item: v })),
     ...trigs.map(t => ({ kind: 'trigger',  item: t })),
   ];
+
+  // Pre-load existing variables and triggers to avoid duplicate-name 400s on retry.
+  // GTM returns 400 "Found entity with duplicate name" if we POST an entity whose
+  // name already exists in the workspace (e.g. from a previous partial attempt).
+  // We build name->id maps so we can update instead of blindly POSTing.
+  let existingVarMap = {};   // name -> variableId
+  let existingTrigMap = {};  // name -> triggerId
+  try {
+    const evr = await gtmRequest('GET', `${basePath}/variables`).catch(() => ({ variable: [] }));
+    (evr.variable || []).forEach(v => { existingVarMap[v.name] = v.variableId; });
+    const etr = await gtmRequest('GET', `${basePath}/triggers`).catch(() => ({ trigger: [] }));
+    (etr.trigger || []).forEach(t => { existingTrigMap[t.name] = t.triggerId; });
+  } catch (_) { /* non-fatal — proceed and handle duplicates inline */ }
+
   await runInBursts(varsAndTrigs, 'var/trig', async ({ kind, item }) => {
     const body = { ...item };
     delete body.accountId; delete body.containerId; delete body.workspaceId;
     delete body.fingerprint; delete body.path; delete body.parentFolderId;
     if (kind === 'variable') {
+      const existingId = existingVarMap[body.name];
+      if (existingId) {
+        // Already exists — update in place instead of creating a duplicate.
+        console.log(`[gtm] variable "${body.name}" already exists (id=${existingId}) — updating`);
+        delete body.variableId;
+        try {
+          return await gtmRequest('PUT', `${basePath}/variables/${existingId}`, JSON.stringify({ ...body, variableId: existingId }));
+        } catch (putErr) {
+          console.warn(`[gtm] variable "${body.name}" PUT failed — skipping:`, putErr.message);
+          return;
+        }
+      }
       delete body.variableId;
-      return gtmRequest('POST', `${basePath}/variables`, JSON.stringify(body));
+      try {
+        const created = await gtmRequest('POST', `${basePath}/variables`, JSON.stringify(body));
+        existingVarMap[body.name] = created.variableId; // track for later items
+        return created;
+      } catch (e) {
+        if (e.status === 400 && /duplicate/i.test(e.message || '')) {
+          console.warn(`[gtm] variable "${body.name}" duplicate on POST — skipping`);
+          return;
+        }
+        throw e;
+      }
     }
+    // kind === 'trigger'
     const oldId = body.triggerId;
     delete body.triggerId;
-    const created = await gtmRequest('POST', `${basePath}/triggers`, JSON.stringify(body));
-    if (oldId && created.triggerId) triggerMap[oldId] = created.triggerId;
-    return created;
+    const existingTriggerId = existingTrigMap[body.name];
+    if (existingTriggerId) {
+      console.log(`[gtm] trigger "${body.name}" already exists (id=${existingTriggerId}) — skipping`);
+      if (oldId) triggerMap[oldId] = existingTriggerId;
+      return;
+    }
+    try {
+      const created = await gtmRequest('POST', `${basePath}/triggers`, JSON.stringify(body));
+      if (oldId && created.triggerId) triggerMap[oldId] = created.triggerId;
+      existingTrigMap[body.name] = created.triggerId;
+      return created;
+    } catch (e) {
+      if (e.status === 400 && /duplicate/i.test(e.message || '')) {
+        console.warn(`[gtm] trigger "${body.name}" duplicate on POST — skipping`);
+        return;
+      }
+      throw e;
+    }
   });
 
   // Phase 2: Tags (depend on triggerMap from phase 1)
+  let existingTagMap = {};   // name -> tagId
+  try {
+    const etagr = await gtmRequest('GET', `${basePath}/tags`).catch(() => ({ tag: [] }));
+    (etagr.tag || []).forEach(t => { existingTagMap[t.name] = t.tagId; });
+  } catch (_) { /* non-fatal */ }
+
   await runInBursts(tags, 'tag', async (t) => {
     const body = { ...t };
     delete body.accountId; delete body.containerId; delete body.workspaceId;
@@ -333,7 +391,27 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
     if (body.firingTriggerId)   body.firingTriggerId   = body.firingTriggerId.map(id => triggerMap[id] || id);
     if (body.blockingTriggerId) body.blockingTriggerId = body.blockingTriggerId.map(id => triggerMap[id] || id);
     if (body.enablingTriggerId) body.enablingTriggerId = body.enablingTriggerId.map(id => triggerMap[id] || id);
-    return gtmRequest('POST', `${basePath}/tags`, JSON.stringify(body));
+    const existingTagId = existingTagMap[body.name];
+    if (existingTagId) {
+      console.log(`[gtm] tag "${body.name}" already exists (id=${existingTagId}) — updating`);
+      try {
+        return await gtmRequest('PUT', `${basePath}/tags/${existingTagId}`, JSON.stringify({ ...body, tagId: existingTagId }));
+      } catch (putErr) {
+        console.warn(`[gtm] tag "${body.name}" PUT failed — skipping:`, putErr.message);
+        return;
+      }
+    }
+    try {
+      const created = await gtmRequest('POST', `${basePath}/tags`, JSON.stringify(body));
+      existingTagMap[body.name] = created.tagId;
+      return created;
+    } catch (e) {
+      if (e.status === 400 && /duplicate/i.test(e.message || '')) {
+        console.warn(`[gtm] tag "${body.name}" duplicate on POST — skipping`);
+        return;
+      }
+      throw e;
+    }
   });
 
   // Phase 3: Clients (server containers only)
@@ -400,8 +478,8 @@ async function inviteUserToContainer(containerId, email, permission) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// END-TO-END: Client → Managed Container
-// Does: createContainer → import JSON → create version → (optional) publish.
+// END-TO-END: Client -> Managed Container
+// Does: createContainer -> import JSON -> create version -> (optional) publish.
 // Returns everything the frontend needs to show the overview.
 // ══════════════════════════════════════════════════════════════════════════════
 async function provisionForClient({ projectName, domain, configJson, publishLive, onProgress, inviteEmail }) {
@@ -514,13 +592,13 @@ async function createServerContainer(name) {
   const acc = getAccountId();
   const body = JSON.stringify({
     name: name,
-    usageContext: ['server'],   // ← the only difference from createContainer()
+    usageContext: ['server'],   // <- the only difference from createContainer()
   });
   return gtmRequest('POST', `/accounts/${acc}/containers`, body);
 }
 
 // Fetches the *live* container config string. This is the value that GTM admin
-// shows under "Container Settings → Server Container Config", which the user's
+// shows under "Container Settings -> Server Container Config", which the user's
 // chosen sGTM host (Stape/Cloud Run/Docker) consumes. It only becomes non-null
 // after a version is created and published.
 async function getContainerConfig(containerId) {
@@ -633,7 +711,7 @@ async function provisionForClientWithServer(opts) {
   // 1. Web container — DO NOT publishLive yet.
   onProgress({ stage: 'web_container', done: 0, total: 1 });
   const web = await provisionForClient({
-    ...opts,
+    opts,
     publishLive: false,                 // overridden — wire-transport publishes
   });
   onProgress({ stage: 'web_container', done: 1, total: 1 });
@@ -698,7 +776,7 @@ async function provisionForClientWithServer(opts) {
       workspaceId:     serverWorkspaceId,
       versionId:       serverVersionId,
       containerName:   serverName,
-      containerConfig,                              // ← the deploy blob
+      containerConfig,                              // <- the deploy blob
       importedTagCount:      importResult.importedTagCount      || 0,
       importedTriggerCount:  importResult.importedTriggerCount  || 0,
       importedVariableCount: importResult.importedVariableCount || 0,
@@ -720,5 +798,6 @@ module.exports = {
   createServerContainer,
   getContainerConfig,
   setGA4TransportUrl,
+  upsertServerUrlVariable,
   provisionForClientWithServer,
 };
