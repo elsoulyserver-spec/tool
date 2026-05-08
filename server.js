@@ -1556,20 +1556,105 @@ http.createServer((req, res) => {
     }
 
     // ────────────────────────────────────────────────────────────────────────
-    // POST /api/ss/deploy-stape — DEPRECATED (returns 410 Gone)
-    // The Stape API auto-deploy was removed in favour of the new client+server
-    // flow: /api/managed/create-container with mode=client_server creates the
-    // server container in GTM and returns its containerConfig blob. Users
-    // deploy that blob themselves to Stape / Cloud Run / Docker, then call
-    // /api/ss/wire-transport to wire the web container.
+    // POST /api/ss/deploy-stape
+    // Deploys the GTM server containerConfig to Stape.io via their API.
+    //
+    // Body: {
+    //   stapeApiKey:     string   — Stape API key (from user, never stored without consent)
+    //   containerConfig: string   — GTM container config JSON blob from create-containers job
+    //   containerName?:  string   — display name for the Stape container
+    //   region?:         string   — 'us-central' (default) | 'eu-west' | 'me-central1'
+    //   saveKey?:        boolean  — encrypt + persist stapeApiKey in user's SS config
+    // }
+    //
+    // Returns: { ok, serverUrl, containerId, status }
+    // On success also patches ss_config with stapeContainerId + serverUrl so
+    // /api/ss/wire-transport can be called immediately after.
     // ────────────────────────────────────────────────────────────────────────
     if (req.method === 'POST' && ssPath === '/api/ss/deploy-stape') {
       (async () => {
         const auth = await ssAuthAndRate();
         if (!auth) return;
-        sendJSON(res, 410, {
-          error: 'هذه النقطة ملغاة',
-          hint:  'استخدم /api/managed/create-container مع mode=client_server للحصول على containerConfig، ثم انشره بنفسك على Stape/Cloud Run.',
+        const { clientId, email } = auth;
+        if (!ssRequireFirestore()) return;
+
+        ssParseBody(async body => {
+          const stapeApiKey     = (body.stapeApiKey || '').trim();
+          const containerConfig = (body.containerConfig || '').trim();
+          const containerName   = (body.containerName  || ((email || clientId.slice(0, 8)) + ' — sGTM')).trim();
+          const region          = (body.region || 'us-central').trim();
+          const saveKey         = !!body.saveKey;
+
+          if (!stapeApiKey)     return sendJSON(res, 400, { error: 'حقل stapeApiKey مطلوب' });
+          if (!containerConfig) return sendJSON(res, 400, { error: 'حقل containerConfig مطلوب — أنشئ الـ containers أولاً (الخطوة 5)' });
+
+          // Validate that the API key looks plausible before hitting Stape
+          // (Stape keys are typically > 20 chars; reject obvious garbage early)
+          if (stapeApiKey.length < 10) {
+            return sendJSON(res, 400, { error: 'stapeApiKey يبدو قصيراً جداً — تأكد من نسخ المفتاح كاملاً من Stape' });
+          }
+
+          try {
+            const provider = new StapeProvider({ stapeApiKey });
+            const result   = await provider.deployContainer({
+              stapeApiKey,
+              gtmConfigBody: containerConfig,
+              containerName,
+              region,
+            });
+
+            // result = { serverUrl, containerId, status }
+            if (!result.serverUrl && result.status === 'provisioning') {
+              // Stape sometimes returns the container before the URL is ready.
+              // Return what we have — frontend will poll /api/ss/validate-url.
+              sendJSON(res, 202, {
+                ok:          true,
+                provisioning: true,
+                containerId: result.containerId,
+                status:      result.status,
+                message:     'الـ Container بدأ التجهيز على Stape — قد يستغرق 1-3 دقائق قبل أن يكون الـ URL جاهزاً',
+              });
+              return;
+            }
+
+            // Patch the user's SS config with stapeContainerId + serverUrl so the
+            // wizard can auto-advance to Step 7 without the user typing the URL.
+            try {
+              const existing = await firestoreService.getSSConfig(clientId).catch(() => null);
+              const patch = {
+                ...(existing || {}),
+                stapeContainerId:  result.containerId || null,
+                serverUrl:         result.serverUrl   || '',
+                stapeAutoDeployed: true,
+              };
+              // Optionally persist the encrypted API key for future use
+              if (saveKey && ssRequireCrypto()) {
+                patch.stapeApiKey = cryptoVault.encryptToken(stapeApiKey, clientId + ':stape');
+              }
+              await firestoreService.saveSSConfig(clientId, patch);
+            } catch (saveErr) {
+              // Non-fatal — log and continue; the deploy itself succeeded.
+              console.warn('[ss/deploy-stape] saveSSConfig patch failed (non-fatal):', saveErr.message);
+            }
+
+            rateLimiter.recordSuccess(clientId);
+            sendJSON(res, 200, {
+              ok:          true,
+              serverUrl:   result.serverUrl,
+              containerId: result.containerId,
+              status:      result.status,
+              message:     'تم النشر على Stape بنجاح — الـ URL جاهز للربط',
+            });
+          } catch (e) {
+            rateLimiter.recordError(clientId);
+            // Surface Stape auth errors clearly so the user can fix their API key
+            const msg = e.message || '';
+            if (e.status === 401 || e.status === 403 || /auth/i.test(msg)) {
+              return sendJSON(res, 401, { error: 'Stape API key غير صالح أو منتهي — تحقق من المفتاح في إعدادات حسابك على stape.io', detail: msg });
+            }
+            const c = ssClassifyError(e, 'فشل النشر على Stape');
+            sendJSON(res, c.status, c.payload);
+          }
         });
       })();
       return;
@@ -1784,8 +1869,8 @@ http.createServer((req, res) => {
               cfg.webContainerId, cfg.webWorkspaceId, sgtmUrl,
             );
 
-            // Also upsert ET - sGTM URL constant variable in the server container
-            // so server-side tags can reference the URL without hardcoding it.
+            // Also add/update ET - sGTM URL constant variable in the server container
+            // so sGTM tags can reference the server URL without hardcoding it.
             let serverVarResult = null;
             if (cfg.serverContainerId && cfg.serverWorkspaceId) {
               try {
@@ -1903,9 +1988,9 @@ http.createServer((req, res) => {
             try {
               _setJob(jobId, { status: 'running', stage: 'gtm_provisioning', mode: 'client_server' });
 
-              // Build full web + server configs from wizard data at creation time so
-              // containers are populated with the user's actual GA4 ID, pixels, events.
-              // sgtmUrl is empty — it gets wired later via /api/ss/wire-transport.
+              // Build full web + server configs from wizard data now (at creation time),
+              // so containers are populated with the user's actual GA4 ID, pixels, events.
+              // sgtmUrl is empty string at this stage — it gets wired later via /api/ss/wire-transport.
               const { buildWebConfig, buildServerConfig } = require('./lib/gtm-config-builder');
 
               const webConfig = configJson || buildWebConfig({
@@ -2012,8 +2097,7 @@ http.createServer((req, res) => {
       return;
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // GET /api/ss/full-status
+        // GET /api/ss/full-status
     // Returns combined container + SS config data for the Overview section.
     // Tokens are always redacted. Container snippets are included.
     // ────────────────────────────────────────────────────────────────────────
@@ -2057,11 +2141,11 @@ http.createServer((req, res) => {
     }
 
     // Unknown /api/ss/* path
-    sendJSON(res, 404, { error: 'SS endpoint \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f: ' + ssPath });
+    sendJSON(res, 404, { error: 'SS endpoint غير موجود: ' + ssPath });
     return;
   }
 
-  // \u2500\u2500 Static File Server \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── Static File Server ────────────────────────────────────────
   let urlPath;
   try {
     urlPath = decodeURIComponent(req.url.split('?')[0]);
@@ -2069,11 +2153,11 @@ http.createServer((req, res) => {
     res.writeHead(400, securityHeaders()); res.end('Bad Request'); return;
   }
 
-  // Default root \u2192 tool.html (the app's single-page entry)
+  // Default root → tool.html (the app's single-page entry)
   const requestedPath = urlPath === '/' ? '/tool.html' : urlPath;
   const filePath      = path.normalize(path.join(ROOT, requestedPath));
 
-  // Path traversal guard \u2014 filePath MUST stay within ROOT
+  // Path traversal guard — filePath MUST stay within ROOT
   if (filePath !== ROOT && !filePath.startsWith(ROOT + path.sep)) {
     res.writeHead(403, securityHeaders()); res.end('Forbidden'); return;
   }
@@ -2086,14 +2170,14 @@ http.createServer((req, res) => {
   function serveFile(fp, triedFallback) {
     fs.readFile(fp, (err, data) => {
       if (err) {
-        // Extensionless URLs (e.g. /tool) \u2192 try <name>.html once
+        // Extensionless URLs (e.g. /tool) → try <name>.html once
         if (!triedFallback && !path.extname(fp)) return serveFile(fp + '.html', true);
         res.writeHead(404, securityHeaders()); res.end('Not found');
         return;
       }
       const ext    = path.extname(fp).toLowerCase();
 
-      // Extension allowlist \u2014 blocks server.js / package.json / Dockerfile / etc.
+      // Extension allowlist — blocks server.js / package.json / Dockerfile / etc.
       if (!STATIC_ALLOW_EXT.has(ext)) {
         res.writeHead(403, securityHeaders()); res.end('Forbidden');
         return;
@@ -2109,8 +2193,8 @@ http.createServer((req, res) => {
   }
   serveFile(filePath);
 
-}).listen(PORT, '0.0.0.0', () => {
-  const mode = puppeteer ? '\U0001f7e2 Puppeteer (headless Chrome)' : '\U0001f7e1 HTTP fallback (install puppeteer for full analysis)';
-  console.log(`Easy Track server running at http://0.0.0.0:${PORT}`);
+}).listen(PORT, () => {
+  const mode = puppeteer ? '🟢 Puppeteer (headless Chrome)' : '🟡 HTTP fallback (install puppeteer for full analysis)';
+  console.log(`Easy Track server running at http://localhost:${PORT}`);
   console.log(`Scanner mode: ${mode}`);
 });
