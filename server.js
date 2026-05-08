@@ -933,10 +933,31 @@ http.createServer((req, res) => {
           //                        once the user confirms the sGTM URL.
           _setJob(jobId, { stage: 'gtm_provisioning', mode });
 
+          // Build server config for client_server mode using the same builder
+          // that /api/ss/create-containers uses, so the server container gets
+          // the user's actual GA4 ID, platforms, and events — not a blank template.
+          let serverConfigJson = null;
+          if (mode === 'client_server') {
+            try {
+              const { buildServerConfig } = require('./lib/gtm-config-builder');
+              const ga4Id = (pixelIds && (pixelIds.ga4 || pixelIds.GA4 || pixelIds['ga4'])) || '';
+              serverConfigJson = buildServerConfig({
+                ga4MeasurementId: ga4Id,
+                sgtmUrl:          '',          // wired later via /api/ss/wire-transport
+                platforms:        platforms || [],
+                events:           events    || [],
+              });
+              console.log('[managed/create] built serverConfigJson — ga4Id:', ga4Id || '(none)', 'platforms:', (platforms || []).join(','));
+            } catch (scErr) {
+              console.warn('[managed/create] buildServerConfig failed (non-fatal):', scErr.message);
+            }
+          }
+
           const provisionOpts = {
             projectName: projectName || `${clientEmail || 'client'} — ${cmsType || 'site'}`,
             domain,
             configJson,
+            serverConfigJson,              // null for 'client' mode, populated for 'client_server'
             publishLive: mode === 'client_server' ? false : !!publishLive,
             inviteEmail: clientEmail || null,
             onProgress: (p) => _setJob(jobId, { stage: 'gtm_provisioning', progress: p }),
