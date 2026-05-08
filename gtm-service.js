@@ -762,12 +762,20 @@ async function provisionForClientWithServer(opts) {
   const serverWs = await getDefaultWorkspace(serverContainerId);
   const serverWorkspaceId = serverWs.workspaceId;
 
+  // Use caller-supplied serverConfigJson if provided (e.g. from /api/ss/create-containers
+  // which builds a full config from the user's GA4 ID + pixels + events).
+  // Fall back to the static default file only if nothing was supplied.
   let sgtmConfig;
-  try {
-    sgtmConfig = require('./lib/sgtm-default-config.json');
-  } catch (e) {
-    sgtmConfig = { containerVersion: { variable: [], trigger: [], tag: [] } };
-    console.warn('[gtm] lib/sgtm-default-config.json missing — server container will be empty');
+  if (opts.serverConfigJson) {
+    sgtmConfig = opts.serverConfigJson;
+    console.log('[gtm] using caller-supplied serverConfigJson for server container');
+  } else {
+    try {
+      sgtmConfig = require('./lib/sgtm-default-config.json');
+    } catch (e) {
+      sgtmConfig = { containerVersion: { variable: [], trigger: [], tag: [] } };
+      console.warn('[gtm] lib/sgtm-default-config.json missing — server container will be empty');
+    }
   }
 
   onProgress({ stage: 'sgtm_import', done: 0, total: 1 });
