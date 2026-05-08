@@ -442,10 +442,33 @@ async function createVersion(containerId, workspaceId, versionName) {
 }
 
 // Publish a version to Live.
+// If the given versionId returns 404 (version not found / already published),
+// we fall back to listing all versions and publishing the latest unfinished one.
 async function publishVersion(containerId, versionId) {
   const acc = getAccountId();
-  return gtmRequest('POST',
-    `/accounts/${acc}/containers/${containerId}/versions/${versionId}:publish`, '');
+  try {
+    return await gtmRequest('POST',
+      `/accounts/${acc}/containers/${containerId}/versions/${versionId}:publish`, '');
+  } catch (e) {
+    if (e.status !== 404) throw e;
+    // 404 → the specific versionId wasn't found. Try the latest workspace version instead.
+    console.warn(`[gtm] publish version ${versionId} returned 404 — attempting fallback to latest version`);
+    try {
+      const listResp = await gtmRequest('GET', `/accounts/${acc}/containers/${containerId}/versions`);
+      const versions = (listResp.containerVersion || [])
+        .map(v => ({ ...v, _id: parseInt(v.containerVersionId, 10) || 0 }))
+        .sort((a, b) => b._id - a._id);
+      if (!versions.length) throw new Error('No versions found in container ' + containerId);
+      const latest = versions[0];
+      console.log(`[gtm] publishing latest version ${latest.containerVersionId} instead`);
+      return await gtmRequest('POST',
+        `/accounts/${acc}/containers/${containerId}/versions/${latest.containerVersionId}:publish`, '');
+    } catch (fallbackErr) {
+      // If the fallback also fails (e.g. already live), log and continue non-fatally.
+      console.warn(`[gtm] publish fallback also failed for container ${containerId}:`, fallbackErr.message);
+      throw fallbackErr;
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -711,7 +734,7 @@ async function provisionForClientWithServer(opts) {
   // 1. Web container — DO NOT publishLive yet.
   onProgress({ stage: 'web_container', done: 0, total: 1 });
   const web = await provisionForClient({
-    opts,
+    ...opts,
     publishLive: false,                 // overridden — wire-transport publishes
   });
   onProgress({ stage: 'web_container', done: 1, total: 1 });
@@ -759,11 +782,13 @@ async function provisionForClientWithServer(opts) {
     'sGTM initial — ' + new Date().toISOString().split('T')[0]);
   const serverVersionId = verResp.containerVersion && verResp.containerVersion.containerVersionId;
   if (serverVersionId) {
-    await publishVersion(serverContainerId, serverVersionId);
+    await publishVersion(serverContainerId, serverVersionId).catch(e => {
+      console.warn('[gtm] sGTM publish non-fatal:', e.message);
+    });
   }
   onProgress({ stage: 'sgtm_publish', done: 1, total: 1 });
 
-  // 5. Pull the live containerConfig blob — this is what the user pastes
+  // 5. Pull the live containerConfig blob -- this is what the user pastes
   //    into Stape / Cloud Run / Docker as the CONTAINER_CONFIG env var.
   const containerConfig = await getContainerConfig(serverContainerId);
 
