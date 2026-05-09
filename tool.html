@@ -4533,7 +4533,7 @@
                   🚀 فعّل Server-Side Tracking (مستحسن)
                 </div>
                 <div style="font-size:11px;color:var(--mut);margin-top:2px;line-height:1.5;">
-                  Easy Track هيعمل لك <strong>كل حاجة تلقائياً</strong>: ينشئ sGTM container، ينشره على Stape، ويربطه بالـ web container. مفيش حاجة تعملها انت — هتطلع snippet جاهز يتلصق على الموقع وبس. يتجاوز ad blockers + يدعم Conversions APIs.
+                  Easy Track هيعمل لك <strong>كل حاجة تلقائياً</strong>: ينشئ sGTM container ويربطه بالـ web container. محتاج بس تحط رابط السيرفر بتاعك (sGTM URL). يتجاوز ad blockers + يدعم Conversions APIs.
                 </div>
               </div>
             </label>
@@ -4541,6 +4541,20 @@
             <!-- CAPI Tokens block — shown when Server-Side is checked -->
             <div id="mgdCapiTokensBlock" style="display:none;margin-bottom:8px;padding:12px 14px;
               border-radius:12px;border:1px solid rgba(70,241,197,.25);background:rgba(70,241,197,.04);">
+              <!-- sGTM URL -->
+              <div style="font-size:12px;font-weight:700;color:var(--acc);margin-bottom:6px;">
+                🌐 رابط السيرفر بتاعك (sGTM URL)
+              </div>
+              <div style="font-size:11px;color:var(--mut);margin-bottom:8px;line-height:1.5;">
+                الرابط اللي بتشتغل عليه sGTM — هيتربط تلقائياً بالـ Web Container.
+              </div>
+              <input id="mgdSgtmUrlInput" type="url" dir="ltr" placeholder="https://gtm.your-domain.com"
+                style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--bdr2);
+                border-radius:8px;padding:9px 12px;color:var(--wht);font-family:var(--font-mono);
+                font-size:12px;margin-bottom:14px;outline:none;"
+                oninput="this.style.borderColor=this.value.trim()?'var(--acc)':'var(--bdr2)'">
+
+              <!-- CAPI Tokens -->
               <div style="font-size:12px;font-weight:700;color:var(--acc);margin-bottom:8px;">
                 🔑 CAPI Access Tokens — مطلوبة للـ Server-Side
               </div>
@@ -10822,14 +10836,17 @@
       var _ssToggle = document.getElementById('mgdServerSideChk');
       var _wantServer = !!(_ssToggle && _ssToggle.checked);
 
-      // Collect CAPI tokens from the token input fields (only when server-side is on)
+      // Collect CAPI tokens + sGTM URL (only when server-side is on)
       var _capiTokens = {};
+      var _sgtmUrl    = '';
       if (_wantServer) {
         var _capiPlatforms = ['meta', 'tiktok', 'snap'];
         _capiPlatforms.forEach(function(p) {
           var el = document.getElementById('mgd-capi-tok-' + p);
           if (el && el.value.trim()) _capiTokens[p] = el.value.trim();
         });
+        var _urlEl = document.getElementById('mgdSgtmUrlInput');
+        if (_urlEl) _sgtmUrl = _urlEl.value.trim();
       }
 
       var payload = {
@@ -10844,12 +10861,10 @@
         events:      S.events    || [],
         pixelIds:    _serializePixelIds(S.pixelIds),
         capiTokens:  _capiTokens,   // CAPI access tokens for server-side tags
+        sgtmUrl:     _sgtmUrl,      // user's sGTM server URL for transport_url wiring
         configJson:  configJson,
-        // When mode=client_server, the server defers publishing the web
-        // container until /api/ss/wire-transport runs — we override the user's
-        // publishLive choice in that case.
         mode:        _wantServer ? 'client_server' : 'client',
-        publishLive: _wantServer ? false : !!document.getElementById('mgdPublishChk').checked,
+        publishLive: !!document.getElementById('mgdPublishChk').checked,
       };
 
       // 3. UI → busy
@@ -10896,15 +10911,28 @@
         // Poll the job endpoint
         var jobId = data.jobId;
         var _projectDisplayName = payload.projectName || 'Container';
+        var n = _projectDisplayName;
+        // Top-level job stages
         var stageMsgs = {
-          queued:            'في الطابور...',
-          capacity_check:    'جاري التحقق من السعة...',
-          gtm_provisioning:  'جاري إنشاء "' + _projectDisplayName + '"',
-          inviting_user:     'جاري إرسال دعوة "' + _projectDisplayName + '" لبريدك',
-          saving:            'جاري حفظ "' + _projectDisplayName + '"',
-          done:              'تم إنشاء "' + _projectDisplayName + '" بنجاح',
-          error:             'حصل خطأ في "' + _projectDisplayName + '"',
-          capacity_exceeded: 'السعة وصلت للحد الأقصى',
+          queued:               'في الطابور...',
+          capacity_check:       'جاري التحقق من السعة...',
+          gtm_provisioning:     'جاري إنشاء "' + n + '"',
+          inviting_user:        'جاري إرسال دعوة لبريدك...',
+          saving:               'جاري حفظ "' + n + '"',
+          stape_deploy:         'جاري نشر السيرفر على Stape...',
+          wiring_transport_url: 'جاري ربط السيرفر بالـ Web Container...',
+          done:                 'تم إنشاء "' + n + '" بنجاح ✓',
+          error:                'حصل خطأ في "' + n + '"',
+          capacity_exceeded:    'السعة وصلت للحد الأقصى',
+        };
+        // Inner progress stages (from gtm-service onProgress)
+        var innerMsgs = {
+          'web_container':    'جاري إنشاء الـ Web Container...',
+          'server_container': 'جاري إنشاء الـ Server Container (sGTM)...',
+          'capi_templates':   'جاري تركيب قوالب CAPI على السيرفر...',
+          'sgtm_import':      'جاري إضافة Variables & Tags للسيرفر...',
+          'sgtm_publish':     'جاري نشر الـ Server Container...',
+          'inviting_user':    'جاري إرسال دعوة لبريدك...',
         };
 
         var maxWaitMs   = 15 * 60 * 1000;  // 15 min hard cap
@@ -10930,6 +10958,11 @@
 
             // Build a rich progress message with counter if available
             var base = stageMsgs[j2.stage] || ('جاري العمل... (' + j2.stage + ')');
+            // If we're in gtm_provisioning, show the inner sub-stage label
+            if (j2.stage === 'gtm_provisioning' && j2.progress && j2.progress.stage) {
+              var inner = innerMsgs[j2.progress.stage] || j2.progress.stage;
+              base = inner;
+            }
             if (j2.progress && j2.progress.total) {
               base += ' (' + j2.progress.done + '/' + j2.progress.total + ')';
             }
@@ -14808,80 +14841,4 @@
         return Math.round(val * 100) / 100;
       }
 
-      // ── Normalize Salla raw push to GA4 structure (shape-agnostic) ──
-      function normalizeSalla(raw) {
-        if (!raw || !raw.event) return null;
-        var ga4Ev = SALLA_UA_TO_GA4[raw.event];
-        if (!ga4Ev) return null;
-
-        var ec = raw.ecommerce || {};
-        var prod0 = (raw[0] && typeof raw[0] === 'object') ? raw[0] : {};
-
-        // Dynamic extraction — works with data[] / [0] / [0].products / ecommerce.*.products
-        var prods = extractSallaProducts(raw);
-
-        var items = normalizeSallaItems(prods);
-        var currency = ec.currencyCode || ec.currency || prod0.currency || 'SAR';
-
-        // Monetary field semantics — per-event, NOT generalized:
-        //   purchase          → ecommerce.value  (final order revenue / total)
-        //   view_item         → ecommerce.price  (single product price)
-        //   add_to_wishlist   → ecommerce.price  (single product price)
-        //   add_to_cart       → ecommerce.price  (unit price × quantity — line total)
-        //   remove_from_cart  → ecommerce.price  (line total of removed item)
-        //   view_cart         → ecommerce.price  (sum across all line items)
-        //   begin_checkout    → ecommerce.price  (sum across all line items at checkout)
-        //   view_item_list    → (no monetary field)
-        var ecBlock = { currency: currency, items: items };
-        var sumQty = items.reduce(function (s, it) { return s + (parseInt(it.quantity, 10) || 0); }, 0);
-        if (ga4Ev === 'purchase') {
-          ecBlock.value     = extractValue('purchase', items, ec, raw);
-          ecBlock.num_items = sumQty;
-        } else if (ga4Ev === 'view_item' || ga4Ev === 'add_to_wishlist') {
-          ecBlock.price     = extractValue(ga4Ev, items, ec, raw);
-          ecBlock.num_items = items.length ? (parseInt(items[0].quantity, 10) || 1) : 0;
-        } else if (ga4Ev === 'add_to_cart' || ga4Ev === 'remove_from_cart' ||
-                   ga4Ev === 'view_cart'   || ga4Ev === 'begin_checkout') {
-          ecBlock.price     = extractValue(ga4Ev, items, ec, raw);
-          ecBlock.num_items = sumQty;
-        }
-
-        var payload = {
-          event: ga4Ev,
-          event_id: generateEventId(raw, ga4Ev),
-          ecommerce: ecBlock
-        };
-
-        // purchase extras
-        if (ga4Ev === 'purchase') {
-          var af2 = (ec.purchase && ec.purchase.actionField) || {};
-          payload.ecommerce.transaction_id = String(af2.id || ec.event_id || raw.order_id || payload.event_id);
-          payload.ecommerce.tax = parseFloat(af2.tax || 0) || 0;
-          payload.ecommerce.shipping = parseFloat(af2.shipping || 0) || 0;
-          if (af2.coupon) payload.ecommerce.coupon = String(af2.coupon);
-        }
-        if (ga4Ev === 'view_item_list') {
-          payload.ecommerce.item_list_name = raw.title
-            ? String(raw.title).replace(/<[^>]+>/g, '').trim() : '';
-        }
-        if (ga4Ev === 'search') { payload.search_term = raw.searchTerm || raw.search_term || ''; delete payload.ecommerce; }
-        if (ga4Ev === 'login') { delete payload.ecommerce; payload.method = 'salla'; }
-        if (ga4Ev === 'sign_up') { delete payload.ecommerce; payload.method = 'salla'; }
-
-        if (raw.customer) payload.customer = raw.customer;
-        return payload;
-      }
-
-      // ── Normalize Zid raw push to GA4 structure ──
-      function normalizeZid(raw) {
-        if (!raw || !raw.event) return null;
-        var ga4Ev = ZID_TO_GA4[raw.event];
-        if (!ga4Ev) return null;
-
-        var ec = raw.ecommerce || {};
-
-        // Zid duplicate structure: ec might have both 'purchase' and 'items'
-        var items = [];
-        if (ec.items && Array.isArray(ec.items)) {
-          items = normalizeZidItems(ec.items);
-        } else if (ec.products && Array.isArray(e
+      // ── Norma
