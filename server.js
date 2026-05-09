@@ -887,7 +887,8 @@ http.createServer((req, res) => {
       }
 
       const { clientId, clientEmail, projectName, domain, cmsType,
-              platforms, events, pixelIds, configJson, publishLive } = body;
+              platforms, events, pixelIds, configJson, publishLive,
+              capiTokens } = body;    // capiTokens: { meta, tiktok, snap } — CAPI access tokens
 
       // Tracking mode picker — 'client' (default) or 'client_server'.
       // Anything else is normalised to 'client' so old callers keep working.
@@ -946,8 +947,11 @@ http.createServer((req, res) => {
                 sgtmUrl:          '',          // wired later via /api/ss/wire-transport
                 platforms:        platforms || [],
                 events:           events    || [],
+                pixelIds:         pixelIds  || {},   // pixel ID constant variables
+                capiTokens:       capiTokens || {},  // CAPI access token constant variables
               });
-              console.log('[managed/create] built serverConfigJson — ga4Id:', ga4Id || '(none)', 'platforms:', (platforms || []).join(','));
+              console.log('[managed/create] built serverConfigJson — ga4Id:', ga4Id || '(none)',
+                'platforms:', (platforms || []).join(','), 'events:', (events || []).join(','));
             } catch (scErr) {
               console.warn('[managed/create] buildServerConfig failed (non-fatal):', scErr.message);
             }
@@ -958,6 +962,7 @@ http.createServer((req, res) => {
             domain,
             configJson,
             serverConfigJson,              // null for 'client' mode, populated for 'client_server'
+            capiTokens:  capiTokens || {}, // CAPI tokens for custom template creation in sGTM
             publishLive: mode === 'client_server' ? false : !!publishLive,
             inviteEmail: clientEmail || null,
             onProgress: (p) => _setJob(jobId, { stage: 'gtm_provisioning', progress: p }),
