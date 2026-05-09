@@ -613,6 +613,280 @@ async function provisionForClient({ projectName, domain, configJson, publishLive
 // CONTAINER_CONFIG env var. We provision it via the same GTM API as the web one.
 // ══════════════════════════════════════════════════════════════════════════════
 
+// ══════════════════════════════════════════════════════════════════════════════
+// CAPI CUSTOM TEMPLATES  —  create sandboxed-JS tag templates in sGTM workspace
+// so users don't need to install community templates manually.
+// Each template makes a direct HTTPS call to the platform's CAPI endpoint using
+// the stored access token.  Templates are created via GTM API before the config
+// import so tags can reference them immediately.
+//
+// Tag type in the container = the INFO block "id" field in the template data.
+// We use deterministic IDs: et_meta_capi | et_tiktok_events | et_snap_capi
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Template source builders ────────────────────────────────────────────────
+
+function _metaCAPITemplateData() {
+  const js = `
+const sendHttpRequest = require('sendHttpRequest');
+const JSON = require('JSON');
+const Math = require('Math');
+
+const pixelId     = data.pixelId;
+const accessToken = data.accessToken;
+if (!pixelId || !accessToken) { data.gtmOnSuccess(); return; }
+
+function arr(v) { return v ? [v] : undefined; }
+function pick(obj) {
+  var out = {};
+  Object.keys(obj).forEach(function(k){ if(obj[k] !== undefined && obj[k] !== '') out[k] = obj[k]; });
+  return Object.keys(out).length ? out : undefined;
+}
+
+var ud = pick({
+  em:                  arr(data.userEmail),
+  ph:                  arr(data.userPhone),
+  fn:                  arr(data.userFirstName),
+  ln:                  arr(data.userLastName),
+  external_id:         arr(data.externalId),
+  client_ip_address:   data.clientIpAddress,
+  client_user_agent:   data.clientUserAgent,
+  fbclid:              data.fbclid,
+  fbp:                 data.fbp,
+  fbc:                 data.fbc
+});
+
+var cd = pick({
+  value:       data.value,
+  currency:    data.currency,
+  order_id:    data.orderId,
+  content_ids: data.contentIds,
+  contents:    data.contents
+});
+
+var payload = {
+  data: [{
+    event_name:       data.eventName,
+    event_time:       Math.round(Date.now() / 1000),
+    event_id:         data.eventId,
+    action_source:    'website',
+    event_source_url: data.sourceUrl,
+    user_data:        ud,
+    custom_data:      cd
+  }]
+};
+
+var url = 'https://graph.facebook.com/v19.0/' + pixelId +
+          '/events?access_token=' + accessToken;
+
+sendHttpRequest(url, function(sc) {
+  if (sc >= 200 && sc < 300) { data.gtmOnSuccess(); } else { data.gtmOnFailure(); }
+}, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload), timeout:5000 });
+`.trim();
+
+  const params = [
+    'pixelId','accessToken','eventName','eventId','value','currency',
+    'orderId','contentIds','contents','userEmail','userPhone',
+    'userFirstName','userLastName','externalId',
+    'clientIpAddress','clientUserAgent','sourceUrl','fbclid','fbp','fbc'
+  ].map(n => ({type:'TEXT', name:n, displayName:n, simpleValueType:true}));
+
+  const perm = JSON.stringify([{
+    instance:{ key:{publicId:'send_http',versionId:'1'},
+      param:[{key:'allowedUrls',value:{type:1,listItem:[{type:3,
+        mapKey:[{type:1,string:'value'},{type:1,string:'id'}],
+        mapValue:[{type:1,string:'https://graph.facebook.com/'},{type:1,string:'specific'}]}]}}]},
+    isRequired:true
+  }]);
+
+  return [
+    '___INFO___', '',
+    JSON.stringify({type:'TAG',id:'et_meta_capi',version:1,securityGroups:[],
+      displayName:'ET - Meta Conversions API',
+      description:'Easy Track — server-side Meta CAPI. Auto-created by Easy Track.',
+      containerContexts:['SERVER']}),
+    '', '___TEMPLATE_PARAMETERS___', '', JSON.stringify(params),
+    '', '___SANDBOXED_JS_FOR_SERVER___', '', js,
+    '', '___WEB_PERMISSIONS___', '', perm, ''
+  ].join('\n');
+}
+
+function _tiktokEventsTemplateData() {
+  const js = `
+const sendHttpRequest = require('sendHttpRequest');
+const JSON = require('JSON');
+
+const pixelId     = data.pixelId;
+const accessToken = data.accessToken;
+if (!pixelId || !accessToken) { data.gtmOnSuccess(); return; }
+
+function pick(obj) {
+  var out = {};
+  Object.keys(obj).forEach(function(k){ if(obj[k] !== undefined && obj[k] !== '') out[k] = obj[k]; });
+  return Object.keys(out).length ? out : undefined;
+}
+
+var contact = pick({ email:data.email, phone:data.phone, external_id:data.externalId });
+var props   = pick({ value:data.value ? parseFloat(data.value)||undefined : undefined,
+                     currency:data.currency, order_id:data.orderId,
+                     content_id:data.contentIds, contents:data.contents });
+var ctx = { ip:data.ipAddress, user_agent:data.userAgent,
+            page: data.pageUrl ? {url:data.pageUrl} : undefined,
+            ad:   data.ttclid  ? {callback:data.ttclid} : undefined,
+            user: contact };
+
+var payload = {
+  pixel_code: pixelId,
+  event:      data.eventName,
+  event_id:   data.eventId,
+  timestamp:  new Date(Date.now()).toISOString(),
+  properties: props,
+  context:    ctx
+};
+
+var url = 'https://business-api.tiktok.com/open_api/v1.3/event/track/';
+
+sendHttpRequest(url, function(sc) {
+  if (sc >= 200 && sc < 300) { data.gtmOnSuccess(); } else { data.gtmOnFailure(); }
+}, { method:'POST',
+     headers:{'Content-Type':'application/json','Access-Token':accessToken},
+     body:JSON.stringify(payload), timeout:5000 });
+`.trim();
+
+  const params = [
+    'pixelId','accessToken','eventName','eventId','value','currency',
+    'orderId','contentIds','contents','email','phone','externalId',
+    'ipAddress','userAgent','pageUrl','ttclid'
+  ].map(n => ({type:'TEXT', name:n, displayName:n, simpleValueType:true}));
+
+  const perm = JSON.stringify([{
+    instance:{ key:{publicId:'send_http',versionId:'1'},
+      param:[{key:'allowedUrls',value:{type:1,listItem:[{type:3,
+        mapKey:[{type:1,string:'value'},{type:1,string:'id'}],
+        mapValue:[{type:1,string:'https://business-api.tiktok.com/'},{type:1,string:'specific'}]}]}}]},
+    isRequired:true
+  }]);
+
+  return [
+    '___INFO___', '',
+    JSON.stringify({type:'TAG',id:'et_tiktok_events',version:1,securityGroups:[],
+      displayName:'ET - TikTok Events API',
+      description:'Easy Track — server-side TikTok Events API. Auto-created by Easy Track.',
+      containerContexts:['SERVER']}),
+    '', '___TEMPLATE_PARAMETERS___', '', JSON.stringify(params),
+    '', '___SANDBOXED_JS_FOR_SERVER___', '', js,
+    '', '___WEB_PERMISSIONS___', '', perm, ''
+  ].join('\n');
+}
+
+function _snapCAPITemplateData() {
+  const js = `
+const sendHttpRequest = require('sendHttpRequest');
+const JSON = require('JSON');
+const Math = require('Math');
+
+const pixelId     = data.pixelId;
+const accessToken = data.accessToken;
+if (!pixelId || !accessToken) { data.gtmOnSuccess(); return; }
+
+function pick(obj) {
+  var out = {};
+  Object.keys(obj).forEach(function(k){ if(obj[k] !== undefined && obj[k] !== '') out[k] = obj[k]; });
+  return Object.keys(out).length ? out : undefined;
+}
+
+var payload = {
+  data: [{
+    event_type:             data.eventType,
+    event_conversion_type:  'WEB',
+    event_tag:              data.eventId,
+    timestamp:              Math.round(Date.now() / 1000),
+    page_url:               data.pageUrl,
+    hashed_data_fields: pick({
+      em:                  data.email,
+      ph:                  data.phone,
+      external_id:         data.externalId,
+      client_ip_address:   data.ipAddress,
+      client_user_agent:   data.userAgent
+    }),
+    custom_data: pick({
+      price:    data.price,
+      currency: data.currency,
+      order_id: data.orderId,
+      item_ids: data.itemIds
+    })
+  }]
+};
+
+var url = 'https://tr.snapchat.com/v3/' + pixelId +
+          '/events?access_token=' + accessToken;
+
+sendHttpRequest(url, function(sc) {
+  if (sc >= 200 && sc < 300) { data.gtmOnSuccess(); } else { data.gtmOnFailure(); }
+}, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload), timeout:5000 });
+`.trim();
+
+  const params = [
+    'pixelId','accessToken','eventType','eventId','price','currency',
+    'orderId','itemIds','email','phone','externalId',
+    'ipAddress','userAgent','pageUrl'
+  ].map(n => ({type:'TEXT', name:n, displayName:n, simpleValueType:true}));
+
+  const perm = JSON.stringify([{
+    instance:{ key:{publicId:'send_http',versionId:'1'},
+      param:[{key:'allowedUrls',value:{type:1,listItem:[{type:3,
+        mapKey:[{type:1,string:'value'},{type:1,string:'id'}],
+        mapValue:[{type:1,string:'https://tr.snapchat.com/'},{type:1,string:'specific'}]}]}}]},
+    isRequired:true
+  }]);
+
+  return [
+    '___INFO___', '',
+    JSON.stringify({type:'TAG',id:'et_snap_capi',version:1,securityGroups:[],
+      displayName:'ET - Snapchat CAPI',
+      description:'Easy Track — server-side Snapchat CAPI. Auto-created by Easy Track.',
+      containerContexts:['SERVER']}),
+    '', '___TEMPLATE_PARAMETERS___', '', JSON.stringify(params),
+    '', '___SANDBOXED_JS_FOR_SERVER___', '', js,
+    '', '___WEB_PERMISSIONS___', '', perm, ''
+  ].join('\n');
+}
+
+// ── Template creation ────────────────────────────────────────────────────────
+
+const CAPI_TEMPLATE_BUILDERS = {
+  meta:   { infoId: 'et_meta_capi',      build: _metaCAPITemplateData   },
+  tiktok: { infoId: 'et_tiktok_events',  build: _tiktokEventsTemplateData },
+  snap:   { infoId: 'et_snap_capi',      build: _snapCAPITemplateData   },
+};
+
+/**
+ * Creates CAPI custom templates in the sGTM workspace for the given platforms.
+ * Must be called BEFORE importContainerJSON so tags can reference the templates.
+ * Returns a map: { meta: 'et_meta_capi', tiktok: 'et_tiktok_events', snap: 'et_snap_capi' }
+ */
+async function createCAPITemplates(containerId, workspaceId, platforms) {
+  const acc      = getAccountId();
+  const basePath = `/accounts/${acc}/containers/${containerId}/workspaces/${workspaceId}/templates`;
+  const result   = {};
+
+  for (const platform of (platforms || [])) {
+    const tpl = CAPI_TEMPLATE_BUILDERS[platform];
+    if (!tpl) continue;
+    try {
+      const body = JSON.stringify({ name: tpl.infoId, templateData: tpl.build() });
+      await gtmRequest('POST', basePath, body);
+      result[platform] = tpl.infoId;
+      console.log('[gtm] created CAPI template for', platform, '— type:', tpl.infoId);
+    } catch (e) {
+      // Non-fatal — if template already exists (409) or any other error, skip
+      console.warn('[gtm] createCAPITemplates skipped', platform, ':', e.message);
+    }
+  }
+  return result;
+}
+
+
 async function createServerContainer(name) {
   const acc = getAccountId();
   const body = JSON.stringify({
@@ -764,6 +1038,17 @@ async function provisionForClientWithServer(opts) {
   const serverWs = await getDefaultWorkspace(serverContainerId);
   const serverWorkspaceId = serverWs.workspaceId;
 
+  // 3a. Auto-create CAPI custom templates for all platforms that have tokens.
+  // Must happen BEFORE import so the tags that reference them are valid.
+  const capiPlatforms = Object.keys(opts.capiTokens || {})
+    .filter(p => (opts.capiTokens[p] || '').trim());
+  if (capiPlatforms.length) {
+    onProgress({ stage: 'capi_templates', done: 0, total: capiPlatforms.length });
+    await createCAPITemplates(serverContainerId, serverWorkspaceId, capiPlatforms);
+    onProgress({ stage: 'capi_templates', done: capiPlatforms.length, total: capiPlatforms.length });
+    console.log('[gtm] CAPI templates created for:', capiPlatforms.join(', '));
+  }
+
   // Use caller-supplied serverConfigJson if provided (e.g. from /api/ss/create-containers
   // which builds a full config from the user's GA4 ID + pixels + events).
   // Fall back to the static default file only if nothing was supplied.
@@ -811,7 +1096,7 @@ async function provisionForClientWithServer(opts) {
       workspaceId:     serverWorkspaceId,
       versionId:       serverVersionId,
       containerName:   serverName,
-      containerConfig,                              // <- the deploy blob
+      containerConfig,
       importedTagCount:      importResult.importedTagCount      || 0,
       importedTriggerCount:  importResult.importedTriggerCount  || 0,
       importedVariableCount: importResult.importedVariableCount || 0,
@@ -829,10 +1114,8 @@ module.exports = {
   publishVersion,
   inviteUserToContainer,
   provisionForClient,
-  // Server-side (client + server flow)
   createServerContainer,
   getContainerConfig,
   setGA4TransportUrl,
-  upsertServerUrlVariable,
   provisionForClientWithServer,
 };
