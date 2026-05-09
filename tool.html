@@ -4526,7 +4526,8 @@
             <label for="mgdServerSideChk" style="display:flex;align-items:center;gap:10px;padding:12px 14px;
               border-radius:12px;border:1px solid var(--bdr2);background:var(--sur);margin-bottom:8px;cursor:pointer;">
               <input type="checkbox" id="mgdServerSideChk"
-                style="width:18px;height:18px;accent-color:var(--acc);cursor:pointer;flex-shrink:0;">
+                style="width:18px;height:18px;accent-color:var(--acc);cursor:pointer;flex-shrink:0;"
+                onchange="_mgdToggleCapiTokens(this.checked)">
               <div style="flex:1;min-width:0;">
                 <div style="font-size:13px;font-weight:700;color:var(--wht);">
                   🚀 فعّل Server-Side Tracking (مستحسن)
@@ -4536,6 +4537,18 @@
                 </div>
               </div>
             </label>
+
+            <!-- CAPI Tokens block — shown when Server-Side is checked -->
+            <div id="mgdCapiTokensBlock" style="display:none;margin-bottom:8px;padding:12px 14px;
+              border-radius:12px;border:1px solid rgba(70,241,197,.25);background:rgba(70,241,197,.04);">
+              <div style="font-size:12px;font-weight:700;color:var(--acc);margin-bottom:8px;">
+                🔑 CAPI Access Tokens — مطلوبة للـ Server-Side
+              </div>
+              <div style="font-size:11px;color:var(--mut);margin-bottom:10px;line-height:1.5;">
+                هتتحفظ مشفّرة وتتضاف تلقائياً في السيرفر كونتينر. لو مفيش token لمنصة معينة، بنفضل بالـ client-side pixel بتاعها.
+              </div>
+              <div id="mgdCapiTokenFields"></div>
+            </div>
 
             <!-- Publish toggle -->
             <label for="mgdPublishChk" style="display:flex;align-items:center;gap:10px;padding:12px 14px;
@@ -10463,6 +10476,45 @@
     // Creates a GTM container in Easy Track's managed account (server-side),
     // no OAuth needed. Calls /api/managed/create-container.
     // ══════════════════════════════════════════════════════════════════════
+    // CAPI token field labels per platform
+    var _MGD_CAPI_LABELS = {
+      meta:   { name: 'Meta',     ph: 'EAABsbCS4IIQBA...',       link: 'https://business.facebook.com/events_manager' },
+      tiktok: { name: 'TikTok',   ph: '91234abcd...',            link: 'https://ads.tiktok.com/i18n/events_manager' },
+      snap:   { name: 'Snapchat', ph: 'eyJhbGciOiJIUzI1Ni...', link: 'https://ads.snapchat.com/organizations' },
+    };
+
+    function _mgdToggleCapiTokens(on) {
+      var block = document.getElementById('mgdCapiTokensBlock');
+      var fields = document.getElementById('mgdCapiTokenFields');
+      if (!block || !fields) return;
+      block.style.display = on ? 'block' : 'none';
+      if (!on) return;
+
+      // Render one token row per platform the user selected in the main wizard
+      var activePlats = (window.S && S.platforms) ? S.platforms : [];
+      var capiPlats   = activePlats.filter(function(p) { return _MGD_CAPI_LABELS[p]; });
+
+      if (!capiPlats.length) {
+        fields.innerHTML = '<div style="font-size:11px;color:var(--mut);">مفيش منصات محتاجة CAPI tokens (Meta / TikTok / Snapchat) متاختارة.</div>';
+        return;
+      }
+
+      fields.innerHTML = capiPlats.map(function(p) {
+        var lbl = _MGD_CAPI_LABELS[p];
+        return '<div style="margin-bottom:8px;">'
+          + '<div style="font-size:11px;color:var(--wht);margin-bottom:4px;display:flex;align-items:center;gap:6px;">'
+          + '<span style="font-weight:600;">' + lbl.name + ' CAPI Token</span>'
+          + '<a href="' + lbl.link + '" target="_blank" rel="noopener" '
+          + 'style="font-size:10px;color:var(--acc);text-decoration:none;">أين أجده؟ ↗</a>'
+          + '</div>'
+          + '<input id="mgd-capi-tok-' + p + '" type="password" autocomplete="new-password" dir="ltr"'
+          + ' placeholder="' + lbl.ph + '"'
+          + ' style="width:100%;background:var(--bg);border:1px solid var(--bdr2);border-radius:8px;'
+          + 'padding:8px 10px;font-size:12px;color:var(--wht);outline:none;box-sizing:border-box;">'
+          + '</div>';
+      }).join('');
+    }
+
     function _mgdProgress(msg, show) {
       var el  = document.getElementById('mgdProgress');
       var txt = document.getElementById('mgdProgressText');
@@ -10769,6 +10821,17 @@
       // 2. Collect metadata from current session state (S) + currentUser
       var _ssToggle = document.getElementById('mgdServerSideChk');
       var _wantServer = !!(_ssToggle && _ssToggle.checked);
+
+      // Collect CAPI tokens from the token input fields (only when server-side is on)
+      var _capiTokens = {};
+      if (_wantServer) {
+        var _capiPlatforms = ['meta', 'tiktok', 'snap'];
+        _capiPlatforms.forEach(function(p) {
+          var el = document.getElementById('mgd-capi-tok-' + p);
+          if (el && el.value.trim()) _capiTokens[p] = el.value.trim();
+        });
+      }
+
       var payload = {
         clientId:    currentUser.id,
         clientEmail: currentUser.email || null,
@@ -10780,6 +10843,7 @@
         platforms:   S.platforms || [],
         events:      S.events    || [],
         pixelIds:    _serializePixelIds(S.pixelIds),
+        capiTokens:  _capiTokens,   // CAPI access tokens for server-side tags
         configJson:  configJson,
         // When mode=client_server, the server defers publishing the web
         // container until /api/ss/wire-transport runs — we override the user's
