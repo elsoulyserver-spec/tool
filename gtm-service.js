@@ -621,7 +621,8 @@ async function provisionForClient({ projectName, domain, configJson, publishLive
 // import so tags can reference them immediately.
 //
 // Tag type in the container = the INFO block "id" field in the template data.
-// We use deterministic IDs: et_meta_capi | et_tiktok_events | et_snap_capi
+// We use deterministic IDs: et_meta_capi_manual | et_tiktok_events_manual |
+//                            et_snapchat_capi_manual | et_gads_ec_manual
 // ══════════════════════════════════════════════════════════════════════════════
 
 // ── Template source builders ────────────────────────────────────────────────
@@ -676,7 +677,7 @@ var payload = {
   }]
 };
 
-var url = 'https://graph.facebook.com/v19.0/' + pixelId +
+var url = 'https://graph.facebook.com/v22.0/' + pixelId +
           '/events?access_token=' + accessToken;
 
 sendHttpRequest(url, function(sc) {
@@ -701,7 +702,7 @@ sendHttpRequest(url, function(sc) {
 
   return [
     '___INFO___', '',
-    JSON.stringify({type:'TAG',id:'et_meta_capi',version:1,securityGroups:[],
+    JSON.stringify({type:'TAG',id:'et_meta_capi_manual',version:1,securityGroups:[],
       displayName:'ET - Meta Conversions API',
       description:'Easy Track — server-side Meta CAPI. Auto-created by Easy Track.',
       containerContexts:['SERVER']}),
@@ -769,7 +770,7 @@ sendHttpRequest(url, function(sc) {
 
   return [
     '___INFO___', '',
-    JSON.stringify({type:'TAG',id:'et_tiktok_events',version:1,securityGroups:[],
+    JSON.stringify({type:'TAG',id:'et_tiktok_events_manual',version:1,securityGroups:[],
       displayName:'ET - TikTok Events API',
       description:'Easy Track — server-side TikTok Events API. Auto-created by Easy Track.',
       containerContexts:['SERVER']}),
@@ -818,12 +819,13 @@ var payload = {
   }]
 };
 
-var url = 'https://tr.snapchat.com/v3/' + pixelId +
-          '/events?access_token=' + accessToken;
+var url = 'https://tr.snapchat.com/v2/conversion';
 
 sendHttpRequest(url, function(sc) {
   if (sc >= 200 && sc < 300) { data.gtmOnSuccess(); } else { data.gtmOnFailure(); }
-}, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload), timeout:5000 });
+}, { method:'POST',
+     headers:{'Content-Type':'application/json','Authorization':'Bearer ' + accessToken},
+     body:JSON.stringify(payload), timeout:5000 });
 `.trim();
 
   const params = [
@@ -842,9 +844,86 @@ sendHttpRequest(url, function(sc) {
 
   return [
     '___INFO___', '',
-    JSON.stringify({type:'TAG',id:'et_snap_capi',version:1,securityGroups:[],
+    JSON.stringify({type:'TAG',id:'et_snapchat_capi_manual',version:1,securityGroups:[],
       displayName:'ET - Snapchat CAPI',
       description:'Easy Track — server-side Snapchat CAPI. Auto-created by Easy Track.',
+      containerContexts:['SERVER']}),
+    '', '___TEMPLATE_PARAMETERS___', '', JSON.stringify(params),
+    '', '___SANDBOXED_JS_FOR_SERVER___', '', js,
+    '', '___WEB_PERMISSIONS___', '', perm, ''
+  ].join('\n');
+}
+
+function _gadsECTemplateData() {
+  const js = `
+const sendHttpRequest = require('sendHttpRequest');
+const JSON = require('JSON');
+const Math = require('Math');
+
+const customerId     = data.customerId;
+const accessToken    = data.accessToken;
+const developerToken = data.developerToken;
+const convActionId   = data.conversionActionId;
+if (!customerId || !accessToken || !convActionId) { data.gtmOnSuccess(); return; }
+
+// Build the Google Ads Enhanced Conversions payload (REST API v18)
+var conversion = {
+  conversionAction: 'customers/' + customerId + '/conversionActions/' + convActionId,
+  conversionDateTime: data.conversionDateTime || (() => {
+    var d = new Date(Date.now());
+    var pad = function(n){return n<10?'0'+n:String(n);};
+    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+
+           pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds())+'+00:00';
+  })(),
+  orderId: data.orderId || undefined,
+  conversionValue: data.value ? parseFloat(data.value)||undefined : undefined,
+  currencyCode: data.currency || undefined,
+  userIdentifiers: []
+};
+
+if (data.userEmail) {
+  conversion.userIdentifiers.push({ hashedEmail: data.userEmail });
+}
+if (data.userPhone) {
+  conversion.userIdentifiers.push({ hashedPhoneNumber: data.userPhone });
+}
+if (!conversion.userIdentifiers.length) delete conversion.userIdentifiers;
+
+var payload = { conversions: [conversion], partialFailure: true };
+
+var cid = customerId.replace(/-/g,'');
+var url = 'https://googleads.googleapis.com/v18/customers/' + cid + ':uploadClickConversions';
+
+sendHttpRequest(url, function(sc) {
+  if (sc >= 200 && sc < 300) { data.gtmOnSuccess(); } else { data.gtmOnFailure(); }
+}, { method:'POST',
+     headers:{
+       'Content-Type':'application/json',
+       'Authorization':'Bearer ' + accessToken,
+       'developer-token': developerToken || ''
+     },
+     body:JSON.stringify(payload), timeout:8000 });
+`.trim();
+
+  const params = [
+    'customerId','accessToken','developerToken','conversionActionId',
+    'conversionDateTime','value','currency','orderId',
+    'userEmail','userPhone'
+  ].map(n => ({type:'TEXT', name:n, displayName:n, simpleValueType:true}));
+
+  const perm = JSON.stringify([{
+    instance:{ key:{publicId:'send_http',versionId:'1'},
+      param:[{key:'allowedUrls',value:{type:1,listItem:[{type:3,
+        mapKey:[{type:1,string:'value'},{type:1,string:'id'}],
+        mapValue:[{type:1,string:'https://googleads.googleapis.com/'},{type:1,string:'specific'}]}]}}]},
+    isRequired:true
+  }]);
+
+  return [
+    '___INFO___', '',
+    JSON.stringify({type:'TAG',id:'et_gads_ec_manual',version:1,securityGroups:[],
+      displayName:'ET - Google Ads Enhanced Conversions',
+      description:'Easy Track — server-side Google Ads Enhanced Conversions. Auto-created by Easy Track.',
       containerContexts:['SERVER']}),
     '', '___TEMPLATE_PARAMETERS___', '', JSON.stringify(params),
     '', '___SANDBOXED_JS_FOR_SERVER___', '', js,
@@ -855,15 +934,17 @@ sendHttpRequest(url, function(sc) {
 // ── Template creation ────────────────────────────────────────────────────────
 
 const CAPI_TEMPLATE_BUILDERS = {
-  meta:   { infoId: 'et_meta_capi',      build: _metaCAPITemplateData   },
-  tiktok: { infoId: 'et_tiktok_events',  build: _tiktokEventsTemplateData },
-  snap:   { infoId: 'et_snap_capi',      build: _snapCAPITemplateData   },
+  meta:   { infoId: 'et_meta_capi_manual',      build: _metaCAPITemplateData   },
+  tiktok: { infoId: 'et_tiktok_events_manual',  build: _tiktokEventsTemplateData },
+  snap:   { infoId: 'et_snapchat_capi_manual',  build: _snapCAPITemplateData   },
+  gads:   { infoId: 'et_gads_ec_manual',        build: _gadsECTemplateData     },
 };
 
 /**
  * Creates CAPI custom templates in the sGTM workspace for the given platforms.
  * Must be called BEFORE importContainerJSON so tags can reference the templates.
- * Returns a map: { meta: 'et_meta_capi', tiktok: 'et_tiktok_events', snap: 'et_snap_capi' }
+ * Returns a map: { meta: 'et_meta_capi_manual', tiktok: 'et_tiktok_events_manual',
+ *                  snap: 'et_snapchat_capi_manual', gads: 'et_gads_ec_manual' }
  */
 async function createCAPITemplates(containerId, workspaceId, platforms) {
   const acc      = getAccountId();
@@ -932,9 +1013,9 @@ async function setGA4TransportUrl(webContainerId, webWorkspaceId, sgtmUrl) {
     throw new Error('No GA4 Configuration tag in web container — was it created by Easy Track?');
   }
 
-  // Replace any existing transport_url, append fresh.
-  const params = (ga4.parameter || []).filter(p => p.key !== 'transport_url');
-  params.push({ type: 'template', key: 'transport_url', value: sgtmUrl });
+  // Replace any existing transportUrl (camelCase — GTM JSON format requirement), append fresh.
+  const params = (ga4.parameter || []).filter(p => p.key !== 'transportUrl' && p.key !== 'transport_url');
+  params.push({ type: 'template', key: 'transportUrl', value: sgtmUrl });
 
   // PUT the full tag object back. GTM requires fingerprint to match for write
   // — gtmRequest already includes auth, fingerprint comes from the GET response.
@@ -1114,8 +1195,11 @@ module.exports = {
   publishVersion,
   inviteUserToContainer,
   provisionForClient,
+  // Server-side (client + server flow)
   createServerContainer,
   getContainerConfig,
   setGA4TransportUrl,
+  upsertServerUrlVariable,
+  createCAPITemplates,
   provisionForClientWithServer,
 };

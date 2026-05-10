@@ -10492,9 +10492,10 @@
     // ══════════════════════════════════════════════════════════════════════
     // CAPI token field labels per platform
     var _MGD_CAPI_LABELS = {
-      meta:   { name: 'Meta',     ph: 'EAABsbCS4IIQBA...',       link: 'https://business.facebook.com/events_manager' },
-      tiktok: { name: 'TikTok',   ph: '91234abcd...',            link: 'https://ads.tiktok.com/i18n/events_manager' },
-      snap:   { name: 'Snapchat', ph: 'eyJhbGciOiJIUzI1Ni...', link: 'https://ads.snapchat.com/organizations' },
+      meta:   { name: 'Meta',       ph: 'EAABsbCS4IIQBA...',       link: 'https://business.facebook.com/events_manager' },
+      tiktok: { name: 'TikTok',     ph: '91234abcd...',            link: 'https://ads.tiktok.com/i18n/events_manager' },
+      snap:   { name: 'Snapchat',   ph: 'eyJhbGciOiJIUzI1Ni...', link: 'https://ads.snapchat.com/organizations' },
+      gads:   { name: 'Google Ads', ph: 'ya29.a0AfH6SM...',        link: 'https://console.cloud.google.com/apis/credentials' },
     };
 
     function _mgdToggleCapiTokens(on) {
@@ -10840,7 +10841,7 @@
       var _capiTokens = {};
       var _sgtmUrl    = '';
       if (_wantServer) {
-        var _capiPlatforms = ['meta', 'tiktok', 'snap'];
+        var _capiPlatforms = ['meta', 'tiktok', 'snap', 'gads'];
         _capiPlatforms.forEach(function(p) {
           var el = document.getElementById('mgd-capi-tok-' + p);
           if (el && el.value.trim()) _capiTokens[p] = el.value.trim();
@@ -14841,4 +14842,4 @@
         return Math.round(val * 100) / 100;
       }
 
-      // ── Norma
+      // ── Norma      
