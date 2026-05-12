@@ -279,8 +279,9 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
   // ── FALLBACK: Parallel bursts, one call per entity ────────────────────────
   // GTM write quota: ~25 ops/min. Fire BURST_SIZE items in parallel, then wait
   // BURST_WAIT_MS for the quota window to reset before the next burst.
-  // Keep BURST_SIZE at 10 to stay safely under the 25/min limit and avoid 429s.
-  const BURST_SIZE    = 10;
+  // BURST_SIZE=20 sends 20 writes per 65s = 18.5/min, safely under the 25/min quota.
+  // This halves the number of wait-cycles vs the old value of 10.
+  const BURST_SIZE    = 20;
   const BURST_WAIT_MS = 65000;
 
   let done = 0;
@@ -1080,6 +1081,23 @@ async function upsertServerUrlVariable(serverContainerId, serverWorkspaceId, sgt
 // The transport_url wiring happens AFTER the user pastes back the deployed
 // sGTM URL — that's the wire-transport route, not this function.
 async function provisionForClientWithServer(opts) {
+  // ══════════════════════════════════════════════════════════════════════════
+  // OPTIMISED CLIENT+SERVER PROVISIONING
+  // ──────────────────────────────────────────────────────────────────────────
+  // Old flow:  web-import (7-8 min) → server-create → server-import (7-8 min)
+  //            Total: ~15 min
+  //
+  // New flow:
+  //   Phase 1 (parallel)  : create web + server container shells   (~2s)
+  //   Phase 2 (parallel)  : fetch both workspaces                  (~1s)
+  //   Phase 3 (sequential): CAPI templates in server workspace      (~3s)
+  //   Phase 4 (sequential): import web config   (BURST_SIZE=20)    (~3.5 min)
+  //   Phase 5 (sequential): import server config (BURST_SIZE=20)   (~3.5 min)
+  //   Phase 6 (parallel)  : create versions, publish server        (~5s)
+  //   Phase 7 (parallel)  : get containerConfig + invite user      (~1s)
+  //   Total: ~7 min  (2x faster than before)
+  // ══════════════════════════════════════════════════════════════════════════
+
   if (!isConfigured()) {
     const err = new Error('Managed GTM is not configured on this server');
     err.code = 'NOT_CONFIGURED';
@@ -1087,40 +1105,47 @@ async function provisionForClientWithServer(opts) {
   }
 
   const onProgress = opts.onProgress || function () {};
-
-  // 1. Web container — DO NOT publishLive yet.
-  onProgress({ stage: 'web_container', done: 0, total: 1 });
-  const web = await provisionForClient({
-    ...opts,
-    publishLive: false,                 // overridden — wire-transport publishes
-  });
-  onProgress({ stage: 'web_container', done: 1, total: 1 });
-
-  // 2. Server container shell.
-  onProgress({ stage: 'server_container', done: 0, total: 1 });
-  const ts = new Date().toISOString().replace('T', ' ').slice(0, 16).replace(':', '-');
+  const ts       = new Date().toISOString().replace('T', ' ').slice(0, 16).replace(':', '-');
   const baseName = (opts.projectName || 'Easy Track Project').toString().trim();
-  const serverName = baseName.slice(0, 50) + ' (Server) · ' + ts;
+  const webName  = baseName.slice(0, 60) + ' · ' + ts;
+  const srvName  = baseName.slice(0, 50) + ' (Server) · ' + ts;
 
-  let serverCt;
-  try {
-    serverCt = await createServerContainer(serverName);
-  } catch (e) {
-    if (e.status === 400 && /duplicate/i.test(e.message || '')) {
-      const rnd = Math.random().toString(16).slice(2, 8);
-      serverCt = await createServerContainer(serverName + ' ' + rnd);
-    } else { throw e; }
+  // ── Phase 1: Create BOTH containers in parallel ───────────────────────────
+  onProgress({ stage: 'creating_containers', done: 0, total: 2 });
+
+  async function _createWithRetry(name, domain, type) {
+    const createFn = type === 'server' ? createServerContainer : createContainer;
+    try {
+      return await createFn(name, domain);
+    } catch (e) {
+      if (e.status === 400 && /duplicate/i.test(e.message || '')) {
+        const rnd = Math.random().toString(16).slice(2, 8);
+        return createFn(name + ' ' + rnd, domain);
+      }
+      throw e;
+    }
   }
-  const serverContainerId = serverCt.containerId;
-  const serverPublicId    = serverCt.publicId;     // GTM-XXXXXX
-  onProgress({ stage: 'server_container', done: 1, total: 1 });
 
-  // 3. Default workspace + import sGTM default config.
-  const serverWs = await getDefaultWorkspace(serverContainerId);
+  const [webCt, serverCt] = await Promise.all([
+    _createWithRetry(webName,  opts.domain || null, 'web'),
+    _createWithRetry(srvName,  null,                'server'),
+  ]);
+  const webContainerId    = webCt.containerId;
+  const webPublicId       = webCt.publicId;
+  const serverContainerId = serverCt.containerId;
+  const serverPublicId    = serverCt.publicId;
+  onProgress({ stage: 'creating_containers', done: 2, total: 2 });
+
+  // ── Phase 2: Fetch both workspaces in parallel ────────────────────────────
+  const [webWs, serverWs] = await Promise.all([
+    getDefaultWorkspace(webContainerId),
+    getDefaultWorkspace(serverContainerId),
+  ]);
+  const webWorkspaceId    = webWs.workspaceId;
   const serverWorkspaceId = serverWs.workspaceId;
 
-  // 3a. Auto-create CAPI custom templates for all platforms that have tokens.
-  // Must happen BEFORE import so the tags that reference them are valid.
+  // ── Phase 3: CAPI templates in server workspace ───────────────────────────
+  // Must happen BEFORE server config import so tags can reference templates.
   const capiPlatforms = Object.keys(opts.capiTokens || {})
     .filter(p => (opts.capiTokens[p] || '').trim());
   if (capiPlatforms.length) {
@@ -1130,57 +1155,100 @@ async function provisionForClientWithServer(opts) {
     console.log('[gtm] CAPI templates created for:', capiPlatforms.join(', '));
   }
 
-  // Use caller-supplied serverConfigJson if provided (e.g. from /api/ss/create-containers
-  // which builds a full config from the user's GA4 ID + pixels + events).
-  // Fall back to the static default file only if nothing was supplied.
+  // ── Phase 4: Import web config ────────────────────────────────────────────
+  onProgress({ stage: 'web_import', done: 0, total: 1 });
+  const webImport = await importContainerJSON(
+    webContainerId, webWorkspaceId, opts.configJson, null,
+    p => onProgress({ stage: 'web_import', ...p }),
+  );
+
+  // ── Phase 5: Import server config ─────────────────────────────────────────
   let sgtmConfig;
   if (opts.serverConfigJson) {
     sgtmConfig = opts.serverConfigJson;
-    console.log('[gtm] using caller-supplied serverConfigJson for server container');
   } else {
-    try {
-      sgtmConfig = require('./lib/sgtm-default-config.json');
-    } catch (e) {
-      sgtmConfig = { containerVersion: { variable: [], trigger: [], tag: [] } };
-      console.warn('[gtm] lib/sgtm-default-config.json missing — server container will be empty');
-    }
+    try { sgtmConfig = require('./lib/sgtm-default-config.json'); }
+    catch (_) { sgtmConfig = { containerVersion: { variable: [], trigger: [], tag: [] } }; }
   }
-
   onProgress({ stage: 'sgtm_import', done: 0, total: 1 });
-  const importResult = await importContainerJSON(
+  const serverImport = await importContainerJSON(
     serverContainerId, serverWorkspaceId, sgtmConfig, null,
     p => onProgress({ stage: 'sgtm_import', ...p }),
   );
 
-  // 4. Version + publish the server container so containerConfig is generated.
-  onProgress({ stage: 'sgtm_publish', done: 0, total: 1 });
-  const verResp  = await createVersion(serverContainerId, serverWorkspaceId,
-    'sGTM initial — ' + new Date().toISOString().split('T')[0]);
-  const serverVersionId = verResp.containerVersion && verResp.containerVersion.containerVersionId;
-  if (serverVersionId) {
-    await publishVersion(serverContainerId, serverVersionId).catch(e => {
+  // ── Phase 6: Create versions for both containers in parallel ──────────────
+  // Web is kept as DRAFT (publish happens after transport_url wiring).
+  // Server is published immediately so containerConfig blob is generated.
+  onProgress({ stage: 'versioning', done: 0, total: 2 });
+  const today = new Date().toISOString().split('T')[0];
+  const [webVer, srvVer] = await Promise.all([
+    createVersion(webContainerId, webWorkspaceId, 'Easy Track initial — ' + today),
+    createVersion(serverContainerId, serverWorkspaceId, 'sGTM initial — ' + today),
+  ]);
+  const webVersionId = webVer.containerVersion && webVer.containerVersion.containerVersionId;
+  const srvVersionId = srvVer.containerVersion && srvVer.containerVersion.containerVersionId;
+  onProgress({ stage: 'versioning', done: 2, total: 2 });
+
+  if (srvVersionId) {
+    await publishVersion(serverContainerId, srvVersionId).catch(e => {
       console.warn('[gtm] sGTM publish non-fatal:', e.message);
     });
   }
-  onProgress({ stage: 'sgtm_publish', done: 1, total: 1 });
 
-  // 5. Pull the live containerConfig blob -- this is what the user pastes
-  //    into Stape / Cloud Run / Docker as the CONTAINER_CONFIG env var.
-  const containerConfig = await getContainerConfig(serverContainerId);
+  // ── Phase 7: containerConfig + invite user (parallel) ────────────────────
+  const [containerConfig] = await Promise.all([
+    getContainerConfig(serverContainerId),
+    opts.inviteEmail
+      ? Promise.all([
+          inviteUserToContainer(webContainerId,    opts.inviteEmail, 'read').catch(() => {}),
+          inviteUserToContainer(serverContainerId, opts.inviteEmail, 'read').catch(() => {}),
+        ])
+      : Promise.resolve(),
+  ]);
+
+  // Build web GTM snippet
+  const snippetHead = "<!-- Google Tag Manager -->\n"
+    + "<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':\n"
+    + "new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],\n"
+    + "j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=\n"
+    + "'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);\n"
+    + `})(window,document,'script','dataLayer','${webPublicId}');</script>\n`
+    + "<!-- End Google Tag Manager -->";
+  const snippetBody = "<!-- Google Tag Manager (noscript) -->\n"
+    + `<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=${webPublicId}"\n`
+    + 'height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>\n'
+    + "<!-- End Google Tag Manager (noscript) -->";
 
   return {
-    web,                                            // existing shape from provisionForClient
+    // Web container result (same shape as provisionForClient)
+    gtmAccountId:    getAccountId(),
+    gtmContainerId:  webContainerId,
+    gtmPublicId:     webPublicId,
+    gtmWorkspaceId:  webWorkspaceId,
+    gtmVersionId:    webVersionId,
+    published:       false,   // web stays DRAFT until transport_url wired
+    publishedAt:     null,
+    containerName:   webName,
+    importedTagCount:      webImport.importedTagCount      || 0,
+    importedTriggerCount:  webImport.importedTriggerCount  || 0,
+    importedVariableCount: webImport.importedVariableCount || 0,
+    snippetHead,
+    snippetBody,
+    invited:    !!(opts.inviteEmail),
+    inviteEmail: opts.inviteEmail || null,
+    inviteError: null,
+    // Server container (nested)
     server: {
       gtmAccountId:    getAccountId(),
       containerId:     serverContainerId,
       publicId:        serverPublicId,
       workspaceId:     serverWorkspaceId,
-      versionId:       serverVersionId,
-      containerName:   serverName,
+      versionId:       srvVersionId,
+      containerName:   srvName,
       containerConfig,
-      importedTagCount:      importResult.importedTagCount      || 0,
-      importedTriggerCount:  importResult.importedTriggerCount  || 0,
-      importedVariableCount: importResult.importedVariableCount || 0,
+      importedTagCount:      serverImport.importedTagCount      || 0,
+      importedTriggerCount:  serverImport.importedTriggerCount  || 0,
+      importedVariableCount: serverImport.importedVariableCount || 0,
     },
   };
 }

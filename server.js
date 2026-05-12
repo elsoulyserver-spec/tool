@@ -888,7 +888,7 @@ http.createServer((req, res) => {
 
       const { clientId, clientEmail, projectName, domain, cmsType,
               platforms, events, pixelIds, configJson, publishLive,
-              capiTokens } = body;    // capiTokens: { meta, tiktok, snap } — CAPI access tokens
+              capiTokens, sgtmUrl } = body;  // sgtmUrl: user's own sGTM server URL
 
       // Tracking mode picker — 'client' (default) or 'client_server'.
       // Anything else is normalised to 'client' so old callers keep working.
@@ -944,7 +944,7 @@ http.createServer((req, res) => {
               const ga4Id = (pixelIds && (pixelIds.ga4 || pixelIds.GA4 || pixelIds['ga4'])) || '';
               serverConfigJson = buildServerConfig({
                 ga4MeasurementId: ga4Id,
-                sgtmUrl:          '',          // wired later via /api/ss/wire-transport
+                sgtmUrl:          (sgtmUrl || '').trim(),
                 platforms:        platforms || [],
                 events:           events    || [],
                 pixelIds:         pixelIds  || {},   // pixel ID constant variables
@@ -971,9 +971,10 @@ http.createServer((req, res) => {
           let webResult;
           let serverResult = null;
           if (mode === 'client_server') {
+            // provisionForClientWithServer returns flat web fields + nested .server
             const both    = await gtmService.provisionForClientWithServer(provisionOpts);
-            webResult     = both.web;
-            serverResult  = both.server;
+            webResult     = both;          // web fields are at top level
+            serverResult  = both.server;   // server fields nested under .server
           } else {
             webResult = await gtmService.provisionForClient(provisionOpts);
           }
@@ -1011,75 +1012,38 @@ http.createServer((req, res) => {
             serverContainerPublicId: serverResult ? serverResult.publicId : null,
           });
 
-          // 4. client_server flow — auto-deploy to Stape + auto-wire transport_url.
-          //    The Stape API key is a PLATFORM credential (set via STAPE_API_KEY env
-          //    var) — clients never see or enter it. If the env var is missing or
-          //    the deploy fails, we fall back to "manual mode": save the
-          //    containerConfig blob in Firestore so the frontend can show it and
-          //    /api/ss/wire-transport remains available for manual recovery.
-          let stapeDeployed   = null;
-          let stapeDeployErr  = null;
-          let webRepublished  = false;
+          // 4. client_server — wire the user-supplied sGTM URL into the web GA4 tag.
+          let webRepublished = false;
 
           if (mode === 'client_server' && serverResult) {
-            const platformStapeKey = (process.env.STAPE_API_KEY || '').trim();
-            const stapeRegion      = process.env.STAPE_REGION === 'eu' ? 'eu' : 'global';
+            const userSgtmUrl = (sgtmUrl || '').trim();
 
-            if (platformStapeKey && serverResult.containerConfig) {
+            if (userSgtmUrl) {
+              _setJob(jobId, { stage: 'wiring_transport_url' });
               try {
-                _setJob(jobId, { stage: 'stape_deploy' });
-                const stape = new StapeProvider({ stapeRegion });
-                const dep = await stape.deployContainer({
-                  stapeApiKey:   platformStapeKey,
-                  containerName: serverResult.containerName ||
-                                 ('Easy Track sGTM — ' + (clientId || '').slice(0, 8)),
-                  gtmConfigBody: serverResult.containerConfig,
-                });
-                stapeDeployed = {
-                  serverUrl:   dep.serverUrl,
-                  containerId: dep.containerId,
-                  status:      dep.status,
-                  region:      stapeRegion,
-                };
-
-                // Wire the web container's GA4 tag → the deployed sGTM URL.
-                // setGA4TransportUrl creates a new web container version + publishes
-                // it, so this single call covers both wiring and going-live.
-                if (dep.serverUrl) {
-                  _setJob(jobId, { stage: 'wiring_transport_url' });
-                  try {
-                    await gtmService.setGA4TransportUrl(
-                      webResult.gtmContainerId,
-                      webResult.gtmWorkspaceId,
-                      dep.serverUrl,
-                    );
-                    webRepublished = true;
-                    // Refresh local snippet flags so the success UI shows LIVE.
-                    webResult.published   = true;
-                    webResult.publishedAt = new Date().toISOString();
-                  } catch (wireErr) {
-                    console.warn('[managed/create] wire transport_url failed:', wireErr.message);
-                    stapeDeployErr = 'Stape deployed but wiring failed: ' + wireErr.message;
-                  }
-                }
-              } catch (depErr) {
-                console.warn('[managed/create] Stape deploy failed:', depErr.message);
-                stapeDeployErr = depErr.message;
+                await gtmService.setGA4TransportUrl(
+                  webResult.gtmContainerId,
+                  webResult.gtmWorkspaceId,
+                  userSgtmUrl,
+                );
+                webRepublished = true;
+                webResult.published   = true;
+                webResult.publishedAt = new Date().toISOString();
+              } catch (wireErr) {
+                console.warn('[managed/create] wire transport_url failed (non-fatal):', wireErr.message);
               }
-            } else if (!platformStapeKey) {
-              stapeDeployErr = 'STAPE_API_KEY env var is not set on the server — manual deploy required';
             }
 
-            // Persist the SS config regardless of deploy outcome.
+            // Persist the SS config so /api/ss/* endpoints can reference the containers.
             try {
               const existingSs = await firestoreService.getSSConfig(clientId).catch(() => null);
               await firestoreService.saveSSConfig(clientId, {
-                provider:         'stape',
-                serverUrl:        (stapeDeployed && stapeDeployed.serverUrl) || '',
-                platforms:        (existingSs && existingSs.platforms)        || (platforms || []),
-                encryptedTokens:  (existingSs && existingSs.encryptedTokens)  || {},
+                provider:         'custom',
+                serverUrl:        userSgtmUrl,
+                platforms:        (existingSs && existingSs.platforms)       || (platforms || []),
+                encryptedTokens:  (existingSs && existingSs.encryptedTokens) || {},
                 stapeApiKey:      null,
-                stapeContainerId: stapeDeployed ? stapeDeployed.containerId : null,
+                stapeContainerId: null,
                 mode:                 'client_server',
                 webContainerId:       webResult.gtmContainerId,
                 webPublicId:          webResult.gtmPublicId,
@@ -1088,29 +1052,16 @@ http.createServer((req, res) => {
                 serverPublicId:       serverResult.publicId,
                 serverWorkspaceId:    serverResult.workspaceId,
                 serverVersionId:      serverResult.versionId,
-                // Keep the blob ONLY when auto-deploy didn't succeed — saves
-                // Firestore space and prevents stale blobs after redeploys.
-                containerConfig:      stapeDeployed ? null : (serverResult.containerConfig || null),
+                containerConfig:      serverResult.containerConfig || null,
                 transportUrlWired:    webRepublished,
                 transportUrlWiredAt:  webRepublished ? new Date() : null,
-                stapeAutoDeployed:    !!stapeDeployed,
-                stapeDeployError:     stapeDeployErr || null,
               });
             } catch (saveErr) {
               console.warn('[managed/create] saveSSConfig failed (non-fatal):', saveErr.message);
             }
-          }
 
-          // Attach deploy info to serverResult before returning to the client
-          if (serverResult && (stapeDeployed || stapeDeployErr)) {
-            serverResult.deployedUrl       = stapeDeployed ? stapeDeployed.serverUrl   : null;
-            serverResult.stapeContainerId  = stapeDeployed ? stapeDeployed.containerId : null;
-            serverResult.stapeStatus       = stapeDeployed ? stapeDeployed.status      : null;
+            serverResult.deployedUrl       = userSgtmUrl || null;
             serverResult.transportUrlWired = webRepublished;
-            serverResult.deployError       = stapeDeployErr || null;
-            // For manual-fallback path: keep the blob in the response only if
-            // auto-deploy didn't happen, so the frontend can still render it.
-            if (stapeDeployed) delete serverResult.containerConfig;
           }
 
           _setJob(jobId, {
@@ -2212,15 +2163,4 @@ http.createServer((req, res) => {
       const isHtml = ext === '.html';
       res.writeHead(200, {
         'Content-Type': mime[ext] || 'text/plain',
-        ...securityHeaders({ html: isHtml }),
-      });
-      res.end(data);
-    });
-  }
-  serveFile(filePath);
-
-}).listen(PORT, () => {
-  const mode = puppeteer ? '🟢 Puppeteer (headless Chrome)' : '🟡 HTTP fallback (install puppeteer for full analysis)';
-  console.log(`Easy Track server running at http://localhost:${PORT}`);
-  console.log(`Scanner mode: ${mode}`);
-});
+        
