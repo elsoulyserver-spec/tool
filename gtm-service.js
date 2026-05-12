@@ -279,10 +279,10 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
   // ── FALLBACK: Parallel bursts, one call per entity ────────────────────────
   // GTM write quota: ~25 ops/min. Fire BURST_SIZE items in parallel, then wait
   // BURST_WAIT_MS for the quota window to reset before the next burst.
-  // BURST_SIZE=20 sends 20 writes per 65s = 18.5/min, safely under the 25/min quota.
-  // This halves the number of wait-cycles vs the old value of 10.
-  const BURST_SIZE    = 20;
-  const BURST_WAIT_MS = 65000;
+  // BURST_SIZE=18 per 45s = 24/min — stays just under the 25/min hard quota.
+  // Saves ~20s per burst cycle vs the old 65s window.
+  const BURST_SIZE    = 18;
+  const BURST_WAIT_MS = 45000;
 
   let done = 0;
   const reportBurst = (label) => report(`${label}`, done);
@@ -1091,8 +1091,8 @@ async function provisionForClientWithServer(opts) {
   //   Phase 1 (parallel)  : create web + server container shells   (~2s)
   //   Phase 2 (parallel)  : fetch both workspaces                  (~1s)
   //   Phase 3 (sequential): CAPI templates in server workspace      (~3s)
-  //   Phase 4 (sequential): import web config   (BURST_SIZE=20)    (~3.5 min)
-  //   Phase 5 (sequential): import server config (BURST_SIZE=20)   (~3.5 min)
+  //   Phase 4 (sequential): import web config   (BURST_SIZE=18/45s) (~2.5 min)
+  //   Phase 5 (sequential): import server config (BURST_SIZE=18/45s)(~2.5 min)
   //   Phase 6 (parallel)  : create versions, publish server        (~5s)
   //   Phase 7 (parallel)  : get containerConfig + invite user      (~1s)
   //   Total: ~7 min  (2x faster than before)
@@ -1271,3 +1271,4 @@ module.exports = {
   createCAPITemplates,
   provisionForClientWithServer,
 };
+                
