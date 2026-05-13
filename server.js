@@ -947,8 +947,9 @@ http.createServer((req, res) => {
                 sgtmUrl:          (sgtmUrl || '').trim(),
                 platforms:        platforms || [],
                 events:           events    || [],
-                pixelIds:         pixelIds  || {},   // pixel ID constant variables
-                capiTokens:       capiTokens || {},  // CAPI access token constant variables
+                pixelIds:         pixelIds  || {},
+                capiTokens:       capiTokens || {},
+                includeCapi:      false,  // CAPI added separately via /api/managed/setup-capi
               });
               console.log('[managed/create] built serverConfigJson — ga4Id:', ga4Id || '(none)',
                 'platforms:', (platforms || []).join(','), 'events:', (events || []).join(','));
@@ -962,9 +963,9 @@ http.createServer((req, res) => {
             domain,
             configJson,
             serverConfigJson,              // null for 'client' mode, populated for 'client_server'
-            platforms:   platforms  || [], // passed to Phase 3 so CAPI templates match tag types
-            pixelIds:    pixelIds   || {}, // used alongside platforms to decide which templates to create
-            capiTokens:  capiTokens || {}, // CAPI tokens for custom template creation in sGTM
+            platforms:   [],     // no CAPI in this step — Phase 3 skipped (setup-capi endpoint handles it)
+            pixelIds:    {},     // idem
+            capiTokens:  {},     // idem
             publishLive: mode === 'client_server' ? false : !!publishLive,
             inviteEmail: clientEmail || null,
             onProgress: (p) => _setJob(jobId, { stage: 'gtm_provisioning', progress: p }),
@@ -1064,6 +1065,10 @@ http.createServer((req, res) => {
 
             serverResult.deployedUrl       = userSgtmUrl || null;
             serverResult.transportUrlWired = webRepublished;
+            // Store client data so the frontend "Setup CAPI" button can pass it back
+            serverResult._platforms  = platforms  || [];
+            serverResult._events     = events     || [];
+            serverResult._pixelIds   = pixelIds   || {};
           }
 
           _setJob(jobId, {
@@ -1106,6 +1111,61 @@ http.createServer((req, res) => {
     const job = managedJobs.get(jobId);
     if (!job) return sendJSON(res, 404, { error: 'Job not found or expired' });
     sendJSON(res, 200, { ok: true, jobId, ...job });
+    return;
+  }
+
+  // POST /api/managed/setup-capi
+  // Adds CAPI templates + variables + tags to an existing server container.
+  // Called from the tool after "Create Web + Server" completes successfully.
+  // Body: { clientId, serverContainerId, serverWorkspaceId,
+  //         platforms[], events[], pixelIds{}, capiTokens{} }
+  if (req.method === 'POST' && req.url === '/api/managed/setup-capi') {
+    parseJsonBody(req, res, body => {
+      const { clientId, serverContainerId, serverWorkspaceId,
+              platforms, events, pixelIds, capiTokens } = body;
+
+      if (!serverContainerId || !serverWorkspaceId)
+        return sendJSON(res, 400, { error: 'serverContainerId و serverWorkspaceId مطلوبان' });
+      if (!platforms || !platforms.length)
+        return sendJSON(res, 400, { error: 'اختار platform واحد على الأقل' });
+
+      const jobId = _newJobId();
+      _setJob(jobId, { status: 'pending', stage: 'queued', clientId, startedAt: Date.now() });
+
+      (async () => {
+        try {
+          _setJob(jobId, { status: 'running', stage: 'capi_setup' });
+          const result = await gtmService.setupCAPIOnServer({
+            serverContainerId,
+            serverWorkspaceId,
+            platforms: platforms || [],
+            events:    events    || [],
+            pixelIds:  pixelIds  || {},
+            capiTokens: capiTokens || {},
+            onProgress: (p) => _setJob(jobId, { stage: 'capi_setup', progress: p }),
+          });
+          _setJob(jobId, {
+            status:     'completed',
+            stage:      'done',
+            result:     { ok: true, ...result },
+            finishedAt: Date.now(),
+          });
+          _scheduleJobCleanup(jobId);
+        } catch (e) {
+          console.error('[setup-capi][job ' + jobId + ']', e);
+          _setJob(jobId, {
+            status:     'failed',
+            stage:      'error',
+            error:      e.message,
+            httpStatus: (e.status && e.status >= 400) ? e.status : 502,
+            finishedAt: Date.now(),
+          });
+          _scheduleJobCleanup(jobId);
+        }
+      })();
+
+      sendJSON(res, 202, { ok: true, jobId, status: 'pending' });
+    });
     return;
   }
 

@@ -1283,6 +1283,229 @@ async function provisionForClientWithServer(opts) {
   };
 }
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SETUP CAPI ON EXISTING SERVER CONTAINER
+// Called after the server container is already live (GA4-only), to add CAPI
+// templates + variables + tags without touching what's already there.
+// ─────────────────────────────────────────────────────────────────────────────
+const CAPI_PLATFORM_VARS = {
+  meta:   [
+    ['ET - Meta Pixel ID',       'pixelIds.meta'],
+    ['ET - Meta CAPI Token',     'capiTokens.meta'],
+  ],
+  tiktok: [
+    ['ET - TikTok Pixel ID',     'pixelIds.tiktok'],
+    ['ET - TikTok Events Token', 'capiTokens.tiktok'],
+  ],
+  snap:   [
+    ['ET - Snapchat Pixel ID',   'pixelIds.snap'],
+    ['ET - Snapchat CAPI Token', 'capiTokens.snap'],
+  ],
+  gads:   [
+    ['ET - Google Ads ID',       'pixelIds.gads'],
+    ['ET - Google Ads Label',    'pixelIds.gads_label'],
+  ],
+};
+
+const CAPI_TAG_PARAMS = {
+  meta: (mEv) => [
+    { type:'template', key:'pixelId',         value:'{{ET - Meta Pixel ID}}' },
+    { type:'template', key:'accessToken',     value:'{{ET - Meta CAPI Token}}' },
+    { type:'template', key:'eventName',       value:mEv },
+    { type:'template', key:'eventId',         value:'{{ET - ep event_id}}' },
+    { type:'template', key:'eventTime',       value:'{{ET - event_time_unix}}' },
+    { type:'template', key:'actionSource',    value:'website' },
+    { type:'template', key:'sourceUrl',       value:'{{ET - page_location}}' },
+    { type:'template', key:'value',           value:'{{ET - epn value}}' },
+    { type:'template', key:'currency',        value:'{{ET - ep currency}}' },
+    { type:'template', key:'orderId',         value:'{{ET - ep transaction_id}}' },
+    { type:'template', key:'contentIds',      value:'{{ET - ep content_ids}}' },
+    { type:'template', key:'contentName',     value:'{{ET - ep content_name}}' },
+    { type:'template', key:'numItems',        value:'{{ET - ep num_items}}' },
+    { type:'template', key:'userEmail',       value:'{{ET - up em}}' },
+    { type:'template', key:'userPhone',       value:'{{ET - up ph}}' },
+    { type:'template', key:'userFirstName',   value:'{{ET - up fn}}' },
+    { type:'template', key:'userLastName',    value:'{{ET - up ln}}' },
+    { type:'template', key:'fbp',             value:'{{ET - resolved_fbp}}' },
+    { type:'template', key:'fbc',             value:'{{ET - resolved_fbc}}' },
+    { type:'template', key:'clientIpAddress', value:'{{ET - client_ip_clean}}' },
+    { type:'template', key:'clientUserAgent', value:'{{ET - Header user_agent}}' },
+    { type:'boolean',  key:'enableDebug',     value:'false' },
+  ],
+  tiktok: (ttEv) => [
+    { type:'template', key:'pixelCode',    value:'{{ET - TikTok Pixel ID}}' },
+    { type:'template', key:'accessToken',  value:'{{ET - TikTok Events Token}}' },
+    { type:'template', key:'eventName',    value:ttEv },
+    { type:'template', key:'eventId',      value:'{{ET - ep event_id}}' },
+    { type:'template', key:'eventTime',    value:'{{ET - event_time_unix}}' },
+    { type:'template', key:'value',        value:'{{ET - epn value}}' },
+    { type:'template', key:'currency',     value:'{{ET - ep currency}}' },
+    { type:'template', key:'orderId',      value:'{{ET - ep transaction_id}}' },
+    { type:'template', key:'contentIds',   value:'{{ET - ep content_ids}}' },
+    { type:'template', key:'userEmail',    value:'{{ET - up em}}' },
+    { type:'template', key:'userPhone',    value:'{{ET - up ph}}' },
+    { type:'template', key:'ipAddress',    value:'{{ET - client_ip_clean}}' },
+    { type:'template', key:'userAgent',    value:'{{ET - Header user_agent}}' },
+    { type:'template', key:'pageUrl',      value:'{{ET - page_location}}' },
+    { type:'boolean',  key:'enableDebug',  value:'false' },
+  ],
+  snap: (sEv) => [
+    { type:'template', key:'pixelId',       value:'{{ET - Snapchat Pixel ID}}' },
+    { type:'template', key:'accessToken',   value:'{{ET - Snapchat CAPI Token}}' },
+    { type:'template', key:'eventType',     value:sEv },
+    { type:'template', key:'eventId',       value:'{{ET - ep event_id}}' },
+    { type:'template', key:'eventTime',     value:'{{ET - event_time_unix}}' },
+    { type:'template', key:'price',         value:'{{ET - epn value}}' },
+    { type:'template', key:'currency',      value:'{{ET - ep currency}}' },
+    { type:'template', key:'transactionId', value:'{{ET - ep transaction_id}}' },
+    { type:'template', key:'userEmail',     value:'{{ET - up em}}' },
+    { type:'template', key:'userPhone',     value:'{{ET - up ph}}' },
+    { type:'template', key:'ipAddress',     value:'{{ET - client_ip_clean}}' },
+    { type:'template', key:'userAgent',     value:'{{ET - Header user_agent}}' },
+    { type:'boolean',  key:'enableDebug',   value:'false' },
+  ],
+  gads: (gEv) => [
+    { type:'template', key:'conversionActionId', value:'{{ET - Google Ads ID}}' },
+    { type:'template', key:'conversionLabel',    value:'{{ET - Google Ads Label}}' },
+    { type:'template', key:'eventId',            value:'{{ET - ep event_id}}' },
+    { type:'template', key:'eventTime',          value:'{{ET - event_time_unix}}' },
+    { type:'template', key:'value',              value:'{{ET - epn value}}' },
+    { type:'template', key:'currency',           value:'{{ET - ep currency}}' },
+    { type:'template', key:'orderId',            value:'{{ET - ep transaction_id}}' },
+    { type:'template', key:'userEmail',          value:'{{ET - up em}}' },
+    { type:'boolean',  key:'enableDebug',        value:'false' },
+  ],
+};
+
+const CAPI_TAG_TYPE  = { meta:'et_meta_capi_manual', tiktok:'et_tiktok_events_manual', snap:'et_snapchat_capi_manual', gads:'et_gads_ec_manual' };
+const META_EV_MAP    = { page_view:'PageView', view_content:'ViewContent', add_to_cart:'AddToCart', initiate_checkout:'InitiateCheckout', purchase:'Purchase', lead:'Lead', sign_up:'CompleteRegistration', search:'Search' };
+const TIKTOK_EV_MAP  = { page_view:'Pageview', view_content:'ViewContent', add_to_cart:'AddToCart', initiate_checkout:'InitiateCheckout', purchase:'PlaceAnOrder', lead:'SubmitForm', sign_up:'CompleteRegistration', search:'Search' };
+const SNAP_EV_MAP    = { page_view:'PAGE_VIEW', view_content:'VIEW_CONTENT', add_to_cart:'ADD_CART', initiate_checkout:'START_CHECKOUT', purchase:'PURCHASE', lead:'SIGN_UP', sign_up:'SIGN_UP', search:'SEARCH' };
+const GADS_EV_MAP    = { purchase:'purchase', lead:'submit_lead_form', sign_up:'sign_up', add_to_cart:'add_to_cart' };
+const PLAT_EV_MAP    = { meta:META_EV_MAP, tiktok:TIKTOK_EV_MAP, snap:SNAP_EV_MAP, gads:GADS_EV_MAP };
+
+async function setupCAPIOnServer({
+  serverContainerId, serverWorkspaceId,
+  platforms = [], events = [],
+  pixelIds = {}, capiTokens = {},
+  onProgress,
+}) {
+  if (!isConfigured()) {
+    const err = new Error('Managed GTM is not configured on this server');
+    err.code = 'NOT_CONFIGURED';
+    throw err;
+  }
+
+  const fn  = onProgress || (() => {});
+  const acc = getAccountId();
+  const base = `/accounts/${acc}/containers/${serverContainerId}/workspaces/${serverWorkspaceId}`;
+  const px  = pixelIds   || {};
+  const tok = capiTokens || {};
+
+  const activePlatforms = (platforms || []).filter(p => CAPI_TAG_TYPE[p] && px[p]);
+  if (!activePlatforms.length) throw new Error('لازم تختار platform واحد على الأقل وتحط الـ Pixel ID بتاعه');
+
+  // ── Step 1: Create custom templates ──────────────────────────────────────
+  fn({ stage: 'capi_templates', done: 0, total: activePlatforms.length });
+  await createCAPITemplates(serverContainerId, serverWorkspaceId, activePlatforms);
+  fn({ stage: 'capi_templates', done: activePlatforms.length, total: activePlatforms.length });
+
+  // ── Step 2: Find existing event triggers by name ──────────────────────────
+  // The GA4-only import already created event triggers named "ET - sGTM Event <ga4Ev>".
+  // We look them up to get the real workspace triggerId values.
+  const GA4_EV = { page_view:'page_view', view_content:'view_item', add_to_cart:'add_to_cart', initiate_checkout:'begin_checkout', purchase:'purchase', lead:'generate_lead', sign_up:'sign_up', search:'search' };
+  const trigsResp = await gtmRequest('GET', `${base}/triggers`);
+  const wsTriggers = trigsResp.trigger || [];
+  // map ga4EventName → triggerId
+  const trigIdByName = {};
+  wsTriggers.forEach(t => {
+    if (t.type === 'customEvent' && t.customEventFilter) {
+      const arg1 = (t.customEventFilter[0] && t.customEventFilter[0].parameter || []).find(p => p.key === 'arg1');
+      if (arg1) trigIdByName[arg1.value] = t.triggerId;
+    }
+  });
+
+  // ── Step 3: Create CAPI variables one-by-one ─────────────────────────────
+  const varDefs = [];
+  for (const plat of activePlatforms) {
+    for (const [name, path] of (CAPI_PLATFORM_VARS[plat] || [])) {
+      const val = path.includes('.') ? (path.startsWith('pixelIds') ? px[path.split('.')[1]] : tok[path.split('.')[1]]) : null;
+      if (val) varDefs.push({ name, value: val });
+    }
+  }
+
+  fn({ stage: 'capi_vars', done: 0, total: varDefs.length });
+  let varDone = 0;
+  for (const v of varDefs) {
+    try {
+      await gtmRequest('POST', `${base}/variables`, JSON.stringify({
+        name: v.name, type: 'c',
+        parameter: [{ type: 'template', key: 'value', value: v.value }],
+      }));
+    } catch (e) {
+      // 409 = already exists — safe to ignore
+      if (e.status !== 409 && !/already exists|duplicate/i.test(e.message || ''))
+        console.warn('[gtm] setupCAPI var failed:', v.name, e.message);
+    }
+    fn({ stage: 'capi_vars', done: ++varDone, total: varDefs.length });
+  }
+
+  // ── Step 4: Create CAPI tags one-by-one ──────────────────────────────────
+  const tagDefs = [];
+  for (const plat of activePlatforms) {
+    const evMap = PLAT_EV_MAP[plat] || {};
+    const tagType = CAPI_TAG_TYPE[plat];
+    const paramFn = CAPI_TAG_PARAMS[plat];
+    for (const evKey of (events || [])) {
+      const platEv = evMap[evKey];
+      const ga4Ev  = GA4_EV[evKey];
+      if (!platEv || !ga4Ev) continue;
+      const tid = trigIdByName[ga4Ev];
+      if (!tid) { console.warn('[gtm] setupCAPI: no trigger found for', ga4Ev, '— skipping', plat, platEv); continue; }
+      tagDefs.push({
+        name: `ET - ${plat.charAt(0).toUpperCase() + plat.slice(1)} CAPI - ${platEv}`,
+        type: tagType,
+        tagFiringOption: 'oncePerEvent',
+        firingTriggerId: [tid],
+        parameter: paramFn(platEv),
+      });
+    }
+  }
+
+  fn({ stage: 'capi_tags', done: 0, total: tagDefs.length });
+  let tagDone = 0;
+  for (const tag of tagDefs) {
+    try {
+      await gtmRequest('POST', `${base}/tags`, JSON.stringify(tag));
+    } catch (e) {
+      console.warn('[gtm] setupCAPI tag failed:', tag.name, e.message);
+    }
+    fn({ stage: 'capi_tags', done: ++tagDone, total: tagDefs.length });
+  }
+
+  // ── Step 5: Version + publish ─────────────────────────────────────────────
+  fn({ stage: 'versioning', done: 0, total: 1 });
+  const today = new Date().toISOString().split('T')[0];
+  const ver = await createVersion(serverContainerId, serverWorkspaceId, 'Add CAPI — ' + today);
+  const versionId = ver.containerVersion && ver.containerVersion.containerVersionId;
+  fn({ stage: 'versioning', done: 1, total: 1 });
+
+  if (versionId) {
+    await publishVersion(serverContainerId, versionId).catch(e => {
+      console.warn('[gtm] CAPI publish non-fatal:', e.message);
+    });
+  }
+
+  return {
+    ok: true,
+    platforms: activePlatforms,
+    versionId,
+    tagCount: tagDone,
+    varCount: varDone,
+  };
+}
+
 module.exports = {
   isConfigured,
   getAccessToken,
@@ -1300,4 +1523,5 @@ module.exports = {
   upsertServerUrlVariable,
   createCAPITemplates,
   provisionForClientWithServer,
+  setupCAPIOnServer,
 };
