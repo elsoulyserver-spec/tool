@@ -4522,62 +4522,33 @@
               </div>
             </div>
 
-            <!-- Server-Side toggle -->
-            <label for="mgdServerSideChk" style="display:flex;align-items:center;gap:10px;padding:12px 14px;
-              border-radius:12px;border:1px solid var(--bdr2);background:var(--sur);margin-bottom:8px;cursor:pointer;">
-              <input type="checkbox" id="mgdServerSideChk"
-                style="width:18px;height:18px;accent-color:var(--acc);cursor:pointer;flex-shrink:0;"
-                onchange="_mgdToggleCapiTokens(this.checked)">
-              <div style="flex:1;min-width:0;">
-                <div style="font-size:13px;font-weight:700;color:var(--wht);">
-                  🚀 فعّل Server-Side Tracking (مستحسن)
-                </div>
-                <div style="font-size:11px;color:var(--mut);margin-top:2px;line-height:1.5;">
-                  Easy Track هيعمل لك <strong>كل حاجة تلقائياً</strong>: ينشئ sGTM container ويربطه بالـ web container. محتاج بس تحط رابط السيرفر بتاعك (sGTM URL). يتجاوز ad blockers + يدعم Conversions APIs.
-                </div>
-              </div>
-            </label>
-
-            <!-- CAPI Tokens block — shown when Server-Side is checked -->
-            <div id="mgdCapiTokensBlock" style="display:none;margin-bottom:8px;padding:12px 14px;
+            <!-- Server-Side section — always visible, used only when clicking server button -->
+            <div id="mgdCapiTokensBlock" style="margin-bottom:8px;padding:12px 14px;
               border-radius:12px;border:1px solid rgba(70,241,197,.25);background:rgba(70,241,197,.04);">
-              <!-- sGTM URL -->
-              <div style="font-size:12px;font-weight:700;color:var(--acc);margin-bottom:6px;">
-                🌐 رابط السيرفر بتاعك (sGTM URL)
+              <!-- header -->
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                <span class="material-symbols-outlined" style="font-size:16px;color:var(--acc);">dns</span>
+                <div style="font-size:12px;font-weight:700;color:var(--acc);">
+                  إعدادات Server-Side
+                  <span style="font-size:10px;font-weight:500;color:var(--mut);margin-right:6px;">(مطلوبة لو هتضغط Create Web + Server)</span>
+                </div>
               </div>
-              <div style="font-size:11px;color:var(--mut);margin-bottom:8px;line-height:1.5;">
-                الرابط اللي بتشتغل عليه sGTM — هيتربط تلقائياً بالـ Web Container.
+              <!-- sGTM URL -->
+              <div style="font-size:11px;color:var(--mut);margin-bottom:6px;line-height:1.5;">
+                🌐 رابط السيرفر بتاعك (sGTM URL)
               </div>
               <input id="mgdSgtmUrlInput" type="url" dir="ltr" placeholder="https://gtm.your-domain.com"
                 style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--bdr2);
                 border-radius:8px;padding:9px 12px;color:var(--wht);font-family:var(--font-mono);
-                font-size:12px;margin-bottom:14px;outline:none;"
+                font-size:12px;margin-bottom:12px;outline:none;"
                 oninput="this.style.borderColor=this.value.trim()?'var(--acc)':'var(--bdr2)'">
-
               <!-- CAPI Tokens -->
-              <div style="font-size:12px;font-weight:700;color:var(--acc);margin-bottom:8px;">
-                🔑 CAPI Access Tokens — مطلوبة للـ Server-Side
-              </div>
-              <div style="font-size:11px;color:var(--mut);margin-bottom:10px;line-height:1.5;">
-                هتتحفظ مشفّرة وتتضاف تلقائياً في السيرفر كونتينر. لو مفيش token لمنصة معينة، بنفضل بالـ client-side pixel بتاعها.
+              <div style="font-size:11px;color:var(--mut);margin-bottom:8px;line-height:1.5;">
+                🔑 CAPI Access Tokens
+                <span style="color:rgba(255,255,255,.35)"> — اختياري، هتتضاف تلقائياً في السيرفر كونتينر</span>
               </div>
               <div id="mgdCapiTokenFields"></div>
             </div>
-
-            <!-- Publish toggle -->
-            <label for="mgdPublishChk" style="display:flex;align-items:center;gap:10px;padding:12px 14px;
-              border-radius:12px;border:1px solid var(--bdr2);background:var(--sur);margin-bottom:12px;cursor:pointer;">
-              <input type="checkbox" id="mgdPublishChk" checked
-                style="width:18px;height:18px;accent-color:var(--acc);cursor:pointer;flex-shrink:0;">
-              <div style="flex:1;min-width:0;">
-                <div style="font-size:13px;font-weight:700;color:var(--wht);">
-                  Publish to Live فوراً
-                </div>
-                <div style="font-size:11px;color:var(--mut);margin-top:2px;line-height:1.5;">
-                  لو مفعّل: الـ container يبقى شغال دلوقتي. لو مقفول: بيفضل Draft وانت تراجعه وتنشره بنفسك. <em>(يتم تجاهله لو فعّلت Server-Side — هنعمل publish تلقائي بعد wiring)</em>
-                </div>
-              </div>
-            </label>
 
             <!-- Progress area -->
             <div id="mgdProgress"
@@ -4593,11 +4564,27 @@
               </div>
             </div>
 
-            <!-- Action button -->
-            <button class="gtm-deploy-btn" id="mgdCreateBtn" onclick="gtmManagedCreate()" style="width:100%;">
-              <span class="material-symbols-outlined" style="font-size:18px;">rocket_launch</span>
-              Create Managed Container
-            </button>
+            <!-- Two action buttons -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+
+              <!-- Web only -->
+              <button class="gtm-deploy-btn" id="mgdCreateBtn"
+                onclick="gtmManagedCreate('client')"
+                style="width:100%;background:var(--sur);border:1px solid var(--bdr2);
+                       font-size:12px;padding:11px 10px;gap:6px;">
+                <span class="material-symbols-outlined" style="font-size:16px;">language</span>
+                Create Web Container
+              </button>
+
+              <!-- Web + Server -->
+              <button class="gtm-deploy-btn" id="mgdCreateServerBtn"
+                onclick="gtmManagedCreate('client_server')"
+                style="width:100%;font-size:12px;padding:11px 10px;gap:6px;">
+                <span class="material-symbols-outlined" style="font-size:16px;">dns</span>
+                Create Web + Server
+              </button>
+
+            </div>
 
             <!-- Result area (populated after success) -->
             <div id="mgdResult" style="display:none;margin-top:14px;"></div>
@@ -5583,6 +5570,8 @@
           if (gtmEmpty) gtmEmpty.style.display = 'flex';
           if (gtmViewContent) gtmViewContent.innerHTML = '';
         }
+        // Render CAPI token fields based on selected platforms
+        if (typeof _mgdRenderCapiTokens === 'function') _mgdRenderCapiTokens();
       }
 
       // If going to My Projects view — load projects into the sidebar list
@@ -10498,14 +10487,11 @@
       gads:   { name: 'Google Ads', ph: 'ya29.a0AfH6SM...',        link: 'https://console.cloud.google.com/apis/credentials' },
     };
 
-    function _mgdToggleCapiTokens(on) {
-      var block = document.getElementById('mgdCapiTokensBlock');
+    // Renders CAPI token fields based on selected platforms — called on GTM view load
+    function _mgdRenderCapiTokens() {
       var fields = document.getElementById('mgdCapiTokenFields');
-      if (!block || !fields) return;
-      block.style.display = on ? 'block' : 'none';
-      if (!on) return;
+      if (!fields) return;
 
-      // Render one token row per platform the user selected in the main wizard
       var activePlats = (window.S && S.platforms) ? S.platforms : [];
       var capiPlats   = activePlats.filter(function(p) { return _MGD_CAPI_LABELS[p]; });
 
@@ -10529,6 +10515,8 @@
           + '</div>';
       }).join('');
     }
+    // Keep backward-compat alias (no-op toggle, fields always visible now)
+    function _mgdToggleCapiTokens() { _mgdRenderCapiTokens(); }
 
     function _mgdProgress(msg, show) {
       var el  = document.getElementById('mgdProgress');
@@ -10818,7 +10806,11 @@
       } catch (_) { /* ignore */ }
     }
 
-    async function gtmManagedCreate() {
+    async function gtmManagedCreate(mode) {
+      // mode = 'client' (web only) | 'client_server' (web + server)
+      mode = mode || 'client';
+      var _wantServer = (mode === 'client_server');
+
       // 1. Preconditions
       if (typeof currentUser === 'undefined' || !currentUser || !currentUser.id) {
         _mgdShowError('محتاج تسجل دخول الأول', 'افتح الحساب من أعلى يمين.');
@@ -10834,8 +10826,6 @@
       catch (e) { _mgdShowError('الـ GTM JSON مش صحيح: ' + e.message); return; }
 
       // 2. Collect metadata from current session state (S) + currentUser
-      var _ssToggle = document.getElementById('mgdServerSideChk');
-      var _wantServer = !!(_ssToggle && _ssToggle.checked);
 
       // Collect CAPI tokens + sGTM URL (only when server-side is on)
       var _capiTokens = {};
@@ -10868,12 +10858,14 @@
         publishLive: !!document.getElementById('mgdPublishChk').checked,
       };
 
-      // 3. UI → busy
-      var btn = document.getElementById('mgdCreateBtn');
+      // 3. UI → busy (disable the clicked button)
+      var btn = document.getElementById(_wantServer ? 'mgdCreateServerBtn' : 'mgdCreateBtn');
+      var btnOther = document.getElementById(_wantServer ? 'mgdCreateBtn' : 'mgdCreateServerBtn');
       var resultBox = document.getElementById('mgdResult');
-      if (btn) { btn.disabled = true; btn.style.opacity = '.6'; btn.style.cursor = 'wait'; }
+      if (btn)      { btn.disabled = true;      btn.style.opacity = '.6'; btn.style.cursor = 'wait'; }
+      if (btnOther) { btnOther.disabled = true; btnOther.style.opacity = '.4'; btnOther.style.cursor = 'not-allowed'; }
       if (resultBox) resultBox.style.display = 'none';
-      _mgdProgress('جاري إنشاء Container جديد على Easy Track GTM...', true);
+      _mgdProgress(_wantServer ? 'جاري إنشاء Web + Server Containers...' : 'جاري إنشاء Web Container...', true);
 
       // 4. Call server — kick off an async job, then poll for status.
       // Container provisioning takes 60-120s because of GTM write-quota pacing,
@@ -10896,7 +10888,8 @@
 
         if (!resp.ok || !data.ok) {
           _mgdProgress('', false);
-          if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; }
+          if (btn)      { btn.disabled = false;      btn.style.opacity = '1'; btn.style.cursor = 'pointer'; }
+          if (btnOther) { btnOther.disabled = false; btnOther.style.opacity = '1'; btnOther.style.cursor = 'pointer'; }
           _mgdShowError(data.error || ('HTTP ' + resp.status), data.hint || null);
           return;
         }
@@ -10904,7 +10897,8 @@
         if (!data.jobId) {
           // Old server behavior — accept synchronous result if present
           _mgdProgress('', false);
-          if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; }
+          if (btn)      { btn.disabled = false;      btn.style.opacity = '1'; btn.style.cursor = 'pointer'; }
+          if (btnOther) { btnOther.disabled = false; btnOther.style.opacity = '1'; btnOther.style.cursor = 'pointer'; }
           _mgdShowSuccess(data);
           return;
         }
@@ -14842,4 +14836,4 @@
         return Math.round(val * 100) / 100;
       }
 
-      // ── Norma      
+      // ── Norma                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
