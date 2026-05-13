@@ -268,12 +268,11 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
       importedClientCount:   clients.length,
     };
   } catch (bulkErr) {
-    // Bulk endpoint doesn't exist on this GTM account/quota tier -> fall through
-    // to individual entity creation.  Any error other than 404/405 is re-thrown.
-    const isMissing = bulkErr.status === 404 || bulkErr.status === 405 ||
-      /method not (found|allowed)|not implemented/i.test(bulkErr.message || '');
-    if (!isMissing) throw bulkErr;
-    console.warn('[gtm] bulk import not available (' + bulkErr.status + ') — falling back to individual calls');
+    // Fall through to individual creation for ANY error.
+    // 400 = invalid field (e.g. 'client' not supported in bulk import for server containers)
+    // 404/405 = endpoint not available on this GTM tier
+    // Others = quota / transient errors → safer to retry individually
+    console.warn('[gtm] bulk import failed (status=' + bulkErr.status + ') — falling back to individual calls:', bulkErr.message);
   }
 
   // ── FALLBACK: Parallel bursts, one call per entity ────────────────────────
@@ -1135,6 +1134,7 @@ async function provisionForClientWithServer(opts) {
   const srvName  = baseName.slice(0, 50) + ' (Server) · ' + ts;
 
   // ── Phase 1: Create BOTH containers in parallel ───────────────────────────
+  console.log('[gtm] provisionForClientWithServer — Phase 1: creating containers');
   onProgress({ stage: 'creating_containers', done: 0, total: 2 });
 
   async function _createWithRetry(name, domain, type) {
@@ -1159,6 +1159,7 @@ async function provisionForClientWithServer(opts) {
   const serverContainerId = serverCt.containerId;
   const serverPublicId    = serverCt.publicId;
   onProgress({ stage: 'creating_containers', done: 2, total: 2 });
+  console.log('[gtm] Phase 1 done — webId:', webContainerId, 'serverId:', serverContainerId);
 
   // ── Phase 2: Fetch both workspaces in parallel ────────────────────────────
   const [webWs, serverWs] = await Promise.all([
@@ -1167,6 +1168,7 @@ async function provisionForClientWithServer(opts) {
   ]);
   const webWorkspaceId    = webWs.workspaceId;
   const serverWorkspaceId = serverWs.workspaceId;
+  console.log('[gtm] Phase 2 done — webWs:', webWorkspaceId, 'serverWs:', serverWorkspaceId);
 
   // ── Phase 3: CAPI templates in server workspace ───────────────────────────
   // Must happen BEFORE server config import so tags can reference templates.
@@ -1186,6 +1188,7 @@ async function provisionForClientWithServer(opts) {
   }
 
   // ── Phase 4: Import web config ────────────────────────────────────────────
+  console.log('[gtm] Phase 4: importing web config...');
   onProgress({ stage: 'web_import', done: 0, total: 1 });
   const webImport = await importContainerJSON(
     webContainerId, webWorkspaceId, opts.configJson, null,
@@ -1193,6 +1196,7 @@ async function provisionForClientWithServer(opts) {
   );
 
   // ── Phase 5: Import server config ─────────────────────────────────────────
+  console.log('[gtm] Phase 4 done. Phase 5: importing server config...');
   let sgtmConfig;
   if (opts.serverConfigJson) {
     sgtmConfig = opts.serverConfigJson;
@@ -1206,6 +1210,7 @@ async function provisionForClientWithServer(opts) {
     p => onProgress({ stage: 'sgtm_import', ...p }),
   );
 
+  console.log('[gtm] Phase 5 done. Phase 6: creating versions...');
   // ── Phase 6: Create versions for both containers in parallel ──────────────
   // Web is kept as DRAFT (publish happens after transport_url wiring).
   // Server is published immediately so containerConfig blob is generated.
@@ -1225,6 +1230,7 @@ async function provisionForClientWithServer(opts) {
     });
   }
 
+  console.log('[gtm] Phase 6 done. Phase 7: containerConfig + invite...');
   // ── Phase 7: containerConfig + invite user (parallel) ────────────────────
   const [containerConfig] = await Promise.all([
     getContainerConfig(serverContainerId),
@@ -1249,6 +1255,7 @@ async function provisionForClientWithServer(opts) {
     + 'height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>\n'
     + "<!-- End Google Tag Manager (noscript) -->";
 
+  console.log('[gtm] Phase 7 done — provisionForClientWithServer complete. serverPublicId:', serverPublicId);
   return {
     // Web container result (same shape as provisionForClient)
     gtmAccountId:    getAccountId(),
