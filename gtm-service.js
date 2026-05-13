@@ -449,28 +449,49 @@ async function createVersion(containerId, workspaceId, versionName) {
 // we fall back to listing all versions and publishing the latest unfinished one.
 async function publishVersion(containerId, versionId) {
   const acc = getAccountId();
-  try {
-    return await gtmRequest('POST',
-      `/accounts/${acc}/containers/${containerId}/versions/${versionId}:publish`, '');
-  } catch (e) {
-    if (e.status !== 404) throw e;
-    // 404 → the specific versionId wasn't found. Try the latest workspace version instead.
-    console.warn(`[gtm] publish version ${versionId} returned 404 — attempting fallback to latest version`);
+
+  // Guard: if versionId is missing, skip the direct publish and go straight to fallback
+  if (versionId) {
     try {
-      const listResp = await gtmRequest('GET', `/accounts/${acc}/containers/${containerId}/versions`);
-      const versions = (listResp.containerVersion || [])
-        .map(v => ({ ...v, _id: parseInt(v.containerVersionId, 10) || 0 }))
-        .sort((a, b) => b._id - a._id);
-      if (!versions.length) throw new Error('No versions found in container ' + containerId);
-      const latest = versions[0];
-      console.log(`[gtm] publishing latest version ${latest.containerVersionId} instead`);
       return await gtmRequest('POST',
-        `/accounts/${acc}/containers/${containerId}/versions/${latest.containerVersionId}:publish`, '');
-    } catch (fallbackErr) {
-      // If the fallback also fails (e.g. already live), log and continue non-fatally.
-      console.warn(`[gtm] publish fallback also failed for container ${containerId}:`, fallbackErr.message);
-      throw fallbackErr;
+        `/accounts/${acc}/containers/${containerId}/versions/${versionId}:publish`, '');
+    } catch (e) {
+      if (e.status !== 404) throw e;
+      console.warn(`[gtm] publish version ${versionId} returned 404 — trying live-version fallback`);
     }
+  } else {
+    console.warn(`[gtm] publishVersion: no versionId — trying live-version fallback for container ${containerId}`);
+  }
+
+  // Fallback: fetch the container's current live version and publish it.
+  // GTM API v2: GET .../versions?containerVersionId=live returns the published version.
+  try {
+    const liveResp = await gtmRequest('GET',
+      `/accounts/${acc}/containers/${containerId}/versions?containerVersionId=live`);
+    const liveId = liveResp && liveResp.containerVersionId;
+    if (liveId) {
+      console.log(`[gtm] found live version ${liveId} — re-publishing`);
+      return await gtmRequest('POST',
+        `/accounts/${acc}/containers/${containerId}/versions/${liveId}:publish`, '');
+    }
+  } catch (liveErr) {
+    console.warn(`[gtm] live-version fetch failed:`, liveErr.message);
+  }
+
+  // Final fallback: list all versions and publish the latest
+  try {
+    const listResp = await gtmRequest('GET', `/accounts/${acc}/containers/${containerId}/versions`);
+    const versions = (listResp.containerVersion || [])
+      .map(v => ({ ...v, _id: parseInt(v.containerVersionId, 10) || 0 }))
+      .sort((a, b) => b._id - a._id);
+    if (!versions.length) throw new Error('No versions found in container ' + containerId);
+    const latest = versions[0];
+    console.log(`[gtm] publishing latest version ${latest.containerVersionId}`);
+    return await gtmRequest('POST',
+      `/accounts/${acc}/containers/${containerId}/versions/${latest.containerVersionId}:publish`, '');
+  } catch (fallbackErr) {
+    console.warn(`[gtm] all publish fallbacks failed for container ${containerId}:`, fallbackErr.message);
+    throw fallbackErr;
   }
 }
 
@@ -546,13 +567,17 @@ async function provisionForClient({ projectName, domain, configJson, publishLive
   const containerVersion = versionResp.containerVersion || {};
   const versionId = containerVersion.containerVersionId;
 
-  // 5. Publish if requested
+  // 5. Publish if requested (non-fatal — container stays as draft if publish fails)
   let published = false;
   let publishedAt = null;
   if (publishLive && versionId) {
-    await publishVersion(containerId, versionId);
-    published = true;
-    publishedAt = new Date().toISOString();
+    try {
+      await publishVersion(containerId, versionId);
+      published = true;
+      publishedAt = new Date().toISOString();
+    } catch (pubErr) {
+      console.warn('[gtm] provisionForClient: publish failed (non-fatal), container stays draft:', pubErr.message);
+    }
   }
 
   // 6. Invite the client by email with READ access (non-fatal if it fails)
@@ -1234,40 +1259,4 @@ async function provisionForClientWithServer(opts) {
     importedVariableCount: webImport.importedVariableCount || 0,
     snippetHead,
     snippetBody,
-    invited:    !!(opts.inviteEmail),
-    inviteEmail: opts.inviteEmail || null,
-    inviteError: null,
-    // Server container (nested)
-    server: {
-      gtmAccountId:    getAccountId(),
-      containerId:     serverContainerId,
-      publicId:        serverPublicId,
-      workspaceId:     serverWorkspaceId,
-      versionId:       srvVersionId,
-      containerName:   srvName,
-      containerConfig,
-      importedTagCount:      serverImport.importedTagCount      || 0,
-      importedTriggerCount:  serverImport.importedTriggerCount  || 0,
-      importedVariableCount: serverImport.importedVariableCount || 0,
-    },
-  };
-}
-
-module.exports = {
-  isConfigured,
-  getAccessToken,
-  listContainers,
-  createContainer,
-  importContainerJSON,
-  createVersion,
-  publishVersion,
-  inviteUserToContainer,
-  provisionForClient,
-  // Server-side (client + server flow)
-  createServerContainer,
-  getContainerConfig,
-  setGA4TransportUrl,
-  upsertServerUrlVariable,
-  createCAPITemplates,
-  provisionForClientWithServer,
-};
+    invited:    !!(opts.
