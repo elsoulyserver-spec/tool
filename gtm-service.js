@@ -1190,13 +1190,20 @@ async function provisionForClientWithServer(opts) {
   // ── Phase 4: Import web config ────────────────────────────────────────────
   console.log('[gtm] Phase 4: importing web config...');
   onProgress({ stage: 'web_import', done: 0, total: 1 });
-  const webImport = await importContainerJSON(
-    webContainerId, webWorkspaceId, opts.configJson, null,
-    p => onProgress({ stage: 'web_import', ...p }),
-  );
+  let webImport = { importedTagCount: 0, importedTriggerCount: 0, importedVariableCount: 0 };
+  try {
+    webImport = await importContainerJSON(
+      webContainerId, webWorkspaceId, opts.configJson, null,
+      p => onProgress({ stage: 'web_import', ...p }),
+    );
+    console.log('[gtm] Phase 4 done — tags:', webImport.importedTagCount);
+  } catch (p4Err) {
+    console.error('[gtm] Phase 4 FAILED (web import):', p4Err.message);
+    throw p4Err; // fatal — web container is the primary deliverable
+  }
 
   // ── Phase 5: Import server config ─────────────────────────────────────────
-  console.log('[gtm] Phase 4 done. Phase 5: importing server config...');
+  console.log('[gtm] Phase 5: importing server config...');
   let sgtmConfig;
   if (opts.serverConfigJson) {
     sgtmConfig = opts.serverConfigJson;
@@ -1205,23 +1212,34 @@ async function provisionForClientWithServer(opts) {
     catch (_) { sgtmConfig = { containerVersion: { variable: [], trigger: [], tag: [] } }; }
   }
   onProgress({ stage: 'sgtm_import', done: 0, total: 1 });
-  const serverImport = await importContainerJSON(
-    serverContainerId, serverWorkspaceId, sgtmConfig, null,
-    p => onProgress({ stage: 'sgtm_import', ...p }),
-  );
+  let serverImport = { importedTagCount: 0, importedTriggerCount: 0, importedVariableCount: 0 };
+  try {
+    serverImport = await importContainerJSON(
+      serverContainerId, serverWorkspaceId, sgtmConfig, null,
+      p => onProgress({ stage: 'sgtm_import', ...p }),
+    );
+    console.log('[gtm] Phase 5 done — tags:', serverImport.importedTagCount, 'vars:', serverImport.importedVariableCount);
+  } catch (p5Err) {
+    // NON-FATAL — server shell exists, user still gets containerConfig + publicId
+    console.error('[gtm] Phase 5 FAILED (server import) — continuing:', p5Err.message);
+  }
 
-  console.log('[gtm] Phase 5 done. Phase 6: creating versions...');
-  // ── Phase 6: Create versions for both containers in parallel ──────────────
-  // Web is kept as DRAFT (publish happens after transport_url wiring).
-  // Server is published immediately so containerConfig blob is generated.
+  // ── Phase 6: Create versions ──────────────────────────────────────────────
+  console.log('[gtm] Phase 6: creating versions...');
   onProgress({ stage: 'versioning', done: 0, total: 2 });
   const today = new Date().toISOString().split('T')[0];
-  const [webVer, srvVer] = await Promise.all([
-    createVersion(webContainerId, webWorkspaceId, 'Easy Track initial — ' + today),
-    createVersion(serverContainerId, serverWorkspaceId, 'sGTM initial — ' + today),
-  ]);
-  const webVersionId = webVer.containerVersion && webVer.containerVersion.containerVersionId;
-  const srvVersionId = srvVer.containerVersion && srvVer.containerVersion.containerVersionId;
+  let webVersionId = null, srvVersionId = null;
+  try {
+    const [webVer, srvVer] = await Promise.all([
+      createVersion(webContainerId, webWorkspaceId, 'Easy Track initial — ' + today),
+      createVersion(serverContainerId, serverWorkspaceId, 'sGTM initial — ' + today),
+    ]);
+    webVersionId = webVer.containerVersion && webVer.containerVersion.containerVersionId;
+    srvVersionId = srvVer.containerVersion && srvVer.containerVersion.containerVersionId;
+    console.log('[gtm] Phase 6 done — webVer:', webVersionId, 'srvVer:', srvVersionId);
+  } catch (p6Err) {
+    console.error('[gtm] Phase 6 FAILED (versioning) — non-fatal:', p6Err.message);
+  }
   onProgress({ stage: 'versioning', done: 2, total: 2 });
 
   if (srvVersionId) {
@@ -1230,32 +1248,26 @@ async function provisionForClientWithServer(opts) {
     });
   }
 
-  console.log('[gtm] Phase 6 done. Phase 7: containerConfig + invite...');
-  // ── Phase 7: containerConfig + invite user (parallel) ────────────────────
-  const [containerConfig] = await Promise.all([
-    getContainerConfig(serverContainerId),
-    opts.inviteEmail
-      ? Promise.all([
-          inviteUserToContainer(webContainerId,    opts.inviteEmail, 'read').catch(() => {}),
-          inviteUserToContainer(serverContainerId, opts.inviteEmail, 'read').catch(() => {}),
-        ])
-      : Promise.resolve(),
-  ]);
+  // ── Phase 7: containerConfig + invite ─────────────────────────────────────
+  console.log('[gtm] Phase 7: containerConfig + invite...');
+  let containerConfig = null;
+  try {
+    const results = await Promise.all([
+      getContainerConfig(serverContainerId),
+      opts.inviteEmail
+        ? Promise.all([
+            inviteUserToContainer(webContainerId,    opts.inviteEmail, 'read').catch(() => {}),
+            inviteUserToContainer(serverContainerId, opts.inviteEmail, 'read').catch(() => {}),
+          ])
+        : Promise.resolve(),
+    ]);
+    containerConfig = results[0];
+    console.log('[gtm] Phase 7 done — containerConfig:', containerConfig ? 'present' : 'null (version not published yet)');
+  } catch (p7Err) {
+    console.error('[gtm] Phase 7 FAILED (containerConfig) — non-fatal:', p7Err.message);
+  }
+  console.log('[gtm] provisionForClientWithServer complete — serverPublicId:', serverPublicId);
 
-  // Build web GTM snippet
-  const snippetHead = "<!-- Google Tag Manager -->\n"
-    + "<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':\n"
-    + "new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],\n"
-    + "j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=\n"
-    + "'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);\n"
-    + `})(window,document,'script','dataLayer','${webPublicId}');</script>\n`
-    + "<!-- End Google Tag Manager -->";
-  const snippetBody = "<!-- Google Tag Manager (noscript) -->\n"
-    + `<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=${webPublicId}"\n`
-    + 'height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>\n'
-    + "<!-- End Google Tag Manager (noscript) -->";
-
-  console.log('[gtm] Phase 7 done — provisionForClientWithServer complete. serverPublicId:', serverPublicId);
   return {
     // Web container result (same shape as provisionForClient)
     gtmAccountId:    getAccountId(),
