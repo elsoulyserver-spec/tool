@@ -10858,12 +10858,10 @@
         publishLive: !_wantServer,   // web-only → publish live; server mode → publish after wiring
       };
 
-      // 3. UI → busy (disable the clicked button)
+      // 3. UI → busy (only disable the clicked button — the other stays independent)
       var btn = document.getElementById(_wantServer ? 'mgdCreateServerBtn' : 'mgdCreateBtn');
-      var btnOther = document.getElementById(_wantServer ? 'mgdCreateBtn' : 'mgdCreateServerBtn');
       var resultBox = document.getElementById('mgdResult');
-      if (btn)      { btn.disabled = true;      btn.style.opacity = '.6'; btn.style.cursor = 'wait'; }
-      if (btnOther) { btnOther.disabled = true; btnOther.style.opacity = '.4'; btnOther.style.cursor = 'not-allowed'; }
+      if (btn) { btn.disabled = true; btn.style.opacity = '.6'; btn.style.cursor = 'wait'; }
       if (resultBox) resultBox.style.display = 'none';
       _mgdProgress(_wantServer ? 'جاري إنشاء Web + Server Containers...' : 'جاري إنشاء Web Container...', true);
 
@@ -10888,8 +10886,7 @@
 
         if (!resp.ok || !data.ok) {
           _mgdProgress('', false);
-          if (btn)      { btn.disabled = false;      btn.style.opacity = '1'; btn.style.cursor = 'pointer'; }
-          if (btnOther) { btnOther.disabled = false; btnOther.style.opacity = '1'; btnOther.style.cursor = 'pointer'; }
+          if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; }
           _mgdShowError(data.error || ('HTTP ' + resp.status), data.hint || null);
           return;
         }
@@ -10897,8 +10894,7 @@
         if (!data.jobId) {
           // Old server behavior — accept synchronous result if present
           _mgdProgress('', false);
-          if (btn)      { btn.disabled = false;      btn.style.opacity = '1'; btn.style.cursor = 'pointer'; }
-          if (btnOther) { btnOther.disabled = false; btnOther.style.opacity = '1'; btnOther.style.cursor = 'pointer'; }
+          if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; }
           _mgdShowSuccess(data);
           return;
         }
@@ -14836,4 +14832,4 @@
         return Math.round(val * 100) / 100;
       }
 
-      // ── Norma                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
+      // ── Norma                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
