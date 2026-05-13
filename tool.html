@@ -10704,159 +10704,40 @@
               'Server GTM ID: <span style="font-family:var(--font-mono);color:#a99cff;">' + serverGtmId + '</span>' +
             '</div>';
         } else {
-          // ── FALLBACK PATH ── server container ready (GA4-only)
-          serverBlock.style.cssText = 'margin-top:18px;background:rgba(100,100,255,.05);border:1px solid rgba(130,100,255,.3);border-radius:14px;padding:16px 18px;';
-          var rawConfig  = data.server.containerConfig || '(الـ container config لسه بيتولّد)';
+          // ── FALLBACK PATH ── auto-deploy didn't run/succeed — show manual UI.
+          serverBlock.style.cssText = 'margin-top:18px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.3);border-radius:14px;padding:16px 18px;';
+          var rawConfig  = data.server.containerConfig || '(الـ container config لسه بيتولّد — حاول reload الصفحة)';
           var safeConfig = rawConfig.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          window._mgdServerInfo = {
-            containerId: data.server.containerId,
-            workspaceId: data.server.workspaceId,
-            publicId:    data.server.publicId,
-            platforms:   data.server._platforms || [],
-            events:      data.server._events    || [],
-            pixelIds:    data.server._pixelIds  || {},
-          };
+          var errLine    = deployError
+            ? '<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--amber);">' +
+              '⚠️ الـ auto-deploy فشل: ' + deployError.replace(/</g, '&lt;') +
+              '</div>'
+            : '';
           serverBlock.innerHTML =
-            '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">' +
-              '<span class="material-symbols-outlined" style="color:#a99cff;font-size:22px;">dns</span>' +
-              '<div style="font-family:var(--font-display);font-weight:800;font-size:15px;color:var(--wht);">Server Container جاهز ✓</div>' +
-              '<div style="margin-right:auto;background:rgba(130,100,255,.15);color:#a99cff;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;">sGTM</div>' +
+            '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">' +
+              '<span class="material-symbols-outlined" style="color:var(--amber);font-size:22px;">build</span>' +
+              '<div style="font-family:var(--font-display);font-weight:800;font-size:15px;color:var(--wht);">Server Container — نشر يدوي مطلوب</div>' +
             '</div>' +
-            '<div style="font-size:12px;color:var(--wht2);font-weight:700;margin-bottom:6px;">1️⃣ انسخ Container Config وحطه في Stape / Cloud Run:</div>' +
-            '<pre id="mgdServerConfig" style="background:var(--bg);border:1px solid var(--bdr2);border-radius:8px;padding:10px;font-family:var(--font-mono);font-size:10.5px;color:var(--wht2);max-height:120px;overflow:auto;direction:ltr;text-align:left;margin-bottom:8px;line-height:1.5;word-break:break-all;">' + safeConfig + '</pre>' +
-            '<button onclick="_mgdCopy(document.getElementById(\'mgdServerConfig\').textContent, this)" style="margin-bottom:16px;background:var(--sur3);border:1px solid var(--bdr2);border-radius:8px;padding:6px 12px;color:var(--wht2);font-family:var(--font-ui);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;"><span class="material-symbols-outlined" style="font-size:13px;">content_copy</span>نسخ Config</button>' +
-            '<div style="font-size:12px;color:var(--wht2);font-weight:700;margin-bottom:6px;">2️⃣ بعد ما تشغّل الـ server، الصق الـ sGTM URL هنا:</div>' +
+            errLine +
+            '<div style="font-size:12px;color:var(--wht2);font-weight:700;margin-bottom:6px;">1️⃣ انسخ Container Config code:</div>' +
+            '<pre id="mgdServerConfig" style="background:var(--bg);border:1px solid var(--bdr2);border-radius:8px;padding:10px;font-family:var(--font-mono);font-size:10.5px;color:var(--wht2);max-height:140px;overflow:auto;direction:ltr;text-align:left;margin-bottom:8px;line-height:1.5;word-break:break-all;">' + safeConfig + '</pre>' +
+            '<button onclick="_mgdCopy(document.getElementById(\'mgdServerConfig\').textContent, this)" style="margin-bottom:14px;background:var(--sur3);border:1px solid var(--bdr2);border-radius:8px;padding:6px 12px;color:var(--wht2);font-family:var(--font-ui);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;"><span class="material-symbols-outlined" style="font-size:13px;">content_copy</span>نسخ Config</button>' +
+            '<div style="font-size:12px;color:var(--wht2);font-weight:700;margin-bottom:6px;">2️⃣ بعد ما تنشره يدوياً، الصق الـ sGTM URL هنا:</div>' +
             '<div style="display:flex;gap:8px;align-items:stretch;margin-bottom:8px;">' +
-              '<input id="mgdSgtmUrl" type="url" placeholder="https://gtm.your-domain.com" style="flex:1;padding:10px 12px;border-radius:8px;border:1px solid var(--bdr2);background:var(--bg);color:var(--wht);font-family:var(--font-mono);font-size:12px;direction:ltr;">' +
-              '<button id="mgdWireBtn" onclick="_mgdWireTransport()" style="background:var(--acc);border:none;border-radius:8px;padding:10px 16px;color:var(--bg);font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;"><span class="material-symbols-outlined" style="font-size:15px;">link</span>ربط</button>' +
+              '<input id="mgdSgtmUrl" type="url" placeholder="https://gtm.your-domain.com" ' +
+                'style="flex:1;padding:10px 12px;border-radius:8px;border:1px solid var(--bdr2);background:var(--bg);color:var(--wht);font-family:var(--font-mono);font-size:12px;direction:ltr;text-align:left;">' +
+              '<button id="mgdWireBtn" onclick="_mgdWireTransport()" ' +
+                'style="background:var(--acc);border:none;border-radius:8px;padding:10px 16px;color:var(--bg);font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;">' +
+                '<span class="material-symbols-outlined" style="font-size:15px;">link</span>ربط ونشر' +
+              '</button>' +
             '</div>' +
-            '<div id="mgdWireStatus" style="font-size:11.5px;color:var(--mut);min-height:18px;line-height:1.5;margin-bottom:16px;"></div>' +
-            '<div style="border-top:1px solid var(--bdr2);margin-bottom:16px;"></div>' +
-            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">' +
-              '<span class="material-symbols-outlined" style="color:#a99cff;font-size:18px;">bolt</span>' +
-              '<div style="font-size:13px;font-weight:700;color:var(--wht);">3️⃣ إضافة CAPI على الـ Server Container (اختياري)</div>' +
-            '</div>' +
-            '<div style="font-size:11.5px;color:var(--mut);margin-bottom:12px;line-height:1.6;">حط الـ Access Tokens للمنصات اللي عايز تفعّلها — هيتضاف Tags + Templates تلقائياً.</div>' +
-            '<div id="mgdCapiTokenInputs" style="display:grid;gap:8px;margin-bottom:14px;">' + _mgdCapiInputsHTML(window._mgdServerInfo.platforms) + '</div>' +
-            '<button id="mgdSetupCapiBtn" onclick="_mgdSetupCapi()" style="background:linear-gradient(135deg,#6c63ff,#a99cff);border:none;border-radius:10px;padding:11px 20px;color:#fff;font-family:var(--font-ui);font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;width:100%;justify-content:center;"><span class="material-symbols-outlined" style="font-size:16px;">add_circle</span>Setup CAPI على Server Container</button>' +
-            '<div id="mgdCapiStatus" style="font-size:12px;color:var(--mut);min-height:18px;margin-top:10px;line-height:1.6;text-align:center;"></div>';
+            '<div id="mgdWireStatus" style="font-size:11.5px;color:var(--mut);min-height:18px;line-height:1.5;"></div>';
         }
         box.appendChild(serverBlock);
       }
     }
 
-    // ── Setup CAPI helpers ────────────────────────────────────────────────────
-
-    // Build token input rows for each platform that has a pixel ID
-    function _mgdCapiInputsHTML(platforms) {
-      var defs = {
-        meta:   { label: 'Meta CAPI Token',       id: 'mgd-capi-tok-meta',   ph: 'EAAxxxx...' },
-        tiktok: { label: 'TikTok Events Token',   id: 'mgd-capi-tok-tiktok', ph: 'aaa111...' },
-        snap:   { label: 'Snapchat CAPI Token',   id: 'mgd-capi-tok-snap',   ph: 'snap_capi...' },
-        gads:   { label: 'Google Ads Label',      id: 'mgd-capi-tok-gads',   ph: 'AbCd1234...' },
-      };
-      var html = '';
-      (platforms || ['meta','tiktok','snap','gads']).forEach(function(p) {
-        var d = defs[p];
-        if (!d) return;
-        html +=
-          '<div style="display:flex;align-items:center;gap:10px;">' +
-            '<div style="width:130px;font-size:11px;color:var(--mut);flex-shrink:0;">' + d.label + '</div>' +
-            '<input id="' + d.id + '" type="text" placeholder="' + d.ph + '" ' +
-              'style="flex:1;padding:8px 10px;border-radius:7px;border:1px solid var(--bdr2);background:var(--bg);color:var(--wht);font-family:var(--font-mono);font-size:11px;direction:ltr;">' +
-          '</div>';
-      });
-      return html || '<div style="font-size:11px;color:var(--mut);">مفيش platforms محددة</div>';
-    }
-
-    async function _mgdSetupCapi() {
-      var info = window._mgdServerInfo;
-      if (!info || !info.containerId) {
-        alert('معلومات الـ server container مش موجودة. جرب تعيد تشغيل الـ container.');
-        return;
-      }
-      // Collect tokens
-      var capiTokens = {};
-      var tokDefs = { meta:'mgd-capi-tok-meta', tiktok:'mgd-capi-tok-tiktok', snap:'mgd-capi-tok-snap', gads:'mgd-capi-tok-gads' };
-      Object.keys(tokDefs).forEach(function(p) {
-        var el = document.getElementById(tokDefs[p]);
-        if (el && el.value.trim()) capiTokens[p] = el.value.trim();
-      });
-      var activePlats = (info.platforms || []).filter(function(p) { return capiTokens[p] || info.pixelIds[p]; });
-      if (!activePlats.length) {
-        alert('حط token واحد على الأقل أو تأكد إن الـ pixel IDs موجودة.');
-        return;
-      }
-
-      var btn    = document.getElementById('mgdSetupCapiBtn');
-      var status = document.getElementById('mgdCapiStatus');
-      if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
-      if (status) status.textContent = 'جاري الإعداد...';
-
-      try {
-        var resp = await fetch('/api/managed/setup-capi', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            clientId:           (window.currentUser && currentUser.id) || null,
-            serverContainerId:  info.containerId,
-            serverWorkspaceId:  info.workspaceId,
-            platforms:          activePlats,
-            events:             info.events   || [],
-            pixelIds:           info.pixelIds || {},
-            capiTokens:         capiTokens,
-          }),
-        });
-        var data = await resp.json();
-        if (!resp.ok || !data.ok) throw new Error(data.error || 'HTTP ' + resp.status);
-
-        // Poll job
-        var jobId = data.jobId;
-        var maxMs = 5 * 60 * 1000;
-        var start = Date.now();
-        var final = null;
-        var stageLabels = {
-          capi_templates: 'جاري رفع الـ Templates...',
-          capi_vars:      'جاري إضافة المتغيرات...',
-          capi_tags:      'جاري إضافة الـ Tags...',
-          versioning:     'جاري نشر الـ version...',
-        };
-        while (Date.now() - start < maxMs) {
-          await new Promise(function(r){ setTimeout(r, 3000); });
-          try {
-            var r2 = await fetch('/api/managed/job/' + encodeURIComponent(jobId));
-            var j2 = await r2.json();
-            if (!r2.ok || !j2.ok) continue;
-            var stageLabel = (j2.progress && stageLabels[j2.progress.stage]) || 'جاري الإعداد...';
-            if (j2.progress && j2.progress.total) stageLabel += ' (' + j2.progress.done + '/' + j2.progress.total + ')';
-            if (status) status.textContent = stageLabel + ' — ' + Math.floor((Date.now()-start)/1000) + 's';
-            if (j2.status === 'completed' || j2.status === 'failed') { final = j2; break; }
-          } catch(_) {}
-        }
-
-        if (!final || final.status === 'failed') {
-          throw new Error(final ? (final.error || 'فشل الإعداد') : 'انتهت المهلة');
-        }
-
-        if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
-        var r = final.result || {};
-        if (status) {
-          status.style.color = 'var(--acc)';
-          status.textContent = '✓ تم إضافة CAPI بنجاح — ' + (r.tagCount || 0) + ' tags على ' + (r.platforms || activePlats).join(', ');
-        }
-        if (btn) {
-          btn.style.background = 'rgba(70,241,197,.15)';
-          btn.style.color = 'var(--acc)';
-          btn.style.border = '1px solid rgba(70,241,197,.3)';
-          btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">check_circle</span> تم Setup CAPI ✓';
-        }
-      } catch (e) {
-        if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
-        if (status) { status.style.color = '#ffb4ab'; status.textContent = 'فشل: ' + (e.message || e); }
-      }
-    }
-
-        // ── Authenticated helper for /api/ss/* endpoints ──────────────────────────
+    // ── Authenticated helper for /api/ss/* endpoints ──────────────────────────
     // _ssApi(method, path, body, callback)
     // Gets a fresh Firebase ID token, calls the server endpoint, and invokes
     // callback(err, { ok, status, data }) — mirrors the old SS wizard helper.

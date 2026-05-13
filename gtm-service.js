@@ -268,11 +268,10 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
       importedClientCount:   clients.length,
     };
   } catch (bulkErr) {
-    // Fall through to individual creation for ANY error.
-    // 400 = invalid field (e.g. 'client' not supported in bulk import for server containers)
-    // 404/405 = endpoint not available on this GTM tier
-    // Others = quota / transient errors → safer to retry individually
-    console.warn('[gtm] bulk import failed (status=' + bulkErr.status + ') — falling back to individual calls:', bulkErr.message);
+    // ANY error from the bulk endpoint → fall through to individual creation.
+    // GTM returns 400 for unsupported entity types (custom templates, clients, etc.),
+    // 404/405 when the bulk endpoint isn't available on the account's quota tier.
+    console.warn('[gtm] bulk import failed (' + (bulkErr.status || bulkErr.message) + ') — falling back to individual calls');
   }
 
   // ── FALLBACK: Parallel bursts, one call per entity ────────────────────────
@@ -449,26 +448,27 @@ async function createVersion(containerId, workspaceId, versionName) {
 async function publishVersion(containerId, versionId) {
   const acc = getAccountId();
 
-  // Guard: if versionId is missing, skip direct publish and go straight to fallback
+  // Guard: if versionId is missing, skip the direct publish and go straight to fallback
   if (versionId) {
     try {
       return await gtmRequest('POST',
         `/accounts/${acc}/containers/${containerId}/versions/${versionId}:publish`, '');
     } catch (e) {
       if (e.status !== 404) throw e;
-      console.warn(`[gtm] publish version ${versionId} returned 404 — trying fallbacks`);
+      console.warn(`[gtm] publish version ${versionId} returned 404 — trying live-version fallback`);
     }
   } else {
-    console.warn(`[gtm] publishVersion: no versionId — fallback for container ${containerId}`);
+    console.warn(`[gtm] publishVersion: no versionId — trying live-version fallback for container ${containerId}`);
   }
 
-  // Fallback 1: fetch live version
+  // Fallback: fetch the container's current live version and publish it.
+  // GTM API v2: GET .../versions?containerVersionId=live returns the published version.
   try {
     const liveResp = await gtmRequest('GET',
       `/accounts/${acc}/containers/${containerId}/versions?containerVersionId=live`);
     const liveId = liveResp && liveResp.containerVersionId;
     if (liveId) {
-      console.log(`[gtm] re-publishing live version ${liveId}`);
+      console.log(`[gtm] found live version ${liveId} — re-publishing`);
       return await gtmRequest('POST',
         `/accounts/${acc}/containers/${containerId}/versions/${liveId}:publish`, '');
     }
@@ -476,7 +476,7 @@ async function publishVersion(containerId, versionId) {
     console.warn(`[gtm] live-version fetch failed:`, liveErr.message);
   }
 
-  // Fallback 2: list all versions, publish latest
+  // Final fallback: list all versions and publish the latest
   try {
     const listResp = await gtmRequest('GET', `/accounts/${acc}/containers/${containerId}/versions`);
     const versions = (listResp.containerVersion || [])
@@ -565,7 +565,7 @@ async function provisionForClient({ projectName, domain, configJson, publishLive
   const containerVersion = versionResp.containerVersion || {};
   const versionId = containerVersion.containerVersionId;
 
-  // 5. Publish if requested (non-fatal — stays draft if publish fails)
+  // 5. Publish if requested (non-fatal — container stays as draft if publish fails)
   let published = false;
   let publishedAt = null;
   if (publishLive && versionId) {
@@ -574,7 +574,7 @@ async function provisionForClient({ projectName, domain, configJson, publishLive
       published = true;
       publishedAt = new Date().toISOString();
     } catch (pubErr) {
-      console.warn('[gtm] publish failed (non-fatal), container stays draft:', pubErr.message);
+      console.warn('[gtm] provisionForClient: publish failed (non-fatal), container stays draft:', pubErr.message);
     }
   }
 
@@ -1134,7 +1134,6 @@ async function provisionForClientWithServer(opts) {
   const srvName  = baseName.slice(0, 50) + ' (Server) · ' + ts;
 
   // ── Phase 1: Create BOTH containers in parallel ───────────────────────────
-  console.log('[gtm] provisionForClientWithServer — Phase 1: creating containers');
   onProgress({ stage: 'creating_containers', done: 0, total: 2 });
 
   async function _createWithRetry(name, domain, type) {
@@ -1159,7 +1158,6 @@ async function provisionForClientWithServer(opts) {
   const serverContainerId = serverCt.containerId;
   const serverPublicId    = serverCt.publicId;
   onProgress({ stage: 'creating_containers', done: 2, total: 2 });
-  console.log('[gtm] Phase 1 done — webId:', webContainerId, 'serverId:', serverContainerId);
 
   // ── Phase 2: Fetch both workspaces in parallel ────────────────────────────
   const [webWs, serverWs] = await Promise.all([
@@ -1168,18 +1166,11 @@ async function provisionForClientWithServer(opts) {
   ]);
   const webWorkspaceId    = webWs.workspaceId;
   const serverWorkspaceId = serverWs.workspaceId;
-  console.log('[gtm] Phase 2 done — webWs:', webWorkspaceId, 'serverWs:', serverWorkspaceId);
 
   // ── Phase 3: CAPI templates in server workspace ───────────────────────────
   // Must happen BEFORE server config import so tags can reference templates.
-  // Create a template for every platform that has a pixel ID (matching the tag
-  // creation condition in buildServerConfig: platList.includes(p) && px[p]).
-  // Previously this only ran when CAPI tokens were supplied — that caused Phase 5
-  // to fail with "unknown tag type" whenever pixel IDs existed but tokens didn't.
-  const _px        = opts.pixelIds   || {};
-  const _platforms = opts.platforms  || Object.keys(opts.capiTokens || {});
-  const capiPlatforms = _platforms
-    .filter(p => CAPI_TEMPLATE_BUILDERS[p] && (_px[p] || (opts.capiTokens || {})[p]));
+  const capiPlatforms = Object.keys(opts.capiTokens || {})
+    .filter(p => (opts.capiTokens[p] || '').trim());
   if (capiPlatforms.length) {
     onProgress({ stage: 'capi_templates', done: 0, total: capiPlatforms.length });
     await createCAPITemplates(serverContainerId, serverWorkspaceId, capiPlatforms);
@@ -1188,22 +1179,13 @@ async function provisionForClientWithServer(opts) {
   }
 
   // ── Phase 4: Import web config ────────────────────────────────────────────
-  console.log('[gtm] Phase 4: importing web config...');
   onProgress({ stage: 'web_import', done: 0, total: 1 });
-  let webImport = { importedTagCount: 0, importedTriggerCount: 0, importedVariableCount: 0 };
-  try {
-    webImport = await importContainerJSON(
-      webContainerId, webWorkspaceId, opts.configJson, null,
-      p => onProgress({ stage: 'web_import', ...p }),
-    );
-    console.log('[gtm] Phase 4 done — tags:', webImport.importedTagCount);
-  } catch (p4Err) {
-    console.error('[gtm] Phase 4 FAILED (web import):', p4Err.message);
-    throw p4Err; // fatal — web container is the primary deliverable
-  }
+  const webImport = await importContainerJSON(
+    webContainerId, webWorkspaceId, opts.configJson, null,
+    p => onProgress({ stage: 'web_import', ...p }),
+  );
 
   // ── Phase 5: Import server config ─────────────────────────────────────────
-  console.log('[gtm] Phase 5: importing server config...');
   let sgtmConfig;
   if (opts.serverConfigJson) {
     sgtmConfig = opts.serverConfigJson;
@@ -1218,29 +1200,27 @@ async function provisionForClientWithServer(opts) {
       serverContainerId, serverWorkspaceId, sgtmConfig, null,
       p => onProgress({ stage: 'sgtm_import', ...p }),
     );
-    console.log('[gtm] Phase 5 done — tags:', serverImport.importedTagCount, 'vars:', serverImport.importedVariableCount);
-  } catch (p5Err) {
-    // NON-FATAL — server shell exists, user still gets containerConfig + publicId
-    console.error('[gtm] Phase 5 FAILED (server import) — continuing:', p5Err.message);
+  } catch (importErr) {
+    console.warn('[gtm] Phase 5 server import failed (non-fatal):', importErr.message);
   }
 
-  // ── Phase 6: Create versions ──────────────────────────────────────────────
-  console.log('[gtm] Phase 6: creating versions...');
-  onProgress({ stage: 'versioning', done: 0, total: 2 });
-  const today = new Date().toISOString().split('T')[0];
+  // ── Phase 6: Create versions for both containers in parallel ──────────────
+  // Web is kept as DRAFT (publish happens after transport_url wiring).
+  // Server is published immediately so containerConfig blob is generated.
   let webVersionId = null, srvVersionId = null;
   try {
+    onProgress({ stage: 'versioning', done: 0, total: 2 });
+    const today = new Date().toISOString().split('T')[0];
     const [webVer, srvVer] = await Promise.all([
       createVersion(webContainerId, webWorkspaceId, 'Easy Track initial — ' + today),
       createVersion(serverContainerId, serverWorkspaceId, 'sGTM initial — ' + today),
     ]);
     webVersionId = webVer.containerVersion && webVer.containerVersion.containerVersionId;
     srvVersionId = srvVer.containerVersion && srvVer.containerVersion.containerVersionId;
-    console.log('[gtm] Phase 6 done — webVer:', webVersionId, 'srvVer:', srvVersionId);
-  } catch (p6Err) {
-    console.error('[gtm] Phase 6 FAILED (versioning) — non-fatal:', p6Err.message);
+    onProgress({ stage: 'versioning', done: 2, total: 2 });
+  } catch (verErr) {
+    console.warn('[gtm] Phase 6 versioning failed (non-fatal):', verErr.message);
   }
-  onProgress({ stage: 'versioning', done: 2, total: 2 });
 
   if (srvVersionId) {
     await publishVersion(serverContainerId, srvVersionId).catch(e => {
@@ -1248,11 +1228,10 @@ async function provisionForClientWithServer(opts) {
     });
   }
 
-  // ── Phase 7: containerConfig + invite ─────────────────────────────────────
-  console.log('[gtm] Phase 7: containerConfig + invite...');
+  // ── Phase 7: containerConfig + invite user (parallel) ────────────────────
   let containerConfig = null;
   try {
-    const results = await Promise.all([
+    const [cfg] = await Promise.all([
       getContainerConfig(serverContainerId),
       opts.inviteEmail
         ? Promise.all([
@@ -1261,12 +1240,10 @@ async function provisionForClientWithServer(opts) {
           ])
         : Promise.resolve(),
     ]);
-    containerConfig = results[0];
-    console.log('[gtm] Phase 7 done — containerConfig:', containerConfig ? 'present' : 'null (version not published yet)');
-  } catch (p7Err) {
-    console.error('[gtm] Phase 7 FAILED (containerConfig) — non-fatal:', p7Err.message);
+    containerConfig = cfg;
+  } catch (cfgErr) {
+    console.warn('[gtm] Phase 7 containerConfig failed (non-fatal):', cfgErr.message);
   }
-  console.log('[gtm] provisionForClientWithServer complete — serverPublicId:', serverPublicId);
 
   // Build web GTM snippet
   const snippetHead = "<!-- Google Tag Manager -->\n"
@@ -1315,229 +1292,6 @@ async function provisionForClientWithServer(opts) {
   };
 }
 
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SETUP CAPI ON EXISTING SERVER CONTAINER
-// Called after the server container is already live (GA4-only), to add CAPI
-// templates + variables + tags without touching what's already there.
-// ─────────────────────────────────────────────────────────────────────────────
-const CAPI_PLATFORM_VARS = {
-  meta:   [
-    ['ET - Meta Pixel ID',       'pixelIds.meta'],
-    ['ET - Meta CAPI Token',     'capiTokens.meta'],
-  ],
-  tiktok: [
-    ['ET - TikTok Pixel ID',     'pixelIds.tiktok'],
-    ['ET - TikTok Events Token', 'capiTokens.tiktok'],
-  ],
-  snap:   [
-    ['ET - Snapchat Pixel ID',   'pixelIds.snap'],
-    ['ET - Snapchat CAPI Token', 'capiTokens.snap'],
-  ],
-  gads:   [
-    ['ET - Google Ads ID',       'pixelIds.gads'],
-    ['ET - Google Ads Label',    'pixelIds.gads_label'],
-  ],
-};
-
-const CAPI_TAG_PARAMS = {
-  meta: (mEv) => [
-    { type:'template', key:'pixelId',         value:'{{ET - Meta Pixel ID}}' },
-    { type:'template', key:'accessToken',     value:'{{ET - Meta CAPI Token}}' },
-    { type:'template', key:'eventName',       value:mEv },
-    { type:'template', key:'eventId',         value:'{{ET - ep event_id}}' },
-    { type:'template', key:'eventTime',       value:'{{ET - event_time_unix}}' },
-    { type:'template', key:'actionSource',    value:'website' },
-    { type:'template', key:'sourceUrl',       value:'{{ET - page_location}}' },
-    { type:'template', key:'value',           value:'{{ET - epn value}}' },
-    { type:'template', key:'currency',        value:'{{ET - ep currency}}' },
-    { type:'template', key:'orderId',         value:'{{ET - ep transaction_id}}' },
-    { type:'template', key:'contentIds',      value:'{{ET - ep content_ids}}' },
-    { type:'template', key:'contentName',     value:'{{ET - ep content_name}}' },
-    { type:'template', key:'numItems',        value:'{{ET - ep num_items}}' },
-    { type:'template', key:'userEmail',       value:'{{ET - up em}}' },
-    { type:'template', key:'userPhone',       value:'{{ET - up ph}}' },
-    { type:'template', key:'userFirstName',   value:'{{ET - up fn}}' },
-    { type:'template', key:'userLastName',    value:'{{ET - up ln}}' },
-    { type:'template', key:'fbp',             value:'{{ET - resolved_fbp}}' },
-    { type:'template', key:'fbc',             value:'{{ET - resolved_fbc}}' },
-    { type:'template', key:'clientIpAddress', value:'{{ET - client_ip_clean}}' },
-    { type:'template', key:'clientUserAgent', value:'{{ET - Header user_agent}}' },
-    { type:'boolean',  key:'enableDebug',     value:'false' },
-  ],
-  tiktok: (ttEv) => [
-    { type:'template', key:'pixelCode',    value:'{{ET - TikTok Pixel ID}}' },
-    { type:'template', key:'accessToken',  value:'{{ET - TikTok Events Token}}' },
-    { type:'template', key:'eventName',    value:ttEv },
-    { type:'template', key:'eventId',      value:'{{ET - ep event_id}}' },
-    { type:'template', key:'eventTime',    value:'{{ET - event_time_unix}}' },
-    { type:'template', key:'value',        value:'{{ET - epn value}}' },
-    { type:'template', key:'currency',     value:'{{ET - ep currency}}' },
-    { type:'template', key:'orderId',      value:'{{ET - ep transaction_id}}' },
-    { type:'template', key:'contentIds',   value:'{{ET - ep content_ids}}' },
-    { type:'template', key:'userEmail',    value:'{{ET - up em}}' },
-    { type:'template', key:'userPhone',    value:'{{ET - up ph}}' },
-    { type:'template', key:'ipAddress',    value:'{{ET - client_ip_clean}}' },
-    { type:'template', key:'userAgent',    value:'{{ET - Header user_agent}}' },
-    { type:'template', key:'pageUrl',      value:'{{ET - page_location}}' },
-    { type:'boolean',  key:'enableDebug',  value:'false' },
-  ],
-  snap: (sEv) => [
-    { type:'template', key:'pixelId',       value:'{{ET - Snapchat Pixel ID}}' },
-    { type:'template', key:'accessToken',   value:'{{ET - Snapchat CAPI Token}}' },
-    { type:'template', key:'eventType',     value:sEv },
-    { type:'template', key:'eventId',       value:'{{ET - ep event_id}}' },
-    { type:'template', key:'eventTime',     value:'{{ET - event_time_unix}}' },
-    { type:'template', key:'price',         value:'{{ET - epn value}}' },
-    { type:'template', key:'currency',      value:'{{ET - ep currency}}' },
-    { type:'template', key:'transactionId', value:'{{ET - ep transaction_id}}' },
-    { type:'template', key:'userEmail',     value:'{{ET - up em}}' },
-    { type:'template', key:'userPhone',     value:'{{ET - up ph}}' },
-    { type:'template', key:'ipAddress',     value:'{{ET - client_ip_clean}}' },
-    { type:'template', key:'userAgent',     value:'{{ET - Header user_agent}}' },
-    { type:'boolean',  key:'enableDebug',   value:'false' },
-  ],
-  gads: (gEv) => [
-    { type:'template', key:'conversionActionId', value:'{{ET - Google Ads ID}}' },
-    { type:'template', key:'conversionLabel',    value:'{{ET - Google Ads Label}}' },
-    { type:'template', key:'eventId',            value:'{{ET - ep event_id}}' },
-    { type:'template', key:'eventTime',          value:'{{ET - event_time_unix}}' },
-    { type:'template', key:'value',              value:'{{ET - epn value}}' },
-    { type:'template', key:'currency',           value:'{{ET - ep currency}}' },
-    { type:'template', key:'orderId',            value:'{{ET - ep transaction_id}}' },
-    { type:'template', key:'userEmail',          value:'{{ET - up em}}' },
-    { type:'boolean',  key:'enableDebug',        value:'false' },
-  ],
-};
-
-const CAPI_TAG_TYPE  = { meta:'et_meta_capi_manual', tiktok:'et_tiktok_events_manual', snap:'et_snapchat_capi_manual', gads:'et_gads_ec_manual' };
-const META_EV_MAP    = { page_view:'PageView', view_content:'ViewContent', add_to_cart:'AddToCart', initiate_checkout:'InitiateCheckout', purchase:'Purchase', lead:'Lead', sign_up:'CompleteRegistration', search:'Search' };
-const TIKTOK_EV_MAP  = { page_view:'Pageview', view_content:'ViewContent', add_to_cart:'AddToCart', initiate_checkout:'InitiateCheckout', purchase:'PlaceAnOrder', lead:'SubmitForm', sign_up:'CompleteRegistration', search:'Search' };
-const SNAP_EV_MAP    = { page_view:'PAGE_VIEW', view_content:'VIEW_CONTENT', add_to_cart:'ADD_CART', initiate_checkout:'START_CHECKOUT', purchase:'PURCHASE', lead:'SIGN_UP', sign_up:'SIGN_UP', search:'SEARCH' };
-const GADS_EV_MAP    = { purchase:'purchase', lead:'submit_lead_form', sign_up:'sign_up', add_to_cart:'add_to_cart' };
-const PLAT_EV_MAP    = { meta:META_EV_MAP, tiktok:TIKTOK_EV_MAP, snap:SNAP_EV_MAP, gads:GADS_EV_MAP };
-
-async function setupCAPIOnServer({
-  serverContainerId, serverWorkspaceId,
-  platforms = [], events = [],
-  pixelIds = {}, capiTokens = {},
-  onProgress,
-}) {
-  if (!isConfigured()) {
-    const err = new Error('Managed GTM is not configured on this server');
-    err.code = 'NOT_CONFIGURED';
-    throw err;
-  }
-
-  const fn  = onProgress || (() => {});
-  const acc = getAccountId();
-  const base = `/accounts/${acc}/containers/${serverContainerId}/workspaces/${serverWorkspaceId}`;
-  const px  = pixelIds   || {};
-  const tok = capiTokens || {};
-
-  const activePlatforms = (platforms || []).filter(p => CAPI_TAG_TYPE[p] && px[p]);
-  if (!activePlatforms.length) throw new Error('لازم تختار platform واحد على الأقل وتحط الـ Pixel ID بتاعه');
-
-  // ── Step 1: Create custom templates ──────────────────────────────────────
-  fn({ stage: 'capi_templates', done: 0, total: activePlatforms.length });
-  await createCAPITemplates(serverContainerId, serverWorkspaceId, activePlatforms);
-  fn({ stage: 'capi_templates', done: activePlatforms.length, total: activePlatforms.length });
-
-  // ── Step 2: Find existing event triggers by name ──────────────────────────
-  // The GA4-only import already created event triggers named "ET - sGTM Event <ga4Ev>".
-  // We look them up to get the real workspace triggerId values.
-  const GA4_EV = { page_view:'page_view', view_content:'view_item', add_to_cart:'add_to_cart', initiate_checkout:'begin_checkout', purchase:'purchase', lead:'generate_lead', sign_up:'sign_up', search:'search' };
-  const trigsResp = await gtmRequest('GET', `${base}/triggers`);
-  const wsTriggers = trigsResp.trigger || [];
-  // map ga4EventName → triggerId
-  const trigIdByName = {};
-  wsTriggers.forEach(t => {
-    if (t.type === 'customEvent' && t.customEventFilter) {
-      const arg1 = (t.customEventFilter[0] && t.customEventFilter[0].parameter || []).find(p => p.key === 'arg1');
-      if (arg1) trigIdByName[arg1.value] = t.triggerId;
-    }
-  });
-
-  // ── Step 3: Create CAPI variables one-by-one ─────────────────────────────
-  const varDefs = [];
-  for (const plat of activePlatforms) {
-    for (const [name, path] of (CAPI_PLATFORM_VARS[plat] || [])) {
-      const val = path.includes('.') ? (path.startsWith('pixelIds') ? px[path.split('.')[1]] : tok[path.split('.')[1]]) : null;
-      if (val) varDefs.push({ name, value: val });
-    }
-  }
-
-  fn({ stage: 'capi_vars', done: 0, total: varDefs.length });
-  let varDone = 0;
-  for (const v of varDefs) {
-    try {
-      await gtmRequest('POST', `${base}/variables`, JSON.stringify({
-        name: v.name, type: 'c',
-        parameter: [{ type: 'template', key: 'value', value: v.value }],
-      }));
-    } catch (e) {
-      // 409 = already exists — safe to ignore
-      if (e.status !== 409 && !/already exists|duplicate/i.test(e.message || ''))
-        console.warn('[gtm] setupCAPI var failed:', v.name, e.message);
-    }
-    fn({ stage: 'capi_vars', done: ++varDone, total: varDefs.length });
-  }
-
-  // ── Step 4: Create CAPI tags one-by-one ──────────────────────────────────
-  const tagDefs = [];
-  for (const plat of activePlatforms) {
-    const evMap = PLAT_EV_MAP[plat] || {};
-    const tagType = CAPI_TAG_TYPE[plat];
-    const paramFn = CAPI_TAG_PARAMS[plat];
-    for (const evKey of (events || [])) {
-      const platEv = evMap[evKey];
-      const ga4Ev  = GA4_EV[evKey];
-      if (!platEv || !ga4Ev) continue;
-      const tid = trigIdByName[ga4Ev];
-      if (!tid) { console.warn('[gtm] setupCAPI: no trigger found for', ga4Ev, '— skipping', plat, platEv); continue; }
-      tagDefs.push({
-        name: `ET - ${plat.charAt(0).toUpperCase() + plat.slice(1)} CAPI - ${platEv}`,
-        type: tagType,
-        tagFiringOption: 'oncePerEvent',
-        firingTriggerId: [tid],
-        parameter: paramFn(platEv),
-      });
-    }
-  }
-
-  fn({ stage: 'capi_tags', done: 0, total: tagDefs.length });
-  let tagDone = 0;
-  for (const tag of tagDefs) {
-    try {
-      await gtmRequest('POST', `${base}/tags`, JSON.stringify(tag));
-    } catch (e) {
-      console.warn('[gtm] setupCAPI tag failed:', tag.name, e.message);
-    }
-    fn({ stage: 'capi_tags', done: ++tagDone, total: tagDefs.length });
-  }
-
-  // ── Step 5: Version + publish ─────────────────────────────────────────────
-  fn({ stage: 'versioning', done: 0, total: 1 });
-  const today = new Date().toISOString().split('T')[0];
-  const ver = await createVersion(serverContainerId, serverWorkspaceId, 'Add CAPI — ' + today);
-  const versionId = ver.containerVersion && ver.containerVersion.containerVersionId;
-  fn({ stage: 'versioning', done: 1, total: 1 });
-
-  if (versionId) {
-    await publishVersion(serverContainerId, versionId).catch(e => {
-      console.warn('[gtm] CAPI publish non-fatal:', e.message);
-    });
-  }
-
-  return {
-    ok: true,
-    platforms: activePlatforms,
-    versionId,
-    tagCount: tagDone,
-    varCount: varDone,
-  };
-}
-
 module.exports = {
   isConfigured,
   getAccessToken,
@@ -1555,5 +1309,4 @@ module.exports = {
   upsertServerUrlVariable,
   createCAPITemplates,
   provisionForClientWithServer,
-  setupCAPIOnServer,
 };
