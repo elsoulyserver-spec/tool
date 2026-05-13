@@ -1170,8 +1170,14 @@ async function provisionForClientWithServer(opts) {
 
   // ── Phase 3: CAPI templates in server workspace ───────────────────────────
   // Must happen BEFORE server config import so tags can reference templates.
-  const capiPlatforms = Object.keys(opts.capiTokens || {})
-    .filter(p => (opts.capiTokens[p] || '').trim());
+  // Create a template for every platform that has a pixel ID (matching the tag
+  // creation condition in buildServerConfig: platList.includes(p) && px[p]).
+  // Previously this only ran when CAPI tokens were supplied — that caused Phase 5
+  // to fail with "unknown tag type" whenever pixel IDs existed but tokens didn't.
+  const _px        = opts.pixelIds   || {};
+  const _platforms = opts.platforms  || Object.keys(opts.capiTokens || {});
+  const capiPlatforms = _platforms
+    .filter(p => CAPI_TEMPLATE_BUILDERS[p] && (_px[p] || (opts.capiTokens || {})[p]));
   if (capiPlatforms.length) {
     onProgress({ stage: 'capi_templates', done: 0, total: capiPlatforms.length });
     await createCAPITemplates(serverContainerId, serverWorkspaceId, capiPlatforms);

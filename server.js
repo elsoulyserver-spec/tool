@@ -962,6 +962,8 @@ http.createServer((req, res) => {
             domain,
             configJson,
             serverConfigJson,              // null for 'client' mode, populated for 'client_server'
+            platforms:   platforms  || [], // passed to Phase 3 so CAPI templates match tag types
+            pixelIds:    pixelIds   || {}, // used alongside platforms to decide which templates to create
             capiTokens:  capiTokens || {}, // CAPI tokens for custom template creation in sGTM
             publishLive: mode === 'client_server' ? false : !!publishLive,
             inviteEmail: clientEmail || null,
