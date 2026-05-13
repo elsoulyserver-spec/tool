@@ -450,27 +450,26 @@ async function createVersion(containerId, workspaceId, versionName) {
 async function publishVersion(containerId, versionId) {
   const acc = getAccountId();
 
-  // Guard: if versionId is missing, skip the direct publish and go straight to fallback
+  // Guard: if versionId is missing, skip direct publish and go straight to fallback
   if (versionId) {
     try {
       return await gtmRequest('POST',
         `/accounts/${acc}/containers/${containerId}/versions/${versionId}:publish`, '');
     } catch (e) {
       if (e.status !== 404) throw e;
-      console.warn(`[gtm] publish version ${versionId} returned 404 — trying live-version fallback`);
+      console.warn(`[gtm] publish version ${versionId} returned 404 — trying fallbacks`);
     }
   } else {
-    console.warn(`[gtm] publishVersion: no versionId — trying live-version fallback for container ${containerId}`);
+    console.warn(`[gtm] publishVersion: no versionId — fallback for container ${containerId}`);
   }
 
-  // Fallback: fetch the container's current live version and publish it.
-  // GTM API v2: GET .../versions?containerVersionId=live returns the published version.
+  // Fallback 1: fetch live version
   try {
     const liveResp = await gtmRequest('GET',
       `/accounts/${acc}/containers/${containerId}/versions?containerVersionId=live`);
     const liveId = liveResp && liveResp.containerVersionId;
     if (liveId) {
-      console.log(`[gtm] found live version ${liveId} — re-publishing`);
+      console.log(`[gtm] re-publishing live version ${liveId}`);
       return await gtmRequest('POST',
         `/accounts/${acc}/containers/${containerId}/versions/${liveId}:publish`, '');
     }
@@ -478,7 +477,7 @@ async function publishVersion(containerId, versionId) {
     console.warn(`[gtm] live-version fetch failed:`, liveErr.message);
   }
 
-  // Final fallback: list all versions and publish the latest
+  // Fallback 2: list all versions, publish latest
   try {
     const listResp = await gtmRequest('GET', `/accounts/${acc}/containers/${containerId}/versions`);
     const versions = (listResp.containerVersion || [])
@@ -567,7 +566,7 @@ async function provisionForClient({ projectName, domain, configJson, publishLive
   const containerVersion = versionResp.containerVersion || {};
   const versionId = containerVersion.containerVersionId;
 
-  // 5. Publish if requested (non-fatal — container stays as draft if publish fails)
+  // 5. Publish if requested (non-fatal — stays draft if publish fails)
   let published = false;
   let publishedAt = null;
   if (publishLive && versionId) {
@@ -576,7 +575,7 @@ async function provisionForClient({ projectName, domain, configJson, publishLive
       published = true;
       publishedAt = new Date().toISOString();
     } catch (pubErr) {
-      console.warn('[gtm] provisionForClient: publish failed (non-fatal), container stays draft:', pubErr.message);
+      console.warn('[gtm] publish failed (non-fatal), container stays draft:', pubErr.message);
     }
   }
 
@@ -1259,4 +1258,40 @@ async function provisionForClientWithServer(opts) {
     importedVariableCount: webImport.importedVariableCount || 0,
     snippetHead,
     snippetBody,
-    invited:    !!(opts.
+    invited:    !!(opts.inviteEmail),
+    inviteEmail: opts.inviteEmail || null,
+    inviteError: null,
+    // Server container (nested)
+    server: {
+      gtmAccountId:    getAccountId(),
+      containerId:     serverContainerId,
+      publicId:        serverPublicId,
+      workspaceId:     serverWorkspaceId,
+      versionId:       srvVersionId,
+      containerName:   srvName,
+      containerConfig,
+      importedTagCount:      serverImport.importedTagCount      || 0,
+      importedTriggerCount:  serverImport.importedTriggerCount  || 0,
+      importedVariableCount: serverImport.importedVariableCount || 0,
+    },
+  };
+}
+
+module.exports = {
+  isConfigured,
+  getAccessToken,
+  listContainers,
+  createContainer,
+  importContainerJSON,
+  createVersion,
+  publishVersion,
+  inviteUserToContainer,
+  provisionForClient,
+  // Server-side (client + server flow)
+  createServerContainer,
+  getContainerConfig,
+  setGA4TransportUrl,
+  upsertServerUrlVariable,
+  createCAPITemplates,
+  provisionForClientWithServer,
+};
