@@ -6657,10 +6657,17 @@
         var _ssBannerSub = document.querySelector('#pane-ss-gtm .pc-ss-out-banner div > div:last-child');
         if (_ssBannerSub) {
           if (_pcSS.enabled && _pcSS.platforms.length) {
-            var _ssUrlTxt = _pcSS.serverUrl ? ' · ' + _pcSS.serverUrl : '';
-            _ssBannerSub.innerHTML = '✅ <strong style="color:var(--acc);">' + _pcSS.platforms.length + ' منصة</strong> مفعّلة' + _ssUrlTxt + ' — استورد الـ JSON في GTM → Admin → Import Container';
+            var _ssUrlTxt = _pcSS.serverUrl
+              ? ' · <span style="color:var(--acc);font-family:var(--font-mono);font-size:10px;">' + _pcSS.serverUrl + '</span>'
+              : ' · <span style="color:var(--red);font-size:10px;">⚠️ sGTM URL غير مُدخل</span>';
+            var _platNames = _pcSS.platforms.map(function(p){
+              return ({meta:'Meta',gads:'Google Ads',snap:'Snapchat',tiktok:'TikTok'})[p] || p;
+            }).join(' + ');
+            _ssBannerSub.innerHTML = '✅ <strong style="color:var(--acc);">' + _platNames + '</strong> مفعّلة' + _ssUrlTxt
+              + '<br><span style="font-size:10px;color:var(--mut);">• Web Container: GA4 سيرسل للسيرفر عبر transport_url ✓ &nbsp;|&nbsp; Server Container: Custom Templates جاهزة للـ CAPI ✓</span>';
           } else {
-            _ssBannerSub.innerHTML = '⚙️ فعّل <strong style="color:var(--wht2);">Server Side</strong> من الكارت فوق واختار منصاتك — Container جاهز للتحديث فور التفعيل';
+            _ssBannerSub.innerHTML = '⚙️ فعّل <strong style="color:var(--wht2);">Server Side</strong> من الكارت فوق واختار منصاتك'
+              + '<br><span style="font-size:10px;color:var(--mut);">الـ Container جاهز دايماً — فور التفعيل سيتضمن Custom Templates حقيقية لكل CAPI</span>';
           }
         }
 
@@ -6888,55 +6895,328 @@
     // ===== BUILD SERVER CONTAINER (sGTM) =====
     // ═══════════════════════════════════════════════════════════════
     function buildSSContainer() {
-      // يشتغل دايماً — يولّد Server Container سواء SS مفعّل أو لا
-      // لو مفيش platforms محددة → يولّد container فاضي جاهز للاستخدام
+      // Always generates — even when SS is off (empty container ready for use)
+      // Produces a fully importable sGTM container JSON with:
+      //   • GA4 Client
+      //   • customEvent Triggers (one per selected SS event, correct filter format)
+      //   • Custom Templates (real Sandboxed JS CAPI code for each platform)
+      //   • Tags referencing the custom templates via cvt_<fingerprint>
 
       var ts = Date.now();
-      function fp(id) { return String(ts + id * 7 + 1000000); }
+      // Fingerprint must be ≤13 digits (sGTM int64 safe range)
+      function fp(id) { return String((ts % 9000000000000 + id * 7 + 1000000) % 9999999999999); }
       function safeName(s) { return String(s).replace(/[:\/\\?*\[\]|<>]/g,'-').trim(); }
+      function sid(n) { return String(n); }
 
       var varId = 1, tagId = 1, triggerId = 1, clientId = 1;
-      var variables = [], tags = [], triggers = [], clients = [];
+      var variables = [], tags = [], triggers = [], clients = [], customTemplates = [];
 
-      // ── Helper: Event Data variable ─────────────────────────────
-      function evDataVar(name, key) {
-        variables.push({
-          accountId:'000000000', containerId:'00000000', variableId: varId,
-          name: name, type:'gtes',
-          parameter:[{ type:'TEMPLATE', key:'varType', value:'event_data' },
-                     { type:'TEMPLATE', key:'varName', value: key }],
-          fingerprint: fp(varId)
-        });
-        return varId++;
-      }
+      // ── Stable custom-template fingerprints for this session ──────────────
+      var TPL_META   = fp(50001);
+      var TPL_GADS   = fp(51001);
+      var TPL_SNAP   = fp(52001);
+      var TPL_TIKTOK = fp(53001);
 
-      // ── Helper: HTTP Request variable ───────────────────────────
-      function httpVar(name, key) {
-        variables.push({
-          accountId:'000000000', containerId:'00000000', variableId: varId,
-          name: name, type:'gtes',
-          parameter:[{ type:'TEMPLATE', key:'varType', value:'request_header' },
-                     { type:'TEMPLATE', key:'varName', value: key }],
-          fingerprint: fp(varId)
-        });
-        return varId++;
-      }
+      // ══════════════════════════════════════════════════════════════════════
+      // SANDBOXED JS TEMPLATES — real HTTP request code for each CAPI
+      // ══════════════════════════════════════════════════════════════════════
 
-      // ── Helper: Query Param variable ─────────────────────────────
-      function queryVar(name, key) {
-        variables.push({
-          accountId:'000000000', containerId:'00000000', variableId: varId,
-          name: name, type:'gtes',
-          parameter:[{ type:'TEMPLATE', key:'varType', value:'query_parameter' },
-                     { type:'TEMPLATE', key:'varName', value: key }],
-          fingerprint: fp(varId)
-        });
-        return varId++;
-      }
+      // ── Meta Conversions API ───────────────────────────────────────────────
+      var META_TEMPLATE_CODE = [
+        '___SANDBOXED_JS_FOR_SERVER_SIDE_TEMPLATE___',
+        '',
+        "const sendHttpRequest    = require('sendHttpRequest');",
+        "const JSON               = require('JSON');",
+        "const getEventData       = require('getEventData');",
+        "const encodeUriComponent = require('encodeUriComponent');",
+        "const getTimestampMillis = require('getTimestampMillis');",
+        '',
+        'const pixelId     = data.pixelId;',
+        'const accessToken = data.accessToken;',
+        "const eventName   = data.eventName || getEventData('event_name');",
+        "const currency    = getEventData('currency') || 'SAR';",
+        "const value       = parseFloat(getEventData('value') || getEventData('price') || 0);",
+        "const eventId     = data.eventId || getEventData('event_id') || ('ET-' + getTimestampMillis());",
+        "const em          = getEventData('up.em')          || '';",
+        "const ph          = getEventData('up.ph')          || '';",
+        "const fn_         = getEventData('up.fn')          || '';",
+        "const ln_         = getEventData('up.ln')          || '';",
+        "const extId       = getEventData('up.external_id') || '';",
+        "const fbp         = getEventData('up.fbp')         || '';",
+        "const fbc         = getEventData('up.fbc')         || '';",
+        "const fbclid      = getEventData('ep.fbclid')      || '';",
+        "const clientIp    = data.clientIp    || '';",
+        "const ua          = data.userAgent   || '';",
+        "const pageUrl     = getEventData('page_location')    || '';",
+        "const contentIds  = getEventData('content_ids')      || '';",
+        "const contentType = getEventData('content_type')     || 'product';",
+        "const orderId     = getEventData('transaction_id')   || '';",
+        "const numItems    = parseInt(getEventData('num_items') || 0, 10);",
+        '',
+        'function clean(o) {',
+        '  const r = {};',
+        "  for (const k in o) { if (o[k] !== '' && o[k] !== null && o[k] !== undefined) r[k] = o[k]; }",
+        '  return r;',
+        '}',
+        '',
+        'const ud = clean({',
+        '  em:                em    ? [em]    : undefined,',
+        '  ph:                ph    ? [ph]    : undefined,',
+        '  fn:                fn_   ? [fn_]   : undefined,',
+        '  ln:                ln_   ? [ln_]   : undefined,',
+        '  external_id:       extId ? [extId] : undefined,',
+        '  fbp:               fbp   || undefined,',
+        '  fbc:               fbc   || (fbclid ? ("fb.1." + getTimestampMillis() + "." + fbclid) : undefined),',
+        '  client_ip_address: clientIp || undefined,',
+        '  client_user_agent: ua       || undefined',
+        '});',
+        '',
+        'const cd = clean({',
+        '  currency:    currency,',
+        '  value:       value,',
+        '  content_ids: contentIds ? [contentIds] : undefined,',
+        '  content_type:contentType,',
+        '  order_id:    orderId   || undefined,',
+        '  num_items:   numItems  || undefined',
+        '});',
+        '',
+        'const payload = JSON.stringify({',
+        '  data: [{',
+        '    event_name:       eventName,',
+        '    event_time:       Math.floor(getTimestampMillis() / 1000),',
+        '    event_id:         eventId,',
+        "    action_source:    'website',",
+        '    event_source_url: pageUrl || undefined,',
+        '    user_data:        ud,',
+        '    custom_data:      cd',
+        '  }]',
+        '});',
+        '',
+        "sendHttpRequest(",
+        "  'https://graph.facebook.com/v18.0/' + encodeUriComponent(pixelId) + '/events?access_token=' + encodeUriComponent(accessToken),",
+        "  { headers: { 'Content-Type': 'application/json' }, method: 'POST', body: payload },",
+        "  { timeout: 10000, useCache: false }",
+        ').then(data.gtmOnSuccess).catch(data.gtmOnFailure);',
+        '',
+        '___WEB_PERMISSIONS___',
+        '[]'
+      ].join('\n');
+
+      // ── TikTok Events API ──────────────────────────────────────────────────
+      var TIKTOK_TEMPLATE_CODE = [
+        '___SANDBOXED_JS_FOR_SERVER_SIDE_TEMPLATE___',
+        '',
+        "const sendHttpRequest    = require('sendHttpRequest');",
+        "const JSON               = require('JSON');",
+        "const getEventData       = require('getEventData');",
+        "const getTimestampMillis = require('getTimestampMillis');",
+        '',
+        'const pixelCode   = data.pixelCode;',
+        'const accessToken = data.accessToken;',
+        "const eventName   = data.eventName   || getEventData('event_name');",
+        "const currency    = getEventData('currency')        || 'SAR';",
+        "const value       = parseFloat(getEventData('value') || 0);",
+        "const eventId     = data.eventId     || getEventData('event_id') || ('TT-' + getTimestampMillis());",
+        "const em          = getEventData('up.em')          || '';",
+        "const ph          = getEventData('up.ph')          || '';",
+        "const extId       = getEventData('up.external_id') || '';",
+        "const ttclid      = getEventData('ep.ttclid')      || '';",
+        "const ttp         = getEventData('up.ttp')         || '';",
+        "const clientIp    = data.clientIp    || '';",
+        "const ua          = data.userAgent   || '';",
+        "const pageUrl     = getEventData('page_location')  || '';",
+        "const contentId   = getEventData('content_ids')    || '';",
+        "const contentType = getEventData('content_type')   || 'product';",
+        "const orderId     = getEventData('transaction_id') || '';",
+        '',
+        'function clean(o) {',
+        '  const r = {};',
+        "  for (const k in o) { if (o[k] !== '' && o[k] !== null && o[k] !== undefined) r[k] = o[k]; }",
+        '  return r;',
+        '}',
+        '',
+        'const payload = JSON.stringify({',
+        "  event_source:    'web',",
+        '  event_source_id: pixelCode,',
+        '  data: [{',
+        '    event:      eventName,',
+        '    event_time: Math.floor(getTimestampMillis() / 1000),',
+        '    event_id:   eventId,',
+        '    user: clean({',
+        '      email:       em        || undefined,',
+        '      phone_number:ph        || undefined,',
+        '      external_id: extId     || undefined,',
+        '      ttclid:      ttclid    || undefined,',
+        '      ttp:         ttp       || undefined,',
+        '      ip:          clientIp  || undefined,',
+        '      user_agent:  ua        || undefined',
+        '    }),',
+        '    properties: clean({',
+        '      currency:     currency,',
+        '      value:        value,',
+        '      content_id:   contentId   || undefined,',
+        '      content_type: contentType,',
+        '      order_id:     orderId     || undefined,',
+        '      page_url:     pageUrl     || undefined',
+        '    })',
+        '  }]',
+        '});',
+        '',
+        "sendHttpRequest(",
+        "  'https://business-api.tiktok.com/open_api/v1.3/event/track/',",
+        "  { headers: { 'Content-Type': 'application/json', 'Access-Token': accessToken }, method: 'POST', body: payload },",
+        "  { timeout: 10000, useCache: false }",
+        ').then(data.gtmOnSuccess).catch(data.gtmOnFailure);',
+        '',
+        '___WEB_PERMISSIONS___',
+        '[]'
+      ].join('\n');
+
+      // ── Snapchat Conversions API ───────────────────────────────────────────
+      var SNAP_TEMPLATE_CODE = [
+        '___SANDBOXED_JS_FOR_SERVER_SIDE_TEMPLATE___',
+        '',
+        "const sendHttpRequest    = require('sendHttpRequest');",
+        "const JSON               = require('JSON');",
+        "const getEventData       = require('getEventData');",
+        "const getTimestampMillis = require('getTimestampMillis');",
+        '',
+        'const pixelId     = data.pixelId;',
+        'const apiToken    = data.apiToken;',
+        "const eventType   = data.eventType   || 'PURCHASE';",
+        "const eventId     = data.eventId     || getEventData('event_id') || ('SNAP-' + getTimestampMillis());",
+        "const currency    = getEventData('currency')        || 'SAR';",
+        "const price       = parseFloat(getEventData('value') || 0);",
+        "const transId     = getEventData('transaction_id') || '';",
+        "const em          = getEventData('up.em')          || '';",
+        "const ph          = getEventData('up.ph')          || '';",
+        "const extId       = getEventData('up.external_id') || '';",
+        "const scClickId   = getEventData('ep.sccid')       || '';",
+        "const uuidC1      = getEventData('up.scid')        || '';",
+        "const clientIp    = data.clientIp    || '';",
+        "const ua          = data.userAgent   || '';",
+        "const pageUrl     = getEventData('page_location')  || '';",
+        "const contentIds  = getEventData('content_ids')    || '';",
+        '',
+        'function clean(o) {',
+        '  const r = {};',
+        "  for (const k in o) { if (o[k] !== '' && o[k] !== null && o[k] !== undefined) r[k] = o[k]; }",
+        '  return r;',
+        '}',
+        '',
+        'const payload = JSON.stringify({',
+        '  data: [{',
+        "    event_conversion_type: 'WEB',",
+        '    event_type:   eventType,',
+        '    event_tag:    eventId,',
+        '    timestamp:    new Date().toISOString(),',
+        '    hashed_data_fields: clean({',
+        '      email:       em    || undefined,',
+        '      phone_number:ph    || undefined,',
+        '      external_id: extId || undefined',
+        '    }),',
+        '    user_data: clean({',
+        '      sc_click_id: scClickId || undefined,',
+        '      uuid_c1:     uuidC1    || undefined,',
+        '      ip_address:  clientIp  || undefined,',
+        '      user_agent:  ua        || undefined',
+        '    }),',
+        '    custom_data: clean({',
+        '      currency:        currency,',
+        '      price:           price,',
+        '      transaction_id:  transId                        || undefined,',
+        '      content_ids:     contentIds ? [contentIds] : undefined,',
+        '      page_url:        pageUrl                        || undefined',
+        '    })',
+        '  }]',
+        '});',
+        '',
+        "sendHttpRequest(",
+        "  'https://tr.snapchat.com/v2/conversion',",
+        "  { headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiToken }, method: 'POST', body: payload },",
+        "  { timeout: 10000, useCache: false }",
+        ').then(data.gtmOnSuccess).catch(data.gtmOnFailure);',
+        '',
+        '___WEB_PERMISSIONS___',
+        '[]'
+      ].join('\n');
+
+      // ── Google Ads Enhanced Conversions ───────────────────────────────────
+      var GADS_TEMPLATE_CODE = [
+        '___SANDBOXED_JS_FOR_SERVER_SIDE_TEMPLATE___',
+        '',
+        "const sendHttpRequest    = require('sendHttpRequest');",
+        "const JSON               = require('JSON');",
+        "const getEventData       = require('getEventData');",
+        "const getTimestampMillis = require('getTimestampMillis');",
+        '',
+        'const conversionId    = data.conversionId;',
+        'const conversionLabel = data.conversionLabel;',
+        "const value           = parseFloat(getEventData('value') || 0);",
+        "const currency        = getEventData('currency')        || 'SAR';",
+        "const orderId         = getEventData('transaction_id') || '';",
+        "const gclid           = getEventData('ep.gclid')   || getEventData('up.gclid') || '';",
+        "const wbraid          = getEventData('ep.wbraid')  || '';",
+        "const gbraid          = getEventData('ep.gbraid')  || '';",
+        "const em              = getEventData('up.em')      || '';",
+        "const ph              = getEventData('up.ph')      || '';",
+        "const clientIp        = data.clientIp   || '';",
+        "const ua              = data.userAgent  || '';",
+        '',
+        '// Build ISO-8601 datetime string for Google Ads API',
+        'const now = new Date();',
+        'function pad2(n){ return n<10?"0"+n:String(n); }',
+        'const convTime = now.getUTCFullYear()+"-"+pad2(now.getUTCMonth()+1)+"-"+pad2(now.getUTCDate())+" "+pad2(now.getUTCHours())+":"+pad2(now.getUTCMinutes())+":"+pad2(now.getUTCSeconds())+" +0000";',
+        '',
+        'const identifiers = [];',
+        'if (em) identifiers.push({ hashedEmail: em });',
+        'if (ph) identifiers.push({ hashedPhoneNumber: ph });',
+        '',
+        'const payload = JSON.stringify({',
+        '  conversions: [{',
+        '    conversionAction:   "customers/" + conversionId + "/conversionActions/" + conversionLabel,',
+        '    conversionDateTime: convTime,',
+        '    conversionValue:    value,',
+        '    currencyCode:       currency,',
+        '    orderId:            orderId   || undefined,',
+        '    gclid:              gclid     || undefined,',
+        '    wbraid:             wbraid    || undefined,',
+        '    gbraid:             gbraid    || undefined,',
+        '    userIdentifiers:    identifiers',
+        '  }],',
+        '  partialFailure: true',
+        '});',
+        '',
+        '// ⚠️  Google Ads Enhanced Conversions API requires a valid OAuth2 Bearer token.',
+        '// Replace YOUR_OAUTH2_TOKEN below with a token from Google Ads API OAuth flow,',
+        '// or use the official "Google Ads Conversion Tracking" tag template instead.',
+        "const OAUTH_TOKEN = 'YOUR_OAUTH2_TOKEN';",
+        '',
+        "sendHttpRequest(",
+        "  'https://googleads.googleapis.com/v14/customers/' + conversionId + ':uploadConversions',",
+        "  { headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OAUTH_TOKEN, 'developer-token': 'YOUR_DEVELOPER_TOKEN' }, method: 'POST', body: payload },",
+        "  { timeout: 10000, useCache: false }",
+        ').then(data.gtmOnSuccess).catch(data.gtmOnFailure);',
+        '',
+        '___WEB_PERMISSIONS___',
+        '[]'
+      ].join('\n');
+
+      // ── Register custom templates ─────────────────────────────────────────
+      customTemplates.push({ accountId:'000000000', containerId:'00000000',
+        name:'Easy Track — Meta CAPI',          templateData: META_TEMPLATE_CODE,   fingerprint: TPL_META   });
+      customTemplates.push({ accountId:'000000000', containerId:'00000000',
+        name:'Easy Track — TikTok Events API',  templateData: TIKTOK_TEMPLATE_CODE, fingerprint: TPL_TIKTOK });
+      customTemplates.push({ accountId:'000000000', containerId:'00000000',
+        name:'Easy Track — Snapchat CAPI',      templateData: SNAP_TEMPLATE_CODE,   fingerprint: TPL_SNAP   });
+      customTemplates.push({ accountId:'000000000', containerId:'00000000',
+        name:'Easy Track — Google Ads Enhanced',templateData: GADS_TEMPLATE_CODE,   fingerprint: TPL_GADS   });
+
+      var varId = 1, tagId = 1, triggerId = 1, clientId = 1;
 
       // ── 1. GA4 Client ────────────────────────────────────────────
       clients.push({
-        accountId:'000000000', containerId:'00000000', clientId: clientId,
+        accountId:'000000000', containerId:'00000000', clientId: sid(clientId),
         name: 'GA4 Client',
         type: 'google-ga4',
         parameter:[{ type:'TEMPLATE', key:'activationPage', value:'/' }],
@@ -6945,82 +7225,52 @@
       });
       clientId++;
 
-      // ── 2. Variables — Event Data ────────────────────────────────
-      var vEventName      = evDataVar('SS - event_name',      'event_name');
-      var vTransId        = evDataVar('SS - transaction_id',   'transaction_id');
-      var vValue          = evDataVar('SS - value',            'value');
-      var vCurrency       = evDataVar('SS - currency',         'currency');
-      var vEventId        = evDataVar('SS - event_id',         'event_id');
-      var vContentIds     = evDataVar('SS - content_ids',      'content_ids');
-      var vContentType    = evDataVar('SS - content_type',     'content_type');
-      var vNumItems       = evDataVar('SS - num_items',        'num_items');
-      var vItems          = evDataVar('SS - items',            'items');
-      // User data (forwarded from web as GA4 user_properties)
-      var vEm             = evDataVar('SS - user.email_hashed',  'up.em');
-      var vPh             = evDataVar('SS - user.phone_hashed',  'up.ph');
-      var vFn             = evDataVar('SS - user.first_name',    'up.fn');
-      var vLn             = evDataVar('SS - user.last_name',     'up.ln');
-      var vExtId          = evDataVar('SS - user.external_id',   'up.external_id');
-      // Click IDs & cookies (forwarded as event params)
-      var vFbp            = evDataVar('SS - user.fbp',           'up.fbp');
-      var vFbc            = evDataVar('SS - user.fbc',           'up.fbc');
-      var vFbclid         = evDataVar('SS - fbclid',             'ep.fbclid');
-      var vGclid          = evDataVar('SS - gclid',              'ep.gclid');
-      var vWbraid         = evDataVar('SS - wbraid',             'ep.wbraid');
-      var vGbraid         = evDataVar('SS - gbraid',             'ep.gbraid');
-      var vTtp            = evDataVar('SS - user.ttp',           'up.ttp');
-      var vTtclid         = evDataVar('SS - ttclid',             'ep.ttclid');
-      var vScid           = evDataVar('SS - user.scid',          'up.scid');
-      var vScCid          = evDataVar('SS - ScCid',              'ep.sccid');
-      var vPageUrl        = evDataVar('SS - page_url',           'page_location');
-      var vPageRef        = evDataVar('SS - page_referrer',      'page_referrer');
+      // ── 2. No custom variables needed — templates use getEventData() directly ──
+      // Built-in sGTM variables {{Client IP}} and {{User Agent}} are used in tags.
 
-      // HTTP variables
-      var vIp             = httpVar('SS - client_ip',            'X-Forwarded-For');
-      var vUa             = httpVar('SS - user_agent',           'User-Agent');
-
-      // ── 3. Triggers — one per selected event (across all platforms) ──
+      // ── 3. Triggers ───────────────────────────────────────────────────────────
+      // Collect all unique events across all enabled SS platforms
       var allSsEvents = {};
       _pcSS.platforms.forEach(function(plat) {
         (_pcSS.events[plat] || []).forEach(function(ev) { allSsEvents[ev] = true; });
       });
 
-      // Map SS event key → GA4 event name (salla/zid aware)
-      var cmsEvMap = (CMS_DL_MAP[S.cms] && CMS_DL_MAP[S.cms].eventNames) || {};
-      var ssEvTrigMap = {}; // { ev_key: triggerId }
+      // CMS-aware event name map: SS event key → actual GA4 event_name value sent by browser
+      var ssEvNameMap = {
+        purchase:          'purchase',
+        add_to_cart:       S.cms === 'salla' ? 'addToCart'       : 'add_to_cart',
+        initiate_checkout: S.cms === 'salla' ? 'cart::submitted'  : 'begin_checkout',
+        view_content:      S.cms === 'salla' ? 'Product Viewed'   : 'view_item',
+        page_view:         'page_view',
+        sign_up:           S.cms === 'salla' ? 'Signed In'        : 'sign_up',
+        lead:              'generate_lead',
+        search:            'search'
+      };
 
-      // Always add All Events trigger
-      var allEvTrigId = triggerId;
+      var ssEvTrigMap = {}; // { evKey: triggerId_string }
+
+      // Fallback: All Events trigger (fires on every server hit)
+      var allEvTrigId = sid(triggerId);
       triggers.push({
-        accountId:'000000000', containerId:'00000000', triggerId: triggerId,
+        accountId:'000000000', containerId:'00000000', triggerId: sid(triggerId),
         name:'All Events', type:'always',
         fingerprint: fp(triggerId)
       });
       triggerId++;
 
+      // One customEvent trigger per unique SS event — fires only when Event Name matches
       Object.keys(allSsEvents).forEach(function(evKey) {
-        // Map event key to actual GA4 event name in the data layer
-        var ga4EvName = cmsEvMap[evKey] || evKey;
-        // For Salla, certain events have different names
-        // purchase stays as 'purchase', add_to_cart='addToCart', etc.
-        // initiate_checkout → 'cart::submitted', view_content → 'Product Viewed' on salla
-        var ssEvNameMap = {
-          initiate_checkout: S.cms === 'salla' ? 'cart::submitted' : 'begin_checkout',
-          view_content:      S.cms === 'salla' ? 'Product Viewed'  : 'view_item',
-          page_view:         'page_view',
-          sign_up:           'sign_up',
-          lead:              'generate_lead'
-        };
-        var finalEvName = ssEvNameMap[evKey] || ga4EvName || evKey;
-        ssEvTrigMap[evKey] = triggerId;
+        var finalEvName = ssEvNameMap[evKey] || evKey;
+        ssEvTrigMap[evKey] = sid(triggerId);
         triggers.push({
-          accountId:'000000000', containerId:'00000000', triggerId: triggerId,
-          name: safeName('SS Event — ' + evKey),
-          type: 'always',
-          filter:[{
+          accountId:'000000000', containerId:'00000000', triggerId: sid(triggerId),
+          name: safeName('SS Trigger — ' + evKey + ' [' + finalEvName + ']'),
+          // ✅ CORRECT sGTM trigger type: customEvent fires when Event Name equals value
+          type: 'customEvent',
+          customEventFilter:[{
             type:'EQUALS',
             parameter:[
-              { type:'TEMPLATE', key:'arg0', value:'{{SS - event_name}}' },
+              { type:'TEMPLATE', key:'arg0', value:'{{Event Name}}' }, // built-in sGTM variable
               { type:'TEMPLATE', key:'arg1', value: finalEvName }
             ]
           }],
@@ -7029,84 +7279,69 @@
         triggerId++;
       });
 
-      // ── 4. Tags — per enabled SS platform ───────────────────────
+      // ── 4. Tags — one per platform × event, referencing custom templates ─────
+      // Meta CAPI event name mapping
+      var META_EV_MAP = {
+        purchase:'Purchase', add_to_cart:'AddToCart', initiate_checkout:'InitiateCheckout',
+        view_content:'ViewContent', page_view:'PageView', lead:'Lead',
+        sign_up:'CompleteRegistration', search:'Search'
+      };
+      // TikTok event name mapping
+      var TIKTOK_EV_MAP = {
+        purchase:'CompletePayment', add_to_cart:'AddToCart', initiate_checkout:'InitiateCheckout',
+        view_content:'ViewContent', page_view:'Pageview', lead:'SubmitForm',
+        sign_up:'CompleteRegistration', search:'Search'
+      };
+      // Snapchat event type mapping
+      var SNAP_EV_MAP = {
+        purchase:'PURCHASE', add_to_cart:'ADD_CART', initiate_checkout:'START_CHECKOUT',
+        view_content:'VIEW_CONTENT', page_view:'PAGE_VIEW', sign_up:'SIGN_UP',
+        lead:'SIGN_UP', search:'SEARCH'
+      };
+
       _pcSS.platforms.forEach(function(plat) {
-        var platEvents = _pcSS.events[plat] || [];
-        var platTrigIds = platEvents.map(function(ev) {
-          return ssEvTrigMap[ev] || allEvTrigId;
-        });
-        if (!platTrigIds.length) platTrigIds = [allEvTrigId];
-        // Deduplicate trigger IDs
-        platTrigIds = platTrigIds.filter(function(v,i,a){ return a.indexOf(v)===i; });
+        var platEvents = (_pcSS.events[plat] || []);
+        if (!platEvents.length) platEvents = ['purchase']; // safety fallback
 
         if (plat === 'meta') {
-          var pixId  = _pcSS.pixelIds['meta'] || 'YOUR_META_PIXEL_ID';
-          var token  = _pcSS.tokens['meta']   || 'YOUR_CAPI_ACCESS_TOKEN';
+          var pixId = _pcSS.pixelIds['meta'] || 'YOUR_META_PIXEL_ID';
+          var token = _pcSS.tokens['meta']   || 'YOUR_CAPI_ACCESS_TOKEN';
           platEvents.forEach(function(evKey) {
-            var metaEvMap = {
-              purchase:'Purchase', add_to_cart:'AddToCart', initiate_checkout:'InitiateCheckout',
-              view_content:'ViewContent', page_view:'PageView', lead:'Lead', sign_up:'CompleteRegistration',
-              search:'Search'
-            };
             tags.push({
-              accountId:'000000000', containerId:'00000000', tagId: tagId,
+              accountId:'000000000', containerId:'00000000', tagId: sid(tagId),
               name: safeName('Meta CAPI | ' + evKey),
-              type:'siwt', // Custom Tag — using Custom Template slot for CAPI
+              // ✅ type references the embedded custom template by fingerprint
+              type: 'cvt_' + TPL_META,
               parameter:[
-                { type:'TEMPLATE', key:'pixelId',      value: pixId   },
-                { type:'TEMPLATE', key:'accessToken',  value: token   },
-                { type:'TEMPLATE', key:'eventName',    value: metaEvMap[evKey] || 'CustomEvent' },
-                { type:'TEMPLATE', key:'eventId',      value:'{{SS - event_id}}' },
-                { type:'TEMPLATE', key:'value',        value:'{{SS - value}}' },
-                { type:'TEMPLATE', key:'currency',     value:'{{SS - currency}}' },
-                { type:'TEMPLATE', key:'contentIds',   value:'{{SS - content_ids}}' },
-                { type:'TEMPLATE', key:'contentType',  value:'{{SS - content_type}}' },
-                { type:'TEMPLATE', key:'orderId',      value:'{{SS - transaction_id}}' },
-                { type:'TEMPLATE', key:'numItems',     value:'{{SS - num_items}}' },
-                { type:'TEMPLATE', key:'email',        value:'{{SS - user.email_hashed}}' },
-                { type:'TEMPLATE', key:'phone',        value:'{{SS - user.phone_hashed}}' },
-                { type:'TEMPLATE', key:'firstName',    value:'{{SS - user.first_name}}' },
-                { type:'TEMPLATE', key:'lastName',     value:'{{SS - user.last_name}}' },
-                { type:'TEMPLATE', key:'externalId',   value:'{{SS - user.external_id}}' },
-                { type:'TEMPLATE', key:'fbp',          value:'{{SS - user.fbp}}' },
-                { type:'TEMPLATE', key:'fbc',          value:'{{SS - user.fbc}}' },
-                { type:'TEMPLATE', key:'fbclid',       value:'{{SS - fbclid}}' },
-                { type:'TEMPLATE', key:'clientIp',     value:'{{SS - client_ip}}' },
-                { type:'TEMPLATE', key:'userAgent',    value:'{{SS - user_agent}}' },
-                { type:'TEMPLATE', key:'pageUrl',      value:'{{SS - page_url}}' },
-                { type:'TEMPLATE', key:'actionSource', value:'website' }
+                { type:'TEMPLATE', key:'pixelId',     value: pixId },
+                { type:'TEMPLATE', key:'accessToken', value: token },
+                { type:'TEMPLATE', key:'eventName',   value: META_EV_MAP[evKey] || evKey },
+                { type:'TEMPLATE', key:'clientIp',    value:'{{Client IP}}'   },
+                { type:'TEMPLATE', key:'userAgent',   value:'{{User Agent}}'  }
               ],
               firingTriggerId: [ ssEvTrigMap[evKey] || allEvTrigId ],
-              notes: 'Meta CAPI — ' + evKey + ' | Pixel: ' + pixId + ' | Generated by Easy Track',
+              notes: 'Meta CAPI — ' + evKey + ' | Pixel ID: ' + pixId + ' | Token: ' + (token !== 'YOUR_CAPI_ACCESS_TOKEN' ? '✅ set' : '⚠️ not set') + ' | Generated by Easy Track',
               fingerprint: fp(tagId)
             });
             tagId++;
           });
 
         } else if (plat === 'gads') {
-          var convId = (_pcSS.gadsConvId || 'AW-XXXXXXXXXX').replace('AW-','');
+          var convId = (_pcSS.gadsConvId || 'AW-XXXXXXXXXX').replace(/^AW-/, '');
           platEvents.forEach(function(evKey) {
             var label = _pcSS.gadsLabels[evKey] || ('LABEL_' + evKey.toUpperCase());
             tags.push({
-              accountId:'000000000', containerId:'00000000', tagId: tagId,
-              name: safeName('Google Ads SS | ' + evKey),
-              type:'siwt',
+              accountId:'000000000', containerId:'00000000', tagId: sid(tagId),
+              name: safeName('Google Ads Enhanced | ' + evKey),
+              type: 'cvt_' + TPL_GADS,
               parameter:[
-                { type:'TEMPLATE', key:'conversionId',    value: convId  },
-                { type:'TEMPLATE', key:'conversionLabel', value: label   },
-                { type:'TEMPLATE', key:'value',           value:'{{SS - value}}' },
-                { type:'TEMPLATE', key:'currency',        value:'{{SS - currency}}' },
-                { type:'TEMPLATE', key:'orderId',         value:'{{SS - transaction_id}}' },
-                { type:'TEMPLATE', key:'gclid',           value:'{{SS - gclid}}' },
-                { type:'TEMPLATE', key:'wbraid',          value:'{{SS - wbraid}}' },
-                { type:'TEMPLATE', key:'gbraid',          value:'{{SS - gbraid}}' },
-                { type:'TEMPLATE', key:'email',           value:'{{SS - user.email_hashed}}' },
-                { type:'TEMPLATE', key:'phone',           value:'{{SS - user.phone_hashed}}' },
-                { type:'TEMPLATE', key:'clientIp',        value:'{{SS - client_ip}}' },
-                { type:'TEMPLATE', key:'userAgent',       value:'{{SS - user_agent}}' }
+                { type:'TEMPLATE', key:'conversionId',    value: convId },
+                { type:'TEMPLATE', key:'conversionLabel', value: label  },
+                { type:'TEMPLATE', key:'clientIp',        value:'{{Client IP}}'  },
+                { type:'TEMPLATE', key:'userAgent',       value:'{{User Agent}}' }
               ],
               firingTriggerId: [ ssEvTrigMap[evKey] || allEvTrigId ],
-              notes: 'Google Ads SS — ' + evKey + ' | Conv ID: AW-' + convId + ' | Label: ' + label + ' | Generated by Easy Track',
+              notes: 'Google Ads Enhanced Conversions — ' + evKey + ' | AW-' + convId + ' | Label: ' + label + ' | Generated by Easy Track',
               fingerprint: fp(tagId)
             });
             tagId++;
@@ -7115,36 +7350,20 @@
         } else if (plat === 'snap') {
           var snapId  = _pcSS.pixelIds['snap']  || 'YOUR_SNAP_PIXEL_ID';
           var snapTok = _pcSS.tokens['snap']    || 'YOUR_SNAP_CAPI_TOKEN';
-          var snapEvMap = {
-            purchase:'PURCHASE', add_to_cart:'ADD_CART', initiate_checkout:'START_CHECKOUT',
-            view_content:'VIEW_CONTENT', page_view:'PAGE_VIEW', sign_up:'SIGN_UP',
-            lead:'SIGN_UP', search:'SEARCH'
-          };
           platEvents.forEach(function(evKey) {
             tags.push({
-              accountId:'000000000', containerId:'00000000', tagId: tagId,
+              accountId:'000000000', containerId:'00000000', tagId: sid(tagId),
               name: safeName('Snapchat CAPI | ' + evKey),
-              type:'siwt',
+              type: 'cvt_' + TPL_SNAP,
               parameter:[
-                { type:'TEMPLATE', key:'pixelId',     value: snapId   },
-                { type:'TEMPLATE', key:'apiToken',    value: snapTok  },
-                { type:'TEMPLATE', key:'eventType',   value: snapEvMap[evKey] || 'CUSTOM' },
-                { type:'TEMPLATE', key:'eventId',     value:'{{SS - event_id}}' },
-                { type:'TEMPLATE', key:'price',       value:'{{SS - value}}' },
-                { type:'TEMPLATE', key:'currency',    value:'{{SS - currency}}' },
-                { type:'TEMPLATE', key:'transId',     value:'{{SS - transaction_id}}' },
-                { type:'TEMPLATE', key:'contentIds',  value:'{{SS - content_ids}}' },
-                { type:'TEMPLATE', key:'email',       value:'{{SS - user.email_hashed}}' },
-                { type:'TEMPLATE', key:'phone',       value:'{{SS - user.phone_hashed}}' },
-                { type:'TEMPLATE', key:'externalId',  value:'{{SS - user.external_id}}' },
-                { type:'TEMPLATE', key:'scClickId',   value:'{{SS - ScCid}}' },
-                { type:'TEMPLATE', key:'uuidC1',      value:'{{SS - user.scid}}' },
-                { type:'TEMPLATE', key:'clientIp',    value:'{{SS - client_ip}}' },
-                { type:'TEMPLATE', key:'userAgent',   value:'{{SS - user_agent}}' },
-                { type:'TEMPLATE', key:'pageUrl',     value:'{{SS - page_url}}' }
+                { type:'TEMPLATE', key:'pixelId',   value: snapId   },
+                { type:'TEMPLATE', key:'apiToken',  value: snapTok  },
+                { type:'TEMPLATE', key:'eventType', value: SNAP_EV_MAP[evKey] || 'CUSTOM' },
+                { type:'TEMPLATE', key:'clientIp',  value:'{{Client IP}}'   },
+                { type:'TEMPLATE', key:'userAgent', value:'{{User Agent}}'  }
               ],
               firingTriggerId: [ ssEvTrigMap[evKey] || allEvTrigId ],
-              notes: 'Snapchat CAPI — ' + evKey + ' | Pixel: ' + snapId + ' | Generated by Easy Track',
+              notes: 'Snapchat CAPI — ' + evKey + ' | Pixel: ' + snapId + ' | Token: ' + (snapTok !== 'YOUR_SNAP_CAPI_TOKEN' ? '✅ set' : '⚠️ not set') + ' | Generated by Easy Track',
               fingerprint: fp(tagId)
             });
             tagId++;
@@ -7153,42 +7372,36 @@
         } else if (plat === 'tiktok') {
           var ttId  = _pcSS.pixelIds['tiktok']  || 'YOUR_TIKTOK_PIXEL_ID';
           var ttTok = _pcSS.tokens['tiktok']    || 'YOUR_TIKTOK_API_TOKEN';
-          var ttEvMap = {
-            purchase:'CompletePayment', add_to_cart:'AddToCart', initiate_checkout:'InitiateCheckout',
-            view_content:'ViewContent', page_view:'Pageview', lead:'SubmitForm',
-            sign_up:'CompleteRegistration', search:'Search'
-          };
           platEvents.forEach(function(evKey) {
             tags.push({
-              accountId:'000000000', containerId:'00000000', tagId: tagId,
+              accountId:'000000000', containerId:'00000000', tagId: sid(tagId),
               name: safeName('TikTok Events API | ' + evKey),
-              type:'siwt',
+              type: 'cvt_' + TPL_TIKTOK,
               parameter:[
-                { type:'TEMPLATE', key:'pixelCode',   value: ttId    },
-                { type:'TEMPLATE', key:'accessToken', value: ttTok   },
-                { type:'TEMPLATE', key:'eventName',   value: ttEvMap[evKey] || 'CustomEvent' },
-                { type:'TEMPLATE', key:'eventId',     value:'{{SS - event_id}}' },
-                { type:'TEMPLATE', key:'value',       value:'{{SS - value}}' },
-                { type:'TEMPLATE', key:'currency',    value:'{{SS - currency}}' },
-                { type:'TEMPLATE', key:'contentId',   value:'{{SS - content_ids}}' },
-                { type:'TEMPLATE', key:'contentType', value:'{{SS - content_type}}' },
-                { type:'TEMPLATE', key:'email',       value:'{{SS - user.email_hashed}}' },
-                { type:'TEMPLATE', key:'phone',       value:'{{SS - user.phone_hashed}}' },
-                { type:'TEMPLATE', key:'externalId',  value:'{{SS - user.external_id}}' },
-                { type:'TEMPLATE', key:'ttclid',      value:'{{SS - ttclid}}' },
-                { type:'TEMPLATE', key:'ttp',         value:'{{SS - user.ttp}}' },
-                { type:'TEMPLATE', key:'clientIp',    value:'{{SS - client_ip}}' },
-                { type:'TEMPLATE', key:'userAgent',   value:'{{SS - user_agent}}' },
-                { type:'TEMPLATE', key:'pageUrl',     value:'{{SS - page_url}}' }
+                { type:'TEMPLATE', key:'pixelCode',   value: ttId  },
+                { type:'TEMPLATE', key:'accessToken', value: ttTok },
+                { type:'TEMPLATE', key:'eventName',   value: TIKTOK_EV_MAP[evKey] || evKey },
+                { type:'TEMPLATE', key:'clientIp',    value:'{{Client IP}}'  },
+                { type:'TEMPLATE', key:'userAgent',   value:'{{User Agent}}' }
               ],
               firingTriggerId: [ ssEvTrigMap[evKey] || allEvTrigId ],
-              notes: 'TikTok Events API — ' + evKey + ' | Pixel: ' + ttId + ' | Generated by Easy Track',
+              notes: 'TikTok Events API — ' + evKey + ' | Pixel: ' + ttId + ' | Token: ' + (ttTok !== 'YOUR_TIKTOK_API_TOKEN' ? '✅ set' : '⚠️ not set') + ' | Generated by Easy Track',
               fingerprint: fp(tagId)
             });
             tagId++;
           });
         }
       });
+
+      // ── Summary note for container ───────────────────────────────────────────
+      var _ssNote = [
+        'Generated by Easy Track',
+        'sGTM URL: '     + (_pcSS.serverUrl || 'not set'),
+        'CMS: '          + (S.cms || 'unknown'),
+        'Platforms: '    + (_pcSS.platforms.length ? _pcSS.platforms.join(', ') : 'none'),
+        'Custom Templates included: Meta CAPI, TikTok Events API, Snapchat CAPI, Google Ads Enhanced',
+        'Import via GTM → Admin → Import Container (choose Merge or Overwrite)'
+      ].join(' | ');
 
       return {
         exportFormatVersion: 2,
@@ -7201,12 +7414,13 @@
             name:         'Easy Track — Server Container (sGTM)',
             publicId:     'GTM-SS000000',
             usageContext: ['server'],
-            notes:        'Generated by Easy Track | sGTM URL: ' + (_pcSS.serverUrl||'') + ' | CMS: ' + (S.cms||'') + ' | Platforms: ' + _pcSS.platforms.join(', ')
+            notes:        _ssNote
           },
-          variable: variables,
-          trigger:  triggers,
-          tag:      tags,
-          client:   clients
+          variable:       variables,         // HTTP header variables (IP, UA)
+          trigger:        triggers,          // customEvent triggers per SS event
+          tag:            tags,              // CAPI tags referencing custom templates
+          client:         clients,           // GA4 Client
+          customTemplate: customTemplates    // ✅ Embedded Sandboxed JS templates for all CAPI platforms
         }
       };
     }
@@ -14662,187 +14876,4 @@
       </div>
 
       <!-- Content -->
-      <div id="payloadTabContent" style="flex:1;overflow-y:auto;padding:18px 22px;">
-        <!-- filled by JS -->
-      </div>
-
-      <!-- Footer -->
-      <div
-        style="padding:14px 22px;border-top:1px solid rgba(255,255,255,.06);display:flex;justify-content:flex-end;gap:10px;">
-        <button onclick="copyPayloadRaw()"
-          style="padding:9px 18px;border-radius:10px;border:1.5px solid rgba(173,198,255,.25);background:transparent;color:#adc6ff;font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;">
-          <span class="material-symbols-outlined" style="font-size:15px;">content_copy</span> Copy JSON
-        </button>
-        <button
-          onclick="document.getElementById('payloadModal').style.display='none';document.getElementById('pubGtm').click()"
-          style="padding:9px 20px;border-radius:10px;border:none;background:#00d4aa;color:#00382b;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;">
-          <span class="material-symbols-outlined" style="font-size:15px;">rocket_launch</span> Deploy Now
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══════════════════════════════════════════════════════════
-       EASY TRACK — Complete Marketing Data Infrastructure Engine
-       DataLayer Normalizer · Attribution · Deduplication · Server-Side
-  ════════════════════════════════════════════════════════════════ -->
-  <script>
-    (function () {
-      'use strict';
-
-      // ══════════════════════════════════════════════════════
-      // 1. PLATFORM REGISTRY (Isolation Map)
-      // ══════════════════════════════════════════════════════
-      var ET_PLATFORMS = {
-        ga4: { name: 'GA4', icon: '📊', color: '#F9AB00', type: 'analytics' },
-        mixpanel: { name: 'Mixpanel', icon: '📈', color: '#7856FF', type: 'analytics' },
-        meta: { name: 'Meta CAPI', icon: '👥', color: '#1877F2', type: 'ads' },
-        tiktok: { name: 'TikTok Events', icon: '🎵', color: '#69C9D0', type: 'ads' },
-        snapchat: { name: 'Snapchat CAPI', icon: '👻', color: '#FFFC00', type: 'ads' },
-        google: { name: 'Google Ads', icon: '🎯', color: '#4285F4', type: 'ads' },
-      };
-
-      // ── Event name mapping: GA4 → platform native name ──
-      var ET_EVENT_MAP = {
-        ga4: {
-          view_item: 'view_item', view_item_list: 'view_item_list',
-          add_to_cart: 'add_to_cart', view_cart: 'view_cart',
-          begin_checkout: 'begin_checkout', purchase: 'purchase',
-          remove_from_cart: 'remove_from_cart', add_to_wishlist: 'add_to_wishlist',
-          search: 'search', login: 'login', sign_up: 'sign_up'
-        },
-        meta: {
-          view_item: 'ViewContent', view_item_list: 'ViewContent',
-          add_to_cart: 'AddToCart', view_cart: 'ViewContent',
-          begin_checkout: 'InitiateCheckout', purchase: 'Purchase',
-          add_to_wishlist: 'AddToWishlist', search: 'Search',
-          login: 'CompleteRegistration', sign_up: 'CompleteRegistration'
-        },
-        tiktok: {
-          view_item: 'ViewContent', view_item_list: 'ViewContent',
-          add_to_cart: 'AddToCart', view_cart: 'ViewContent',
-          begin_checkout: 'InitiateCheckout', purchase: 'CompletePayment',
-          add_to_wishlist: 'AddToWishlist', search: 'Search',
-          login: 'CompleteRegistration', sign_up: 'CompleteRegistration'
-        },
-        snapchat: {
-          view_item: 'VIEW_CONTENT', view_item_list: 'VIEW_CONTENT',
-          add_to_cart: 'ADD_CART', view_cart: 'VIEW_CONTENT',
-          begin_checkout: 'START_CHECKOUT', purchase: 'PURCHASE',
-          add_to_wishlist: 'ADD_TO_WISHLIST', search: 'SEARCH',
-          login: 'SIGN_UP', sign_up: 'SIGN_UP'
-        },
-        google: {
-          view_item: 'remarketing', view_item_list: 'remarketing',
-          add_to_cart: 'conversion', begin_checkout: 'conversion',
-          purchase: 'conversion', sign_up: 'conversion'
-        },
-        mixpanel: {
-          view_item: 'Product Viewed', view_item_list: 'Product List Viewed',
-          add_to_cart: 'Product Added', view_cart: 'Cart Viewed',
-          begin_checkout: 'Checkout Started', purchase: 'Order Completed',
-          remove_from_cart: 'Product Removed', add_to_wishlist: 'Product Added to Wishlist',
-          search: 'Products Searched', login: 'Signed In', sign_up: 'Signed Up'
-        }
-      };
-
-      // ══════════════════════════════════════════════════════
-      // 2. DATALAYER NORMALIZER — Salla & Zid → GA4
-      // ══════════════════════════════════════════════════════
-
-      // Salla raw event → GA4 event name
-      var SALLA_UA_TO_GA4 = {
-        'Product Viewed': 'view_item', 'product_viewed': 'view_item',
-        'Product List Viewed': 'view_item_list', 'product_list_viewed': 'view_item_list',
-        'addToCart': 'add_to_cart', 'Add To Cart': 'add_to_cart', 'product_added_to_cart': 'add_to_cart',
-        'Cart Viewed': 'view_cart', 'cart_viewed': 'view_cart',
-        'Product Removed': 'remove_from_cart', 'product_removed_from_cart': 'remove_from_cart',
-        'Product Added to Wishlist': 'add_to_wishlist', 'product_added_to_wishlist': 'add_to_wishlist',
-        'cart::submitted': 'begin_checkout', 'checkout_started': 'begin_checkout',
-        'purchase': 'purchase', 'order_completed': 'purchase',
-        'search': 'search', 'Search': 'search',
-        'Signed In': 'login', 'signed_in': 'login', 'login': 'login',
-        'sign_up': 'sign_up', 'Signed Up': 'sign_up'
-      };
-
-      // Zid event names (already close to GA4)
-      var ZID_TO_GA4 = {
-        'view_item': 'view_item', 'view_item_list': 'view_item_list',
-        'add_to_cart': 'add_to_cart', 'view_cart': 'view_cart',
-        'begin_checkout': 'begin_checkout', 'purchase': 'purchase',
-        'remove_from_cart': 'remove_from_cart', 'add_to_wishlist': 'add_to_wishlist',
-        'search': 'search', 'login': 'login', 'sign_up': 'sign_up'
-      };
-
-      function normalizeSallaItems(raw) {
-        var prods = [];
-        if (!raw) return prods;
-        if (Array.isArray(raw)) { prods = raw; }
-        else if (raw.id || raw.sku) { prods = [raw]; }
-        else if (raw[0] && (raw[0].id || raw[0].sku)) { prods = Object.values(raw); }
-        return prods.map(function (p, i) {
-          if (!p || typeof p !== 'object') return null;
-          var cat = p.category;
-          if (cat && typeof cat === 'object') cat = cat.name || cat.title || '';
-          var qty = parseInt(p.quantity || p.qty, 10);
-          if (isNaN(qty) || qty < 1) qty = 1;
-          return {
-            item_id: String(p.id || p.sku || p.product_id || ''),
-            item_name: p.name || p.title || '',
-            item_brand: p.brand || '',
-            item_category: cat || p.type || '',
-            item_variant: p.variant || p.variation || '',
-            price: Math.round(parseFloat(p.price || p.regular_price || p.unit_price || 0) * 100) / 100,
-            quantity: qty,
-            index: i
-          };
-        }).filter(function (x) { return x && x.item_id; });
-      }
-
-      // ── Dynamic product extractor — detects shape by MEANING, not fixed paths ──
-      function extractSallaProducts(raw) {
-        var out = [];
-        var ec = raw.ecommerce || {};
-        var slot0 = raw[0] || raw['0'];
-        [ec.add, ec.remove, ec.purchase, ec.checkout, ec.detail].forEach(function (box) {
-          if (box && Array.isArray(box.products) && box.products.length) out.push(box.products);
-        });
-        if (Array.isArray(ec.impressions) && ec.impressions.length) out.push(ec.impressions);
-        if (Array.isArray(ec.products) && ec.products.length) out.push(ec.products);
-        if (Array.isArray(raw.data) && raw.data.length) out.push(raw.data);
-        if (Array.isArray(raw.items) && raw.items.length) out.push(raw.items);
-        if (Array.isArray(raw.products) && raw.products.length) out.push(raw.products);
-        if (slot0 && typeof slot0 === 'object') {
-          if (Array.isArray(slot0.products) && slot0.products.length) out.push(slot0.products);
-          else if (slot0.id || slot0.sku || slot0.name) out.push([slot0]);
-        }
-        if (!out.length) {
-          Object.keys(raw).forEach(function (k) {
-            if (/^\d+$/.test(k) && raw[k] && (raw[k].id || raw[k].sku || raw[k].name)) {
-              out.push([raw[k]]);
-            }
-          });
-        }
-        for (var i = 0; i < out.length; i++) if (out[i] && out[i].length) return out[i];
-        return [];
-      }
-
-      function normalizeZidItems(rawItems) {
-        if (!Array.isArray(rawItems)) return [];
-        return rawItems.map(function (p, i) {
-          var qty = parseInt(p.quantity || p.qty || 1, 10);
-          if (isNaN(qty) || qty < 1) qty = 1;
-          return {
-            item_id: String(p.id || p.product_id || p.sku || ''),
-            item_name: p.name || p.title || '',
-            item_brand: p.brand || '',
-            item_category: p.category || '',
-            price: parseFloat(p.price || p.unit_price || 0),
-            quantity: qty,
-            index: i
-          };
-        });
-      }
-
-      // ── Value logic: meaning over name ──
-      function extractValue(ga4Event, items, ec, raw
+      <div id="payloadTabC
