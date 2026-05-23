@@ -16,8 +16,33 @@
 //      → invite the service account's `client_email` as "Admin"
 // ══════════════════════════════════════════════════════════════════════════════
 
-const https = require('https');
+const https  = require('https');
 const crypto = require('crypto');
+const fs     = require('fs');
+const path   = require('path');
+
+// ── Load actual .tpl files for CAPI template creation ───────────────────────
+// Using the real .tpl sources guarantees correct sandboxed-JS, permissions,
+// and sha256Sync hashing — the old inline builders had wrong permission
+// sections and used an outdated sendHttpRequest callback API.
+function _loadTpl(name) {
+  try {
+    return fs.readFileSync(
+      path.join(__dirname, 'lib', 'server-side', 'sgtm-templates', name + '.tpl'),
+      'utf8',
+    );
+  } catch (e) {
+    console.warn('[gtm] _loadTpl: could not read', name + '.tpl —', e.message);
+    return null;
+  }
+}
+
+const _TPL = {
+  meta:   _loadTpl('meta-capi'),
+  tiktok: _loadTpl('tiktok-events'),
+  snap:   _loadTpl('snapchat-capi'),
+  gads:   _loadTpl('google-ads-ec'),
+};
 
 // Shared keep-alive agent — reuses TLS connections across all GTM API calls.
 // Without this, each request pays ~200ms for TCP+TLS handshake. With it, that
@@ -245,13 +270,14 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
   const acc = getAccountId();
   const cv = configJson && configJson.containerVersion ? configJson.containerVersion : (configJson || {});
 
-  const vars    = cv.variable || [];
-  const trigs   = cv.trigger  || [];
-  const tags    = cv.tag      || [];
+  const vars      = cv.variable       || [];
+  const trigs     = cv.trigger        || [];
+  const tags      = cv.tag            || [];
+  const customTpl = cv.customTemplate || [];
   // client[] lives at the top level of the config (server containers only)
   const clients = (configJson && configJson.client) || cv.client || [];
 
-  const total = vars.length + trigs.length + tags.length + clients.length;
+  const total = vars.length + trigs.length + tags.length + clients.length + customTpl.length;
 
   // Empty config — nothing to import, skip quietly.
   if (!total) {
@@ -271,13 +297,17 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
   // ── ATTEMPT 1: Single-call Workspace Import (GTM API v2 custom method) ────
   // POST .../workspaces/{id}:import  with the full ContainerVersion as body.
   // importOption=OVERWRITE merges cleanly with an empty or existing workspace.
+  // customTemplate[] is included so the server container's HTTP-request tag
+  // templates (et_meta_capi_manual, et_tiktok_events_manual, etc.) are
+  // registered automatically — no separate template import step required.
   report('importing', 0);
   const importOption = (mode === 'merge') ? 'MERGE' : 'OVERWRITE';
   const importBody = JSON.stringify({
-    ...(vars.length    ? { variable: vars }    : {}),
-    ...(trigs.length   ? { trigger:  trigs }   : {}),
-    ...(tags.length    ? { tag:      tags }     : {}),
-    ...(clients.length ? { client:   clients }  : {}),
+    ...(vars.length      ? { variable:       vars       } : {}),
+    ...(trigs.length     ? { trigger:        trigs      } : {}),
+    ...(tags.length      ? { tag:            tags       } : {}),
+    ...(clients.length   ? { client:         clients    } : {}),
+    ...(customTpl.length ? { customTemplate: customTpl  } : {}),
   });
 
   try {
@@ -307,6 +337,31 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
 
   let done = 0;
   const reportBurst = (label) => report(`${label}`, done);
+
+  // ── Fallback Phase 0: Custom templates (must exist before tags reference them) ─
+  if (customTpl.length > 0) {
+    const tplPath = `/accounts/${acc}/containers/${containerId}/workspaces/${workspaceId}/templates`;
+    for (const tpl of customTpl) {
+      try {
+        await gtmRequest('POST', tplPath, JSON.stringify({
+          name:         tpl.name,
+          templateData: tpl.templateData,
+        }));
+        done++;
+        reportBurst('custom_templates');
+        console.log('[gtm] fallback: created custom template:', tpl.name);
+      } catch (e) {
+        // 409 = template already exists (e.g. created by createCAPITemplates earlier) — skip
+        if (e.status === 409 || (e.message && /duplicate|already exists/i.test(e.message))) {
+          console.log('[gtm] fallback: template already exists, skipping:', tpl.name);
+          done++;
+          reportBurst('custom_templates');
+        } else {
+          console.warn('[gtm] fallback: template creation failed (non-fatal):', tpl.name, e.message);
+        }
+      }
+    }
+  }
 
   async function runInBursts(items, label, writeFn) {
     for (let i = 0; i < items.length; i += BURST_SIZE) {
@@ -449,10 +504,11 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
   }
 
   return {
-    importedVariableCount: vars.length,
-    importedTriggerCount:  trigs.length,
-    importedTagCount:      tags.length,
-    importedClientCount:   clients.length,
+    importedVariableCount:       vars.length,
+    importedTriggerCount:        trigs.length,
+    importedTagCount:            tags.length,
+    importedClientCount:         clients.length,
+    importedCustomTemplateCount: customTpl.length,
   };
 }
 
@@ -663,18 +719,22 @@ async function provisionForClient({ projectName, domain, configJson, publishLive
 // ══════════════════════════════════════════════════════════════════════════════
 // CAPI CUSTOM TEMPLATES  —  create sandboxed-JS tag templates in sGTM workspace
 // so users don't need to install community templates manually.
-// Each template makes a direct HTTPS call to the platform's CAPI endpoint using
-// the stored access token.  Templates are created via GTM API before the config
-// import so tags can reference them immediately.
+// Template source comes from lib/server-side/sgtm-templates/*.tpl files (loaded
+// at module init above). Using real .tpl files ensures correct sha256Sync hashing,
+// promise-based sendHttpRequest, and proper ___PERMISSIONS___ sections.
 //
-// Tag type in the container = the INFO block "id" field in the template data.
-// We use deterministic IDs: et_meta_capi_manual | et_tiktok_events_manual |
-//                            et_snapchat_capi_manual | et_gads_ec_manual
+// Tag type in the container = the INFO block "id" field in the template data:
+//   et_meta_capi_manual | et_tiktok_events_manual |
+//   et_snapchat_capi_manual | et_gads_ec_manual
 // ══════════════════════════════════════════════════════════════════════════════
 
-// ── Template source builders ────────────────────────────────────────────────
+// ── (Old inline template builders removed — _TPL[] loaded above replaces them) ─
+// The old _metaCAPITemplateData / _tiktokEventsTemplateData / _snapCAPITemplateData /
+// _gadsECTemplateData functions used ___WEB_PERMISSIONS___ (wrong for server containers)
+// and an outdated callback-based sendHttpRequest API. They are fully replaced by reading
+// the authoritative .tpl files from lib/server-side/sgtm-templates/ at module load time.
 
-function _metaCAPITemplateData() {
+function _legacyTemplateBuilderRemoved_doNotCall() {
   const js = `
 const sendHttpRequest = require('sendHttpRequest');
 const JSON = require('JSON');
@@ -980,18 +1040,21 @@ sendHttpRequest(url, function(sc) {
 
 // ── Template creation ────────────────────────────────────────────────────────
 
-const CAPI_TEMPLATE_BUILDERS = {
-  meta:   { infoId: 'et_meta_capi_manual',      build: _metaCAPITemplateData   },
-  tiktok: { infoId: 'et_tiktok_events_manual',  build: _tiktokEventsTemplateData },
-  snap:   { infoId: 'et_snapchat_capi_manual',  build: _snapCAPITemplateData   },
-  gads:   { infoId: 'et_gads_ec_manual',        build: _gadsECTemplateData     },
+// Maps platform key → { infoId, displayName }
+// templateData comes from _TPL[platform] loaded above from the real .tpl files.
+const CAPI_TEMPLATE_META = {
+  meta:   { infoId: 'et_meta_capi_manual',      displayName: 'ET - Meta CAPI (Manual HTTP)'                       },
+  tiktok: { infoId: 'et_tiktok_events_manual',  displayName: 'ET - TikTok Events API (Manual HTTP)'               },
+  snap:   { infoId: 'et_snapchat_capi_manual',  displayName: 'ET - Snapchat CAPI (Manual HTTP)'                   },
+  gads:   { infoId: 'et_gads_ec_manual',        displayName: 'ET - Google Ads Enhanced Conversions (Manual HTTP)' },
 };
 
 /**
  * Creates CAPI custom templates in the sGTM workspace for the given platforms.
+ * Uses the real .tpl source files (sha256Sync hashing, correct permissions,
+ * promise-based sendHttpRequest) instead of the old inline JS builders.
  * Must be called BEFORE importContainerJSON so tags can reference the templates.
- * Returns a map: { meta: 'et_meta_capi_manual', tiktok: 'et_tiktok_events_manual',
- *                  snap: 'et_snapchat_capi_manual', gads: 'et_gads_ec_manual' }
+ * Returns a map: { meta: 'et_meta_capi_manual', tiktok: 'et_tiktok_events_manual', … }
  */
 async function createCAPITemplates(containerId, workspaceId, platforms) {
   const acc      = getAccountId();
@@ -999,16 +1062,26 @@ async function createCAPITemplates(containerId, workspaceId, platforms) {
   const result   = {};
 
   for (const platform of (platforms || [])) {
-    const tpl = CAPI_TEMPLATE_BUILDERS[platform];
-    if (!tpl) continue;
+    const meta = CAPI_TEMPLATE_META[platform];
+    const tplData = _TPL[platform];
+    if (!meta || !tplData) {
+      console.warn('[gtm] createCAPITemplates: no .tpl file for platform', platform, '— skipping');
+      continue;
+    }
     try {
-      const body = JSON.stringify({ name: tpl.infoId, templateData: tpl.build() });
+      const body = JSON.stringify({ name: meta.displayName, templateData: tplData });
       await gtmRequest('POST', basePath, body);
-      result[platform] = tpl.infoId;
-      console.log('[gtm] created CAPI template for', platform, '— type:', tpl.infoId);
+      result[platform] = meta.infoId;
+      console.log('[gtm] created CAPI template for', platform, '— type:', meta.infoId);
     } catch (e) {
-      // Non-fatal — if template already exists (409) or any other error, skip
-      console.warn('[gtm] createCAPITemplates skipped', platform, ':', e.message);
+      // 409 = already exists (e.g. from a previous attempt) — treat as success
+      if (e.status === 409 || (e.message && /duplicate|already exists/i.test(e.message))) {
+        result[platform] = meta.infoId;
+        console.log('[gtm] CAPI template already exists for', platform, '— continuing');
+      } else {
+        // Non-fatal — log and move on; fallback phase in importContainerJSON will retry
+        console.warn('[gtm] createCAPITemplates failed for', platform, ':', e.message);
+      }
     }
   }
   return result;
@@ -1293,4 +1366,40 @@ async function provisionForClientWithServer(opts) {
     containerName:   webName,
     importedTagCount:      webImport.importedTagCount      || 0,
     importedTriggerCount:  webImport.importedTriggerCount  || 0,
-    importedVariableCount: webImport.importedVari
+    importedVariableCount: webImport.importedVariableCount || 0,
+    snippetHead,
+    snippetBody,
+    invited:    !!(opts.inviteEmail),
+    inviteEmail: opts.inviteEmail || null,
+    inviteError: null,
+    // Server container (nested)
+    server: {
+      gtmAccountId:    getAccountId(),
+      containerId:     serverContainerId,
+      publicId:        serverPublicId,
+      workspaceId:     serverWorkspaceId,
+      versionId:       srvVersionId,
+      containerName:   srvName,
+      containerConfig,
+      importedTagCount:      serverImport.importedTagCount      || 0,
+      importedTriggerCount:  serverImport.importedTriggerCount  || 0,
+      importedVariableCount: serverImport.importedVariableCount || 0,
+    },
+  };
+}
+
+module.exports = {
+  isConfigured,
+  getAccessToken,
+  listContainers,
+  createContainer,
+  importContainerJSON,
+  createVersion,
+  publishVersion,
+  inviteUserToContainer,
+  provisionForClient,
+  createServerContainer,
+  getContainerConfig,
+  setGA4TransportUrl,
+  provisionForClientWithServer,
+};
