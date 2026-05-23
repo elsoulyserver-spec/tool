@@ -1,4 +1,4 @@
-# ── Easy Track — Dockerfile for Railway / Render / any VPS ──────────────────
+# ── Easy Track — Dockerfile for Google Cloud Run / Railway / any VPS ────────
 FROM node:20-slim
 
 WORKDIR /app
@@ -16,7 +16,7 @@ RUN npm install --omit=dev
 # Copy app source
 COPY . .
 
-# Railway sets PORT dynamically; server.js reads process.env.PORT || 3000
+# Cloud Run / Railway set PORT dynamically; server.js reads process.env.PORT || 3000
 EXPOSE 3000
 
 CMD ["node", "server.js"]
