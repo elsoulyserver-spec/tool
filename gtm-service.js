@@ -206,13 +206,36 @@ async function createContainer(name, domainName) {
 }
 
 // Default workspace is created automatically with every new container.
+// GTM API has eventual consistency — the workspace list can return 404 or an
+// empty array for a few seconds after container creation. We retry with
+// increasing delays before giving up.
 async function getDefaultWorkspace(containerId) {
   const acc = getAccountId();
-  const res = await gtmRequest('GET',
-    `/accounts/${acc}/containers/${containerId}/workspaces`);
-  const ws = (res.workspace || [])[0];
-  if (!ws) throw new Error('No workspace found in new container ' + containerId);
-  return ws;
+  const DELAYS = [2000, 4000, 8000, 15000, 20000]; // ms between retries (total wait ≤ 49s)
+
+  for (let attempt = 0; attempt <= DELAYS.length; attempt++) {
+    try {
+      const res = await gtmRequest('GET',
+        `/accounts/${acc}/containers/${containerId}/workspaces`);
+      const ws = (res.workspace || [])[0];
+      if (ws) return ws;
+      // Empty list — workspace not ready yet
+      console.warn(`[gtm] getDefaultWorkspace: no workspace yet for container ${containerId} (attempt ${attempt + 1})`);
+    } catch (e) {
+      // 404 means the container itself isn't visible yet — also retry
+      if (e.status === 404) {
+        console.warn(`[gtm] getDefaultWorkspace: 404 for container ${containerId} (attempt ${attempt + 1}) — GTM eventual consistency, retrying`);
+      } else {
+        throw e; // unexpected error — surface immediately
+      }
+    }
+
+    if (attempt < DELAYS.length) {
+      await sleep(DELAYS[attempt]);
+    }
+  }
+
+  throw new Error(`No workspace found in container ${containerId} after ${DELAYS.length + 1} attempts`);
 }
 
 // Import our generated config JSON into the workspace.
@@ -1270,41 +1293,4 @@ async function provisionForClientWithServer(opts) {
     containerName:   webName,
     importedTagCount:      webImport.importedTagCount      || 0,
     importedTriggerCount:  webImport.importedTriggerCount  || 0,
-    importedVariableCount: webImport.importedVariableCount || 0,
-    snippetHead,
-    snippetBody,
-    invited:    !!(opts.inviteEmail),
-    inviteEmail: opts.inviteEmail || null,
-    inviteError: null,
-    // Server container (nested)
-    server: {
-      gtmAccountId:    getAccountId(),
-      containerId:     serverContainerId,
-      publicId:        serverPublicId,
-      workspaceId:     serverWorkspaceId,
-      versionId:       srvVersionId,
-      containerName:   srvName,
-      containerConfig,
-      importedTagCount:      serverImport.importedTagCount      || 0,
-      importedTriggerCount:  serverImport.importedTriggerCount  || 0,
-      importedVariableCount: serverImport.importedVariableCount || 0,
-    },
-  };
-}
-
-module.exports = {
-  isConfigured,
-  getAccessToken,
-  listContainers,
-  createContainer,
-  importContainerJSON,
-  createVersion,
-  publishVersion,
-  inviteUserToContainer,
-  provisionForClient,
-  // Server-side (client + server flow)
-  createServerContainer,
-  getContainerConfig,
-  setGA4TransportUrl,
-  provisionForClientWithServer,
-};
+    importedVariableCount: webImport.importedVari
