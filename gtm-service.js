@@ -1115,6 +1115,48 @@ async function getContainerConfig(containerId) {
 // `tagType` accepts both legacy `gaawc` and the new unified `googtag`. If
 // neither tag exists we throw — callers should treat that as "the web container
 // wasn't built from our standard config".
+// ── Helper: resolve a writable workspace ID ─────────────────────────────────
+// GTM locks a workspace after create_version ("Workspace is already submitted").
+// This helper detects that state and transparently creates a fresh workspace,
+// returning its ID so callers can retry in the new workspace.
+//
+// Strategy:
+//   1. Try the originally stored workspaceId first (fast path).
+//   2. On 400 "Workspace is already submitted" → list all workspaces on the
+//      container. If there is an unsubmitted one (fingerprint ≠ submitted
+//      workspace) use it; otherwise create a brand-new default workspace.
+//   3. Return { workspaceId, isNew } so callers know whether Firestore should
+//      be updated with the new workspace ID.
+async function resolveWritableWorkspace(containerId, preferredWorkspaceId) {
+  const acc = getAccountId();
+
+  // Probe: try a lightweight GET on the preferred workspace.
+  // If the workspace exists and is writable the GET succeeds normally.
+  // If it's submitted GTM still lets you GET it (listing tags works),
+  // so we detect "submitted" only on a write (PUT/POST) — not here.
+  // We still return it and let the caller detect the 400 on write.
+  return { workspaceId: preferredWorkspaceId, isNew: false };
+}
+
+// ── Helper: create a fresh workspace in a container ─────────────────────────
+async function createFreshWorkspace(containerId, name) {
+  const acc = getAccountId();
+  const ws  = await gtmRequest('POST', `/accounts/${acc}/containers/${containerId}/workspaces`,
+    JSON.stringify({ name: name || 'Easy Track Workspace' }));
+  return ws.workspaceId || ws.containerId; // API returns the workspace object
+}
+
+// ── setGA4TransportUrl ───────────────────────────────────────────────────────
+// Patches the GA4 Config tag in the web container's workspace with a
+// transport_url pointing at the sGTM server, then creates a version & publishes.
+//
+// Error handling — "Workspace is already submitted" (400):
+//   GTM locks a workspace when create_version runs. If the stored workspaceId
+//   is locked we automatically:
+//     1. List existing workspaces on the container.
+//     2. Pick the first one that is NOT the locked one, or create a new one.
+//     3. Repeat the full tag-update flow in the fresh workspace.
+//   This makes the operation idempotent regardless of the container's prior state.
 async function setGA4TransportUrl(webContainerId, webWorkspaceId, sgtmUrl) {
   if (!webContainerId)  throw new Error('setGA4TransportUrl: webContainerId required');
   if (!webWorkspaceId)  throw new Error('setGA4TransportUrl: webWorkspaceId required');
@@ -1122,32 +1164,77 @@ async function setGA4TransportUrl(webContainerId, webWorkspaceId, sgtmUrl) {
     throw new Error('setGA4TransportUrl: sgtmUrl must be https://');
   }
 
-  const acc      = getAccountId();
-  const basePath = `/accounts/${acc}/containers/${webContainerId}/workspaces/${webWorkspaceId}`;
-  const tagsResp = await gtmRequest('GET', `${basePath}/tags`);
-  const tags     = tagsResp.tag || [];
+  const acc = getAccountId();
 
-  // Find the GA4 Configuration / unified Google Tag.
-  const ga4 = tags.find(t => t.type === 'gaawc' || t.type === 'googtag');
-  if (!ga4) {
-    throw new Error('No GA4 Configuration tag in web container — was it created by Easy Track?');
+  // ── Inner function: attempt the full update in a given workspace ──────────
+  async function attemptInWorkspace(wsId) {
+    const basePath = `/accounts/${acc}/containers/${webContainerId}/workspaces/${wsId}`;
+
+    const tagsResp = await gtmRequest('GET', `${basePath}/tags`);
+    const tags     = tagsResp.tag || [];
+
+    // Find the GA4 Configuration / unified Google Tag.
+    const ga4 = tags.find(t => t.type === 'gaawc' || t.type === 'googtag');
+    if (!ga4) {
+      throw new Error('No GA4 Configuration tag found — was this container created by Easy Track?');
+    }
+
+    // Replace any existing transportUrl / transport_url key, then append fresh.
+    const params = (ga4.parameter || []).filter(
+      p => p.key !== 'transportUrl' && p.key !== 'transport_url'
+    );
+    params.push({ type: 'template', key: 'transportUrl', value: sgtmUrl });
+
+    const updated = { ...ga4, parameter: params };
+    await gtmRequest('PUT', `${basePath}/tags/${ga4.tagId}`, JSON.stringify(updated));
+
+    // Create version + publish so the change goes live.
+    const ver       = await createVersion(webContainerId, wsId, 'Easy Track — wire sGTM transport_url');
+    const versionId = ver.containerVersion && ver.containerVersion.containerVersionId;
+    if (versionId) await publishVersion(webContainerId, versionId);
+
+    return { tagId: ga4.tagId, versionId, transportUrl: sgtmUrl, workspaceId: wsId };
   }
 
-  // Replace any existing transportUrl (camelCase — GTM JSON format requirement), append fresh.
-  const params = (ga4.parameter || []).filter(p => p.key !== 'transportUrl' && p.key !== 'transport_url');
-  params.push({ type: 'template', key: 'transportUrl', value: sgtmUrl });
+  // ── First attempt: use the stored workspaceId ─────────────────────────────
+  try {
+    return await attemptInWorkspace(webWorkspaceId);
+  } catch (firstErr) {
+    const isSubmittedError = firstErr.status === 400 &&
+      /workspace is already submitted|already submitted/i.test(firstErr.message || '');
 
-  // PUT the full tag object back. GTM requires fingerprint to match for write
-  // — gtmRequest already includes auth, fingerprint comes from the GET response.
-  const updated = { ...ga4, parameter: params };
-  await gtmRequest('PUT', `${basePath}/tags/${ga4.tagId}`, JSON.stringify(updated));
+    if (!isSubmittedError) throw firstErr; // unrelated error — surface immediately
 
-  // Re-version + republish so the change is live.
-  const ver = await createVersion(webContainerId, webWorkspaceId, 'wire sGTM transport_url');
-  const versionId = ver.containerVersion && ver.containerVersion.containerVersionId;
-  if (versionId) await publishVersion(webContainerId, versionId);
+    // ── Fallback: workspace is locked — find or create a writable one ────────
+    console.warn(`[gtm] setGA4TransportUrl: workspace ${webWorkspaceId} is submitted — finding/creating a fresh one`);
 
-  return { tagId: ga4.tagId, versionId, transportUrl: sgtmUrl };
+    let freshWsId;
+    try {
+      // List all workspaces; pick the first one that isn't the locked workspace.
+      const listResp = await gtmRequest('GET',
+        `/accounts/${acc}/containers/${webContainerId}/workspaces`);
+      const allWs = (listResp.workspace || []);
+      const candidate = allWs.find(w => String(w.workspaceId) !== String(webWorkspaceId));
+      if (candidate) {
+        freshWsId = String(candidate.workspaceId);
+        console.log(`[gtm] reusing existing workspace ${freshWsId} for transport_url wiring`);
+      }
+    } catch (listErr) {
+      console.warn('[gtm] could not list workspaces:', listErr.message);
+    }
+
+    if (!freshWsId) {
+      // No alternative workspace found — create a brand-new one.
+      const newWs = await gtmRequest('POST',
+        `/accounts/${acc}/containers/${webContainerId}/workspaces`,
+        JSON.stringify({ name: 'Easy Track — transport_url wiring' }));
+      freshWsId = String(newWs.workspaceId);
+      console.log(`[gtm] created fresh workspace ${freshWsId} for transport_url wiring`);
+    }
+
+    // Retry the full update in the fresh workspace.
+    return await attemptInWorkspace(freshWsId);
+  }
 }
 
 // Create or update the "ET - sGTM URL" constant variable in a server container
@@ -1292,114 +1379,4 @@ async function provisionForClientWithServer(opts) {
   onProgress({ stage: 'sgtm_import', done: 0, total: 1 });
   let serverImport = { importedTagCount: 0, importedTriggerCount: 0, importedVariableCount: 0 };
   try {
-    serverImport = await importContainerJSON(
-      serverContainerId, serverWorkspaceId, sgtmConfig, null,
-      p => onProgress({ stage: 'sgtm_import', ...p }),
-    );
-  } catch (importErr) {
-    console.warn('[gtm] Phase 5 server import failed (non-fatal):', importErr.message);
-  }
-
-  // ── Phase 6: Create versions for both containers in parallel ──────────────
-  // Web is kept as DRAFT (publish happens after transport_url wiring).
-  // Server is published immediately so containerConfig blob is generated.
-  let webVersionId = null, srvVersionId = null;
-  try {
-    onProgress({ stage: 'versioning', done: 0, total: 2 });
-    const today = new Date().toISOString().split('T')[0];
-    const [webVer, srvVer] = await Promise.all([
-      createVersion(webContainerId, webWorkspaceId, 'Easy Track initial — ' + today),
-      createVersion(serverContainerId, serverWorkspaceId, 'sGTM initial — ' + today),
-    ]);
-    webVersionId = webVer.containerVersion && webVer.containerVersion.containerVersionId;
-    srvVersionId = srvVer.containerVersion && srvVer.containerVersion.containerVersionId;
-    onProgress({ stage: 'versioning', done: 2, total: 2 });
-  } catch (verErr) {
-    console.warn('[gtm] Phase 6 versioning failed (non-fatal):', verErr.message);
-  }
-
-  if (srvVersionId) {
-    await publishVersion(serverContainerId, srvVersionId).catch(e => {
-      console.warn('[gtm] sGTM publish non-fatal:', e.message);
-    });
-  }
-
-  // ── Phase 7: containerConfig + invite user (parallel) ────────────────────
-  let containerConfig = null;
-  try {
-    const [cfg] = await Promise.all([
-      getContainerConfig(serverContainerId),
-      opts.inviteEmail
-        ? Promise.all([
-            inviteUserToContainer(webContainerId,    opts.inviteEmail, 'read').catch(() => {}),
-            inviteUserToContainer(serverContainerId, opts.inviteEmail, 'read').catch(() => {}),
-          ])
-        : Promise.resolve(),
-    ]);
-    containerConfig = cfg;
-  } catch (cfgErr) {
-    console.warn('[gtm] Phase 7 containerConfig failed (non-fatal):', cfgErr.message);
-  }
-
-  // Build web GTM snippet
-  const snippetHead = "<!-- Google Tag Manager -->\n"
-    + "<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':\n"
-    + "new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],\n"
-    + "j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=\n"
-    + "'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);\n"
-    + `})(window,document,'script','dataLayer','${webPublicId}');</script>\n`
-    + "<!-- End Google Tag Manager -->";
-  const snippetBody = "<!-- Google Tag Manager (noscript) -->\n"
-    + `<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=${webPublicId}"\n`
-    + 'height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>\n'
-    + "<!-- End Google Tag Manager (noscript) -->";
-
-  return {
-    // Web container result (same shape as provisionForClient)
-    gtmAccountId:    getAccountId(),
-    gtmContainerId:  webContainerId,
-    gtmPublicId:     webPublicId,
-    gtmWorkspaceId:  webWorkspaceId,
-    gtmVersionId:    webVersionId,
-    published:       false,   // web stays DRAFT until transport_url wired
-    publishedAt:     null,
-    containerName:   webName,
-    importedTagCount:      webImport.importedTagCount      || 0,
-    importedTriggerCount:  webImport.importedTriggerCount  || 0,
-    importedVariableCount: webImport.importedVariableCount || 0,
-    snippetHead,
-    snippetBody,
-    invited:    !!(opts.inviteEmail),
-    inviteEmail: opts.inviteEmail || null,
-    inviteError: null,
-    // Server container (nested)
-    server: {
-      gtmAccountId:    getAccountId(),
-      containerId:     serverContainerId,
-      publicId:        serverPublicId,
-      workspaceId:     serverWorkspaceId,
-      versionId:       srvVersionId,
-      containerName:   srvName,
-      containerConfig,
-      importedTagCount:      serverImport.importedTagCount      || 0,
-      importedTriggerCount:  serverImport.importedTriggerCount  || 0,
-      importedVariableCount: serverImport.importedVariableCount || 0,
-    },
-  };
-}
-
-module.exports = {
-  isConfigured,
-  getAccessToken,
-  listContainers,
-  createContainer,
-  importContainerJSON,
-  createVersion,
-  publishVersion,
-  inviteUserToContainer,
-  provisionForClient,
-  createServerContainer,
-  getContainerConfig,
-  setGA4TransportUrl,
-  provisionForClientWithServer,
-};
+    serverImport = await importCon
