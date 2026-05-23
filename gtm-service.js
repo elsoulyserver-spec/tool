@@ -1306,7 +1306,5 @@ module.exports = {
   createServerContainer,
   getContainerConfig,
   setGA4TransportUrl,
-  upsertServerUrlVariable,
-  createCAPITemplates,
   provisionForClientWithServer,
 };

@@ -1,0 +1,42 @@
+# ── Easy Track — .gcloudignore ───────────────────────────────────────────────
+# Tells `gcloud` what NOT to upload when building the container.
+# Keeps the image small and secrets safe.
+
+# Secrets — never upload
+.env
+.env.*
+!.env.example
+*service-account*.json
+*firebase-adminsdk*.json
+*-sa-key*.json
+
+# Node modules — Cloud Build runs `npm install` inside the container
+node_modules/
+npm-debug.log*
+
+# Dev / local tools
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Railway config (not needed on GCP)
+railway.json
+check-deploy.sh
+
+# Backup files
+*.bak
+*.bak2
+
+# Test files (not needed in production image)
+tests/
+
+# Docs / pitch files
+*.pptx
+*.md
+docs/
+Pictures*

@@ -9,9 +9,6 @@
   <meta http-equiv="Expires" content="0">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Easy Track — Pixel Config Generator</title>
-  <!-- Favicon — Easy Track Logo -->
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="alternate icon" type="image/svg+xml" href="data:image/svg+xml,<svg viewBox='0 0 64 64' fill='none' xmlns='http://www.w3.org/2000/svg'> <!-- Dark background --> <rect width='64' height='64' rx='14' fill='%230B0E14'/> <!-- Outer arcs --> <path d='M5 29.5 C5 14.5 17.5 2 32.5 2' stroke='rgba(70,241,197,0.4)' stroke-width='1.2' stroke-linecap='round'/> <path d='M59 29.5 C59 14.5 46.5 2 31.5 2' stroke='rgba(70,241,197,0.4)' stroke-width='1.2' stroke-linecap='round'/> <!-- Mid arcs --> <path d='M12 30 C12 19.8 20 12 30 12' stroke='rgba(70,241,197,0.65)' stroke-width='1.1' stroke-linecap='round'/> <path d='M52 30 C52 19.8 44 12 34 12' stroke='rgba(70,241,197,0.65)' stroke-width='1.1' stroke-linecap='round'/> <!-- Inner arcs --> <path d='M20 30 C20 24.5 24.5 20 30 20' stroke='%2346f1c5' stroke-width='1' stroke-linecap='round'/> <path d='M44 30 C44 24.5 39.5 20 34 20' stroke='%2346f1c5' stroke-width='1' stroke-linecap='round'/> <!-- Dot glow --> <circle cx='32' cy='30' r='8' fill='rgba(70,241,197,0.12)'/> <!-- Dot core --> <circle cx='32' cy='30' r='5'>  <defs>   <radialGradient id='g1' cx='50%25' cy='50%25' r='50%25'>    <stop offset='0%25' stop-color='%2346f1c5'/>    <stop offset='100%25' stop-color='%2300d4aa'/>   </radialGradient>  </defs>  <title>ET</title> </circle> <circle cx='32' cy='30' r='5' fill='%2346f1c5'/> <!-- Arrow down --> <path d='M27 38 L32 50 L37 38' stroke='%2346f1c5' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>">
   <link
     href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;900&family=IBM+Plex+Mono:wght@400;500;700&family=Syne:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap"
     rel="stylesheet" />
@@ -654,30 +651,6 @@
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
       gap: 12px;
-    }
-
-    /* Section header inside the grid — spans full row */
-    .pc-plat-group {
-      grid-column: 1 / -1;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-top: 4px;
-    }
-    .pc-plat-group:first-child { margin-top: 0; }
-    .pc-plat-group-lbl {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,.35);
-      white-space: nowrap;
-    }
-    .pc-plat-group::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: rgba(255,255,255,.06);
     }
 
     .cbtn {
@@ -3517,6 +3490,10 @@
           <span class="material-symbols-outlined" style="font-size:18px;">folder_open</span>
           <span>My Projects</span>
         </button>
+        <button class="sb-link" id="sbServerSide" type="button" onclick="switchAppView('serverside',this)">
+          <span class="material-symbols-outlined" style="font-size:18px;">dns</span>
+          <span>Server-Side Tracking</span>
+        </button>
         <button class="sb-link" type="button" onclick="toggleSettings()">
           <span class="material-symbols-outlined" style="font-size:18px;">settings</span>
           <span>Settings</span>
@@ -3683,6 +3660,7 @@
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
             <span class="material-symbols-outlined" style="font-size:17px;color:var(--acc);">code_blocks</span>
             <span style="font-family:var(--font-display);font-size:14px;font-weight:800;color:var(--wht);">GTM Snippets</span>
+            <button onclick="switchAppView('serverside',document.getElementById('sbServerSide'))" style="margin-right:auto;background:rgba(70,241,197,.08);border:1px solid rgba(70,241,197,.2);border-radius:8px;padding:3px 10px;font-size:11px;font-weight:700;color:var(--acc);cursor:pointer;font-family:var(--font-ui);">إعداد ←</button>
           </div>
           <!-- Web + Server GTM IDs -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
@@ -3714,7 +3692,7 @@
           <div id="ovGtmPlaceholder" style="text-align:center;padding:16px 0;color:var(--mut);font-size:12px;">
             <span class="material-symbols-outlined" style="font-size:28px;display:block;margin-bottom:6px;opacity:.4;">dns</span>
             لم يتم إعداد أي GTM Container بعد —
-            
+            <button onclick="switchAppView('serverside',document.getElementById('sbServerSide'))" style="background:none;border:none;color:var(--acc);cursor:pointer;font-size:12px;font-family:var(--font-ui);font-weight:700;padding:0 4px;">ابدأ الإعداد ←</button>
           </div>
         </div>
 
@@ -3743,317 +3721,6 @@
       </div>
       <!-- END OVERVIEW VIEW -->
 
-
-  <!-- ══ Server Side Card CSS ══ -->
-  <style>
-    /* ─── Card wrapper ─── */
-    .pc-ss-card {
-      background: linear-gradient(135deg, rgba(30,33,40,.9) 0%, rgba(22,25,31,.95) 100%);
-      border: 1px solid rgba(255,255,255,.07);
-      border-radius: 18px;
-      margin-bottom: 24px;
-      overflow: hidden;
-      transition: border-color .25s, box-shadow .25s;
-    }
-    .pc-ss-card.ss-on {
-      border-color: rgba(70,241,197,.3);
-      box-shadow: 0 0 0 1px rgba(70,241,197,.08), 0 8px 40px rgba(70,241,197,.05);
-    }
-
-    /* ─── Header ─── */
-    .pc-ss-header {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 16px 20px;
-    }
-    .pc-ss-icon {
-      font-size: 22px;
-      line-height: 1;
-      flex-shrink: 0;
-    }
-    .pc-ss-title-wrap { flex: 1; min-width: 0; }
-    .pc-ss-title {
-      font-family: var(--font-display);
-      font-size: 14px;
-      font-weight: 800;
-      color: var(--wht);
-      line-height: 1.2;
-    }
-    .pc-ss-sub {
-      font-size: 11px;
-      color: var(--mut);
-      margin-top: 3px;
-      line-height: 1.45;
-    }
-
-    /* ─── Toggle switch ─── */
-    .pc-ss-toggle {
-      position: relative;
-      width: 44px;
-      height: 24px;
-      background: rgba(255,255,255,.06);
-      border: 1.5px solid rgba(255,255,255,.1);
-      border-radius: 12px;
-      cursor: pointer;
-      flex-shrink: 0;
-      outline: none;
-      transition: background .2s, border-color .2s;
-    }
-    .pc-ss-toggle::after {
-      content: '';
-      position: absolute;
-      top: 3px;
-      left: 3px;
-      width: 14px;
-      height: 14px;
-      background: var(--mut);
-      border-radius: 50%;
-      transition: left .2s ease, background .2s;
-    }
-    .pc-ss-toggle.on {
-      background: rgba(70,241,197,.18);
-      border-color: rgba(70,241,197,.45);
-    }
-    .pc-ss-toggle.on::after {
-      left: calc(100% - 17px);
-      background: var(--acc);
-    }
-    .pc-ss-toggle-lbl {
-      font-size: 10px;
-      font-weight: 800;
-      font-family: var(--font-mono);
-      color: var(--mut);
-      min-width: 22px;
-      text-align: center;
-      letter-spacing: .5px;
-      transition: color .2s;
-      flex-shrink: 0;
-    }
-    .pc-ss-toggle-lbl.on { color: var(--acc); }
-
-    /* ─── Body ─── */
-    .pc-ss-body {
-      display: none;
-      padding: 4px 20px 20px;
-      border-top: 1px solid rgba(255,255,255,.06);
-    }
-    .pc-ss-body.open {
-      display: block;
-      animation: pcSSReveal .2s ease;
-    }
-    @keyframes pcSSReveal {
-      from { opacity: 0; transform: translateY(-4px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    /* ─── Section ─── */
-    .pc-ss-section { margin-top: 16px; }
-    .pc-ss-sec-label {
-      font-size: 10.5px;
-      font-weight: 700;
-      color: var(--mut);
-      text-transform: uppercase;
-      letter-spacing: .9px;
-      margin-bottom: 8px;
-      font-family: var(--font-ui);
-    }
-
-    /* ─── Inputs ─── */
-    .pc-ss-input {
-      width: 100%;
-      box-sizing: border-box;
-      background: rgba(255,255,255,.04);
-      border: 1.5px solid rgba(255,255,255,.08);
-      border-radius: 10px;
-      padding: 10px 14px;
-      font-family: var(--font-mono);
-      font-size: 12.5px;
-      color: var(--wht);
-      outline: none;
-      transition: border-color .15s, background .15s;
-    }
-    .pc-ss-input:focus {
-      border-color: rgba(70,241,197,.4);
-      background: rgba(70,241,197,.03);
-    }
-    .pc-ss-valid { margin-top: 5px; font-size: 11px; min-height: 14px; font-family: var(--font-ui); }
-    .pc-ss-hint {
-      font-size: 11px;
-      color: var(--mut);
-      margin-top: 6px;
-      line-height: 1.5;
-      opacity: .8;
-    }
-
-    /* ─── GA4 badge row ─── */
-    .pc-ss-ga4-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: rgba(255,255,255,.04);
-      border: 1px solid rgba(255,255,255,.07);
-      border-radius: 10px;
-      padding: 9px 13px;
-    }
-    .pc-ss-ga4-badge {
-      background: rgba(70,241,197,.14);
-      color: var(--acc);
-      font-size: 9.5px;
-      font-weight: 800;
-      font-family: var(--font-mono);
-      padding: 2px 7px;
-      border-radius: 5px;
-      flex-shrink: 0;
-      letter-spacing: .5px;
-    }
-    .pc-ss-ga4-val {
-      font-family: var(--font-mono);
-      font-size: 12.5px;
-      color: var(--wht);
-      flex: 1;
-    }
-
-    /* ─── Platform grid (inside SS card) ─── */
-    .pc-ss-plat-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-    }
-    .pc-ss-plat-grid .cbtn {
-      padding: 14px 8px;
-      border-radius: 12px;
-      font-size: 11.5px;
-      gap: 7px;
-    }
-    .pc-ss-plat-grid .cicon svg { width: 20px !important; height: 20px !important; }
-
-    /* ─── Accordion ─── */
-    .pc-ss-acc {
-      background: rgba(255,255,255,.02);
-      border: 1px solid rgba(255,255,255,.07);
-      border-radius: 12px;
-      margin-bottom: 8px;
-      overflow: hidden;
-      transition: border-color .2s;
-    }
-    .pc-ss-acc.open { border-color: rgba(70,241,197,.2); }
-    .pc-ss-acc-hdr {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 12px 14px;
-      cursor: pointer;
-      user-select: none;
-      transition: background .15s;
-    }
-    .pc-ss-acc-hdr:hover { background: rgba(255,255,255,.03); }
-    .pc-ss-acc-name {
-      flex: 1;
-      font-family: var(--font-ui);
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--wht2);
-    }
-    .pc-ss-acc-arr {
-      font-size: 9px;
-      color: var(--mut);
-      transition: transform .2s;
-      display: inline-block;
-    }
-    .pc-ss-acc.open .pc-ss-acc-arr { transform: rotate(90deg); }
-    .pc-ss-acc-body {
-      display: none;
-      padding: 4px 14px 14px;
-      border-top: 1px solid rgba(255,255,255,.06);
-    }
-    .pc-ss-acc.open .pc-ss-acc-body {
-      display: block;
-      animation: pcSSReveal .15s ease;
-    }
-
-    /* ─── Event chips ─── */
-    .pc-ss-ev-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 5px;
-      margin: 10px 0 14px;
-    }
-    .pc-ss-ev-chip {
-      padding: 4px 9px;
-      border-radius: 20px;
-      font-size: 10.5px;
-      font-family: var(--font-ui);
-      font-weight: 600;
-      cursor: pointer;
-      user-select: none;
-      background: rgba(255,255,255,.04);
-      border: 1px solid rgba(255,255,255,.08);
-      color: var(--mut);
-      transition: all .15s;
-      white-space: nowrap;
-      line-height: 1.4;
-    }
-    .pc-ss-ev-chip:hover { border-color: rgba(70,241,197,.3); color: var(--wht2); }
-    .pc-ss-ev-chip.on {
-      background: rgba(70,241,197,.1);
-      border-color: rgba(70,241,197,.35);
-      color: var(--acc);
-    }
-    .pc-ss-ev-chip.forced { cursor: default; }
-
-    /* ─── Credentials ─── */
-    .pc-ss-cred-title {
-      font-size: 10px;
-      font-weight: 700;
-      color: var(--mut);
-      text-transform: uppercase;
-      letter-spacing: .8px;
-      margin-bottom: 10px;
-      font-family: var(--font-ui);
-    }
-    .pc-ss-px-row { margin-bottom: 10px; }
-    .pc-ss-px-lbl {
-      font-size: 10.5px;
-      font-weight: 600;
-      color: rgba(255,255,255,.45);
-      margin-bottom: 5px;
-      font-family: var(--font-ui);
-    }
-    .pc-ss-pw-wrap { position: relative; display: flex; align-items: center; }
-    .pc-ss-pw-wrap .pc-ss-input { padding-left: 38px; }
-    .pc-ss-eye {
-      position: absolute;
-      left: 10px;
-      font-size: 16px;
-      color: var(--mut);
-      cursor: pointer;
-      user-select: none;
-      transition: color .15s;
-    }
-    .pc-ss-eye:hover { color: var(--acc); }
-
-    /* ─── Google Ads label rows ─── */
-    .pc-ss-label-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 6px;
-    }
-    .pc-ss-label-ev {
-      font-size: 10.5px;
-      font-family: var(--font-mono);
-      color: var(--mut);
-      min-width: 120px;
-      flex-shrink: 0;
-    }
-    .pc-ss-label-row .pc-ss-input {
-      flex: 1;
-      padding: 7px 10px;
-      font-size: 11.5px;
-    }
-  </style>
-
       <!-- ══════ PIXEL CONFIG VIEW ══════ -->
       <div class="app-view" id="view-pixels">
 
@@ -4065,7 +3732,7 @@
               <div class="pc-ss-title">Server Side</div>
               <div class="pc-ss-sub">يتفعّل لو الزبون عنده سيرفر — يدعم CAPI لكل المنصات بدون ad blockers</div>
             </div>
-            <button class="pc-ss-toggle" id="pc-ss-toggle-btn" type="button" onclick="pcSS_toggle()" aria-label="تفعيل Server Side"></button>
+            <button class="pc-ss-toggle" id="pc-ss-toggle-btn" onclick="pcSS_toggle()" aria-label="تفعيل Server Side"></button>
             <span class="pc-ss-toggle-lbl" id="pc-ss-toggle-lbl">OFF</span>
           </div>
           <div class="pc-ss-body" id="pc-ss-body">
@@ -4357,7 +4024,7 @@
             </button>
 
 
-            <button class="otab" id="tabSsGtm" onclick="oTab('ss-gtm',this)">
+            <button class="otab" id="tabSsGtm" onclick="oTab('ss-gtm',this)" style="display:none;">
               <span class="material-symbols-outlined"
                 style="font-size:15px;font-variation-settings:'FILL' 1;">dns</span>
               🖥️ Server Container
@@ -4375,8 +4042,8 @@
             </button>
           </div>
 
-          <!-- pane-ss-gtm: Server Container output — دايماً متاح زي الـ Web Container -->
-          <div class="opane" id="pane-ss-gtm">
+          <!-- pane-ss-gtm: Server Container output (visible only when SS enabled) -->
+          <div class="opane" id="pane-ss-gtm" style="display:none;">
             <div class="pc-ss-out-banner">
               <span class="pc-ss-out-icon">🖥️</span>
               <div style="flex:1;">
@@ -4391,7 +4058,7 @@
                   <div class="ctdot" style="background:#febc2e"></div>
                   <div class="ctdot" style="background:#28c840"></div>
                 </div>
-                <span class="clang" id="ssGtmFileName">sgtm-container.json</span>
+                <span class="clang">sgtm-container.json</span>
                 <div class="ctacts">
                   <button class="dlbtn" id="dlSsGtm">⬇️ تحميل</button>
                   <button class="cpybtn" id="cpySsGtm">نسخ</button>
@@ -4549,33 +4216,35 @@
               </div>
             </div>
 
-            <!-- Server-Side section — always visible, used only when clicking server button -->
-            <div id="mgdCapiTokensBlock" style="margin-bottom:8px;padding:12px 14px;
-              border-radius:12px;border:1px solid rgba(70,241,197,.25);background:rgba(70,241,197,.04);">
-              <!-- header -->
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-                <span class="material-symbols-outlined" style="font-size:16px;color:var(--acc);">dns</span>
-                <div style="font-size:12px;font-weight:700;color:var(--acc);">
-                  إعدادات Server-Side
-                  <span style="font-size:10px;font-weight:500;color:var(--mut);margin-right:6px;">(مطلوبة لو هتضغط Create Web + Server)</span>
+            <!-- Server-Side toggle -->
+            <label for="mgdServerSideChk" style="display:flex;align-items:center;gap:10px;padding:12px 14px;
+              border-radius:12px;border:1px solid var(--bdr2);background:var(--sur);margin-bottom:8px;cursor:pointer;">
+              <input type="checkbox" id="mgdServerSideChk"
+                style="width:18px;height:18px;accent-color:var(--acc);cursor:pointer;flex-shrink:0;">
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;font-weight:700;color:var(--wht);">
+                  🚀 فعّل Server-Side Tracking (مستحسن)
+                </div>
+                <div style="font-size:11px;color:var(--mut);margin-top:2px;line-height:1.5;">
+                  Easy Track هيعمل لك <strong>كل حاجة تلقائياً</strong>: ينشئ sGTM container، ينشره على Stape، ويربطه بالـ web container. مفيش حاجة تعملها انت — هتطلع snippet جاهز يتلصق على الموقع وبس. يتجاوز ad blockers + يدعم Conversions APIs.
                 </div>
               </div>
-              <!-- sGTM URL -->
-              <div style="font-size:11px;color:var(--mut);margin-bottom:6px;line-height:1.5;">
-                🌐 رابط السيرفر بتاعك (sGTM URL)
+            </label>
+
+            <!-- Publish toggle -->
+            <label for="mgdPublishChk" style="display:flex;align-items:center;gap:10px;padding:12px 14px;
+              border-radius:12px;border:1px solid var(--bdr2);background:var(--sur);margin-bottom:12px;cursor:pointer;">
+              <input type="checkbox" id="mgdPublishChk" checked
+                style="width:18px;height:18px;accent-color:var(--acc);cursor:pointer;flex-shrink:0;">
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;font-weight:700;color:var(--wht);">
+                  Publish to Live فوراً
+                </div>
+                <div style="font-size:11px;color:var(--mut);margin-top:2px;line-height:1.5;">
+                  لو مفعّل: الـ container يبقى شغال دلوقتي. لو مقفول: بيفضل Draft وانت تراجعه وتنشره بنفسك. <em>(يتم تجاهله لو فعّلت Server-Side — هنعمل publish تلقائي بعد wiring)</em>
+                </div>
               </div>
-              <input id="mgdSgtmUrlInput" type="url" dir="ltr" placeholder="https://gtm.your-domain.com"
-                style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--bdr2);
-                border-radius:8px;padding:9px 12px;color:var(--wht);font-family:var(--font-mono);
-                font-size:12px;margin-bottom:12px;outline:none;"
-                oninput="this.style.borderColor=this.value.trim()?'var(--acc)':'var(--bdr2)'">
-              <!-- CAPI Tokens -->
-              <div style="font-size:11px;color:var(--mut);margin-bottom:8px;line-height:1.5;">
-                🔑 CAPI Access Tokens
-                <span style="color:rgba(255,255,255,.35)"> — اختياري، هتتضاف تلقائياً في السيرفر كونتينر</span>
-              </div>
-              <div id="mgdCapiTokenFields"></div>
-            </div>
+            </label>
 
             <!-- Progress area -->
             <div id="mgdProgress"
@@ -4591,27 +4260,11 @@
               </div>
             </div>
 
-            <!-- Two action buttons -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-
-              <!-- Web only -->
-              <button class="gtm-deploy-btn" id="mgdCreateBtn"
-                onclick="gtmManagedCreate('client')"
-                style="width:100%;background:var(--sur);border:1px solid var(--bdr2);
-                       font-size:12px;padding:11px 10px;gap:6px;">
-                <span class="material-symbols-outlined" style="font-size:16px;">language</span>
-                Create Web Container
-              </button>
-
-              <!-- Web + Server -->
-              <button class="gtm-deploy-btn" id="mgdCreateServerBtn"
-                onclick="gtmManagedCreate('client_server')"
-                style="width:100%;font-size:12px;padding:11px 10px;gap:6px;">
-                <span class="material-symbols-outlined" style="font-size:16px;">dns</span>
-                Create Web + Server
-              </button>
-
-            </div>
+            <!-- Action button -->
+            <button class="gtm-deploy-btn" id="mgdCreateBtn" onclick="gtmManagedCreate()" style="width:100%;">
+              <span class="material-symbols-outlined" style="font-size:18px;">rocket_launch</span>
+              Create Managed Container
+            </button>
 
             <!-- Result area (populated after success) -->
             <div id="mgdResult" style="display:none;margin-top:14px;"></div>
@@ -4664,6 +4317,577 @@
         </div>
       </div>
       <!-- END MY PROJECTS VIEW -->
+
+
+
+      <!-- ══════ SERVER-SIDE VIEW ══════ -->
+      <div class="app-view" id="view-serverside">
+
+        <div class="page-hdr">
+          <div>
+            <h2 class="page-title">
+              <span class="material-symbols-outlined" style="color:var(--acc);">dns</span>
+              Server-Side Tracking
+            </h2>
+            <p class="page-sub">إعداد هايبريد شامل — Web + Server GTM بالتوازي مع نشر مباشر من الأداة</p>
+          </div>
+          <button class="btn-ghost-sm" id="ss-hdr-reset-btn" onclick="ss_resetConfig()" style="display:none;color:#f87171;border-color:rgba(248,113,113,.3);">
+            <span class="material-symbols-outlined" style="font-size:14px;">delete</span>
+            إعادة ضبط
+          </button>
+        </div>
+
+        <!-- ── Completed Banner ── -->
+        <div id="ss-done-banner" style="display:none;margin-bottom:20px;padding:16px 20px;border-radius:14px;background:rgba(70,241,197,.08);border:1px solid rgba(70,241,197,.25);display:none;align-items:center;gap:12px;">
+          <span class="material-symbols-outlined" style="color:var(--acc);font-size:22px;flex-shrink:0;">check_circle</span>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:700;color:var(--acc);">Server-Side Tracking مفعّل ✓</div>
+            <div id="ss-done-url" style="font-size:11px;color:var(--mut);font-family:var(--font-mono);margin-top:2px;"></div>
+          </div>
+          <button class="btn-ghost-sm" onclick="ss_editSetup()" style="font-size:11px;flex-shrink:0;">تعديل</button>
+        </div>
+
+        <!-- ── Step Indicator (rendered by JS) ── -->
+        <div class="ss-stepper" id="ss-step-bar"></div>
+
+        <!-- ════ STEP 1: GA4 ════ -->
+        <div class="ss-panel" id="ss-panel-1">
+          <div class="panel-title">Google Analytics 4</div>
+          <div class="panel-sub">أدخل الـ Measurement ID — يُربط الـ Web Container بالـ Server عبر transport_url تلقائياً</div>
+
+          <div class="ss-card">
+            <div class="ss-field-label">GA4 Measurement ID</div>
+            <input type="text" id="ss-p1-ga4-id" class="ss-inp" placeholder="G-XXXXXXXXXX"
+              oninput="ss_onGa4Input()" autocomplete="off" style="letter-spacing:.05em;font-family:var(--font-mono);"/>
+            <div id="ss-p1-ga4-hint" style="font-size:11px;color:var(--mut);margin-top:8px;line-height:1.5;"></div>
+          </div>
+
+          <div class="ss-notice info">
+            💡 <strong>كيف يعمل الهايبريد:</strong> الـ Web Container يرسل الأحداث للـ Server عبر transport_url — ثم الـ Server يرسلها لـ CAPI/API مع SHA-256 hashing
+          </div>
+
+          <div class="ss-btn-row">
+            <button class="btn-acc-sm" onclick="ss_goToStep(2)">التالي <span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle;">arrow_back</span></button>
+            <span style="font-size:11px;color:var(--mut);">يمكنك تخطيه وإضافته لاحقاً</span>
+          </div>
+        </div>
+
+        <!-- ════ STEP 2: E-Commerce Platform ════ -->
+        <div class="ss-panel" id="ss-panel-2" style="display:none;">
+          <div class="panel-title">منصة التجارة الإلكترونية</div>
+          <div class="panel-sub">حدد المنصة — يُولَّد DataLayer Code مخصص لها وتُضبط Triggers أوتوماتيك</div>
+          <div id="ss-p2-ecomm-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px;"></div>
+          <div class="ss-btn-row">
+            <button class="btn-ghost-sm" onclick="ss_goToStep(1)"><span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle;">arrow_forward</span> السابق</button>
+            <button class="btn-acc-sm" onclick="ss_goToStep(3)">التالي <span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle;">arrow_back</span></button>
+          </div>
+        </div>
+
+        <!-- ════ STEP 3: Pixels + Tokens ════ -->
+        <div class="ss-panel" id="ss-panel-3" style="display:none;">
+          <div class="panel-title">Pixels + Access Tokens</div>
+          <div class="panel-sub">فعّل الـ Pixels وأدخل الـ Access Tokens — لكل منها Tags في <span style="color:var(--blu);">Web</span> و<span style="color:var(--acc);">Server</span> Container</div>
+          <div id="ss-p3-px-cards" style="margin-bottom:14px;"></div>
+          <div class="ss-notice info" style="margin-bottom:14px;">
+            <strong style="color:var(--amber);">⚡ Deduplication:</strong> كل حدث يحصل على <code style="font-family:var(--font-mono);background:var(--sur3);padding:1px 5px;border-radius:3px;">event_id = order_id + "_" + timestamp</code> موحد بين الـ Web والـ Server لمنع التكرار
+          </div>
+          <div class="ss-btn-row">
+            <button class="btn-ghost-sm" onclick="ss_goToStep(2)"><span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle;">arrow_forward</span> السابق</button>
+            <button class="btn-acc-sm" onclick="ss_goToStep(4)">التالي <span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle;">arrow_back</span></button>
+          </div>
+        </div>
+
+        <!-- ════ STEP 4: Events ════ -->
+        <div class="ss-panel" id="ss-panel-4" style="display:none;">
+          <div class="panel-title">اختر الأحداث</div>
+          <div class="panel-sub">الأحداث المختارة تُتبع في الـ Web Container والـ Server Container معاً مع deduplication تلقائي</div>
+          <div id="ss-p4-events-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;"></div>
+          <div class="ss-notice info" style="margin-bottom:14px;">
+            🎯 <strong style="color:var(--acc);">Hybrid Coverage:</strong> كل event له Tag في الـ Web (client-side) والـ Server (CAPI relay)
+          </div>
+          <div class="ss-btn-row">
+            <button class="btn-ghost-sm" onclick="ss_goToStep(3)"><span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle;">arrow_forward</span> السابق</button>
+            <button class="btn-acc-sm" onclick="ss_goToStep(5)">مراجعة <span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle;">arrow_back</span></button>
+          </div>
+        </div>
+
+        <!-- ════ STEP 5: Review + Parallel Create ════ -->
+        <div class="ss-panel" id="ss-panel-5" style="display:none;">
+          <div class="panel-title">إنشاء Web + Server Containers بالتوازي</div>
+          <div class="panel-sub">راجع الإعدادات ثم اضغط إنشاء — كلا الـ Containers يُبنيان في نفس الوقت</div>
+
+          <!-- Review Summary -->
+          <div id="ss-p5-review" style="margin-bottom:16px;"></div>
+
+          <!-- Parallel Dual-Column Progress -->
+          <div id="ss-p5-parallel" style="display:none;margin-bottom:16px;">
+            <div class="ss-creation-split">
+
+              <!-- Web Container -->
+              <div class="ss-prog-card web" id="ss-p5-web-card">
+                <div class="ss-prog-hdr">
+                  <div>
+                    <div class="ss-container-badge web" style="margin-bottom:5px;">WEB CONTAINER</div>
+                    <div class="ss-prog-label">GTM Web</div>
+                  </div>
+                  <div class="ss-prog-pct web" id="ss-p5-web-pct">0%</div>
+                </div>
+                <div class="ss-prog-bar-wrap">
+                  <div class="ss-prog-bar web" id="ss-p5-web-bar" style="width:0%"></div>
+                </div>
+                <div class="ss-stage-list" id="ss-p5-web-stages"></div>
+              </div>
+
+              <!-- Server Container -->
+              <div class="ss-prog-card server" id="ss-p5-srv-card">
+                <div class="ss-prog-hdr">
+                  <div>
+                    <div class="ss-container-badge server" style="margin-bottom:5px;">SERVER CONTAINER</div>
+                    <div class="ss-prog-label">GTM Server</div>
+                  </div>
+                  <div class="ss-prog-pct server" id="ss-p5-srv-pct">0%</div>
+                </div>
+                <div class="ss-prog-bar-wrap">
+                  <div class="ss-prog-bar server" id="ss-p5-srv-bar" style="width:0%"></div>
+                </div>
+                <div class="ss-stage-list" id="ss-p5-srv-stages"></div>
+              </div>
+
+            </div>
+            <div style="text-align:center;margin-top:10px;font-size:11px;color:var(--mut);font-family:var(--font-mono);" id="ss-p5-stage-msg"></div>
+          </div>
+
+          <!-- Result -->
+          <div id="ss-p5-result" style="display:none;margin-bottom:16px;">
+            <div class="ss-result-grid">
+              <div class="ss-result-cell">
+                <div class="ss-result-cell-label">🌐 Web Container</div>
+                <div class="ss-result-cell-val" id="ss-p5-web-id">—</div>
+              </div>
+              <div class="ss-result-cell">
+                <div class="ss-result-cell-label">🖥️ Server Container</div>
+                <div class="ss-result-cell-val" id="ss-p5-server-id">—</div>
+              </div>
+            </div>
+            <div class="ss-notice good" style="margin-top:10px;">✅ تم إنشاء الـ Containers بنجاح — جاهزَين للنشر</div>
+          </div>
+
+          <div id="ss-p5-error" style="display:none;" class="ss-notice warn" style="margin-bottom:14px;"></div>
+
+          <div id="ss-p5-btn-wrap" class="ss-btn-row">
+            <button class="btn-ghost-sm" onclick="ss_goToStep(4)"><span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle;">arrow_forward</span> السابق</button>
+            <button class="btn-acc-sm" id="ss-p5-create-btn" onclick="ss_createContainers()">
+              <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">play_circle</span>
+              إنشاء Web + Server معاً
+            </button>
+            <span style="font-size:11px;color:var(--mut);">⏱️ 60-120 ثانية</span>
+          </div>
+          <div id="ss-p5-next-wrap" style="display:none;margin-top:12px;">
+            <button class="btn-acc-sm" onclick="ss_goToStep(6)">
+              <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">cloud_upload</span>
+              التالي — نشر السيرفر ←
+            </button>
+          </div>
+        </div>
+
+        <!-- ════ STEP 6: Deploy Server Container ════ -->
+        <div class="ss-panel" id="ss-panel-6" style="display:none;">
+          <div class="panel-title">نشر Server Container</div>
+          <div class="panel-sub">انسخ الـ Container Config وانشره على Stape أو Cloud Run</div>
+
+          <div class="ss-card" style="margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <div class="ss-field-label" style="margin:0;">Container Config</div>
+              <button class="btn-ghost-sm" onclick="ss_copyContainerConfig()" style="font-size:11px;padding:4px 10px;">
+                <span class="material-symbols-outlined" style="font-size:12px;vertical-align:middle;">content_copy</span> نسخ
+              </button>
+            </div>
+            <pre id="ss-p6-config-blob" class="ss-code-block"></pre>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;">
+            <div class="ss-card">
+              <div style="font-weight:700;color:var(--wht);margin-bottom:6px;font-size:13px;">🚀 Stape.io <span style="font-size:11px;color:var(--acc);font-weight:600;">(الأسهل)</span></div>
+              <ol style="margin:0;padding-right:16px;line-height:1.9;color:var(--mut);font-size:12px;">
+                <li>افتح <a href="https://stape.io" target="_blank" style="color:var(--acc);">stape.io</a> وأنشئ Server Container جديد</li>
+                <li>الصق الـ Container Config في حقل "Container Config"</li>
+                <li>انسخ الـ Server URL وأدخله في الخطوة التالية</li>
+              </ol>
+            </div>
+            <div class="ss-card">
+              <div style="font-weight:700;color:var(--wht);margin-bottom:6px;font-size:13px;">☁️ Google Cloud Run</div>
+              <div style="color:var(--mut);font-size:12px;line-height:1.7;">انشر الـ Docker image الرسمي لـ sGTM مع <code style="font-family:var(--font-mono);background:var(--sur3);padding:1px 5px;border-radius:3px;">CONTAINER_CONFIG</code> كـ env var</div>
+            </div>
+          </div>
+
+          <!-- Stape Direct Deploy -->
+          <div class="ss-card" style="margin-bottom:14px;border-color:rgba(70,241,197,.28);background:rgba(70,241,197,.025);">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+              <div style="font-weight:700;color:var(--wht);font-size:13px;">🚀 نشر مباشر على Stape</div>
+              <a href="https://stape.io" target="_blank" rel="noopener"
+                style="font-size:9px;color:var(--acc);font-weight:700;background:rgba(70,241,197,.1);
+                       padding:2px 7px;border-radius:4px;font-family:var(--font-mono);letter-spacing:.5px;
+                       text-decoration:none;">stape.io ↗</a>
+            </div>
+            <div style="color:var(--mut);font-size:11px;margin-bottom:12px;line-height:1.7;">
+              أدخل الـ API Key من <strong style="color:var(--wht2);">stape.io → Account Settings → API Keys</strong>
+              وسننشر الـ Container تلقائياً ونملأ الـ URL في الخطوة التالية
+            </div>
+
+            <!-- Row 1: API Key + region -->
+            <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:8px;">
+              <div>
+                <div class="ss-field-label">Stape API Key</div>
+                <div style="position:relative;">
+                  <input type="password" id="ss-p6-stape-key" class="ss-inp"
+                    placeholder="stape_api_xxxxxxxxxxxx" autocomplete="new-password"
+                    style="width:100%;font-family:var(--font-mono);font-size:12px;padding-left:28px;"/>
+                  <span class="material-symbols-outlined" onclick="ss_toggleStapeKeyVis()"
+                    style="position:absolute;left:8px;top:50%;transform:translateY(-50%);
+                           font-size:14px;color:var(--mut);cursor:pointer;" id="ss-p6-stape-eye">visibility</span>
+                </div>
+              </div>
+              <div>
+                <div class="ss-field-label">Region</div>
+                <select id="ss-p6-stape-region" class="ss-inp"
+                  style="font-size:11px;min-width:110px;cursor:pointer;background:var(--sur2);">
+                  <option value="us-central">🇺🇸 US Central</option>
+                  <option value="eu-west">🇪🇺 EU West</option>
+                  <option value="me-central1">🇦🇪 ME Central</option>
+                  <option value="asia-east1">🇸🇬 Asia East</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Row 2: Save key toggle + deploy button -->
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;">
+                <input type="checkbox" id="ss-p6-stape-savekey" style="accent-color:var(--acc);width:13px;height:13px;"/>
+                <span style="font-size:11px;color:var(--mut);">احفظ الـ Key مشفّراً لاستخدام لاحق</span>
+              </label>
+              <button class="btn-acc-sm" id="ss-p6-stape-btn" onclick="ss_deployStape()" style="white-space:nowrap;">
+                <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;" id="ss-p6-stape-icon">rocket_launch</span>
+                <span id="ss-p6-stape-btn-lbl">نشر على Stape</span>
+              </button>
+            </div>
+
+            <!-- Status line -->
+            <div id="ss-p6-stape-status" style="margin-top:10px;font-size:12px;font-family:var(--font-mono);min-height:20px;line-height:1.6;"></div>
+          </div>
+
+          <div class="ss-btn-row">
+            <button class="btn-ghost-sm" onclick="ss_goToStep(5)"><span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle;">arrow_forward</span> السابق</button>
+            <button class="btn-acc-sm" onclick="ss_goToStep(7)">نشرت يدوياً — التالي <span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle;">arrow_back</span></button>
+          </div>
+        </div>
+
+        <!-- ════ STEP 7: Server URL + Wire ════ -->
+        <div class="ss-panel" id="ss-panel-7" style="display:none;">
+          <div class="panel-title">ربط URL الخادم</div>
+          <div class="panel-sub">أدخل URL الخادم — سيتم ربطه في GA4 Config Tag (transport_url) ونشر الـ Containers</div>
+
+          <div class="ss-card" style="margin-bottom:14px;">
+            <div class="ss-field-label">Server URL</div>
+            <div style="display:flex;gap:8px;align-items:stretch;">
+              <input type="url" id="ss-p7-url" class="ss-inp"
+                placeholder="https://gtm.yourdomain.com" autocomplete="off"
+                onkeydown="if(event.key==='Enter') ss_validateUrl()"
+                style="flex:1;"/>
+              <button class="btn-ghost-sm" onclick="ss_validateUrl()" id="ss-p7-validate-btn" style="white-space:nowrap;flex-shrink:0;">
+                <span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle;">wifi_tethering</span>
+                تحقق
+              </button>
+            </div>
+            <div id="ss-p7-status" style="margin-top:8px;font-size:12px;color:var(--mut);font-family:var(--font-mono);"></div>
+          </div>
+
+          <div id="ss-p7-wire-wrap" style="display:none;margin-bottom:16px;">
+            <div class="ss-notice good" style="margin-bottom:12px;">
+              ✅ الخادم يستجيب — جاهز للربط<br>
+              <span style="color:var(--mut);font-size:11px;">سيتم: إضافة transport_url للـ Web Container + إضافة URL للـ Server Container + نشر كلاهما</span>
+            </div>
+            <button class="btn-acc-sm" id="ss-p7-wire-btn" onclick="ss_wireUrl()">
+              <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">cable</span>
+              ربط ونشر الـ Containers
+            </button>
+          </div>
+
+          <div id="ss-p7-error" style="display:none;" class="ss-notice warn" style="margin-bottom:12px;"></div>
+
+          <div class="ss-btn-row">
+            <button class="btn-ghost-sm" onclick="ss_goToStep(6)"><span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle;">arrow_forward</span> السابق</button>
+          </div>
+        </div>
+
+        <!-- ════ STEP 8: Done ════ -->
+        <div class="ss-panel" id="ss-panel-8" style="display:none;">
+          <div class="ss-done-hero">
+            <div class="ss-done-icon">✅</div>
+            <div class="ss-done-title">Server-Side Tracking مفعّل! 🎉</div>
+            <div class="ss-done-subtitle">الـ Web Container والـ Server Container منشورَين ومربوطَين — الصق الكود أدناه في موقعك</div>
+          </div>
+
+          <div style="margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <div class="ss-sec-label">GTM Snippet — &lt;head&gt;</div>
+              <button class="btn-ghost-sm" onclick="ss_copySnippet('head')" style="font-size:11px;padding:4px 10px;">
+                <span class="material-symbols-outlined" style="font-size:12px;vertical-align:middle;">content_copy</span> نسخ
+              </button>
+            </div>
+            <pre id="ss-p8-snippet-head" class="ss-snippet-block"></pre>
+          </div>
+
+          <div style="margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <div class="ss-sec-label">GTM Snippet — &lt;body&gt;</div>
+              <button class="btn-ghost-sm" onclick="ss_copySnippet('body')" style="font-size:11px;padding:4px 10px;">
+                <span class="material-symbols-outlined" style="font-size:12px;vertical-align:middle;">content_copy</span> نسخ
+              </button>
+            </div>
+            <pre id="ss-p8-snippet-body" class="ss-snippet-block"></pre>
+          </div>
+
+          <div style="margin-bottom:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <div class="ss-sec-label" id="ss-p8-dl-label">DataLayer Code</div>
+              <button class="btn-ghost-sm" onclick="ss_copyCode('datalayer')" style="font-size:11px;padding:4px 10px;">
+                <span class="material-symbols-outlined" style="font-size:12px;vertical-align:middle;">content_copy</span> نسخ
+              </button>
+            </div>
+            <pre id="ss-p8-datalayer-code" class="ss-snippet-block" style="max-height:220px;color:#a8d8c8;"></pre>
+          </div>
+
+          <div id="ss-p8-summary" class="ss-card" style="font-size:11px;color:var(--wht2);line-height:1.8;margin-bottom:16px;"></div>
+
+          <div class="ss-btn-row">
+            <button class="btn-ghost-sm" onclick="ss_goToStep(7)"><span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle;">arrow_forward</span> السابق</button>
+            <button class="btn-acc-sm" onclick="ss_confirmSetup()">
+              <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">check_circle</span>
+              حفظ وإنهاء
+            </button>
+          </div>
+          <div id="ss-p8-status" style="font-size:12px;color:var(--mut);font-family:var(--font-mono);margin-top:10px;"></div>
+        </div>
+
+      </div>
+
+      <!-- ── Server-Side Wizard CSS ── -->
+      <style>
+        /* ─── Stepper ─── */
+        .ss-stepper{display:flex;align-items:center;gap:0;margin-bottom:24px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;background:var(--sur2);border:1px solid var(--bdr2);border-radius:14px;padding:12px 16px;}
+        .ss-stepper::-webkit-scrollbar{display:none;}
+        .ss-step-chip{display:flex;align-items:center;gap:5px;padding:5px 8px;border-radius:8px;cursor:pointer;flex-shrink:0;transition:background .15s;}
+        .ss-step-chip:hover{background:var(--sur3);}
+        .ss-step-circle{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:var(--font-mono);flex-shrink:0;transition:all .2s;}
+        .ss-step-circle.idle{background:var(--sur3);color:var(--mut);border:1.5px solid var(--bdr2);}
+        .ss-step-circle.active{background:var(--acc-dim,rgba(70,241,197,.10));color:var(--acc);border:1.5px solid var(--acc);box-shadow:0 0 10px rgba(70,241,197,.22);}
+        .ss-step-circle.done{background:rgba(70,241,197,.18);color:var(--acc);border:1.5px solid rgba(70,241,197,.35);}
+        .ss-step-lbl{font-size:10px;font-weight:600;color:var(--mut);white-space:nowrap;}
+        .ss-step-lbl.active{color:var(--acc);}
+        .ss-step-lbl.done{color:var(--wht2);}
+        .ss-step-sep{width:16px;height:1px;background:var(--bdr2);flex-shrink:0;}
+        .ss-step-sep.done{background:rgba(70,241,197,.35);}
+
+        /* ─── Panels ─── */
+        .ss-panel{background:var(--sur2);border:1px solid var(--bdr2);border-radius:16px;padding:24px;animation:ssFadeUp .22s ease;}
+        @keyframes ssFadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .panel-title{font-family:var(--font-display);font-size:17px;font-weight:800;color:var(--wht);letter-spacing:-.3px;margin-bottom:4px;}
+        .panel-sub{font-size:12px;color:var(--mut);margin-bottom:18px;line-height:1.6;}
+
+        /* ─── Cards & inputs ─── */
+        .ss-card{background:var(--sur);border:1px solid var(--bdr2);border-radius:var(--r-md,12px);padding:14px 16px;margin-bottom:10px;}
+        .ss-field-label{font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.9px;margin-bottom:6px;display:block;}
+        .ss-inp{width:100%;background:var(--sur2);border:1px solid var(--bdr2);border-radius:8px;padding:9px 13px;font-size:13px;color:var(--wht);font-family:var(--font-ui);outline:none;transition:border .15s,box-shadow .15s;box-sizing:border-box;}
+        .ss-inp:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(70,241,197,.08);}
+        .ss-inp::placeholder{color:var(--mut);}
+
+        /* ─── Notices ─── */
+        .ss-notice{padding:10px 14px;border-radius:10px;font-size:11px;line-height:1.65;margin-bottom:12px;}
+        .ss-notice.info{background:rgba(70,241,197,.04);border:1px solid rgba(70,241,197,.13);color:var(--wht2);}
+        .ss-notice.good{background:rgba(70,241,197,.07);border:1px solid rgba(70,241,197,.22);color:var(--acc);}
+        .ss-notice.warn{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);color:#f87171;}
+        .ss-notice.blue{background:rgba(173,198,255,.05);border:1px solid rgba(173,198,255,.2);color:var(--blu,#adc6ff);}
+
+        /* ─── Button row ─── */
+        .ss-btn-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px;}
+
+        /* ─── Platform / selection rows ─── */
+        .ss-sel-row{display:flex;align-items:center;gap:12px;background:var(--sur);border:1.5px solid var(--bdr2);border-radius:12px;padding:10px 14px;cursor:pointer;transition:border-color .15s;user-select:none;}
+        .ss-sel-row:hover{border-color:rgba(70,241,197,.3);}
+        .ss-sel-row.selected{border-color:var(--acc);background:rgba(70,241,197,.04);}
+        .ss-sel-ico{font-size:20px;width:32px;text-align:center;flex-shrink:0;}
+        .ss-sel-info{flex:1;min-width:0;}
+        .ss-sel-name{font-family:var(--font-display);font-size:13px;font-weight:700;color:var(--wht);}
+        .ss-sel-sub{font-size:11px;color:var(--mut);}
+        .ss-sel-check{width:17px;height:17px;border-radius:50%;border:1.5px solid var(--bdr2);display:flex;align-items:center;justify-content:center;margin-right:auto;flex-shrink:0;transition:all .15s;}
+        .ss-sel-row.selected .ss-sel-check{background:var(--acc);border-color:var(--acc);}
+        .ss-sel-badge{font-size:9px;font-weight:800;padding:2px 7px;border-radius:4px;font-family:var(--font-mono);}
+        .ss-sel-badge.rec{background:rgba(70,241,197,.15);color:var(--acc);border:1px solid rgba(70,241,197,.25);}
+        .ss-sel-badge.warn{background:rgba(248,113,113,.1);color:#f87171;border:1px solid rgba(248,113,113,.2);}
+
+        /* ─── Pixel cards ─── */
+        .ss-px-card{background:var(--sur);border:1.5px solid var(--bdr2);border-radius:12px;margin-bottom:8px;overflow:hidden;transition:border-color .15s;}
+        .ss-px-card.active{border-color:rgba(70,241,197,.4);}
+        .ss-px-header{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;user-select:none;}
+        .ss-px-name{font-size:13px;font-weight:700;color:var(--wht);}
+        .ss-px-sub{font-size:11px;color:var(--mut);}
+        .ss-px-badge{font-size:9px;font-weight:700;letter-spacing:.8px;padding:2px 7px;border-radius:4px;font-family:var(--font-mono);}
+        .ss-px-badge.web{background:rgba(173,198,255,.12);color:var(--blu,#adc6ff);}
+        .ss-px-badge.server{background:rgba(70,241,197,.1);color:var(--acc);}
+        .ss-px-badge.both{background:rgba(245,158,11,.1);color:#fbbf24;}
+        .ss-px-toggle{width:34px;height:19px;border-radius:10px;background:var(--sur3);border:none;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0;}
+        .ss-px-toggle.on{background:var(--acc);}
+        .ss-px-toggle::after{content:'';position:absolute;top:3px;right:3px;width:13px;height:13px;border-radius:50%;background:#fff;transition:transform .2s,right .2s;}
+        .ss-px-toggle.on::after{right:auto;left:3px;}
+        .ss-px-expand{overflow:hidden;max-height:0;transition:max-height .3s ease,opacity .3s;opacity:0;}
+        .ss-px-expand.open{max-height:200px;opacity:1;}
+
+        /* ══════════════════════════════════════════════════
+           Pixel Config — Server Side Card & Components
+        ══════════════════════════════════════════════════ */
+        .pc-ss-card{border:1px solid var(--bdr2);border-radius:12px;background:var(--sur2);margin-bottom:20px;overflow:hidden;}
+        .pc-ss-header{display:flex;align-items:center;gap:12px;padding:16px 20px;}
+        .pc-ss-icon{font-size:22px;flex-shrink:0;}
+        .pc-ss-title-wrap{flex:1;}
+        .pc-ss-title{font-family:var(--font-display);font-weight:700;font-size:15px;color:var(--wht);line-height:1.2;}
+        .pc-ss-sub{font-size:11px;color:var(--mut);margin-top:2px;}
+        .pc-ss-toggle{width:46px;height:25px;border-radius:13px;background:var(--sur3);border:1px solid var(--bdr2);cursor:pointer;position:relative;transition:background .25s,border-color .25s;flex-shrink:0;}
+        .pc-ss-toggle.on{background:var(--acc);border-color:var(--acc);}
+        .pc-ss-toggle::after{content:'';position:absolute;top:3px;right:3px;width:17px;height:17px;border-radius:50%;background:#fff;transition:right .25s;}
+        .pc-ss-toggle.on::after{right:auto;left:3px;}
+        .pc-ss-toggle-lbl{font-size:10px;font-weight:700;color:var(--mut);letter-spacing:1px;min-width:22px;text-align:center;}
+        .pc-ss-toggle.on + .pc-ss-toggle-lbl{color:var(--acc);}
+        .pc-ss-body{border-top:1px solid var(--bdr2);padding:20px;display:none;}
+        .pc-ss-body.open{display:block;}
+        /* Section inside body */
+        .pc-ss-section{margin-bottom:20px;}
+        .pc-ss-section:last-child{margin-bottom:0;}
+        .pc-ss-sec-label{font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;}
+        /* Inputs */
+        .pc-ss-input{width:100%;background:var(--sur3);border:1px solid var(--bdr2);border-radius:8px;padding:10px 14px;font-size:13px;font-family:var(--font-mono);color:var(--wht);outline:none;transition:border-color .2s;direction:ltr;}
+        .pc-ss-input:focus{border-color:var(--bdr);}
+        .pc-ss-hint{font-size:11px;color:var(--mut);margin-top:5px;}
+        .pc-ss-valid{font-size:11px;margin-top:4px;min-height:14px;}
+        /* GA4 ID row */
+        .pc-ss-ga4-row{display:flex;align-items:center;gap:10px;background:var(--sur3);border:1px solid var(--bdr2);border-radius:8px;padding:10px 14px;}
+        .pc-ss-ga4-badge{font-size:9px;font-weight:700;background:rgba(70,241,197,0.12);color:var(--acc);padding:2px 6px;border-radius:4px;letter-spacing:1px;font-family:var(--font-mono);flex-shrink:0;}
+        .pc-ss-ga4-val{font-family:var(--font-mono);font-size:12px;color:var(--wht);flex:1;word-break:break-all;}
+        .pc-ss-ga4-edit{background:none;border:1px solid var(--bdr2);border-radius:6px;padding:4px 9px;font-size:10px;color:var(--mut);cursor:pointer;transition:border-color .15s;}
+        .pc-ss-ga4-edit:hover{border-color:var(--bdr);}
+        /* Platform cards grid inside SS */
+        .pc-ss-plat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;}
+        /* Accordion per platform */
+        .pc-ss-acc{border:1px solid var(--bdr2);border-radius:10px;overflow:hidden;margin-bottom:10px;}
+        .pc-ss-acc:last-child{margin-bottom:0;}
+        .pc-ss-acc-hdr{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;background:var(--sur2);transition:background .15s;user-select:none;}
+        .pc-ss-acc-hdr:hover{background:var(--sur3);}
+        .pc-ss-acc-name{font-size:13px;font-weight:700;color:var(--wht);flex:1;}
+        .pc-ss-acc-arr{font-size:12px;color:var(--mut);transition:transform .2s;font-family:var(--font-mono);}
+        .pc-ss-acc.open .pc-ss-acc-arr{transform:rotate(90deg);}
+        .pc-ss-acc-body{display:none;border-top:1px solid var(--bdr2);padding:16px;}
+        .pc-ss-acc.open .pc-ss-acc-body{display:block;}
+        /* Event chips inside accordion */
+        .pc-ss-ev-chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px;}
+        .pc-ss-ev-chip{border:1px solid var(--bdr2);border-radius:20px;padding:5px 12px;font-size:11px;color:var(--mut);cursor:pointer;transition:all .15s;background:var(--sur3);white-space:nowrap;}
+        .pc-ss-ev-chip.on{border-color:var(--acc);color:var(--acc);background:rgba(70,241,197,0.07);}
+        .pc-ss-ev-chip.forced{opacity:.65;cursor:default;}
+        /* Pixel/token input rows */
+        .pc-ss-px-row{margin-bottom:12px;}
+        .pc-ss-px-row:last-child{margin-bottom:0;}
+        .pc-ss-px-lbl{font-size:11px;color:var(--mut);margin-bottom:5px;font-weight:600;}
+        .pc-ss-pw-wrap{position:relative;}
+        .pc-ss-pw-wrap .pc-ss-input{padding-left:38px;}
+        .pc-ss-eye{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:15px;color:var(--mut);cursor:pointer;transition:color .15s;}
+        .pc-ss-eye:hover{color:var(--wht2);}
+        /* Gads label sub-rows */
+        .pc-ss-label-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+        .pc-ss-label-ev{font-size:11px;color:var(--mut2);min-width:90px;flex-shrink:0;}
+        /* Platform group labels in Step 2 */
+        .pc-plat-group{grid-column:1/-1;margin-top:12px;margin-bottom:4px;}
+        .pc-plat-group:first-child{margin-top:0;}
+        .pc-plat-group-lbl{font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:1.5px;padding-bottom:6px;border-bottom:1px solid var(--bdr2);}
+        /* Server container output */
+        .pc-ss-out-banner{background:rgba(70,241,197,0.04);border:1px solid var(--bdr);border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;}
+        .pc-ss-out-icon{font-size:24px;flex-shrink:0;}
+        .pc-ss-config-section{margin-top:20px;border:1px solid var(--bdr2);border-radius:10px;overflow:hidden;}
+        .pc-ss-config-header{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--sur3);border-bottom:1px solid var(--bdr2);}
+        .pc-ss-config-box{padding:14px;font-family:var(--font-mono);font-size:11px;color:var(--wht2);word-break:break-all;line-height:1.8;max-height:100px;overflow-y:auto;background:var(--sur2);}
+        .ss-px-token-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px 14px 12px;}
+        @media(max-width:540px){.ss-px-token-grid{grid-template-columns:1fr;}}
+        .ss-px-token-block{background:var(--sur3);border:1px solid var(--bdr2);border-radius:8px;padding:8px 10px;}
+        .ss-px-token-label{font-size:9px;font-weight:700;color:var(--mut);letter-spacing:.8px;text-transform:uppercase;margin-bottom:5px;}
+        .ss-tok-input{width:100%;box-sizing:border-box;background:var(--sur2);border:1px solid var(--bdr2);border-radius:8px;padding:7px 10px;font-family:var(--font-mono);font-size:11px;color:var(--wht);outline:none;transition:border-color .15s;margin-top:0;}
+        .ss-tok-input:focus{border-color:var(--acc);}
+        .ss-px-label{font-size:10px;font-weight:700;color:var(--mut);display:block;margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase;}
+
+        /* ─── Event chips ─── */
+        .ss-ev-chip{padding:7px 14px;border-radius:20px;border:1.5px solid var(--bdr2);font-size:12px;font-weight:600;font-family:var(--font-mono);cursor:pointer;transition:all .15s;color:var(--wht2);}
+        .ss-ev-chip.on{border-color:var(--acc);color:var(--acc);background:rgba(70,241,197,.08);}
+
+        /* ─── Parallel progress ─── */
+        .ss-creation-split{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;}
+        @media(max-width:600px){.ss-creation-split{grid-template-columns:1fr;}}
+        .ss-prog-card{border-radius:14px;padding:18px;border:1.5px solid;position:relative;transition:border-color .3s;}
+        .ss-prog-card.web{border-color:rgba(173,198,255,.2);background:rgba(173,198,255,.03);}
+        .ss-prog-card.web.done{border-color:rgba(173,198,255,.4);}
+        .ss-prog-card.server{border-color:rgba(70,241,197,.2);background:rgba(70,241,197,.03);}
+        .ss-prog-card.server.done{border-color:rgba(70,241,197,.45);box-shadow:0 0 24px rgba(70,241,197,.06);}
+        .ss-prog-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;}
+        .ss-prog-label{font-size:13px;font-weight:700;color:var(--wht);}
+        .ss-prog-pct{font-family:var(--font-mono);font-size:12px;font-weight:700;}
+        .ss-prog-pct.web{color:var(--blu,#adc6ff);}
+        .ss-prog-pct.server{color:var(--acc);}
+        .ss-prog-bar-wrap{height:4px;background:var(--sur3);border-radius:3px;overflow:hidden;margin-bottom:12px;}
+        .ss-prog-bar{height:100%;border-radius:3px;transition:width .4s cubic-bezier(.4,0,.2,1);}
+        .ss-prog-bar.web{background:linear-gradient(90deg,#6fa8ff,#adc6ff);}
+        .ss-prog-bar.server{background:linear-gradient(90deg,var(--acc2,#00d4aa),var(--acc));}
+        .ss-container-badge{font-size:9px;font-weight:700;letter-spacing:1px;padding:2px 7px;border-radius:4px;font-family:var(--font-mono);display:inline-block;}
+        .ss-container-badge.web{background:rgba(173,198,255,.15);color:var(--blu,#adc6ff);}
+        .ss-container-badge.server{background:rgba(70,241,197,.12);color:var(--acc);}
+        .ss-stage-list{display:flex;flex-direction:column;gap:5px;}
+        .ss-stage-item{display:flex;align-items:center;gap:8px;font-size:11px;}
+        .ss-stage-ico{width:15px;height:15px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;flex-shrink:0;transition:all .25s;}
+        .ss-stage-ico.idle{background:var(--sur3);color:var(--mut);}
+        .ss-stage-ico.spin{background:rgba(173,198,255,.15);color:var(--blu,#adc6ff);animation:ssSpin .8s linear infinite;}
+        .ss-stage-ico.spin-grn{background:rgba(70,241,197,.1);color:var(--acc);animation:ssSpin .8s linear infinite;}
+        .ss-stage-ico.done{background:rgba(70,241,197,.18);color:var(--acc);}
+        @keyframes ssSpin{to{transform:rotate(360deg)}}
+        .ss-stage-txt{color:var(--mut);transition:color .2s;}
+        .ss-stage-txt.active{color:var(--wht);}
+        .ss-stage-txt.done{color:var(--wht2);}
+
+        /* ─── Result grid ─── */
+        .ss-result-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+        .ss-result-cell{background:var(--sur2);border:1px solid var(--bdr2);border-radius:10px;padding:11px 13px;}
+        .ss-result-cell-label{font-size:10px;color:var(--mut);margin-bottom:3px;font-family:var(--font-mono);}
+        .ss-result-cell-val{font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--wht);}
+
+        /* ─── Code blocks ─── */
+        .ss-code-block{background:#080b10;border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;font-size:9px;color:#a8d8a8;overflow-x:auto;max-height:120px;overflow-y:auto;margin:0;white-space:pre-wrap;word-break:break-all;font-family:var(--font-mono);}
+        .ss-snippet-block{background:#060910;border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;font-size:10px;color:#a8d8c8;overflow-x:auto;max-height:100px;overflow-y:auto;margin:0;white-space:pre;line-height:1.65;font-family:var(--font-mono);}
+        .ss-sec-label{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--mut);text-transform:uppercase;margin-bottom:6px;}
+
+        /* ─── Done screen ─── */
+        .ss-done-hero{text-align:center;padding:24px 20px 18px;}
+        .ss-done-icon{width:64px;height:64px;border-radius:50%;background:rgba(70,241,197,.1);border:2px solid rgba(70,241,197,.3);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:28px;box-shadow:0 0 36px rgba(70,241,197,.12);}
+        .ss-done-title{font-family:var(--font-display);font-size:20px;font-weight:800;color:var(--wht);margin-bottom:5px;}
+        .ss-done-subtitle{font-size:12px;color:var(--mut);max-width:380px;margin:0 auto;}
+
+        /* ─── Summary / misc ─── */
+        .ss-summary-block{background:var(--sur);border:1px solid var(--bdr2);border-radius:12px;padding:14px 16px;margin-bottom:10px;}
+        .ss-summary-label{font-size:10px;color:var(--mut);font-family:var(--font-mono);letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px;}
+        .ss-summary-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--bdr);}
+        .ss-summary-row:last-child{border-bottom:none;}
+        .ss-summary-key{font-size:12px;color:var(--mut);}
+        .ss-summary-val{font-size:12px;color:var(--wht);font-weight:600;font-family:var(--font-ui);text-align:left;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+        /* URL input (keep for compat) */
+        .ss-url-input{flex:1;min-width:180px;background:var(--sur2);border:1.5px solid var(--bdr2);border-radius:10px;padding:9px 14px;font-family:var(--font-mono);font-size:12px;color:var(--wht);outline:none;transition:border-color .15s;box-sizing:border-box;}
+        .ss-url-input:focus{border-color:var(--acc);}
+        /* Spinner compat */
+        .ss-spin{width:18px;height:18px;border-radius:50%;border:2px solid rgba(70,241,197,.2);border-top-color:var(--acc);animation:ssSpin 0.7s linear infinite;flex-shrink:0;}
+      </style>
+      <!-- END SERVER-SIDE VIEW -->
+
 
     </div>
   </div>
@@ -5563,7 +5787,7 @@
     ];
 
     // ===== APP VIEW SWITCHING =====
-    var APP_VIEWS = { overview: 'view-overview', pixels: 'view-pixels', gtmview: 'view-gtmview', projects: 'view-projects' };
+    var APP_VIEWS = { overview: 'view-overview', pixels: 'view-pixels', gtmview: 'view-gtmview', projects: 'view-projects', serverside: 'view-serverside' };
 
     // Cached GTM JSON string for sidebar view
     var _cachedGtmStr = null;
@@ -5597,8 +5821,6 @@
           if (gtmEmpty) gtmEmpty.style.display = 'flex';
           if (gtmViewContent) gtmViewContent.innerHTML = '';
         }
-        // Render CAPI token fields based on selected platforms
-        if (typeof _mgdRenderCapiTokens === 'function') _mgdRenderCapiTokens();
       }
 
       // If going to My Projects view — load projects into the sidebar list
@@ -6139,9 +6361,7 @@
       document.getElementById('outWrap').classList.remove('on');
       if (n <= 4) document.getElementById('s' + n).classList.add('on');
       updateProg(n);
-      var ptrack = document.getElementById('ptrack');
-      if (ptrack) ptrack.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      else window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function updateProg(cur) {
@@ -6309,12 +6529,11 @@
           html += '<div class="pixhint">💡 Google Ads → Tools → Conversions → Settings → Conversion ID</div>';
           html += '</div>';
 
-          // Conversion Label per event (only events selected for Google Ads)
+          // Conversion Label per event
           html += '<div class="pixrow" style="margin-top:16px;">';
           html += '<label class="pixlabel">Conversion Label <span class="pixlabel-hint">لكل event منفصل</span></label>';
-          var _gadsEvs = (S.platformEvents && S.platformEvents['google'] && S.platformEvents['google'].length) ? S.platformEvents['google'] : S.events;
-          for (var ei = 0; ei < _gadsEvs.length; ei++) {
-            var ev = _gadsEvs[ei];
+          for (var ei = 0; ei < S.events.length; ei++) {
+            var ev = S.events[ei];
             var evLabel = GA4[ev] ? GA4[ev].label : ev;
             html += '<div class="pix-ev-row">';
             html += '<span class="pix-ev-name">' + evLabel + '</span>';
@@ -6414,14 +6633,12 @@
 
     function pcSS_toggle() {
       _pcSS.enabled = !_pcSS.enabled;
-      var btn  = document.getElementById('pc-ss-toggle-btn');
-      var lbl  = document.getElementById('pc-ss-toggle-lbl');
+      var btn = document.getElementById('pc-ss-toggle-btn');
+      var lbl = document.getElementById('pc-ss-toggle-lbl');
       var body = document.getElementById('pc-ss-body');
-      var card = document.getElementById('pc-ss-card');
-      if (btn)  btn.classList.toggle('on', _pcSS.enabled);
-      if (lbl)  { lbl.textContent = _pcSS.enabled ? 'ON' : 'OFF'; lbl.classList.toggle('on', _pcSS.enabled); }
+      if (btn) btn.classList.toggle('on', _pcSS.enabled);
+      if (lbl) lbl.textContent = _pcSS.enabled ? 'ON' : 'OFF';
       if (body) body.classList.toggle('open', _pcSS.enabled);
-      if (card) card.classList.toggle('ss-on', _pcSS.enabled);
       if (_pcSS.enabled) pcSS_refreshGA4Display();
     }
 
@@ -6545,9 +6762,9 @@
           + '<span class="pc-ss-acc-arr">▶</span>'
           + '</div>'
           + '<div class="pc-ss-acc-body">'
-          + '<div class="pc-ss-cred-title" style="margin-top:10px;">Events</div>'
+          + '<div style="font-size:11px;color:var(--mut);margin-bottom:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Events</div>'
           + '<div class="pc-ss-ev-chips">' + evChips + '</div>'
-          + '<div class="pc-ss-cred-title">Credentials</div>'
+          + '<div style="font-size:11px;color:var(--mut);margin-bottom:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Credentials</div>'
           + credsHtml
           + '</div>';
 
@@ -6616,11 +6833,10 @@
             var gRmk = document.getElementById('pf-google-rmk');
             S.pixelIds['google'] = gId ? gId.value.trim() : '';
             S.pixelIds['google_rmk'] = gRmk ? gRmk.value.trim() : '';
-            // Collect per-event conversion labels (only Google Ads events)
+            // Collect per-event conversion labels
             S.pixelIds['google_labels'] = {};
-            var _gadsCollEvs = (S.platformEvents && S.platformEvents['google'] && S.platformEvents['google'].length) ? S.platformEvents['google'] : S.events;
-            for (var ei = 0; ei < _gadsCollEvs.length; ei++) {
-              var ev = _gadsCollEvs[ei];
+            for (var ei = 0; ei < S.events.length; ei++) {
+              var ev = S.events[ei];
               var labelEl = document.getElementById('pf-google-label-' + ev);
               if (labelEl) S.pixelIds['google_labels'][ev] = labelEl.value.trim();
             }
@@ -6647,22 +6863,11 @@
         updateProg(5);
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
-        // ── Server Container tab — دايماً ظاهر زي الـ Web Container ──
+        // ── Show/hide Server Container tab ──
         var tabSsEl = document.getElementById('tabSsGtm');
         var paneSsEl = document.getElementById('pane-ss-gtm');
-        if (tabSsEl) tabSsEl.style.display = '';   // دايماً ظاهر بعد Generate
-        if (paneSsEl) paneSsEl.style.display = '';  // إزالة inline display:none
-
-        // ── تحديث banner الـ SS بناءً على الحالة ──
-        var _ssBannerSub = document.querySelector('#pane-ss-gtm .pc-ss-out-banner div > div:last-child');
-        if (_ssBannerSub) {
-          if (_pcSS.enabled && _pcSS.platforms.length) {
-            var _ssUrlTxt = _pcSS.serverUrl ? ' · ' + _pcSS.serverUrl : '';
-            _ssBannerSub.innerHTML = '✅ <strong style="color:var(--acc);">' + _pcSS.platforms.length + ' منصة</strong> مفعّلة' + _ssUrlTxt + ' — استورد الـ JSON في GTM → Admin → Import Container';
-          } else {
-            _ssBannerSub.innerHTML = '⚙️ فعّل <strong style="color:var(--wht2);">Server Side</strong> من الكارت فوق واختار منصاتك — Container جاهز للتحديث فور التفعيل';
-          }
-        }
+        if (tabSsEl) tabSsEl.style.display = window.ET.ssEnabled ? '' : 'none';
+        if (paneSsEl) paneSsEl.style.display = window.ET.ssEnabled ? '' : 'none';
 
         bindDownloads(); // wire early so buttons are always ready
 
@@ -6670,42 +6875,34 @@
         try { document.getElementById('jsonBody').textContent = JSON.stringify(buildJSON(), null, 2); }
         catch (e) { console.error('buildJSON error:', e); }
 
-        // ── Build Server Container JSON — دايماً زي الـ Web Container ──
-        try {
-          var ssContainerResult = buildSSContainer();
-          var ssContainerStr = JSON.stringify(ssContainerResult, null, 2);
-          var ssBody = document.getElementById('ssGtmBody');
-          if (ssBody) ssBody.textContent = ssContainerStr;
-          // Container Config: compact version for Stape
-          var ssConfigBox = document.getElementById('pc-ss-config-box');
-          if (ssConfigBox) ssConfigBox.textContent = JSON.stringify(ssContainerResult);
-          // Build filename from server URL hostname
-          var _ssFileName = 'sgtm-container.json';
+        // ── Build Server Container JSON if SS enabled ──
+        if (window.ET.ssEnabled) {
           try {
-            if (_pcSS.serverUrl) {
-              var _ssHostname = new URL(_pcSS.serverUrl).hostname.replace(/[^a-zA-Z0-9.-]/g, '_');
-              if (_ssHostname) _ssFileName = _ssHostname + '-container.json';
+            var ssContainerResult = buildSSContainer();
+            var ssContainerStr = JSON.stringify(ssContainerResult, null, 2);
+            var ssBody = document.getElementById('ssGtmBody');
+            if (ssBody) ssBody.textContent = ssContainerStr;
+            // Container Config: compact version for Stape
+            var ssConfigBox = document.getElementById('pc-ss-config-box');
+            if (ssConfigBox) ssConfigBox.textContent = JSON.stringify(ssContainerResult);
+            // Wire download button
+            var dlSsBtn = document.getElementById('dlSsGtm');
+            if (dlSsBtn) {
+              dlSsBtn.onclick = function() {
+                var blob = new Blob([ssContainerStr], { type: 'application/json' });
+                var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+                a.download = 'sgtm-container.json'; a.click();
+              };
             }
-          } catch(_) {}
-          var ssFileLabel = document.getElementById('ssGtmFileName');
-          if (ssFileLabel) ssFileLabel.textContent = _ssFileName;
-          // Wire download button
-          var dlSsBtn = document.getElementById('dlSsGtm');
-          if (dlSsBtn) {
-            (function(fname){ dlSsBtn.onclick = function() {
-              var blob = new Blob([ssContainerStr], { type: 'application/json' });
-              var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-              a.download = fname; a.click();
-            }; })(_ssFileName);
+            var cpySsBtn = document.getElementById('cpySsGtm');
+            if (cpySsBtn) cpySsBtn.onclick = function() { navigator.clipboard.writeText(ssContainerStr).catch(function(){}); };
+            var cpyCfgBtn = document.getElementById('cpySsConfig');
+            if (cpyCfgBtn) cpyCfgBtn.onclick = function() { navigator.clipboard.writeText(JSON.stringify(ssContainerResult)).catch(function(){}); };
+          } catch(e) {
+            console.error('buildSSContainer error:', e);
+            var ssBody2 = document.getElementById('ssGtmBody');
+            if (ssBody2) ssBody2.innerHTML = '<div style="padding:20px;color:#f87171;font-size:12px;font-family:monospace;">⚠️ خطأ في بناء Server Container: ' + (e.message||String(e)) + '</div>';
           }
-          var cpySsBtn = document.getElementById('cpySsGtm');
-          if (cpySsBtn) cpySsBtn.onclick = function() { navigator.clipboard.writeText(ssContainerStr).catch(function(){}); };
-          var cpyCfgBtn = document.getElementById('cpySsConfig');
-          if (cpyCfgBtn) cpyCfgBtn.onclick = function() { navigator.clipboard.writeText(JSON.stringify(ssContainerResult)).catch(function(){}); };
-        } catch(e) {
-          console.error('buildSSContainer error:', e);
-          var ssBody2 = document.getElementById('ssGtmBody');
-          if (ssBody2) ssBody2.innerHTML = '<div style="padding:20px;color:#f87171;font-size:12px;font-family:monospace;">⚠️ خطأ في بناء Server Container: ' + (e.message||String(e)) + '</div>';
         }
 
         try { document.getElementById('dlBody').textContent = buildDL(); }
@@ -6888,8 +7085,7 @@
     // ===== BUILD SERVER CONTAINER (sGTM) =====
     // ═══════════════════════════════════════════════════════════════
     function buildSSContainer() {
-      // يشتغل دايماً — يولّد Server Container سواء SS مفعّل أو لا
-      // لو مفيش platforms محددة → يولّد container فاضي جاهز للاستخدام
+      if (!_pcSS.enabled) return null;
 
       var ts = Date.now();
       function fp(id) { return String(ts + id * 7 + 1000000); }
@@ -7246,8 +7442,7 @@
       ];
       if (S.platforms.indexOf('google') !== -1) {
         dlKeys.push('google_conversion_id');
-        var _gadsKeys = (S.platformEvents && S.platformEvents['google'] && S.platformEvents['google'].length) ? S.platformEvents['google'] : S.events;
-        for (var gi = 0; gi < _gadsKeys.length; gi++) dlKeys.push('google_label_' + _gadsKeys[gi]);
+        for (var gi = 0; gi < S.events.length; gi++) dlKeys.push('google_label_' + S.events[gi]);
       }
       if (S.platforms.indexOf('ga4') !== -1) dlKeys.push('user_id');
 
@@ -10526,45 +10721,6 @@
     // Creates a GTM container in Easy Track's managed account (server-side),
     // no OAuth needed. Calls /api/managed/create-container.
     // ══════════════════════════════════════════════════════════════════════
-    // CAPI token field labels per platform
-    var _MGD_CAPI_LABELS = {
-      meta:   { name: 'Meta',       ph: 'EAABsbCS4IIQBA...',       link: 'https://business.facebook.com/events_manager' },
-      tiktok: { name: 'TikTok',     ph: '91234abcd...',            link: 'https://ads.tiktok.com/i18n/events_manager' },
-      snap:   { name: 'Snapchat',   ph: 'eyJhbGciOiJIUzI1Ni...', link: 'https://ads.snapchat.com/organizations' },
-      gads:   { name: 'Google Ads', ph: 'ya29.a0AfH6SM...',        link: 'https://console.cloud.google.com/apis/credentials' },
-    };
-
-    // Renders CAPI token fields based on selected platforms — called on GTM view load
-    function _mgdRenderCapiTokens() {
-      var fields = document.getElementById('mgdCapiTokenFields');
-      if (!fields) return;
-
-      var activePlats = (window.S && S.platforms) ? S.platforms : [];
-      var capiPlats   = activePlats.filter(function(p) { return _MGD_CAPI_LABELS[p]; });
-
-      if (!capiPlats.length) {
-        fields.innerHTML = '<div style="font-size:11px;color:var(--mut);">مفيش منصات محتاجة CAPI tokens (Meta / TikTok / Snapchat) متاختارة.</div>';
-        return;
-      }
-
-      fields.innerHTML = capiPlats.map(function(p) {
-        var lbl = _MGD_CAPI_LABELS[p];
-        return '<div style="margin-bottom:8px;">'
-          + '<div style="font-size:11px;color:var(--wht);margin-bottom:4px;display:flex;align-items:center;gap:6px;">'
-          + '<span style="font-weight:600;">' + lbl.name + ' CAPI Token</span>'
-          + '<a href="' + lbl.link + '" target="_blank" rel="noopener" '
-          + 'style="font-size:10px;color:var(--acc);text-decoration:none;">أين أجده؟ ↗</a>'
-          + '</div>'
-          + '<input id="mgd-capi-tok-' + p + '" type="password" autocomplete="new-password" dir="ltr"'
-          + ' placeholder="' + lbl.ph + '"'
-          + ' style="width:100%;background:var(--bg);border:1px solid var(--bdr2);border-radius:8px;'
-          + 'padding:8px 10px;font-size:12px;color:var(--wht);outline:none;box-sizing:border-box;">'
-          + '</div>';
-      }).join('');
-    }
-    // Keep backward-compat alias (no-op toggle, fields always visible now)
-    function _mgdToggleCapiTokens() { _mgdRenderCapiTokens(); }
-
     function _mgdProgress(msg, show) {
       var el  = document.getElementById('mgdProgress');
       var txt = document.getElementById('mgdProgressText');
@@ -10784,31 +10940,6 @@
       }
     }
 
-    // ── Authenticated helper for /api/ss/* endpoints ──────────────────────────
-    // _ssApi(method, path, body, callback)
-    // Gets a fresh Firebase ID token, calls the server endpoint, and invokes
-    // callback(err, { ok, status, data }) — mirrors the old SS wizard helper.
-    function _ssApi(method, path, body, cb) {
-      try {
-        var user = firebase.auth().currentUser;
-        if (!user) { cb(new Error('يجب تسجيل الدخول أولاً')); return; }
-        user.getIdToken(false).then(function (token) {
-          var opts = {
-            method:  method,
-            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-          };
-          if (body && method !== 'GET') opts.body = JSON.stringify(body);
-          return fetch(path, opts);
-        }).then(function (r) {
-          return r.text().then(function (txt) {
-            var data = null;
-            try { data = JSON.parse(txt); } catch (_) {}
-            cb(null, { ok: r.ok, status: r.status, data: data });
-          });
-        }).catch(function (err) { cb(err); });
-      } catch (e) { cb(e); }
-    }
-
     // ── Wire the web container's GA4 transport_url to the deployed sGTM URL ──
     // Calls /api/ss/wire-transport via the authenticated _ssApi helper. After
     // success, the web container is auto-published with the new transport_url.
@@ -10853,11 +10984,7 @@
       } catch (_) { /* ignore */ }
     }
 
-    async function gtmManagedCreate(mode) {
-      // mode = 'client' (web only) | 'client_server' (web + server)
-      mode = mode || 'client';
-      var _wantServer = (mode === 'client_server');
-
+    async function gtmManagedCreate() {
       // 1. Preconditions
       if (typeof currentUser === 'undefined' || !currentUser || !currentUser.id) {
         _mgdShowError('محتاج تسجل دخول الأول', 'افتح الحساب من أعلى يمين.');
@@ -10873,20 +11000,8 @@
       catch (e) { _mgdShowError('الـ GTM JSON مش صحيح: ' + e.message); return; }
 
       // 2. Collect metadata from current session state (S) + currentUser
-
-      // Collect CAPI tokens + sGTM URL (only when server-side is on)
-      var _capiTokens = {};
-      var _sgtmUrl    = '';
-      if (_wantServer) {
-        var _capiPlatforms = ['meta', 'tiktok', 'snap', 'gads'];
-        _capiPlatforms.forEach(function(p) {
-          var el = document.getElementById('mgd-capi-tok-' + p);
-          if (el && el.value.trim()) _capiTokens[p] = el.value.trim();
-        });
-        var _urlEl = document.getElementById('mgdSgtmUrlInput');
-        if (_urlEl) _sgtmUrl = _urlEl.value.trim();
-      }
-
+      var _ssToggle = document.getElementById('mgdServerSideChk');
+      var _wantServer = !!(_ssToggle && _ssToggle.checked);
       var payload = {
         clientId:    currentUser.id,
         clientEmail: currentUser.email || null,
@@ -10898,19 +11013,20 @@
         platforms:   S.platforms || [],
         events:      S.events    || [],
         pixelIds:    _serializePixelIds(S.pixelIds),
-        capiTokens:  _capiTokens,   // CAPI access tokens for server-side tags
-        sgtmUrl:     _sgtmUrl,      // user's sGTM server URL for transport_url wiring
         configJson:  configJson,
+        // When mode=client_server, the server defers publishing the web
+        // container until /api/ss/wire-transport runs — we override the user's
+        // publishLive choice in that case.
         mode:        _wantServer ? 'client_server' : 'client',
-        publishLive: !_wantServer,   // web-only → publish live; server mode → publish after wiring
+        publishLive: _wantServer ? false : !!document.getElementById('mgdPublishChk').checked,
       };
 
-      // 3. UI → busy (only disable the clicked button — the other stays independent)
-      var btn = document.getElementById(_wantServer ? 'mgdCreateServerBtn' : 'mgdCreateBtn');
+      // 3. UI → busy
+      var btn = document.getElementById('mgdCreateBtn');
       var resultBox = document.getElementById('mgdResult');
       if (btn) { btn.disabled = true; btn.style.opacity = '.6'; btn.style.cursor = 'wait'; }
       if (resultBox) resultBox.style.display = 'none';
-      _mgdProgress(_wantServer ? 'جاري إنشاء Web + Server Containers...' : 'جاري إنشاء Web Container...', true);
+      _mgdProgress('جاري إنشاء Container جديد على Easy Track GTM...', true);
 
       // 4. Call server — kick off an async job, then poll for status.
       // Container provisioning takes 60-120s because of GTM write-quota pacing,
@@ -10949,28 +11065,15 @@
         // Poll the job endpoint
         var jobId = data.jobId;
         var _projectDisplayName = payload.projectName || 'Container';
-        var n = _projectDisplayName;
-        // Top-level job stages
         var stageMsgs = {
-          queued:               'في الطابور...',
-          capacity_check:       'جاري التحقق من السعة...',
-          gtm_provisioning:     'جاري إنشاء "' + n + '"',
-          inviting_user:        'جاري إرسال دعوة لبريدك...',
-          saving:               'جاري حفظ "' + n + '"',
-          stape_deploy:         'جاري نشر السيرفر على Stape...',
-          wiring_transport_url: 'جاري ربط السيرفر بالـ Web Container...',
-          done:                 'تم إنشاء "' + n + '" بنجاح ✓',
-          error:                'حصل خطأ في "' + n + '"',
-          capacity_exceeded:    'السعة وصلت للحد الأقصى',
-        };
-        // Inner progress stages (from gtm-service onProgress)
-        var innerMsgs = {
-          'web_container':    'جاري إنشاء الـ Web Container...',
-          'server_container': 'جاري إنشاء الـ Server Container (sGTM)...',
-          'capi_templates':   'جاري تركيب قوالب CAPI على السيرفر...',
-          'sgtm_import':      'جاري إضافة Variables & Tags للسيرفر...',
-          'sgtm_publish':     'جاري نشر الـ Server Container...',
-          'inviting_user':    'جاري إرسال دعوة لبريدك...',
+          queued:            'في الطابور...',
+          capacity_check:    'جاري التحقق من السعة...',
+          gtm_provisioning:  'جاري إنشاء "' + _projectDisplayName + '"',
+          inviting_user:     'جاري إرسال دعوة "' + _projectDisplayName + '" لبريدك',
+          saving:            'جاري حفظ "' + _projectDisplayName + '"',
+          done:              'تم إنشاء "' + _projectDisplayName + '" بنجاح',
+          error:             'حصل خطأ في "' + _projectDisplayName + '"',
+          capacity_exceeded: 'السعة وصلت للحد الأقصى',
         };
 
         var maxWaitMs   = 15 * 60 * 1000;  // 15 min hard cap
@@ -10996,11 +11099,6 @@
 
             // Build a rich progress message with counter if available
             var base = stageMsgs[j2.stage] || ('جاري العمل... (' + j2.stage + ')');
-            // If we're in gtm_provisioning, show the inner sub-stage label
-            if (j2.stage === 'gtm_provisioning' && j2.progress && j2.progress.stage) {
-              var inner = innerMsgs[j2.progress.stage] || j2.progress.stage;
-              base = inner;
-            }
             if (j2.progress && j2.progress.total) {
               base += ' (' + j2.progress.done + '/' + j2.progress.total + ')';
             }
@@ -14845,4 +14943,114 @@
       }
 
       // ── Value logic: meaning over name ──
-      function extractValue(ga4Event, items, ec, raw
+      function extractValue(ga4Event, items, ec, raw) {
+        var val = 0;
+        switch (ga4Event) {
+          case 'view_item':
+            val = items.length ? items[0].price : parseFloat(raw.price || ec.value || 0);
+            break;
+          case 'view_item_list':
+            val = 0; // optional for list views
+            break;
+          case 'add_to_cart':
+            val = items.reduce(function (s, it) { return s + (it.price * it.quantity); }, 0);
+            break;
+          case 'view_cart':
+            val = items.reduce(function (s, it) { return s + (it.price * it.quantity); }, 0);
+            break;
+          case 'remove_from_cart':
+            val = items.reduce(function (s, it) { return s + (it.price * it.quantity); }, 0);
+            break;
+          case 'begin_checkout':
+            val = parseFloat(ec.value || raw.total || raw.subtotal || 0)
+              || items.reduce(function (s, it) { return s + (it.price * it.quantity); }, 0);
+            break;
+          case 'purchase':
+            var af = (ec.purchase && ec.purchase.actionField) ||
+              (ec.checkout && ec.checkout.actionField) || ec || {};
+            val = parseFloat(af.revenue || af.total || ec.revenue || raw.revenue || 0)
+              || items.reduce(function (s, it) { return s + (it.price * it.quantity); }, 0);
+            break;
+          default:
+            val = parseFloat(ec.value || raw.value || 0);
+        }
+        return Math.round(val * 100) / 100;
+      }
+
+      // ── Normalize Salla raw push to GA4 structure (shape-agnostic) ──
+      function normalizeSalla(raw) {
+        if (!raw || !raw.event) return null;
+        var ga4Ev = SALLA_UA_TO_GA4[raw.event];
+        if (!ga4Ev) return null;
+
+        var ec = raw.ecommerce || {};
+        var prod0 = (raw[0] && typeof raw[0] === 'object') ? raw[0] : {};
+
+        // Dynamic extraction — works with data[] / [0] / [0].products / ecommerce.*.products
+        var prods = extractSallaProducts(raw);
+
+        var items = normalizeSallaItems(prods);
+        var currency = ec.currencyCode || ec.currency || prod0.currency || 'SAR';
+
+        // Monetary field semantics — per-event, NOT generalized:
+        //   purchase          → ecommerce.value  (final order revenue / total)
+        //   view_item         → ecommerce.price  (single product price)
+        //   add_to_wishlist   → ecommerce.price  (single product price)
+        //   add_to_cart       → ecommerce.price  (unit price × quantity — line total)
+        //   remove_from_cart  → ecommerce.price  (line total of removed item)
+        //   view_cart         → ecommerce.price  (sum across all line items)
+        //   begin_checkout    → ecommerce.price  (sum across all line items at checkout)
+        //   view_item_list    → (no monetary field)
+        var ecBlock = { currency: currency, items: items };
+        var sumQty = items.reduce(function (s, it) { return s + (parseInt(it.quantity, 10) || 0); }, 0);
+        if (ga4Ev === 'purchase') {
+          ecBlock.value     = extractValue('purchase', items, ec, raw);
+          ecBlock.num_items = sumQty;
+        } else if (ga4Ev === 'view_item' || ga4Ev === 'add_to_wishlist') {
+          ecBlock.price     = extractValue(ga4Ev, items, ec, raw);
+          ecBlock.num_items = items.length ? (parseInt(items[0].quantity, 10) || 1) : 0;
+        } else if (ga4Ev === 'add_to_cart' || ga4Ev === 'remove_from_cart' ||
+                   ga4Ev === 'view_cart'   || ga4Ev === 'begin_checkout') {
+          ecBlock.price     = extractValue(ga4Ev, items, ec, raw);
+          ecBlock.num_items = sumQty;
+        }
+
+        var payload = {
+          event: ga4Ev,
+          event_id: generateEventId(raw, ga4Ev),
+          ecommerce: ecBlock
+        };
+
+        // purchase extras
+        if (ga4Ev === 'purchase') {
+          var af2 = (ec.purchase && ec.purchase.actionField) || {};
+          payload.ecommerce.transaction_id = String(af2.id || ec.event_id || raw.order_id || payload.event_id);
+          payload.ecommerce.tax = parseFloat(af2.tax || 0) || 0;
+          payload.ecommerce.shipping = parseFloat(af2.shipping || 0) || 0;
+          if (af2.coupon) payload.ecommerce.coupon = String(af2.coupon);
+        }
+        if (ga4Ev === 'view_item_list') {
+          payload.ecommerce.item_list_name = raw.title
+            ? String(raw.title).replace(/<[^>]+>/g, '').trim() : '';
+        }
+        if (ga4Ev === 'search') { payload.search_term = raw.searchTerm || raw.search_term || ''; delete payload.ecommerce; }
+        if (ga4Ev === 'login') { delete payload.ecommerce; payload.method = 'salla'; }
+        if (ga4Ev === 'sign_up') { delete payload.ecommerce; payload.method = 'salla'; }
+
+        if (raw.customer) payload.customer = raw.customer;
+        return payload;
+      }
+
+      // ── Normalize Zid raw push to GA4 structure ──
+      function normalizeZid(raw) {
+        if (!raw || !raw.event) return null;
+        var ga4Ev = ZID_TO_GA4[raw.event];
+        if (!ga4Ev) return null;
+
+        var ec = raw.ecommerce || {};
+
+        // Zid duplicate structure: ec might have both 'purchase' and 'items'
+        var items = [];
+        if (ec.items && Array.isArray(ec.items)) {
+          items = normalizeZidItems(ec.items);
+        } else if (ec.products && Array.isArray(e

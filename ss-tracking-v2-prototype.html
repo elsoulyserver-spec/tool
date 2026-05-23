@@ -852,4 +852,143 @@ function animateStages(stagesId, barId, pctId, stages, spinClass, delay, onDone)
     var txtEl = document.getElementById(stagesId+'-txt-'+i);
     if (icoEl) { icoEl.className = 'stage-ico '+spinClass; icoEl.textContent = '↻'; }
     if (txtEl) { txtEl.className = 'stage-txt active'; }
-    var pct = Math.rou
+    var pct = Math.round((i / stages.length) * 90 + 5);
+    if (barEl) barEl.style.width = pct + '%';
+    if (pctEl) pctEl.textContent = pct + '%';
+    setTimeout(function() {
+      if (icoEl) { icoEl.className = 'stage-ico done'; icoEl.textContent = '✓'; }
+      if (txtEl) { txtEl.className = 'stage-txt done'; }
+      runStage(i + 1);
+    }, delay + Math.random() * 150);
+  }
+  runStage(0);
+}
+
+// ─── Publish step ─────────────────────────────────────────────────
+function renderPublish() {
+  function pubCard(type, id, label, published) {
+    var statusTxt = published ? 'Live — منشور ✅' : 'Draft — جاهز للنشر';
+    var btnTxt    = published ? '✅ منشور' : 'نشر '+label+' Container';
+    var dotCls    = published ? 'live' : 'draft';
+    var btnStyle  = published ? 'background:rgba(70,241,197,.15);color:var(--acc);border:1px solid rgba(70,241,197,.3);' : '';
+    return '<div class="pub-card '+type+(published?' live':'')+'" id="pub-card-'+type+'">'
+      +'<div style="margin-bottom:10px;"><div class="container-badge '+type+'">'+label.toUpperCase()+' CONTAINER</div></div>'
+      +'<div class="pub-gtm-id">'+id+'</div>'
+      +'<div class="pub-status"><div class="pub-dot '+dotCls+'"></div><span style="font-size:11px;color:var(--wht2);">'+statusTxt+'</span></div>'
+      +'<div class="pub-versions" id="pub-ver-'+type+'">'+(published?'Version: 1 — منشور':'Version: Draft')+'</div>'
+      +'<button class="btn-acc" id="pub-btn-'+type+'" onclick="publishOne(\''+type+'\')" style="width:100%;justify-content:center;'+btnStyle+'">'+(published?'<span class="material-symbols-outlined" style="font-size:14px;">check_circle</span>':'')+btnTxt+'</button>'
+      +'</div>';
+  }
+  document.getElementById('publish-grid').innerHTML =
+    pubCard('web',    'GTM-W8K2P9X', 'Web',    webPublished) +
+    pubCard('server', 'GTM-S4M7R2Q', 'Server', srvPublished);
+}
+
+function publishOne(type) {
+  var btn   = document.getElementById('pub-btn-'+type);
+  var verEl = document.getElementById('pub-ver-'+type);
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ جارٍ النشر...'; }
+  setTimeout(function() {
+    if (type === 'web') webPublished = true; else srvPublished = true;
+    renderPublish();
+    if (webPublished && srvPublished) {
+      var pbBtn = document.getElementById('publish-both-btn');
+      pbBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:14px;">check_circle</span> تم النشر — التالي';
+      pbBtn.onclick = function() { goStep(8); };
+    }
+  }, 1600);
+}
+
+function publishBoth() {
+  publishOne('web');
+  setTimeout(function() { publishOne('server'); }, 350);
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────
+function selectPlat(id) { selectedPlat = id; renderPlatforms(); }
+
+function togglePx(id) {
+  enabledPx[id] = !enabledPx[id];
+  var exp = document.getElementById('px-exp-'+id);
+  // Toggle expand class
+  if (exp) {
+    if (enabledPx[id]) exp.classList.add('open');
+    else exp.classList.remove('open');
+  }
+  renderPixels();
+}
+
+function toggleEvt(e) {
+  var i = selectedEvts.indexOf(e);
+  if (i > -1) selectedEvts.splice(i,1); else selectedEvts.push(e);
+  renderEvents();
+}
+
+function validateUrl() {
+  var st = document.getElementById('url-status');
+  st.style.color = 'var(--mut)';
+  st.textContent = '⏳ جارٍ التحقق...';
+  setTimeout(function() {
+    st.style.color = 'var(--acc)';
+    st.textContent = '✅ الخادم يستجيب (38ms)';
+    document.getElementById('dep-3').classList.add('done');
+  }, 900);
+}
+
+function autoValidateUrl() {
+  var st = document.getElementById('url-status');
+  if (st) {
+    st.style.color = 'var(--acc)';
+    st.textContent = '✅ الخادم يستجيب (38ms)';
+    var dep3 = document.getElementById('dep-3');
+    if (dep3) dep3.classList.add('done');
+  }
+}
+
+function copyConfig() {
+  var text = document.getElementById('config-blob').textContent;
+  navigator.clipboard && navigator.clipboard.writeText(text);
+  var dep1 = document.getElementById('dep-1');
+  if (dep1) dep1.classList.add('done');
+  document.getElementById('dep-2').classList.add('active');
+  alert('✅ تم نسخ الـ Container Config!');
+}
+
+function copySnippet(t) { alert('✅ تم نسخ الـ '+t+' Snippet!'); }
+
+function goStep(n) {
+  if (n < 1 || n > TOTAL) return;
+  document.getElementById('panel-'+STEP).classList.remove('active');
+  STEP = n;
+  document.getElementById('panel-'+STEP).classList.add('active');
+  renderStepper();
+  // Render dynamic panels
+  if (STEP === 2) renderPlatforms();
+  if (STEP === 3) renderPixels();
+  if (STEP === 4) renderEvents();
+  if (STEP === 5) renderHybrid();
+  if (STEP === 6) {
+    renderStages('web-stages', getWebStages());
+    renderStages('srv-stages', getSrvStages());
+    document.getElementById('creation-result').style.display = 'none';
+    document.getElementById('creation-start-btn').style.display = '';
+    document.getElementById('deploy-section').classList.remove('open');
+    document.getElementById('web-bar').style.width = '0%';
+    document.getElementById('srv-bar').style.width = '0%';
+    document.getElementById('web-pct').textContent = '0%';
+    document.getElementById('srv-pct').textContent = '0%';
+    document.getElementById('pc-web').classList.remove('done');
+    document.getElementById('pc-server').classList.remove('done');
+    webPublished = false; srvPublished = false;
+  }
+  if (STEP === 7) renderPublish();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function nextStep() { goStep(STEP+1); }
+function prevStep() { goStep(STEP-1); }
+
+// ─── Init ─────────────────────────────────────────────────────────
+renderStepper();
+</script>
+</body>
+</html>
