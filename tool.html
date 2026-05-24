@@ -7032,8 +7032,7 @@
         return [
           '___INFO___',  '', infoBlock, '',
           '___TEMPLATE_PARAMETERS___', '', paramsBlock, '',
-          '___SANDBOXED_JS_FOR_SERVER___', '', opts.js, '',
-          '___PERMISSIONS___', '', permsBlock
+          '___SANDBOXED_JS_FOR_SERVER___', '', opts.js
         ].join('\n');
       }
 
@@ -15444,4 +15443,5 @@
         });
         if (Array.isArray(ec.impressions) && ec.impressions.length) out.push(ec.impressions);
         if (Array.isArray(ec.products) && ec.products.length) out.push(ec.products);
-        if (Array.isArray(raw.data) && 
+        if (Array.isArray(raw.data) && raw.data.length) out.push(raw.data);
+        if (Ar
