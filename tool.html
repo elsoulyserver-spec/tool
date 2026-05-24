@@ -11459,6 +11459,38 @@
         if (_urlEl) _sgtmUrl = _urlEl.value.trim();
       }
 
+      // ── CRITICAL: build the FULL Server Container JSON from buildSSContainer()
+      // and send it as serverConfigJson. Without this the server falls back to
+      // lib/gtm-config-builder.js's truncated buildServerConfig which returns
+      // an empty container — that's why previously the published Server
+      // Container only had the GA4 Forward tag and no CAPI tags / templates.
+      var _serverConfigJson = null;
+      if (_wantServer) {
+        try {
+          // Sync _pcSS with what the user just entered in the SS UI so
+          // buildSSContainer sees the same pixel IDs/tokens/sGTM URL.
+          if (typeof pcSS_collect === 'function') { try { pcSS_collect(); } catch(_){} }
+          _pcSS.tokens = Object.assign({}, _pcSS.tokens || {}, _capiTokens);
+          if (_sgtmUrl) _pcSS.serverUrl = _sgtmUrl;
+          if (!_pcSS.platforms || !_pcSS.platforms.length) {
+            _pcSS.platforms = Object.keys(_capiTokens || {});
+          }
+          // Pixel IDs for the SS container should mirror the Web container's
+          // pixel IDs — copy them across.
+          _pcSS.pixelIds = Object.assign({}, _pcSS.pixelIds || {}, (S.pixelIds || {}));
+          _pcSS.enabled  = true;
+
+          _serverConfigJson = buildSSContainer();
+          console.log('[ET] Built serverConfigJson for Direct Publish:',
+            'tags=', (_serverConfigJson.containerVersion.tag || []).length,
+            'templates=', (_serverConfigJson.containerVersion.customTemplate || []).length,
+            'triggers=', (_serverConfigJson.containerVersion.trigger || []).length);
+        } catch (sce) {
+          console.warn('[ET] buildSSContainer failed for Direct Publish:', sce);
+          // Continue without serverConfigJson — server will fall back to its builder.
+        }
+      }
+
       var payload = {
         clientId:    currentUser.id,
         clientEmail: currentUser.email || null,
@@ -11473,6 +11505,12 @@
         capiTokens:  _capiTokens,   // CAPI access tokens for server-side tags
         sgtmUrl:     _sgtmUrl,      // user's sGTM server URL for transport_url wiring
         configJson:  configJson,
+        // FULL Server Container JSON the user saw in the UI — contains
+        // GA4 Client, customEvent triggers per event, customTemplate[] for
+        // each CAPI platform (Meta, TikTok, Snap, GADS), and CAPI tags wired
+        // with the user's pixel IDs + tokens. The server will import this
+        // verbatim instead of building a blank container.
+        serverConfigJson: _serverConfigJson,
         mode:        _wantServer ? 'client_server' : 'client',
         publishLive: !_wantServer,   // web-only → publish live; server mode → publish after wiring
       };
@@ -14954,4 +14992,456 @@
               + methodBadge
               + '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:' + statusColor + '22;color:' + statusColor + ';border:1px solid ' + statusColor + '44;">'
               + statusLabel + '</span>'
-              + ((px.events && px.events.length) ? '<button onclick="(function(
+              + ((px.events && px.events.length) ? '<button onclick="(function(){var el=document.getElementById(\'' + uid + '\');var isOpen=el.style.display!==\'none\';el.style.display=isOpen?\'none\':\'block\';this.innerHTML=(isOpen?\'▸\':\'▾\')+\' \'+(this.dataset.count)+\' event' + (px.events.length > 1 ? 's' : '') + '\';}).call(this)" data-count="' + px.events.length + '" style="font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid var(--bdr2);background:var(--sur4);color:var(--mut);cursor:pointer;">▾ ' + px.events.length + ' event' + (px.events.length > 1 ? 's' : '') + '</button>' : '')
+              + '</div>'
+              + '</div>';
+
+            // Request count bar — show both total requests and event-endpoint hits
+            var reqStr = (px.requestCount || 0) + ' network request' + ((px.requestCount || 0) !== 1 ? 's' : '') + ' intercepted';
+            var hitStr = (typeof px.eventHitCount === 'number' && px.eventHitCount > 0)
+              ? ' • <span style="color:#46f1c5;">' + px.eventHitCount + ' event endpoint hit' + (px.eventHitCount > 1 ? 's' : '') + '</span>'
+              : '';
+            html2 += '<div style="padding:0 14px 10px;font-size:11px;color:var(--mut);">📡 ' + reqStr + hitStr + '</div>';
+
+            // Events health report — OPEN BY DEFAULT
+            var pxIssues = hmAnalyzePixel(px);
+            if (px.events && px.events.length) {
+              html2 += '<div id="' + uid + '" style="display:block;padding:0 12px 12px;">';
+              html2 += '<div style="font-size:10px;font-weight:700;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">EVENT PARAMETER AUDIT</div>';
+              html2 += evReport;
+              // Intelligent analysis section (only if we found real issues)
+              if (pxIssues.length) {
+                html2 += '<div style="font-size:10px;font-weight:700;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin:14px 0 8px;">🔍 SMART ANALYSIS (' + pxIssues.length + ' issue' + (pxIssues.length > 1 ? 's' : '') + ')</div>';
+                html2 += hmRenderIssues(pxIssues);
+              } else {
+                html2 += '<div style="font-size:11px;color:#46f1c5;padding:10px 12px;margin-top:10px;background:rgba(70,241,197,.06);border:1px solid rgba(70,241,197,.2);border-radius:10px;">✓ Smart analysis: ما فيش مشاكل اتكتشفت في الـ events الموجودة</div>';
+              }
+              html2 += '</div>';
+            } else if (pxIssues.length) {
+              // No events but analyzer flagged issues (e.g. pixel loaded with no events)
+              html2 += '<div style="padding:0 12px 12px;">';
+              html2 += '<div style="font-size:10px;font-weight:700;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">🔍 SMART ANALYSIS</div>';
+              html2 += hmRenderIssues(pxIssues);
+              html2 += '</div>';
+            } else if (HM_EVENT_SCHEMAS[px.key]) {
+              html2 += '<div style="padding:0 14px 11px;">'
+                + '<div style="font-size:11px;color:var(--mut);padding:8px 10px;border-radius:8px;background:rgba(255,255,255,.03);border:1px dashed var(--bdr2);">'
+                + '⚠️ الـ Pixel موجود في الـ network بس مفيش Events اتبعتت — يمكن الـ events بتتبعت server-side أو عبر GTM على صفحات تانية</div>'
+                + '</div>';
+            }
+
+            html2 += '</div>';
+          });
+
+          // Check for configured pixels not found on page
+          var configuredNotFound = [];
+          HM_PLATFORMS_DEF.forEach(function (plat) {
+            var cfgId = typeof (S.pixelIds || {})[plat.key] === 'object' ? (S.pixelIds || {})[plat.key].id : (S.pixelIds || {})[plat.key];
+            cfgId = (cfgId || '').trim();
+            if (!cfgId) return;
+            var wasFound = puppeteerPixels.some(function (p) { return p.key === plat.key; });
+            if (!wasFound) configuredNotFound.push({ plat: plat, configuredId: cfgId });
+          });
+          if (configuredNotFound.length) {
+            html2 += '<div style="margin-top:10px;margin-bottom:6px;font-size:12px;font-weight:700;color:#ffb4ab;letter-spacing:1px;text-transform:uppercase;">Configured but NOT found via network</div>';
+            configuredNotFound.forEach(function (m) {
+              html2 += '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(255,180,171,.05);border:1px solid rgba(255,180,171,.2);border-radius:10px;margin-bottom:6px;">'
+                + '<span style="font-size:18px;">' + m.plat.icon + '</span>'
+                + '<div>'
+                + '<div style="font-size:13px;font-weight:700;color:#ffb4ab;">' + m.plat.name + '</div>'
+                + '<div style="font-size:11px;color:var(--mut);">Expected ID: ' + _esc(m.configuredId) + ' — no network request detected on page load</div>'
+                + '</div></div>';
+            });
+          }
+
+          resultEl.innerHTML = html2;
+
+        } else {
+          // ── FALLBACK: HTML REGEX PATH (no Puppeteer) ──────────────────────
+          var found = [];
+          var missing = [];
+          var configured = S.pixelIds || {};
+
+          HM_PLATFORMS_DEF.forEach(function (plat) {
+            var detected = plat.detect(html);
+            var ids = hmExtractIds(html, plat.patterns);
+            var configuredId = typeof configured[plat.key] === 'object' ? configured[plat.key].id : configured[plat.key];
+            configuredId = (configuredId || '').trim();
+
+            if (detected || ids.length) {
+              var match = ids.length && configuredId && ids.indexOf(configuredId) > -1;
+              var mismatch = ids.length && configuredId && !match;
+              var events = hmExtractEvents(html, plat.key);
+              found.push({ plat: plat, ids: ids, match: match, mismatch: mismatch, configuredId: configuredId, events: events });
+            } else if (configuredId) {
+              missing.push({ plat: plat, configuredId: configuredId });
+            }
+          });
+
+          var html2 = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:6px;">'
+            + '<div style="font-size:12px;font-weight:700;color:var(--mut);letter-spacing:1px;text-transform:uppercase;">'
+            + 'Detected on ' + _esc(resolvedUrl) + ' — ' + found.length + ' pixel(s) found</div>'
+            + '<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:rgba(255,214,128,.1);color:#ffd680;border:1px solid rgba(255,214,128,.2);">⚡ HTML Scan (limited)</span>'
+            + '</div>';
+
+          if (!found.length && !missing.length) {
+            html2 += '<div style="color:var(--mut);font-size:13px;">No known tracking pixels detected on this page.</div>';
+          }
+
+          found.forEach(function (f) {
+            var statusColor = f.match ? '#46f1c5' : f.mismatch ? '#ffb4ab' : '#adc6ff';
+            var statusLabel = f.match ? '✓ ID Match' : f.mismatch ? '⚠ ID Mismatch' : '● Detected';
+            var evReport = hmBuildEventReport(f.plat.key, f.events);
+            var uid = 'ev_' + f.plat.key + '_' + Date.now();
+
+            html2 += '<div style="background:var(--sur3);border-radius:12px;margin-bottom:10px;overflow:hidden;border:1px solid var(--bdr2);">';
+            html2 += '<div style="display:flex;align-items:center;justify-content:space-between;padding:11px 14px;flex-wrap:wrap;gap:8px;">'
+              + '<div style="display:flex;align-items:center;gap:8px;">'
+              + '<span style="font-size:20px;">' + f.plat.icon + '</span>'
+              + '<div>'
+              + '<div style="font-size:14px;font-weight:800;color:var(--wht);">' + f.plat.name + '</div>'
+              + '<div style="font-size:11px;color:var(--mut);font-family:var(--font-mono);margin-top:1px;">'
+              + (f.ids.length ? 'ID: ' + f.ids.join(', ') : 'ID not extracted') + '</div>'
+              + '</div>'
+              + '</div>'
+              + '<div style="display:flex;align-items:center;gap:8px;">'
+              + '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:' + statusColor + '22;color:' + statusColor + ';border:1px solid ' + statusColor + '44;">'
+              + statusLabel + '</span>'
+              + (f.events.length ? '<button onclick="(function(){var el=document.getElementById(\'' + uid + '\');var isOpen=el.style.display!==\'none\';el.style.display=isOpen?\'none\':\'block\';this.innerHTML=(isOpen?\'▸\':\'▾\')+\' \'+this.dataset.count+\' events\';}).call(this)" data-count="' + f.events.length + '" style="font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid var(--bdr2);background:var(--sur4);color:var(--mut);cursor:pointer;">▾ ' + f.events.length + ' events</button>' : '')
+              + '</div>'
+              + '</div>';
+
+            // Intelligent analysis wrapper — treat HTML-fallback "found" like a pixel
+            var fPseudoPixel = { key: f.plat.key, name: f.plat.name, events: f.events };
+            var fIssues = hmAnalyzePixel(fPseudoPixel);
+            if (f.events.length) {
+              html2 += '<div id="' + uid + '" style="display:block;padding:0 12px 12px;">';
+              html2 += '<div style="font-size:10px;font-weight:700;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;padding-top:4px;">EVENT HEALTH REPORT</div>';
+              html2 += evReport;
+              if (fIssues.length) {
+                html2 += '<div style="font-size:10px;font-weight:700;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin:14px 0 8px;">🔍 SMART ANALYSIS (' + fIssues.length + ' issue' + (fIssues.length > 1 ? 's' : '') + ')</div>';
+                html2 += hmRenderIssues(fIssues);
+              }
+              html2 += '</div>';
+            } else if (fIssues.length) {
+              html2 += '<div style="padding:0 12px 12px;">';
+              html2 += '<div style="font-size:10px;font-weight:700;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">🔍 SMART ANALYSIS</div>';
+              html2 += hmRenderIssues(fIssues);
+              html2 += '</div>';
+            } else if (HM_EVENT_SCHEMAS[f.plat.key]) {
+              html2 += '<div style="padding:0 14px 11px;">'
+                + '<div style="font-size:11px;color:var(--mut);padding:8px 10px;border-radius:8px;background:rgba(255,255,255,.03);border:1px dashed var(--bdr2);">'
+                + '⚠️ الـ Pixel موجود بس مفيش Events في الـ HTML — install Puppeteer for full network scan</div>'
+                + '</div>';
+            }
+
+            html2 += '</div>';
+          });
+
+          if (missing.length) {
+            html2 += '<div style="margin-top:10px;margin-bottom:6px;font-size:12px;font-weight:700;color:#ffb4ab;letter-spacing:1px;text-transform:uppercase;">Configured but NOT found on page</div>';
+            missing.forEach(function (m) {
+              html2 += '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(255,180,171,.05);border:1px solid rgba(255,180,171,.2);border-radius:10px;margin-bottom:6px;">'
+                + '<span style="font-size:18px;">' + m.plat.icon + '</span>'
+                + '<div>'
+                + '<div style="font-size:13px;font-weight:700;color:#ffb4ab;">' + m.plat.name + '</div>'
+                + '<div style="font-size:11px;color:var(--mut);">Expected ID: ' + _esc(m.configuredId) + ' — not detected on page</div>'
+                + '</div></div>';
+            });
+          }
+
+          resultEl.innerHTML = html2;
+        }
+
+      } catch (e) {
+        resultEl.innerHTML = '<div style="color:#ffb4ab;font-size:13px;">❌ Error: ' + _esc(e.message) + '</div>';
+      }
+
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">radar</span> Scan';
+    }
+
+
+
+    // ══════ PAYLOAD TESTER ══════
+    var _payloadData = { vars: [], trigs: [], tags: [], raw: '' };
+    var _activePayloadTab = 'vars';
+
+    function gtmPreviewPayload() {
+      var src = (typeof _cachedGtmStr !== 'undefined' && _cachedGtmStr) || '';
+      if (!src.trim()) {
+        alert('اعمل Generate للـ Config الأول من Pixel Config ثم ارجع هنا');
+        return;
+      }
+      var gtmJson;
+      try { gtmJson = JSON.parse(src); } catch (e) { alert('GTM JSON غير صحيح'); return; }
+      var cv = gtmJson.containerVersion ? gtmJson.containerVersion : gtmJson;
+      _payloadData.vars = cv.variable || [];
+      _payloadData.trigs = cv.trigger || [];
+      _payloadData.tags = cv.tag || [];
+      _payloadData.raw = JSON.stringify(cv, null, 2);
+
+      var total = _payloadData.vars.length + _payloadData.trigs.length + _payloadData.tags.length;
+      document.getElementById('payloadBadge').textContent =
+        _payloadData.tags.length + ' Tags · ' + _payloadData.trigs.length + ' Triggers · ' + _payloadData.vars.length + ' Variables';
+
+      showPayloadTab('vars');
+      document.getElementById('payloadModal').style.display = 'flex';
+    }
+
+    function showPayloadTab(tab) {
+      _activePayloadTab = tab;
+      var tabs = ['vars', 'trigs', 'tags', 'raw'];
+      tabs.forEach(function (t) {
+        var btn = document.getElementById('ptab-' + t);
+        if (!btn) return;
+        if (t === tab) {
+          btn.style.cssText = 'padding:8px 16px;border-radius:8px 8px 0 0;border:none;font-size:13px;font-weight:700;cursor:pointer;background:rgba(70,241,197,.1);color:#46f1c5;border-bottom:2px solid #46f1c5;';
+        } else {
+          btn.style.cssText = 'padding:8px 16px;border-radius:8px 8px 0 0;border:none;font-size:13px;font-weight:700;cursor:pointer;background:transparent;color:#6b7280;';
+        }
+      });
+      var content = document.getElementById('payloadTabContent');
+      if (!content) return;
+
+      if (tab === 'raw') {
+        content.innerHTML = '<pre style="margin:0;font-family:monospace;font-size:12px;color:#bacac2;line-height:1.6;white-space:pre-wrap;word-break:break-all;">' + _esc(_payloadData.raw) + '</pre>';
+        return;
+      }
+
+      var items = tab === 'vars' ? _payloadData.vars : tab === 'trigs' ? _payloadData.trigs : _payloadData.tags;
+      var typeKey = tab === 'vars' ? 'type' : tab === 'trigs' ? 'type' : 'type';
+      var icon = tab === 'vars' ? 'code' : tab === 'trigs' ? 'bolt' : 'label';
+      var color = tab === 'vars' ? '#adc6ff' : tab === 'trigs' ? '#d4d4ff' : '#46f1c5';
+
+      if (!items.length) {
+        content.innerHTML = '<div style="text-align:center;padding:40px;color:#6b7280;font-size:14px;">لا يوجد ' + (tab === 'vars' ? 'Variables' : tab === 'trigs' ? 'Triggers' : 'Tags') + ' في الـ Config الحالي</div>';
+        return;
+      }
+
+      var html = '<div style="display:flex;flex-direction:column;gap:8px;">';
+      items.forEach(function (item, i) {
+        var name = item.name || '(بدون اسم)';
+        var type = item.type || '—';
+        var jsonStr = JSON.stringify(item, null, 2);
+        html += '<div style="border:1px solid rgba(255,255,255,.07);border-radius:12px;overflow:hidden;">'
+          + '<div onclick="togglePayloadItem(\'pi' + tab + i + '\')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;background:rgba(255,255,255,.03);">'
+          + '<div style="display:flex;align-items:center;gap:10px;">'
+          + '<span class="material-symbols-outlined" style="font-size:16px;color:' + color + ';">' + icon + '</span>'
+          + '<span style="font-weight:700;font-size:13px;color:#e1e2eb;">' + _esc(name) + '</span>'
+          + '</div>'
+          + '<div style="display:flex;align-items:center;gap:8px;">'
+          + '<span style="font-size:11px;padding:2px 8px;border-radius:6px;background:rgba(255,255,255,.06);color:#6b7280;">' + _esc(type) + '</span>'
+          + '<span class="material-symbols-outlined" style="font-size:16px;color:#6b7280;">expand_more</span>'
+          + '</div>'
+          + '</div>'
+          + '<pre id="pi' + tab + i + '" style="display:none;margin:0;padding:14px 16px;font-family:monospace;font-size:11.5px;color:#bacac2;line-height:1.6;border-top:1px solid rgba(255,255,255,.05);background:#0b0e14;white-space:pre-wrap;word-break:break-all;">'
+          + _esc(jsonStr) + '</pre>'
+          + '</div>';
+      });
+      html += '</div>';
+      content.innerHTML = html;
+    }
+
+    function togglePayloadItem(id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function copyPayloadRaw() {
+      try {
+        navigator.clipboard.writeText(_payloadData.raw);
+        var btn = event.currentTarget;
+        var orig = btn.innerHTML;
+        btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px;">check</span> Copied!';
+        setTimeout(function () { btn.innerHTML = orig; }, 1800);
+      } catch (e) { alert('Copy failed'); }
+    }
+
+    function _esc(str) {
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+  </script>
+
+  <!-- ══════ PAYLOAD TESTER MODAL ══════ -->
+  <div id="payloadModal"
+    style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
+    <div
+      style="background:#15181f;border:1.5px solid rgba(70,241,197,.2);border-radius:20px;width:100%;max-width:760px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.6);">
+
+      <!-- Header -->
+      <div
+        style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid rgba(255,255,255,.06);">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="material-symbols-outlined" style="color:#adc6ff;font-size:20px;">preview</span>
+          <span style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:16px;color:#e1e2eb;">Payload
+            Preview</span>
+          <span id="payloadBadge"
+            style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;background:rgba(70,241,197,.1);color:#46f1c5;border:1px solid rgba(70,241,197,.2);"></span>
+        </div>
+        <button onclick="document.getElementById('payloadModal').style.display='none'"
+          style="background:rgba(255,255,255,.05);border:none;border-radius:8px;width:32px;height:32px;cursor:pointer;color:#bacac2;font-size:18px;display:flex;align-items:center;justify-content:center;">✕</button>
+      </div>
+
+      <!-- Tabs -->
+      <div style="display:flex;gap:4px;padding:12px 22px 0;border-bottom:1px solid rgba(255,255,255,.06);">
+        <button id="ptab-vars" onclick="showPayloadTab('vars')"
+          style="padding:8px 16px;border-radius:8px 8px 0 0;border:none;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;">Variables</button>
+        <button id="ptab-trigs" onclick="showPayloadTab('trigs')"
+          style="padding:8px 16px;border-radius:8px 8px 0 0;border:none;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;">Triggers</button>
+        <button id="ptab-tags" onclick="showPayloadTab('tags')"
+          style="padding:8px 16px;border-radius:8px 8px 0 0;border:none;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;">Tags</button>
+        <button id="ptab-raw" onclick="showPayloadTab('raw')"
+          style="padding:8px 16px;border-radius:8px 8px 0 0;border:none;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;">Raw
+          JSON</button>
+      </div>
+
+      <!-- Content -->
+      <div id="payloadTabContent" style="flex:1;overflow-y:auto;padding:18px 22px;">
+        <!-- filled by JS -->
+      </div>
+
+      <!-- Footer -->
+      <div
+        style="padding:14px 22px;border-top:1px solid rgba(255,255,255,.06);display:flex;justify-content:flex-end;gap:10px;">
+        <button onclick="copyPayloadRaw()"
+          style="padding:9px 18px;border-radius:10px;border:1.5px solid rgba(173,198,255,.25);background:transparent;color:#adc6ff;font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+          <span class="material-symbols-outlined" style="font-size:15px;">content_copy</span> Copy JSON
+        </button>
+        <button
+          onclick="document.getElementById('payloadModal').style.display='none';document.getElementById('pubGtm').click()"
+          style="padding:9px 20px;border-radius:10px;border:none;background:#00d4aa;color:#00382b;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+          <span class="material-symbols-outlined" style="font-size:15px;">rocket_launch</span> Deploy Now
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       EASY TRACK — Complete Marketing Data Infrastructure Engine
+       DataLayer Normalizer · Attribution · Deduplication · Server-Side
+  ════════════════════════════════════════════════════════════════ -->
+  <script>
+    (function () {
+      'use strict';
+
+      // ══════════════════════════════════════════════════════
+      // 1. PLATFORM REGISTRY (Isolation Map)
+      // ══════════════════════════════════════════════════════
+      var ET_PLATFORMS = {
+        ga4: { name: 'GA4', icon: '📊', color: '#F9AB00', type: 'analytics' },
+        mixpanel: { name: 'Mixpanel', icon: '📈', color: '#7856FF', type: 'analytics' },
+        meta: { name: 'Meta CAPI', icon: '👥', color: '#1877F2', type: 'ads' },
+        tiktok: { name: 'TikTok Events', icon: '🎵', color: '#69C9D0', type: 'ads' },
+        snapchat: { name: 'Snapchat CAPI', icon: '👻', color: '#FFFC00', type: 'ads' },
+        google: { name: 'Google Ads', icon: '🎯', color: '#4285F4', type: 'ads' },
+      };
+
+      // ── Event name mapping: GA4 → platform native name ──
+      var ET_EVENT_MAP = {
+        ga4: {
+          view_item: 'view_item', view_item_list: 'view_item_list',
+          add_to_cart: 'add_to_cart', view_cart: 'view_cart',
+          begin_checkout: 'begin_checkout', purchase: 'purchase',
+          remove_from_cart: 'remove_from_cart', add_to_wishlist: 'add_to_wishlist',
+          search: 'search', login: 'login', sign_up: 'sign_up'
+        },
+        meta: {
+          view_item: 'ViewContent', view_item_list: 'ViewContent',
+          add_to_cart: 'AddToCart', view_cart: 'ViewContent',
+          begin_checkout: 'InitiateCheckout', purchase: 'Purchase',
+          add_to_wishlist: 'AddToWishlist', search: 'Search',
+          login: 'CompleteRegistration', sign_up: 'CompleteRegistration'
+        },
+        tiktok: {
+          view_item: 'ViewContent', view_item_list: 'ViewContent',
+          add_to_cart: 'AddToCart', view_cart: 'ViewContent',
+          begin_checkout: 'InitiateCheckout', purchase: 'CompletePayment',
+          add_to_wishlist: 'AddToWishlist', search: 'Search',
+          login: 'CompleteRegistration', sign_up: 'CompleteRegistration'
+        },
+        snapchat: {
+          view_item: 'VIEW_CONTENT', view_item_list: 'VIEW_CONTENT',
+          add_to_cart: 'ADD_CART', view_cart: 'VIEW_CONTENT',
+          begin_checkout: 'START_CHECKOUT', purchase: 'PURCHASE',
+          add_to_wishlist: 'ADD_TO_WISHLIST', search: 'SEARCH',
+          login: 'SIGN_UP', sign_up: 'SIGN_UP'
+        },
+        google: {
+          view_item: 'remarketing', view_item_list: 'remarketing',
+          add_to_cart: 'conversion', begin_checkout: 'conversion',
+          purchase: 'conversion', sign_up: 'conversion'
+        },
+        mixpanel: {
+          view_item: 'Product Viewed', view_item_list: 'Product List Viewed',
+          add_to_cart: 'Product Added', view_cart: 'Cart Viewed',
+          begin_checkout: 'Checkout Started', purchase: 'Order Completed',
+          remove_from_cart: 'Product Removed', add_to_wishlist: 'Product Added to Wishlist',
+          search: 'Products Searched', login: 'Signed In', sign_up: 'Signed Up'
+        }
+      };
+
+      // ══════════════════════════════════════════════════════
+      // 2. DATALAYER NORMALIZER — Salla & Zid → GA4
+      // ══════════════════════════════════════════════════════
+
+      // Salla raw event → GA4 event name
+      var SALLA_UA_TO_GA4 = {
+        'Product Viewed': 'view_item', 'product_viewed': 'view_item',
+        'Product List Viewed': 'view_item_list', 'product_list_viewed': 'view_item_list',
+        'addToCart': 'add_to_cart', 'Add To Cart': 'add_to_cart', 'product_added_to_cart': 'add_to_cart',
+        'Cart Viewed': 'view_cart', 'cart_viewed': 'view_cart',
+        'Product Removed': 'remove_from_cart', 'product_removed_from_cart': 'remove_from_cart',
+        'Product Added to Wishlist': 'add_to_wishlist', 'product_added_to_wishlist': 'add_to_wishlist',
+        'cart::submitted': 'begin_checkout', 'checkout_started': 'begin_checkout',
+        'purchase': 'purchase', 'order_completed': 'purchase',
+        'search': 'search', 'Search': 'search',
+        'Signed In': 'login', 'signed_in': 'login', 'login': 'login',
+        'sign_up': 'sign_up', 'Signed Up': 'sign_up'
+      };
+
+      // Zid event names (already close to GA4)
+      var ZID_TO_GA4 = {
+        'view_item': 'view_item', 'view_item_list': 'view_item_list',
+        'add_to_cart': 'add_to_cart', 'view_cart': 'view_cart',
+        'begin_checkout': 'begin_checkout', 'purchase': 'purchase',
+        'remove_from_cart': 'remove_from_cart', 'add_to_wishlist': 'add_to_wishlist',
+        'search': 'search', 'login': 'login', 'sign_up': 'sign_up'
+      };
+
+      function normalizeSallaItems(raw) {
+        var prods = [];
+        if (!raw) return prods;
+        if (Array.isArray(raw)) { prods = raw; }
+        else if (raw.id || raw.sku) { prods = [raw]; }
+        else if (raw[0] && (raw[0].id || raw[0].sku)) { prods = Object.values(raw); }
+        return prods.map(function (p, i) {
+          if (!p || typeof p !== 'object') return null;
+          var cat = p.category;
+          if (cat && typeof cat === 'object') cat = cat.name || cat.title || '';
+          var qty = parseInt(p.quantity || p.qty, 10);
+          if (isNaN(qty) || qty < 1) qty = 1;
+          return {
+            item_id: String(p.id || p.sku || p.product_id || ''),
+            item_name: p.name || p.title || '',
+            item_brand: p.brand || '',
+            item_category: cat || p.type || '',
+            item_variant: p.variant || p.variation || '',
+            price: Math.round(parseFloat(p.price || p.regular_price || p.unit_price || 0) * 100) / 100,
+            quantity: qty,
+            index: i
+          };
+        }).filter(function (x) { return x && x.item_id; });
+      }
+
+      // ── Dynamic product extractor — detects shape by MEANING, not fixed paths ──
+      function extractSallaProducts(raw) {
+        var out = [];
+        var ec = raw.ecommerce || {};
+        var slot0 = raw[0] || raw['0'];
+        [ec.add, ec.remove, ec.purchase, ec.checkout, ec.detail].forEach(function (box) {
+          if (box && Array.isArray(box.products) && box.products.length) out.push(box.products);
+        });
+        if (Array.isArray(ec.impressions) && ec.impressions.length) out.push(ec.impressions);

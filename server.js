@@ -915,6 +915,13 @@ http.createServer((req, res) => {
       const { clientId, clientEmail, projectName, domain, cmsType,
               platforms, events, pixelIds, configJson, publishLive,
               capiTokens, sgtmUrl } = body;  // sgtmUrl: user's own sGTM server URL
+      // Optional: full Server Container JSON built by the browser
+      // (buildSSContainer in tool.html). When present we use it verbatim
+      // — it has the real CAPI templates + tags with the user's pixel IDs
+      // and tokens. Without it the server falls back to buildServerConfig
+      // from lib/gtm-config-builder.js which returns an empty container in
+      // this build because the GADS-EC tag block was truncated upstream.
+      const clientServerConfigJson = body.serverConfigJson || null;
 
       // Tracking mode picker — 'client' (default) or 'client_server'.
       // Anything else is normalised to 'client' so old callers keep working.
@@ -960,26 +967,41 @@ http.createServer((req, res) => {
           //                        once the user confirms the sGTM URL.
           _setJob(jobId, { stage: 'gtm_provisioning', mode });
 
-          // Build server config for client_server mode using the same builder
-          // that /api/ss/create-containers uses, so the server container gets
-          // the user's actual GA4 ID, platforms, and events — not a blank template.
+          // Build server config for client_server mode. Priority:
+          //   1. The browser already built the FULL Server Container via
+          //      buildSSContainer() and sent it as body.serverConfigJson.
+          //      Use it verbatim — it has the real CAPI templates and tags
+          //      with the user's pixel IDs + tokens already embedded.
+          //   2. Fallback: build via lib/gtm-config-builder.js (currently
+          //      returns an empty container in this build due to the
+          //      truncated source). Better than nothing — at least GA4
+          //      Client + GA4 forward will exist.
           let serverConfigJson = null;
           if (mode === 'client_server') {
-            try {
-              const { buildServerConfig } = require('./lib/gtm-config-builder');
-              const ga4Id = (pixelIds && (pixelIds.ga4 || pixelIds.GA4 || pixelIds['ga4'])) || '';
-              serverConfigJson = buildServerConfig({
-                ga4MeasurementId: ga4Id,
-                sgtmUrl:          (sgtmUrl || '').trim(),
-                platforms:        platforms || [],
-                events:           events    || [],
-                pixelIds:         pixelIds  || {},   // pixel ID constant variables
-                capiTokens:       capiTokens || {},  // CAPI access token constant variables
-              });
-              console.log('[managed/create] built serverConfigJson — ga4Id:', ga4Id || '(none)',
-                'platforms:', (platforms || []).join(','), 'events:', (events || []).join(','));
-            } catch (scErr) {
-              console.warn('[managed/create] buildServerConfig failed (non-fatal):', scErr.message);
+            if (clientServerConfigJson) {
+              serverConfigJson = clientServerConfigJson;
+              const cv = serverConfigJson.containerVersion || {};
+              console.log('[managed/create] using browser-built serverConfigJson —',
+                'tags:',      (cv.tag || []).length,
+                'templates:', (cv.customTemplate || []).length,
+                'triggers:',  (cv.trigger || []).length);
+            } else {
+              try {
+                const { buildServerConfig } = require('./lib/gtm-config-builder');
+                const ga4Id = (pixelIds && (pixelIds.ga4 || pixelIds.GA4 || pixelIds['ga4'])) || '';
+                serverConfigJson = buildServerConfig({
+                  ga4MeasurementId: ga4Id,
+                  sgtmUrl:          (sgtmUrl || '').trim(),
+                  platforms:        platforms || [],
+                  events:           events    || [],
+                  pixelIds:         pixelIds  || {},   // pixel ID constant variables
+                  capiTokens:       capiTokens || {},  // CAPI access token constant variables
+                });
+                console.log('[managed/create] built serverConfigJson (fallback) — ga4Id:', ga4Id || '(none)',
+                  'platforms:', (platforms || []).join(','), 'events:', (events || []).join(','));
+              } catch (scErr) {
+                console.warn('[managed/create] buildServerConfig failed (non-fatal):', scErr.message);
+              }
             }
           }
 
