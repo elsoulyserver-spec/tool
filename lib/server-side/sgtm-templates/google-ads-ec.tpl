@@ -324,12 +324,4 @@ ___PERMISSIONS___
     "isRequired": true
   }
 ]
-
-___NOTES___
-
-Import via sGTM workspace: Admin → Templates → New → Import
-Template type referenced by tags: et_gads_ec_manual
-Requires a valid OAuth2 access_token + developer_token.
-For automated token refresh in Cloud Run, use a service account with the
-Google Ads API scope (https://www.googleapis.com/auth/adwords).
-No official Google Ads template is used — all HTTP is manual.
+                                                                                                                                                                                                                                                                                                                                                                                                     

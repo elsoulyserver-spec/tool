@@ -276,10 +276,4 @@ ___PERMISSIONS___
     "isRequired": true
   }
 ]
-
-___NOTES___
-
-Import via sGTM workspace: Admin → Templates → New → Import
-Template type referenced by tags: et_snapchat_capi_manual
-Note: Snapchat CAPI requires event_time in milliseconds — this template converts automatically.
-No official Snapchat template is used — all HTTP is manual.
+                                                                                                                                                                                                                                                                                                          

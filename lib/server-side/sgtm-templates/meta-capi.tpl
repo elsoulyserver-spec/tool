@@ -390,12 +390,4 @@ ___PERMISSIONS___
     "isRequired": true
   }
 ]
-
-___NOTES___
-
-Import this file into your sGTM workspace:
-  Admin → Templates → New → Import
-Then import the server container JSON from lib/gtm-config-builder.js output.
-Tags will automatically reference this template via type: et_meta_capi_manual.
-
-IMPORTANT: No official Meta template is used. All HTTP requests are manual.
+                                                                                                                                                                                                                                                                                                                                           

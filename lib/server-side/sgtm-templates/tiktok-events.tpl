@@ -318,9 +318,4 @@ ___PERMISSIONS___
     "isRequired": true
   }
 ]
-
-___NOTES___
-
-Import via sGTM workspace: Admin → Templates → New → Import
-Template type referenced by tags: et_tiktok_events_manual
-No official TikTok template is used — all HTTP is manual.
+                                                                                                                                                                                                      
