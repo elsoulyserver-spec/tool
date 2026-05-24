@@ -835,6 +835,32 @@ http.createServer((req, res) => {
   // have to OAuth into their own GTM. See gtm-service.js + firestore-service.js.
   // ══════════════════════════════════════════════════════════════════════════
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // GET /api/sgtm-templates
+  // Returns the 4 real .tpl source files (Meta, TikTok, Snap, Google Ads).
+  // The browser-side buildSSContainer() in tool.html embeds these verbatim
+  // into the generated Server Container JSON as customTemplate[].templateData
+  // so the container is actually IMPORTABLE in sGTM. Without this endpoint the
+  // browser falls back to a minimal — but still structurally valid — inline
+  // template. Cached for 1 hour because .tpl files are static.
+  // ──────────────────────────────────────────────────────────────────────────
+  if (req.method === 'GET' && req.url === '/api/sgtm-templates') {
+    try {
+      const TPL_DIR = path.join(__dirname, 'lib', 'server-side', 'sgtm-templates');
+      const read = (f) => fs.readFileSync(path.join(TPL_DIR, f), 'utf8');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      sendJSON(res, 200, {
+        meta:   read('meta-capi.tpl'),
+        tiktok: read('tiktok-events.tpl'),
+        snap:   read('snapchat-capi.tpl'),
+        gads:   read('google-ads-ec.tpl'),
+      });
+    } catch (e) {
+      sendJSON(res, 500, { error: 'Could not load sGTM templates: ' + e.message });
+    }
+    return;
+  }
+
   // GET /api/managed/health — capacity + config status (for ops dashboard)
   if (req.method === 'GET' && req.url === '/api/managed/health') {
     (async () => {
@@ -2141,7 +2167,6 @@ http.createServer((req, res) => {
 
   // Dotfile/dotdir guard (.env, .git/, .DS_Store, ...)
   if (filePath.split(path.sep).some(seg => seg.startsWith('.') && seg !== '.' && seg !== '..')) {
-    res.writeHead(403, securityHeaders()); res.end('Forbidden'); return;
   }
 
   function serveFile(fp, triedFallback) {
@@ -2164,18 +2189,6 @@ http.createServer((req, res) => {
       res.writeHead(200, {
         'Content-Type': mime[ext] || 'text/plain',
         ...securityHeaders({ html: isHtml }),
-      });
-      res.end(data);
-    });
-  }
-  serveFile(filePath);
-
-}).listen(PORT, () => {
-  const mode = puppeteer ? '🟢 Puppeteer (headless Chrome)' : '🟡 HTTP fallback (install puppeteer for full analysis)';
-  console.log(`Easy Track server running at http://localhost:${PORT}`);
-  console.log(`Scanner mode: ${mode}`);
-});
-                ...securityHeaders({ html: isHtml }),
       });
       res.end(data);
     });

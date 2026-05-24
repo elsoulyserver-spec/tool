@@ -1379,4 +1379,27 @@ async function provisionForClientWithServer(opts) {
   if (capiPlatforms.length) {
     onProgress({ stage: 'capi_templates', done: 0, total: capiPlatforms.length });
     await createCAPITemplates(serverContainerId, serverWorkspaceId, capiPlatforms);
-    onProgress({ st
+    onProgress({ stage: 'capi_templates', done: capiPlatforms.length, total: capiPlatforms.length });
+  }
+  // Truncation guard: the remainder of provisionClientPlusServer was lost in
+  // an earlier crash. Throw a clear error so callers know this path is
+  // incomplete. The /api/sgtm-templates endpoint and browser-side
+  // buildSSContainer flow do NOT depend on this function — they handle the
+  // common case of users importing the JSON manually.
+  throw new Error('gtm-service.provisionClientPlusServer is incomplete in this build. Use the JSON-export flow (Generate → Download Web/Server Container JSON → import manually in GTM/sGTM) until this function is finished.');
+}
+
+// ── module.exports — best-effort surface so server.js can require() this file
+//    without crashing. Functions that exist are forwarded; missing ones get a
+//    stub that throws a clear error instead of "undefined is not a function".
+function _missing(name) {
+  return function() { throw new Error('gtm-service.' + name + ': not implemented in this build.'); };
+}
+module.exports = module.exports || {};
+['isConfigured','getAccessToken','listContainers','provisionClientPlusServer',
+ 'createContainer','createServerContainer','setGA4TransportUrl',
+ 'upsertServerUrlVariable','createCAPITemplates']
+  .forEach(function(fn){
+    module.exports[fn] = (typeof eval('typeof ' + fn) === 'string' &&
+                          eval('typeof ' + fn) === 'function') ? eval(fn) : _missing(fn);
+  });

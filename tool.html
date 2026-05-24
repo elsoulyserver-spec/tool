@@ -4469,6 +4469,19 @@
                 <span class="material-symbols-outlined" style="font-size:14px;">radar</span> Publish to GTM →
               </button>
             </div>
+            <!-- Cross-link banner — makes the Server Container tab impossible to miss -->
+            <div id="webToSsBanner" style="display:none;background:linear-gradient(90deg,rgba(0,224,170,.08),rgba(0,224,170,.02));border:1px solid rgba(0,224,170,.25);border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;">
+              <span class="material-symbols-outlined" style="color:var(--acc);font-size:20px;">dns</span>
+              <div style="flex:1;font-family:var(--font-ui);font-size:12px;color:var(--wht2);line-height:1.5;">
+                <strong style="color:var(--wht);">Server Container أيضاً جاهز</strong> — الـ transport_url ربط الـ GA4 الكلاينت ساي د بالـ sGTM
+                <span id="webToSsBannerUrl" style="font-family:var(--font-mono);font-size:11px;color:var(--acc);"></span>،
+                والـ CAPI tags لكل منصة موجودة في الـ Server Container.
+              </div>
+              <button onclick="oTab('ss-gtm',document.getElementById('tabSsGtm'))"
+                style="background:var(--acc);color:#00382b;border:none;border-radius:8px;padding:6px 12px;font-family:var(--font-ui);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">
+                🖥️ افتح الـ Server Container ←
+              </button>
+            </div>
             <div class="cwrap">
               <div class="ctbar">
                 <div class="ctdots">
@@ -6653,6 +6666,35 @@
         if (tabSsEl) tabSsEl.style.display = '';   // دايماً ظاهر بعد Generate
         if (paneSsEl) paneSsEl.style.display = '';  // إزالة inline display:none
 
+        // ── Cross-link banner on the Web tab — surfaces the Server Container ──
+        // The Server Container pane lives behind a tab that's easy to miss; this
+        // banner sits at the top of the Web Container output and shouts that
+        // there's a second container to look at, with a button to jump to it.
+        try {
+          var webBanner = document.getElementById('webToSsBanner');
+          if (webBanner) {
+            if (window.ET && window.ET.ssEnabled && _pcSS.platforms && _pcSS.platforms.length) {
+              webBanner.style.display = 'flex';
+              var urlEl = document.getElementById('webToSsBannerUrl');
+              if (urlEl) urlEl.textContent = _pcSS.serverUrl ? (' (' + _pcSS.serverUrl + ')') : '';
+              // Add an animated badge on the SS tab so even users who don't read the banner notice
+              if (tabSsEl && !tabSsEl.querySelector('.ss-tab-badge')) {
+                var badge = document.createElement('span');
+                badge.className = 'ss-tab-badge';
+                badge.textContent = _pcSS.platforms.length;
+                badge.style.cssText = 'margin-right:6px;background:var(--acc);color:#00382b;border-radius:999px;padding:1px 7px;font-size:10px;font-weight:800;font-family:var(--font-mono);';
+                tabSsEl.appendChild(badge);
+              }
+            } else {
+              webBanner.style.display = 'none';
+              if (tabSsEl) {
+                var oldBadge = tabSsEl.querySelector('.ss-tab-badge');
+                if (oldBadge) oldBadge.remove();
+              }
+            }
+          }
+        } catch (e) { console.warn('webToSsBanner wiring error:', e); }
+
         // ── تحديث banner الـ SS بناءً على الحالة ──
         var _ssBannerSub = document.querySelector('#pane-ss-gtm .pc-ss-out-banner div > div:last-child');
         if (_ssBannerSub) {
@@ -6920,9 +6962,325 @@
       // ══════════════════════════════════════════════════════════════════════
       // SANDBOXED JS TEMPLATES — real HTTP request code for each CAPI
       // ══════════════════════════════════════════════════════════════════════
+      //
+      // STRATEGY:
+      //   1. If window._ET_SGTM_TPL was populated by /api/sgtm-templates at
+      //      page load, embed the REAL .tpl source files verbatim. These are
+      //      production-ready templates with proper ___INFO___,
+      //      ___TEMPLATE_PARAMETERS___, ___SANDBOXED_JS_FOR_SERVER___ and
+      //      ___PERMISSIONS___ sections — sGTM will accept the import.
+      //   2. If the server didn't deliver the files (offline preview, static
+      //      hosting), fall back to a MINIMAL but STRUCTURALLY VALID inline
+      //      template. The previous fallback used wrong markers
+      //      (___SANDBOXED_JS_FOR_SERVER_SIDE_TEMPLATE___, ___WEB_PERMISSIONS___)
+      //      and skipped ___INFO___/___TEMPLATE_PARAMETERS___ entirely — GTM
+      //      silently dropped them on import, breaking every CAPI tag.
 
-      // ── Meta Conversions API ───────────────────────────────────────────────
-      var META_TEMPLATE_CODE = [
+      var _SGTM = (typeof window !== 'undefined' && window._ET_SGTM_TPL) || {};
+
+      function _makeFallbackTpl(opts) {
+        // opts: { id, name, description, params:[{name,displayName}...],
+        //         js, allowedHost }
+        var infoBlock = JSON.stringify({
+          type: 'TAG',
+          id:   opts.id,
+          version: 1,
+          securityGroups: [],
+          displayName: opts.name,
+          description: opts.description,
+          containerContexts: ['SERVER']
+        }, null, 2);
+
+        var paramsBlock = JSON.stringify(opts.params.map(function (p) {
+          return {
+            type: 'TEXT',
+            name: p.name,
+            displayName: p.displayName || p.name,
+            simpleValueType: true
+          };
+        }), null, 2);
+
+        var permsBlock = JSON.stringify([
+          {
+            instance: {
+              key:   { publicId: 'send_http', versionId: '1' },
+              param: [{
+                key: 'allowedUrls',
+                value: {
+                  type: 1,
+                  listItem: [{
+                    type: 2,
+                    mapKey:   [{ type: 1, string: 'url' },        { type: 1, string: 'queryParameterNames' }],
+                    mapValue: [{ type: 1, string: opts.allowedHost }, { type: 1, string: 'any' }]
+                  }]
+                }
+              }]
+            },
+            clientAnnotations: { isEditedByUser: true },
+            isRequired: true
+          },
+          {
+            instance: {
+              key:   { publicId: 'logging', versionId: '1' },
+              param: [{ key: 'environments', value: { type: 1, string: 'all' } }]
+            },
+            clientAnnotations: { isEditedByUser: true },
+            isRequired: true
+          }
+        ], null, 2);
+
+        return [
+          '___INFO___',  '', infoBlock, '',
+          '___TEMPLATE_PARAMETERS___', '', paramsBlock, '',
+          '___SANDBOXED_JS_FOR_SERVER___', '', opts.js, '',
+          '___PERMISSIONS___', '', permsBlock, '',
+          '___TESTS___', '', 'scenarios: []', '',
+          '___NOTES___', '', 'Generated by Easy Track — ' + opts.name
+        ].join('\n');
+      }
+
+      var META_TEMPLATE_CODE = _SGTM.meta || _makeFallbackTpl({
+        id: 'et_meta_capi',
+        name: 'Easy Track — Meta CAPI',
+        description: 'Forwards events to Meta Conversions API (graph.facebook.com).',
+        allowedHost: 'https://graph.facebook.com/',
+        params: [
+          { name: 'pixelId',     displayName: 'Meta Pixel ID' },
+          { name: 'accessToken', displayName: 'CAPI Access Token' },
+          { name: 'eventName',   displayName: 'Meta Event Name' },
+          { name: 'clientIp',    displayName: 'Client IP' },
+          { name: 'userAgent',   displayName: 'User Agent' }
+        ],
+        js: [
+          "const sendHttpRequest    = require('sendHttpRequest');",
+          "const JSON               = require('JSON');",
+          "const getEventData       = require('getEventData');",
+          "const encodeUriComponent = require('encodeUriComponent');",
+          "const getTimestampMillis = require('getTimestampMillis');",
+          '',
+          "const eventId  = getEventData('event_id') || ('ET-' + getTimestampMillis());",
+          "const currency = getEventData('currency') || 'SAR';",
+          "const value    = getEventData('value')    || 0;",
+          "const orderId  = getEventData('transaction_id') || '';",
+          "const cIds     = getEventData('content_ids') || '';",
+          '',
+          'function clean(o){var r={};for(var k in o){if(o[k]!==""&&o[k]!=null)r[k]=o[k];}return r;}',
+          '',
+          'const ud = clean({',
+          "  em:                getEventData('user_data.em')  || getEventData('up.em'),",
+          "  ph:                getEventData('user_data.ph')  || getEventData('up.ph'),",
+          "  fn:                getEventData('user_data.fn')  || getEventData('up.fn'),",
+          "  ln:                getEventData('user_data.ln')  || getEventData('up.ln'),",
+          "  external_id:       getEventData('user_data.external_id') || getEventData('up.external_id'),",
+          "  fbp:               getEventData('up.fbp'),",
+          "  fbc:               getEventData('up.fbc'),",
+          '  client_ip_address: data.clientIp,',
+          '  client_user_agent: data.userAgent',
+          '});',
+          '',
+          'const cd = clean({',
+          '  currency:     currency,',
+          '  value:        value,',
+          '  order_id:     orderId,',
+          '  content_ids:  cIds ? [cIds] : undefined,',
+          "  content_type: 'product'",
+          '});',
+          '',
+          'const payload = JSON.stringify({ data: [{',
+          '  event_name:    data.eventName,',
+          '  event_time:    Math.floor(getTimestampMillis()/1000),',
+          '  event_id:      eventId,',
+          "  action_source: 'website',",
+          '  user_data:     ud,',
+          '  custom_data:   cd',
+          '}]});',
+          '',
+          "const url = 'https://graph.facebook.com/v18.0/' + encodeUriComponent(data.pixelId) +",
+          "            '/events?access_token=' + encodeUriComponent(data.accessToken);",
+          '',
+          "sendHttpRequest(url, {",
+          "  method:'POST',",
+          "  headers:{'Content-Type':'application/json'},",
+          "  timeout:8000",
+          '}, payload).then(function(r){',
+          '  if(r.statusCode>=200&&r.statusCode<300){ data.gtmOnSuccess(); }',
+          '  else{ data.gtmOnFailure(); }',
+          '}).catch(data.gtmOnFailure);'
+        ].join('\n')
+      });
+
+      var TIKTOK_TEMPLATE_CODE = _SGTM.tiktok || _makeFallbackTpl({
+        id: 'et_tiktok_events',
+        name: 'Easy Track — TikTok Events API',
+        description: 'Forwards events to TikTok Events API (business-api.tiktok.com).',
+        allowedHost: 'https://business-api.tiktok.com/',
+        params: [
+          { name: 'pixelCode',   displayName: 'TikTok Pixel Code' },
+          { name: 'accessToken', displayName: 'Events API Access Token' },
+          { name: 'eventName',   displayName: 'TikTok Event Name' },
+          { name: 'clientIp',    displayName: 'Client IP' },
+          { name: 'userAgent',   displayName: 'User Agent' }
+        ],
+        js: [
+          "const sendHttpRequest    = require('sendHttpRequest');",
+          "const JSON               = require('JSON');",
+          "const getEventData       = require('getEventData');",
+          "const getTimestampMillis = require('getTimestampMillis');",
+          '',
+          'function clean(o){var r={};for(var k in o){if(o[k]!==""&&o[k]!=null)r[k]=o[k];}return r;}',
+          '',
+          'const payload = JSON.stringify({',
+          "  event_source:    'web',",
+          '  event_source_id: data.pixelCode,',
+          '  data: [{',
+          '    event:      data.eventName,',
+          '    event_time: Math.floor(getTimestampMillis()/1000),',
+          "    event_id:   getEventData('event_id') || ('TT-' + getTimestampMillis()),",
+          '    user: clean({',
+          "      email:        getEventData('user_data.em') || getEventData('up.em'),",
+          "      phone_number: getEventData('user_data.ph') || getEventData('up.ph'),",
+          "      external_id:  getEventData('user_data.external_id') || getEventData('up.external_id'),",
+          "      ttclid:       getEventData('ep.ttclid'),",
+          "      ttp:          getEventData('up.ttp'),",
+          '      ip:           data.clientIp,',
+          '      user_agent:   data.userAgent',
+          '    }),',
+          '    properties: clean({',
+          "      currency:   getEventData('currency') || 'SAR',",
+          "      value:      getEventData('value')    || 0,",
+          "      content_id: getEventData('content_ids'),",
+          "      content_type:'product',",
+          "      order_id:   getEventData('transaction_id')",
+          '    })',
+          '  }]',
+          '});',
+          '',
+          "sendHttpRequest('https://business-api.tiktok.com/open_api/v1.3/event/track/', {",
+          "  method:'POST',",
+          "  headers:{'Content-Type':'application/json','Access-Token':data.accessToken},",
+          "  timeout:8000",
+          '}, payload).then(function(r){',
+          '  if(r.statusCode>=200&&r.statusCode<300){ data.gtmOnSuccess(); }',
+          '  else{ data.gtmOnFailure(); }',
+          '}).catch(data.gtmOnFailure);'
+        ].join('\n')
+      });
+
+      var SNAP_TEMPLATE_CODE = _SGTM.snap || _makeFallbackTpl({
+        id: 'et_snap_capi',
+        name: 'Easy Track — Snapchat CAPI',
+        description: 'Forwards events to Snapchat Conversions API (tr.snapchat.com).',
+        allowedHost: 'https://tr.snapchat.com/',
+        params: [
+          { name: 'pixelId',   displayName: 'Snap Pixel ID' },
+          { name: 'apiToken',  displayName: 'Snap CAPI Token' },
+          { name: 'eventType', displayName: 'Snap Event Type' },
+          { name: 'clientIp',  displayName: 'Client IP' },
+          { name: 'userAgent', displayName: 'User Agent' }
+        ],
+        js: [
+          "const sendHttpRequest    = require('sendHttpRequest');",
+          "const JSON               = require('JSON');",
+          "const getEventData       = require('getEventData');",
+          "const getTimestampMillis = require('getTimestampMillis');",
+          '',
+          'function clean(o){var r={};for(var k in o){if(o[k]!==""&&o[k]!=null)r[k]=o[k];}return r;}',
+          '',
+          'const payload = JSON.stringify({ data: [{',
+          "  event_conversion_type: 'WEB',",
+          '  event_type:   data.eventType,',
+          "  event_tag:    getEventData('event_id') || ('SNAP-' + getTimestampMillis()),",
+          '  timestamp:    new Date().toISOString(),',
+          '  hashed_data_fields: clean({',
+          "    email:        getEventData('user_data.em') || getEventData('up.em'),",
+          "    phone_number: getEventData('user_data.ph') || getEventData('up.ph'),",
+          "    external_id:  getEventData('user_data.external_id') || getEventData('up.external_id')",
+          '  }),',
+          '  user_data: clean({',
+          "    sc_click_id: getEventData('ep.sccid'),",
+          "    uuid_c1:     getEventData('up.scid'),",
+          '    ip_address:  data.clientIp,',
+          '    user_agent:  data.userAgent',
+          '  }),',
+          '  custom_data: clean({',
+          "    currency:       getEventData('currency') || 'SAR',",
+          "    price:          getEventData('value')    || 0,",
+          "    transaction_id: getEventData('transaction_id'),",
+          "    content_ids:    (function(){var v=getEventData('content_ids');return v?[v]:undefined;})()",
+          '  })',
+          '}]});',
+          '',
+          "sendHttpRequest('https://tr.snapchat.com/v2/conversion', {",
+          "  method:'POST',",
+          "  headers:{'Content-Type':'application/json','Authorization':'Bearer '+data.apiToken},",
+          "  timeout:8000",
+          '}, payload).then(function(r){',
+          '  if(r.statusCode>=200&&r.statusCode<300){ data.gtmOnSuccess(); }',
+          '  else{ data.gtmOnFailure(); }',
+          '}).catch(data.gtmOnFailure);'
+        ].join('\n')
+      });
+
+      var GADS_TEMPLATE_CODE = _SGTM.gads || _makeFallbackTpl({
+        id: 'et_gads_ec',
+        name: 'Easy Track — Google Ads Enhanced Conversions',
+        description: 'Forwards conversions to Google Ads Enhanced Conversions API.',
+        allowedHost: 'https://googleads.googleapis.com/',
+        params: [
+          { name: 'conversionId',    displayName: 'Conversion ID (digits, no AW-)' },
+          { name: 'conversionLabel', displayName: 'Conversion Label' },
+          { name: 'clientIp',        displayName: 'Client IP' },
+          { name: 'userAgent',       displayName: 'User Agent' }
+        ],
+        js: [
+          "const sendHttpRequest    = require('sendHttpRequest');",
+          "const JSON               = require('JSON');",
+          "const getEventData       = require('getEventData');",
+          "const getTimestampMillis = require('getTimestampMillis');",
+          '',
+          'const now = new Date();',
+          'function p2(n){return n<10?"0"+n:""+n;}',
+          'const convTime = now.getUTCFullYear()+"-"+p2(now.getUTCMonth()+1)+"-"+p2(now.getUTCDate())+" "+p2(now.getUTCHours())+":"+p2(now.getUTCMinutes())+":"+p2(now.getUTCSeconds())+" +0000";',
+          '',
+          'const ids = [];',
+          "const em  = getEventData('user_data.em') || getEventData('up.em');",
+          "const ph  = getEventData('user_data.ph') || getEventData('up.ph');",
+          'if(em) ids.push({hashedEmail: em});',
+          'if(ph) ids.push({hashedPhoneNumber: ph});',
+          '',
+          'const payload = JSON.stringify({',
+          '  conversions: [{',
+          "    conversionAction:   'customers/' + data.conversionId + '/conversionActions/' + data.conversionLabel,",
+          '    conversionDateTime: convTime,',
+          "    conversionValue:    getEventData('value')    || 0,",
+          "    currencyCode:       getEventData('currency') || 'SAR',",
+          "    orderId:            getEventData('transaction_id'),",
+          "    gclid:              getEventData('ep.gclid')  || getEventData('up.gclid'),",
+          "    wbraid:             getEventData('ep.wbraid'),",
+          "    gbraid:             getEventData('ep.gbraid'),",
+          '    userIdentifiers:    ids',
+          '  }],',
+          '  partialFailure: true',
+          '});',
+          '',
+          '// NOTE: Google Ads API needs an OAuth2 Bearer token + developer-token.',
+          '// Configure these in the sGTM tag UI after import, or replace via',
+          '// additional TEXT parameters on this template.',
+          "sendHttpRequest('https://googleads.googleapis.com/v14/customers/' + data.conversionId + ':uploadConversions', {",
+          "  method:'POST',",
+          "  headers:{'Content-Type':'application/json'},",
+          "  timeout:8000",
+          '}, payload).then(function(r){',
+          '  if(r.statusCode>=200&&r.statusCode<300){ data.gtmOnSuccess(); }',
+          '  else{ data.gtmOnFailure(); }',
+          '}).catch(data.gtmOnFailure);'
+        ].join('\n')
+      });
+
+      // ── Original (broken) inline templates kept below as a no-op so we don't
+      //    need to renumber the rest of buildSSContainer. They are immediately
+      //    overwritten by the assignments above before any code reads them.
+      var _OBSOLETE_META = [
         '___SANDBOXED_JS_FOR_SERVER_SIDE_TEMPLATE___',
         '',
         "const sendHttpRequest    = require('sendHttpRequest');",
@@ -7003,7 +7361,7 @@
       ].join('\n');
 
       // ── TikTok Events API ──────────────────────────────────────────────────
-      var TIKTOK_TEMPLATE_CODE = [
+      var _OBSOLETE_TIKTOK = [
         '___SANDBOXED_JS_FOR_SERVER_SIDE_TEMPLATE___',
         '',
         "const sendHttpRequest    = require('sendHttpRequest');",
@@ -7073,7 +7431,7 @@
       ].join('\n');
 
       // ── Snapchat Conversions API ───────────────────────────────────────────
-      var SNAP_TEMPLATE_CODE = [
+      var _OBSOLETE_SNAP = [
         '___SANDBOXED_JS_FOR_SERVER_SIDE_TEMPLATE___',
         '',
         "const sendHttpRequest    = require('sendHttpRequest');",
@@ -7142,7 +7500,7 @@
       ].join('\n');
 
       // ── Google Ads Enhanced Conversions ───────────────────────────────────
-      var GADS_TEMPLATE_CODE = [
+      var _OBSOLETE_GADS = [
         '___SANDBOXED_JS_FOR_SERVER_SIDE_TEMPLATE___',
         '',
         "const sendHttpRequest    = require('sendHttpRequest');",
@@ -12702,6 +13060,33 @@
       initFirebase();
     }
 
+    // ════════════════════════════════════════════════════════════════════════
+    // Pre-load the REAL sGTM custom-template source files (.tpl) from the
+    // server. buildSSContainer() embeds these verbatim into the generated
+    // Server Container JSON. Without them the container falls back to a
+    // minimal inline template that is structurally valid but only sends a
+    // skeleton CAPI payload. Fetched once, cached in memory for the session.
+    // ════════════════════════════════════════════════════════════════════════
+    window._ET_SGTM_TPL = null;
+    window._ET_SGTM_TPL_PROMISE = (function _loadSgtmTpls() {
+      return fetch('/api/sgtm-templates', { credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          if (j && (j.meta || j.tiktok || j.snap || j.gads)) {
+            window._ET_SGTM_TPL = j;
+            console.log('[ET] Loaded real sGTM templates:',
+              ['meta', 'tiktok', 'snap', 'gads'].filter(function (k) { return !!j[k]; }).join(', '));
+          } else {
+            console.warn('[ET] /api/sgtm-templates returned no templates — buildSSContainer will use inline fallback');
+          }
+          return window._ET_SGTM_TPL;
+        })
+        .catch(function (e) {
+          console.warn('[ET] Could not pre-load sGTM templates — buildSSContainer will use inline fallback:', e.message);
+          return null;
+        });
+    })();
+
 
     // ══ PROJECT HISTORY ═══════════════════════════════════════
     async function loadProjects() {
@@ -14569,311 +14954,4 @@
               + methodBadge
               + '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:' + statusColor + '22;color:' + statusColor + ';border:1px solid ' + statusColor + '44;">'
               + statusLabel + '</span>'
-              + ((px.events && px.events.length) ? '<button onclick="(function(){var el=document.getElementById(\'' + uid + '\');var isOpen=el.style.display!==\'none\';el.style.display=isOpen?\'none\':\'block\';this.innerHTML=(isOpen?\'▸\':\'▾\')+\' \'+(this.dataset.count)+\' event' + (px.events.length > 1 ? 's' : '') + '\';}).call(this)" data-count="' + px.events.length + '" style="font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid var(--bdr2);background:var(--sur4);color:var(--mut);cursor:pointer;">▾ ' + px.events.length + ' event' + (px.events.length > 1 ? 's' : '') + '</button>' : '')
-              + '</div>'
-              + '</div>';
-
-            // Request count bar — show both total requests and event-endpoint hits
-            var reqStr = (px.requestCount || 0) + ' network request' + ((px.requestCount || 0) !== 1 ? 's' : '') + ' intercepted';
-            var hitStr = (typeof px.eventHitCount === 'number' && px.eventHitCount > 0)
-              ? ' • <span style="color:#46f1c5;">' + px.eventHitCount + ' event endpoint hit' + (px.eventHitCount > 1 ? 's' : '') + '</span>'
-              : '';
-            html2 += '<div style="padding:0 14px 10px;font-size:11px;color:var(--mut);">📡 ' + reqStr + hitStr + '</div>';
-
-            // Events health report — OPEN BY DEFAULT
-            var pxIssues = hmAnalyzePixel(px);
-            if (px.events && px.events.length) {
-              html2 += '<div id="' + uid + '" style="display:block;padding:0 12px 12px;">';
-              html2 += '<div style="font-size:10px;font-weight:700;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">EVENT PARAMETER AUDIT</div>';
-              html2 += evReport;
-              // Intelligent analysis section (only if we found real issues)
-              if (pxIssues.length) {
-                html2 += '<div style="font-size:10px;font-weight:700;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin:14px 0 8px;">🔍 SMART ANALYSIS (' + pxIssues.length + ' issue' + (pxIssues.length > 1 ? 's' : '') + ')</div>';
-                html2 += hmRenderIssues(pxIssues);
-              } else {
-                html2 += '<div style="font-size:11px;color:#46f1c5;padding:10px 12px;margin-top:10px;background:rgba(70,241,197,.06);border:1px solid rgba(70,241,197,.2);border-radius:10px;">✓ Smart analysis: ما فيش مشاكل اتكتشفت في الـ events الموجودة</div>';
-              }
-              html2 += '</div>';
-            } else if (pxIssues.length) {
-              // No events but analyzer flagged issues (e.g. pixel loaded with no events)
-              html2 += '<div style="padding:0 12px 12px;">';
-              html2 += '<div style="font-size:10px;font-weight:700;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">🔍 SMART ANALYSIS</div>';
-              html2 += hmRenderIssues(pxIssues);
-              html2 += '</div>';
-            } else if (HM_EVENT_SCHEMAS[px.key]) {
-              html2 += '<div style="padding:0 14px 11px;">'
-                + '<div style="font-size:11px;color:var(--mut);padding:8px 10px;border-radius:8px;background:rgba(255,255,255,.03);border:1px dashed var(--bdr2);">'
-                + '⚠️ الـ Pixel موجود في الـ network بس مفيش Events اتبعتت — يمكن الـ events بتتبعت server-side أو عبر GTM على صفحات تانية</div>'
-                + '</div>';
-            }
-
-            html2 += '</div>';
-          });
-
-          // Check for configured pixels not found on page
-          var configuredNotFound = [];
-          HM_PLATFORMS_DEF.forEach(function (plat) {
-            var cfgId = typeof (S.pixelIds || {})[plat.key] === 'object' ? (S.pixelIds || {})[plat.key].id : (S.pixelIds || {})[plat.key];
-            cfgId = (cfgId || '').trim();
-            if (!cfgId) return;
-            var wasFound = puppeteerPixels.some(function (p) { return p.key === plat.key; });
-            if (!wasFound) configuredNotFound.push({ plat: plat, configuredId: cfgId });
-          });
-          if (configuredNotFound.length) {
-            html2 += '<div style="margin-top:10px;margin-bottom:6px;font-size:12px;font-weight:700;color:#ffb4ab;letter-spacing:1px;text-transform:uppercase;">Configured but NOT found via network</div>';
-            configuredNotFound.forEach(function (m) {
-              html2 += '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(255,180,171,.05);border:1px solid rgba(255,180,171,.2);border-radius:10px;margin-bottom:6px;">'
-                + '<span style="font-size:18px;">' + m.plat.icon + '</span>'
-                + '<div>'
-                + '<div style="font-size:13px;font-weight:700;color:#ffb4ab;">' + m.plat.name + '</div>'
-                + '<div style="font-size:11px;color:var(--mut);">Expected ID: ' + _esc(m.configuredId) + ' — no network request detected on page load</div>'
-                + '</div></div>';
-            });
-          }
-
-          resultEl.innerHTML = html2;
-
-        } else {
-          // ── FALLBACK: HTML REGEX PATH (no Puppeteer) ──────────────────────
-          var found = [];
-          var missing = [];
-          var configured = S.pixelIds || {};
-
-          HM_PLATFORMS_DEF.forEach(function (plat) {
-            var detected = plat.detect(html);
-            var ids = hmExtractIds(html, plat.patterns);
-            var configuredId = typeof configured[plat.key] === 'object' ? configured[plat.key].id : configured[plat.key];
-            configuredId = (configuredId || '').trim();
-
-            if (detected || ids.length) {
-              var match = ids.length && configuredId && ids.indexOf(configuredId) > -1;
-              var mismatch = ids.length && configuredId && !match;
-              var events = hmExtractEvents(html, plat.key);
-              found.push({ plat: plat, ids: ids, match: match, mismatch: mismatch, configuredId: configuredId, events: events });
-            } else if (configuredId) {
-              missing.push({ plat: plat, configuredId: configuredId });
-            }
-          });
-
-          var html2 = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:6px;">'
-            + '<div style="font-size:12px;font-weight:700;color:var(--mut);letter-spacing:1px;text-transform:uppercase;">'
-            + 'Detected on ' + _esc(resolvedUrl) + ' — ' + found.length + ' pixel(s) found</div>'
-            + '<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:rgba(255,214,128,.1);color:#ffd680;border:1px solid rgba(255,214,128,.2);">⚡ HTML Scan (limited)</span>'
-            + '</div>';
-
-          if (!found.length && !missing.length) {
-            html2 += '<div style="color:var(--mut);font-size:13px;">No known tracking pixels detected on this page.</div>';
-          }
-
-          found.forEach(function (f) {
-            var statusColor = f.match ? '#46f1c5' : f.mismatch ? '#ffb4ab' : '#adc6ff';
-            var statusLabel = f.match ? '✓ ID Match' : f.mismatch ? '⚠ ID Mismatch' : '● Detected';
-            var evReport = hmBuildEventReport(f.plat.key, f.events);
-            var uid = 'ev_' + f.plat.key + '_' + Date.now();
-
-            html2 += '<div style="background:var(--sur3);border-radius:12px;margin-bottom:10px;overflow:hidden;border:1px solid var(--bdr2);">';
-            html2 += '<div style="display:flex;align-items:center;justify-content:space-between;padding:11px 14px;flex-wrap:wrap;gap:8px;">'
-              + '<div style="display:flex;align-items:center;gap:8px;">'
-              + '<span style="font-size:20px;">' + f.plat.icon + '</span>'
-              + '<div>'
-              + '<div style="font-size:14px;font-weight:800;color:var(--wht);">' + f.plat.name + '</div>'
-              + '<div style="font-size:11px;color:var(--mut);font-family:var(--font-mono);margin-top:1px;">'
-              + (f.ids.length ? 'ID: ' + f.ids.join(', ') : 'ID not extracted') + '</div>'
-              + '</div>'
-              + '</div>'
-              + '<div style="display:flex;align-items:center;gap:8px;">'
-              + '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:' + statusColor + '22;color:' + statusColor + ';border:1px solid ' + statusColor + '44;">'
-              + statusLabel + '</span>'
-              + (f.events.length ? '<button onclick="(function(){var el=document.getElementById(\'' + uid + '\');var isOpen=el.style.display!==\'none\';el.style.display=isOpen?\'none\':\'block\';this.innerHTML=(isOpen?\'▸\':\'▾\')+\' \'+this.dataset.count+\' events\';}).call(this)" data-count="' + f.events.length + '" style="font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid var(--bdr2);background:var(--sur4);color:var(--mut);cursor:pointer;">▾ ' + f.events.length + ' events</button>' : '')
-              + '</div>'
-              + '</div>';
-
-            // Intelligent analysis wrapper — treat HTML-fallback "found" like a pixel
-            var fPseudoPixel = { key: f.plat.key, name: f.plat.name, events: f.events };
-            var fIssues = hmAnalyzePixel(fPseudoPixel);
-            if (f.events.length) {
-              html2 += '<div id="' + uid + '" style="display:block;padding:0 12px 12px;">';
-              html2 += '<div style="font-size:10px;font-weight:700;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;padding-top:4px;">EVENT HEALTH REPORT</div>';
-              html2 += evReport;
-              if (fIssues.length) {
-                html2 += '<div style="font-size:10px;font-weight:700;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin:14px 0 8px;">🔍 SMART ANALYSIS (' + fIssues.length + ' issue' + (fIssues.length > 1 ? 's' : '') + ')</div>';
-                html2 += hmRenderIssues(fIssues);
-              }
-              html2 += '</div>';
-            } else if (fIssues.length) {
-              html2 += '<div style="padding:0 12px 12px;">';
-              html2 += '<div style="font-size:10px;font-weight:700;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">🔍 SMART ANALYSIS</div>';
-              html2 += hmRenderIssues(fIssues);
-              html2 += '</div>';
-            } else if (HM_EVENT_SCHEMAS[f.plat.key]) {
-              html2 += '<div style="padding:0 14px 11px;">'
-                + '<div style="font-size:11px;color:var(--mut);padding:8px 10px;border-radius:8px;background:rgba(255,255,255,.03);border:1px dashed var(--bdr2);">'
-                + '⚠️ الـ Pixel موجود بس مفيش Events في الـ HTML — install Puppeteer for full network scan</div>'
-                + '</div>';
-            }
-
-            html2 += '</div>';
-          });
-
-          if (missing.length) {
-            html2 += '<div style="margin-top:10px;margin-bottom:6px;font-size:12px;font-weight:700;color:#ffb4ab;letter-spacing:1px;text-transform:uppercase;">Configured but NOT found on page</div>';
-            missing.forEach(function (m) {
-              html2 += '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(255,180,171,.05);border:1px solid rgba(255,180,171,.2);border-radius:10px;margin-bottom:6px;">'
-                + '<span style="font-size:18px;">' + m.plat.icon + '</span>'
-                + '<div>'
-                + '<div style="font-size:13px;font-weight:700;color:#ffb4ab;">' + m.plat.name + '</div>'
-                + '<div style="font-size:11px;color:var(--mut);">Expected ID: ' + _esc(m.configuredId) + ' — not detected on page</div>'
-                + '</div></div>';
-            });
-          }
-
-          resultEl.innerHTML = html2;
-        }
-
-      } catch (e) {
-        resultEl.innerHTML = '<div style="color:#ffb4ab;font-size:13px;">❌ Error: ' + _esc(e.message) + '</div>';
-      }
-
-      btn.disabled = false;
-      btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">radar</span> Scan';
-    }
-
-
-
-    // ══════ PAYLOAD TESTER ══════
-    var _payloadData = { vars: [], trigs: [], tags: [], raw: '' };
-    var _activePayloadTab = 'vars';
-
-    function gtmPreviewPayload() {
-      var src = (typeof _cachedGtmStr !== 'undefined' && _cachedGtmStr) || '';
-      if (!src.trim()) {
-        alert('اعمل Generate للـ Config الأول من Pixel Config ثم ارجع هنا');
-        return;
-      }
-      var gtmJson;
-      try { gtmJson = JSON.parse(src); } catch (e) { alert('GTM JSON غير صحيح'); return; }
-      var cv = gtmJson.containerVersion ? gtmJson.containerVersion : gtmJson;
-      _payloadData.vars = cv.variable || [];
-      _payloadData.trigs = cv.trigger || [];
-      _payloadData.tags = cv.tag || [];
-      _payloadData.raw = JSON.stringify(cv, null, 2);
-
-      var total = _payloadData.vars.length + _payloadData.trigs.length + _payloadData.tags.length;
-      document.getElementById('payloadBadge').textContent =
-        _payloadData.tags.length + ' Tags · ' + _payloadData.trigs.length + ' Triggers · ' + _payloadData.vars.length + ' Variables';
-
-      showPayloadTab('vars');
-      document.getElementById('payloadModal').style.display = 'flex';
-    }
-
-    function showPayloadTab(tab) {
-      _activePayloadTab = tab;
-      var tabs = ['vars', 'trigs', 'tags', 'raw'];
-      tabs.forEach(function (t) {
-        var btn = document.getElementById('ptab-' + t);
-        if (!btn) return;
-        if (t === tab) {
-          btn.style.cssText = 'padding:8px 16px;border-radius:8px 8px 0 0;border:none;font-size:13px;font-weight:700;cursor:pointer;background:rgba(70,241,197,.1);color:#46f1c5;border-bottom:2px solid #46f1c5;';
-        } else {
-          btn.style.cssText = 'padding:8px 16px;border-radius:8px 8px 0 0;border:none;font-size:13px;font-weight:700;cursor:pointer;background:transparent;color:#6b7280;';
-        }
-      });
-      var content = document.getElementById('payloadTabContent');
-      if (!content) return;
-
-      if (tab === 'raw') {
-        content.innerHTML = '<pre style="margin:0;font-family:monospace;font-size:12px;color:#bacac2;line-height:1.6;white-space:pre-wrap;word-break:break-all;">' + _esc(_payloadData.raw) + '</pre>';
-        return;
-      }
-
-      var items = tab === 'vars' ? _payloadData.vars : tab === 'trigs' ? _payloadData.trigs : _payloadData.tags;
-      var typeKey = tab === 'vars' ? 'type' : tab === 'trigs' ? 'type' : 'type';
-      var icon = tab === 'vars' ? 'code' : tab === 'trigs' ? 'bolt' : 'label';
-      var color = tab === 'vars' ? '#adc6ff' : tab === 'trigs' ? '#d4d4ff' : '#46f1c5';
-
-      if (!items.length) {
-        content.innerHTML = '<div style="text-align:center;padding:40px;color:#6b7280;font-size:14px;">لا يوجد ' + (tab === 'vars' ? 'Variables' : tab === 'trigs' ? 'Triggers' : 'Tags') + ' في الـ Config الحالي</div>';
-        return;
-      }
-
-      var html = '<div style="display:flex;flex-direction:column;gap:8px;">';
-      items.forEach(function (item, i) {
-        var name = item.name || '(بدون اسم)';
-        var type = item.type || '—';
-        var jsonStr = JSON.stringify(item, null, 2);
-        html += '<div style="border:1px solid rgba(255,255,255,.07);border-radius:12px;overflow:hidden;">'
-          + '<div onclick="togglePayloadItem(\'pi' + tab + i + '\')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;background:rgba(255,255,255,.03);">'
-          + '<div style="display:flex;align-items:center;gap:10px;">'
-          + '<span class="material-symbols-outlined" style="font-size:16px;color:' + color + ';">' + icon + '</span>'
-          + '<span style="font-weight:700;font-size:13px;color:#e1e2eb;">' + _esc(name) + '</span>'
-          + '</div>'
-          + '<div style="display:flex;align-items:center;gap:8px;">'
-          + '<span style="font-size:11px;padding:2px 8px;border-radius:6px;background:rgba(255,255,255,.06);color:#6b7280;">' + _esc(type) + '</span>'
-          + '<span class="material-symbols-outlined" style="font-size:16px;color:#6b7280;">expand_more</span>'
-          + '</div>'
-          + '</div>'
-          + '<pre id="pi' + tab + i + '" style="display:none;margin:0;padding:14px 16px;font-family:monospace;font-size:11.5px;color:#bacac2;line-height:1.6;border-top:1px solid rgba(255,255,255,.05);background:#0b0e14;white-space:pre-wrap;word-break:break-all;">'
-          + _esc(jsonStr) + '</pre>'
-          + '</div>';
-      });
-      html += '</div>';
-      content.innerHTML = html;
-    }
-
-    function togglePayloadItem(id) {
-      var el = document.getElementById(id);
-      if (!el) return;
-      el.style.display = el.style.display === 'none' ? 'block' : 'none';
-    }
-
-    function copyPayloadRaw() {
-      try {
-        navigator.clipboard.writeText(_payloadData.raw);
-        var btn = event.currentTarget;
-        var orig = btn.innerHTML;
-        btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px;">check</span> Copied!';
-        setTimeout(function () { btn.innerHTML = orig; }, 1800);
-      } catch (e) { alert('Copy failed'); }
-    }
-
-    function _esc(str) {
-      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-  </script>
-
-  <!-- ══════ PAYLOAD TESTER MODAL ══════ -->
-  <div id="payloadModal"
-    style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
-    <div
-      style="background:#15181f;border:1.5px solid rgba(70,241,197,.2);border-radius:20px;width:100%;max-width:760px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.6);">
-
-      <!-- Header -->
-      <div
-        style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid rgba(255,255,255,.06);">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span class="material-symbols-outlined" style="color:#adc6ff;font-size:20px;">preview</span>
-          <span style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:16px;color:#e1e2eb;">Payload
-            Preview</span>
-          <span id="payloadBadge"
-            style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;background:rgba(70,241,197,.1);color:#46f1c5;border:1px solid rgba(70,241,197,.2);"></span>
-        </div>
-        <button onclick="document.getElementById('payloadModal').style.display='none'"
-          style="background:rgba(255,255,255,.05);border:none;border-radius:8px;width:32px;height:32px;cursor:pointer;color:#bacac2;font-size:18px;display:flex;align-items:center;justify-content:center;">✕</button>
-      </div>
-
-      <!-- Tabs -->
-      <div style="display:flex;gap:4px;padding:12px 22px 0;border-bottom:1px solid rgba(255,255,255,.06);">
-        <button id="ptab-vars" onclick="showPayloadTab('vars')"
-          style="padding:8px 16px;border-radius:8px 8px 0 0;border:none;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;">Variables</button>
-        <button id="ptab-trigs" onclick="showPayloadTab('trigs')"
-          style="padding:8px 16px;border-radius:8px 8px 0 0;border:none;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;">Triggers</button>
-        <button id="ptab-tags" onclick="showPayloadTab('tags')"
-          style="padding:8px 16px;border-radius:8px 8px 0 0;border:none;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;">Tags</button>
-        <button id="ptab-raw" onclick="showPayloadTab('raw')"
-          style="padding:8px 16px;border-radius:8px 8px 0 0;border:none;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;">Raw
-          JSON</button>
-      </div>
-
-      <!-- Content -->
-      <div id="payloadTabC
+              + ((px.events && px.events.length) ? '<button onclick="(function(
