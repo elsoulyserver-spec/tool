@@ -332,18 +332,15 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
     console.warn('[gtm] bulk import failed (' + (bulkErr.status || bulkErr.message) + ') — falling back to individual calls');
   }
 
-  // ── FALLBACK: Staggered bursts, one call per entity ──────────────────────
-  // GTM write quota: ~50 ops/min per user (service account).
-  // We fire BURST_SIZE items per cycle with a per-item stagger (ITEM_STAGGER_MS)
-  // so they don't all land at once and trigger simultaneous 429 retries.
-  // After each burst we wait BURST_WAIT_MS — must be > 60 s (the quota window)
-  // so the window fully resets before the next burst starts.
+  // ── FALLBACK: Serial calls with fixed inter-call gap ─────────────────────
+  // GTM write quota: ~50 ops/min per user. Firing in parallel bursts caused
+  // cascading 429s (thundering herd + quota window not fully reset).
   //
-  // BURST_SIZE=10 × ITEM_STAGGER_MS=300ms → burst takes ~3 s → 10 items / ~68 s cycle
-  // = ~9 writes/min, well under the 50/min hard limit even on restrictive projects.
-  const BURST_SIZE      = 10;
-  const BURST_WAIT_MS   = 65000;   // > 60 s quota window — was 45 s (bug: too short)
-  const ITEM_STAGGER_MS = 300;     // ms between items within a burst (thundering-herd guard)
+  // Solution: fully serialise all calls with a 2 s minimum gap between them.
+  //   2 000 ms gap → max 30 calls/min — well under the 50/min hard limit.
+  //   62 vars+trigs → ~124 s (~2 min). 30 tags → ~60 s. Total: ~3 min.
+  //   Zero 429s because we never approach the quota ceiling.
+  const MIN_CALL_GAP_MS = 2000;
 
   let done = 0;
   const reportBurst = (label) => report(`${label}`, done);
@@ -374,26 +371,16 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
   }
 
   async function runInBursts(items, label, writeFn) {
-    for (let i = 0; i < items.length; i += BURST_SIZE) {
-      const batch      = items.slice(i, i + BURST_SIZE);
-      const batchStart = Date.now();
-
-      // Stagger each item within the burst by ITEM_STAGGER_MS to prevent
-      // all requests arriving at Google simultaneously and triggering a
-      // thundering-herd of simultaneous 429s + retries.
-      await Promise.all(batch.map(async (item, idx) => {
-        if (idx > 0) await sleep(idx * ITEM_STAGGER_MS);
-        await writeFn(item);
-        done++;
-        reportBurst(label);
-      }));
-
-      if (i + BURST_SIZE < items.length) {
-        // Wait the full quota-window remainder (BURST_WAIT_MS > 60 s) so the
-        // per-minute counter resets fully before the next burst starts.
-        const elapsed = Date.now() - batchStart;
-        const wait    = Math.max(0, BURST_WAIT_MS - elapsed);
-        console.log(`[gtm] burst done (${batch.length} items in ${elapsed}ms) — waiting ${wait}ms for quota reset`);
+    for (let i = 0; i < items.length; i++) {
+      const callStart = Date.now();
+      await writeFn(items[i]);
+      done++;
+      reportBurst(label);
+      // Enforce minimum gap between calls so we stay under the GTM quota
+      // ceiling without ever needing a 429 retry.
+      if (i < items.length - 1) {
+        const elapsed = Date.now() - callStart;
+        const wait    = Math.max(0, MIN_CALL_GAP_MS - elapsed);
         if (wait > 0) await sleep(wait);
       }
     }
@@ -1373,4 +1360,18 @@ async function provisionForClientWithServer(opts) {
     .filter(p => (opts.capiTokens[p] || '').trim());
   if (capiPlatforms.length) {
     onProgress({ stage: 'capi_templates', done: 0, total: capiPlatforms.length });
-    await createCAPITemplates(serverConta
+    await createCAPITemplates(serverContainerId, serverWorkspaceId, capiPlatforms);
+    onProgress({ stage: 'capi_templates', done: capiPlatforms.length, total: capiPlatforms.length });
+    console.log('[gtm] CAPI templates created for:', capiPlatforms.join(', '));
+  }
+
+  // ── Phase 4: Import web config ────────────────────────────────────────────
+  onProgress({ stage: 'web_import', done: 0, total: 1 });
+  const webImport = await importContainerJSON(
+    webContainerId, webWorkspaceId, opts.configJson, null,
+    p => onProgress({ stage: 'web_import', ...p }),
+  );
+
+  // ── Phase 5: Import server config ─────────────────────────────────────────
+  let sgtmConfig;
+  if (opts.serverConfigJson
