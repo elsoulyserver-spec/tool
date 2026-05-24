@@ -127,7 +127,9 @@ function httpsJSON(opts, body) {
       res.on('end', () => {
         let parsed = null;
         try { parsed = data ? JSON.parse(data) : {}; } catch (_) { parsed = { raw: data }; }
-        resolve({ status: res.statusCode, data: parsed });
+        // Expose Retry-After header so gtmRequest can honour it on 429.
+        const retryAfter = res.headers && res.headers['retry-after'];
+        resolve({ status: res.statusCode, data: parsed, retryAfter });
       });
     });
     req.on('error', reject);
@@ -163,13 +165,14 @@ async function getAccessToken() {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ── Generic GTM REST call wrapper with retry/backoff ────────────────────────
-// GTM quotas default to ~25 writes/minute per user, so we retry 429 with
-// long waits (>= 60s) to let the per-minute window reset fully.
+// GTM quota: up to ~50 writes/min per user (service account).  We retry 429
+// with waits >= 65 s to guarantee the per-minute window fully resets.
+// Retry-After header is honoured when Google sends one.
 async function gtmRequest(method, path, body, attempt = 0) {
   const MAX_RETRIES = 4;
 
   const token = await getAccessToken();
-  const { status, data } = await httpsJSON({
+  const { status, data, retryAfter } = await httpsJSON({
     hostname: GTM_HOST,
     path: API_BASE + path,
     method,
@@ -185,10 +188,12 @@ async function gtmRequest(method, path, body, attempt = 0) {
   if (attempt < MAX_RETRIES) {
     let waitMs = 0;
     if (status === 429) {
-      // 429 means we're past the minute quota — wait the full window + buffer.
-      // GTM quota is "per minute per user", so we need >= 60s to reset.
-      // Schedule: 65s -> 70s -> 80s -> 90s (always > one full quota window).
-      waitMs = [65000, 70000, 80000, 90000][attempt];
+      // Honour Retry-After if Google sends it (value is seconds).
+      // Otherwise use our own schedule — always > 60 s (the quota window).
+      // Schedule: 65s → 70s → 80s → 95s across four attempts.
+      const retryAfterMs = retryAfter ? parseInt(retryAfter, 10) * 1000 + 2000 : 0;
+      const defaultWait  = [65000, 70000, 80000, 95000][attempt];
+      waitMs = Math.max(retryAfterMs, defaultWait);
     } else if (status >= 500 && status < 600) {
       // Transient 5xx — shorter exponential backoff
       waitMs = [2000, 5000, 10000, 20000][attempt];
@@ -327,13 +332,18 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
     console.warn('[gtm] bulk import failed (' + (bulkErr.status || bulkErr.message) + ') — falling back to individual calls');
   }
 
-  // ── FALLBACK: Parallel bursts, one call per entity ────────────────────────
-  // GTM write quota: ~25 ops/min. Fire BURST_SIZE items in parallel, then wait
-  // BURST_WAIT_MS for the quota window to reset before the next burst.
-  // BURST_SIZE=18 per 45s = 24/min — stays just under the 25/min hard quota.
-  // Saves ~20s per burst cycle vs the old 65s window.
-  const BURST_SIZE    = 18;
-  const BURST_WAIT_MS = 45000;
+  // ── FALLBACK: Staggered bursts, one call per entity ──────────────────────
+  // GTM write quota: ~50 ops/min per user (service account).
+  // We fire BURST_SIZE items per cycle with a per-item stagger (ITEM_STAGGER_MS)
+  // so they don't all land at once and trigger simultaneous 429 retries.
+  // After each burst we wait BURST_WAIT_MS — must be > 60 s (the quota window)
+  // so the window fully resets before the next burst starts.
+  //
+  // BURST_SIZE=10 × ITEM_STAGGER_MS=300ms → burst takes ~3 s → 10 items / ~68 s cycle
+  // = ~9 writes/min, well under the 50/min hard limit even on restrictive projects.
+  const BURST_SIZE      = 10;
+  const BURST_WAIT_MS   = 65000;   // > 60 s quota window — was 45 s (bug: too short)
+  const ITEM_STAGGER_MS = 300;     // ms between items within a burst (thundering-herd guard)
 
   let done = 0;
   const reportBurst = (label) => report(`${label}`, done);
@@ -365,19 +375,26 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
 
   async function runInBursts(items, label, writeFn) {
     for (let i = 0; i < items.length; i += BURST_SIZE) {
-      const batch     = items.slice(i, i + BURST_SIZE);
+      const batch      = items.slice(i, i + BURST_SIZE);
       const batchStart = Date.now();
-      await Promise.all(batch.map(async (item) => {
+
+      // Stagger each item within the burst by ITEM_STAGGER_MS to prevent
+      // all requests arriving at Google simultaneously and triggering a
+      // thundering-herd of simultaneous 429s + retries.
+      await Promise.all(batch.map(async (item, idx) => {
+        if (idx > 0) await sleep(idx * ITEM_STAGGER_MS);
         await writeFn(item);
         done++;
         reportBurst(label);
       }));
+
       if (i + BURST_SIZE < items.length) {
-        const wait = Math.max(0, BURST_WAIT_MS - (Date.now() - batchStart));
-        if (wait > 0) {
-          console.log(`[gtm] burst done — waiting ${wait}ms`);
-          await sleep(wait);
-        }
+        // Wait the full quota-window remainder (BURST_WAIT_MS > 60 s) so the
+        // per-minute counter resets fully before the next burst starts.
+        const elapsed = Date.now() - batchStart;
+        const wait    = Math.max(0, BURST_WAIT_MS - elapsed);
+        console.log(`[gtm] burst done (${batch.length} items in ${elapsed}ms) — waiting ${wait}ms for quota reset`);
+        if (wait > 0) await sleep(wait);
       }
     }
   }
@@ -1356,27 +1373,4 @@ async function provisionForClientWithServer(opts) {
     .filter(p => (opts.capiTokens[p] || '').trim());
   if (capiPlatforms.length) {
     onProgress({ stage: 'capi_templates', done: 0, total: capiPlatforms.length });
-    await createCAPITemplates(serverContainerId, serverWorkspaceId, capiPlatforms);
-    onProgress({ stage: 'capi_templates', done: capiPlatforms.length, total: capiPlatforms.length });
-    console.log('[gtm] CAPI templates created for:', capiPlatforms.join(', '));
-  }
-
-  // ── Phase 4: Import web config ────────────────────────────────────────────
-  onProgress({ stage: 'web_import', done: 0, total: 1 });
-  const webImport = await importContainerJSON(
-    webContainerId, webWorkspaceId, opts.configJson, null,
-    p => onProgress({ stage: 'web_import', ...p }),
-  );
-
-  // ── Phase 5: Import server config ─────────────────────────────────────────
-  let sgtmConfig;
-  if (opts.serverConfigJson) {
-    sgtmConfig = opts.serverConfigJson;
-  } else {
-    try { sgtmConfig = require('./lib/sgtm-default-config.json'); }
-    catch (_) { sgtmConfig = { containerVersion: { variable: [], trigger: [], tag: [] } }; }
-  }
-  onProgress({ stage: 'sgtm_import', done: 0, total: 1 });
-  let serverImport = { importedTagCount: 0, importedTriggerCount: 0, importedVariableCount: 0 };
-  try {
-    serverImport = await importCon
+    await createCAPITemplates(serverConta
