@@ -7054,6 +7054,7 @@
           "const getEventData       = require('getEventData');",
           "const encodeUriComponent = require('encodeUriComponent');",
           "const getTimestampMillis = require('getTimestampMillis');",
+          "const Math               = require('Math');",
           '',
           "const eventId  = getEventData('event_id') || ('ET-' + getTimestampMillis());",
           "const currency = getEventData('currency') || 'SAR';",
@@ -7123,6 +7124,7 @@
           "const JSON               = require('JSON');",
           "const getEventData       = require('getEventData');",
           "const getTimestampMillis = require('getTimestampMillis');",
+          "const Math               = require('Math');",
           '',
           'function clean(o){var r={};for(var k in o){if(o[k]!==""&&o[k]!=null)r[k]=o[k];}return r;}',
           '',
@@ -7180,6 +7182,7 @@
           "const JSON               = require('JSON');",
           "const getEventData       = require('getEventData');",
           "const getTimestampMillis = require('getTimestampMillis');",
+          "const Math               = require('Math');",
           '',
           'function clean(o){var r={};for(var k in o){if(o[k]!==""&&o[k]!=null)r[k]=o[k];}return r;}',
           '',
@@ -7187,7 +7190,7 @@
           "  event_conversion_type: 'WEB',",
           '  event_type:   data.eventType,',
           "  event_tag:    getEventData('event_id') || ('SNAP-' + getTimestampMillis()),",
-          '  timestamp:    new Date().toISOString(),',
+          '  timestamp:    getTimestampMillis(),',
           '  hashed_data_fields: clean({',
           "    email:        getEventData('user_data.em') || getEventData('up.em'),",
           "    phone_number: getEventData('user_data.ph') || getEventData('up.ph'),",
@@ -7234,10 +7237,13 @@
           "const JSON               = require('JSON');",
           "const getEventData       = require('getEventData');",
           "const getTimestampMillis = require('getTimestampMillis');",
+          "const Math               = require('Math');",
           '',
-          'const now = new Date();',
-          'function p2(n){return n<10?"0"+n:""+n;}',
-          'const convTime = now.getUTCFullYear()+"-"+p2(now.getUTCMonth()+1)+"-"+p2(now.getUTCDate())+" "+p2(now.getUTCHours())+":"+p2(now.getUTCMinutes())+":"+p2(now.getUTCSeconds())+" +0000";',
+          'var ts=Math.floor(getTimestampMillis()/1000);function p2(n){return n<10?"0"+n:""+n;}',
+          'var rem=ts%86400;var hh=Math.floor(rem/3600);rem=rem%3600;var mm=Math.floor(rem/60);var ss=rem%60;',
+          'var totalDays=Math.floor(ts/86400);var y=1970;while(true){var diy=(y%4===0&&(y%100!==0||y%400===0))?366:365;if(totalDays<diy)break;totalDays-=diy;y++;}',
+          'var leap=(y%4===0&&(y%100!==0||y%400===0));var mD=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31];var mo=0;while(totalDays>=mD[mo]){totalDays-=mD[mo];mo++;}',
+          'const convTime=y+"-"+p2(mo+1)+"-"+p2(totalDays+1)+" "+p2(hh)+":"+p2(mm)+":"+p2(ss)+" +0000";',
           '',
           'const ids = [];',
           "const em  = getEventData('user_data.em') || getEventData('up.em');",
@@ -7338,7 +7344,7 @@
         'const payload = JSON.stringify({',
         '  data: [{',
         '    event_name:       eventName,',
-        '    event_time:       Math.floor(getTimestampMillis() / 1000),',
+        '    event_time:       Math.floor(getTimestampMillis() / 1000),  // Math is required above',
         '    event_id:         eventId,',
         "    action_source:    'website',",
         '    event_source_url: pageUrl || undefined,',
@@ -15433,15 +15439,4 @@
         }).filter(function (x) { return x && x.item_id; });
       }
 
-      // ── Dynamic product extractor — detects shape by MEANING, not fixed paths ──
-      function extractSallaProducts(raw) {
-        var out = [];
-        var ec = raw.ecommerce || {};
-        var slot0 = raw[0] || raw['0'];
-        [ec.add, ec.remove, ec.purchase, ec.checkout, ec.detail].forEach(function (box) {
-          if (box && Array.isArray(box.products) && box.products.length) out.push(box.products);
-        });
-        if (Array.isArray(ec.impressions) && ec.impressions.length) out.push(ec.impressions);
-        if (Array.isArray(ec.products) && ec.products.length) out.push(ec.products);
-        if (Array.isArray(raw.data) && raw.data.length) out.push(raw.data);
-        if (Ar
+      // ── Dynamic product extractor — detects shape by MEANING, not fixed paths ─�
