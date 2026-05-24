@@ -7611,7 +7611,7 @@
       var allEvTrigId = sid(triggerId);
       triggers.push({
         accountId:'000000000', containerId:'00000000', triggerId: sid(triggerId),
-        name:'All Events', type:'always',
+        name:'All Events', type:'ALWAYS',
         fingerprint: fp(triggerId)
       });
       triggerId++;
@@ -7623,8 +7623,8 @@
         triggers.push({
           accountId:'000000000', containerId:'00000000', triggerId: sid(triggerId),
           name: safeName('SS Trigger — ' + evKey + ' [' + finalEvName + ']'),
-          // ✅ CORRECT sGTM trigger type: customEvent fires when Event Name equals value
-          type: 'customEvent',
+          // ✅ CORRECT sGTM trigger type: CUSTOM_EVENT fires when Event Name equals value
+          type: 'CUSTOM_EVENT',
           customEventFilter:[{
             type:'EQUALS',
             parameter:[
@@ -7771,7 +7771,7 @@
             containerId:  '00000000',
             name:         'Easy Track — Server Container (sGTM)',
             publicId:     'GTM-SS000000',
-            usageContext: ['server'],
+            usageContext: ['SERVER'],
             notes:        _ssNote
           },
           variable:       variables,         // HTTP header variables (IP, UA)
@@ -15444,4 +15444,4 @@
         [ec.add, ec.remove, ec.purchase, ec.checkout, ec.detail].forEach(function (box) {
           if (box && Array.isArray(box.products) && box.products.length) out.push(box.products);
         });
-        if (Array.isArray(ec.impressions) && ec.impressions.length) out.push(ec.impressions);
+        if (Array.isArray(ec.impressions) && ec.impressions.length) out.push(ec.impressions
