@@ -302,17 +302,35 @@ async function importContainerJSON(containerId, workspaceId, configJson, mode, o
   // ── ATTEMPT 1: Single-call Workspace Import (GTM API v2 custom method) ────
   // POST .../workspaces/{id}:import  with the full ContainerVersion as body.
   // importOption=OVERWRITE merges cleanly with an empty or existing workspace.
-  // customTemplate[] is included so the server container's HTTP-request tag
-  // templates (et_meta_capi_manual, et_tiktok_events_manual, etc.) are
-  // registered automatically — no separate template import step required.
+  //
+  // IMPORTANT: strip server-assigned fields (accountId, containerId,
+  // workspaceId, fingerprint, path, tagId, variableId, triggerId, clientId,
+  // parentFolderId) from every entity before sending.  GTM rejects the import
+  // with 400 "Invalid value" when these are present because they conflict with
+  // the target workspace.  The fallback individual-call path already strips
+  // them — the bulk path must do the same.
+  //
+  // customTemplate[] is excluded from the bulk body: GTM's :import endpoint
+  // returns 400 for custom templates.  They are created separately via
+  // createCAPITemplates() (Phase 3) before this call.
+  const STRIP = new Set([
+    'accountId','containerId','workspaceId','fingerprint','path','parentFolderId',
+    'tagId','variableId','triggerId','clientId','templateId',
+  ]);
+  function stripEntity(obj) {
+    const out = {};
+    Object.keys(obj).forEach(k => { if (!STRIP.has(k)) out[k] = obj[k]; });
+    return out;
+  }
+
   report('importing', 0);
   const importOption = (mode === 'merge') ? 'MERGE' : 'OVERWRITE';
   const importBody = JSON.stringify({
-    ...(vars.length      ? { variable:       vars       } : {}),
-    ...(trigs.length     ? { trigger:        trigs      } : {}),
-    ...(tags.length      ? { tag:            tags       } : {}),
-    ...(clients.length   ? { client:         clients    } : {}),
-    ...(customTpl.length ? { customTemplate: customTpl  } : {}),
+    ...(vars.length    ? { variable: vars.map(stripEntity)  } : {}),
+    ...(trigs.length   ? { trigger:  trigs.map(stripEntity) } : {}),
+    ...(tags.length    ? { tag:      tags.map(stripEntity)  } : {}),
+    ...(clients.length ? { client:   clients.map(stripEntity) } : {}),
+    // customTemplate intentionally omitted — GTM :import rejects them (400)
   });
 
   try {
@@ -1361,17 +1379,4 @@ async function provisionForClientWithServer(opts) {
   if (capiPlatforms.length) {
     onProgress({ stage: 'capi_templates', done: 0, total: capiPlatforms.length });
     await createCAPITemplates(serverContainerId, serverWorkspaceId, capiPlatforms);
-    onProgress({ stage: 'capi_templates', done: capiPlatforms.length, total: capiPlatforms.length });
-    console.log('[gtm] CAPI templates created for:', capiPlatforms.join(', '));
-  }
-
-  // ── Phase 4: Import web config ────────────────────────────────────────────
-  onProgress({ stage: 'web_import', done: 0, total: 1 });
-  const webImport = await importContainerJSON(
-    webContainerId, webWorkspaceId, opts.configJson, null,
-    p => onProgress({ stage: 'web_import', ...p }),
-  );
-
-  // ── Phase 5: Import server config ─────────────────────────────────────────
-  let sgtmConfig;
-  if (opts.serverConfigJson
+    onProgress({ st
