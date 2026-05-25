@@ -7004,17 +7004,15 @@
           {
             instance: {
               key:   { publicId: 'send_http', versionId: '1' },
-              param: [{
-                key: 'allowedUrls',
-                value: {
-                  type: 1,
-                  listItem: [{
-                    type: 2,
-                    mapKey:   [{ type: 1, string: 'url' },        { type: 1, string: 'queryParameterNames' }],
-                    mapValue: [{ type: 1, string: opts.allowedHost }, { type: 1, string: 'any' }]
-                  }]
-                }
-              }]
+              param: [{ key: 'allowedUrls', value: { type: 1, string: 'any' } }]
+            },
+            clientAnnotations: { isEditedByUser: true },
+            isRequired: true
+          },
+          {
+            instance: {
+              key:   { publicId: 'read_event_data', versionId: '1' },
+              param: [{ key: 'eventDataAccess', value: { type: 1, string: 'any' } }]
             },
             clientAnnotations: { isEditedByUser: true },
             isRequired: true
@@ -7032,7 +7030,8 @@
         return [
           '___INFO___',  '', infoBlock, '',
           '___TEMPLATE_PARAMETERS___', '', paramsBlock, '',
-          '___SANDBOXED_JS_FOR_SERVER___', '', opts.js
+          '___SANDBOXED_JS_FOR_SERVER___', '', opts.js, '',
+          '___SERVER_PERMISSIONS___', '', permsBlock
         ].join('\n');
       }
 
@@ -15438,4 +15437,4 @@
           if (cat && typeof cat === 'object') cat = cat.name || cat.title || '';
           var qty = parseInt(p.quantity || p.qty, 10);
           if (isNaN(qty) || qty < 1) qty = 1;
-          
+   
