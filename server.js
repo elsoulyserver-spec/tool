@@ -2189,6 +2189,7 @@ http.createServer((req, res) => {
 
   // Dotfile/dotdir guard (.env, .git/, .DS_Store, ...)
   if (filePath.split(path.sep).some(seg => seg.startsWith('.') && seg !== '.' && seg !== '..')) {
+    res.writeHead(403, securityHeaders()); res.end('Forbidden'); return;
   }
 
   function serveFile(fp, triedFallback) {
