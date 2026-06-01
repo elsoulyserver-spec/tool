@@ -15437,4 +15437,1276 @@
           if (cat && typeof cat === 'object') cat = cat.name || cat.title || '';
           var qty = parseInt(p.quantity || p.qty, 10);
           if (isNaN(qty) || qty < 1) qty = 1;
-   
+          return {
+            item_id: String(p.id || p.product_id || p.sku || ''),
+            item_name: p.name || p.title || '',
+            item_brand: p.brand || '',
+            item_category: p.category || '',
+            price: parseFloat(p.price || p.unit_price || 0),
+            quantity: qty,
+            index: i
+          };
+        });
+      }
+
+      // ── Value logic: meaning over name ──
+      function extractValue(ga4Event, items, ec, raw) {
+        var val = 0;
+        switch (ga4Event) {
+          case 'view_item':
+            val = items.length ? items[0].price : parseFloat(raw.price || ec.value || 0);
+            break;
+          case 'view_item_list':
+            val = 0; // optional for list views
+            break;
+          case 'add_to_cart':
+            val = items.reduce(function (s, it) { return s + (it.price * it.quantity); }, 0);
+            break;
+          case 'view_cart':
+            val = items.reduce(function (s, it) { return s + (it.price * it.quantity); }, 0);
+            break;
+          case 'remove_from_cart':
+            val = items.reduce(function (s, it) { return s + (it.price * it.quantity); }, 0);
+            break;
+          case 'begin_checkout':
+            val = parseFloat(ec.value || raw.total || raw.subtotal || 0)
+              || items.reduce(function (s, it) { return s + (it.price * it.quantity); }, 0);
+            break;
+          case 'purchase':
+            var af = (ec.purchase && ec.purchase.actionField) ||
+              (ec.checkout && ec.checkout.actionField) || ec || {};
+            val = parseFloat(af.revenue || af.total || ec.revenue || raw.revenue || 0)
+              || items.reduce(function (s, it) { return s + (it.price * it.quantity); }, 0);
+            break;
+          default:
+            val = parseFloat(ec.value || raw.value || 0);
+        }
+        return Math.round(val * 100) / 100;
+      }
+
+      // ── Normalize Salla raw push to GA4 structure (shape-agnostic) ──
+      function normalizeSalla(raw) {
+        if (!raw || !raw.event) return null;
+        var ga4Ev = SALLA_UA_TO_GA4[raw.event];
+        if (!ga4Ev) return null;
+
+        var ec = raw.ecommerce || {};
+        var prod0 = (raw[0] && typeof raw[0] === 'object') ? raw[0] : {};
+
+        // Dynamic extraction — works with data[] / [0] / [0].products / ecommerce.*.products
+        var prods = extractSallaProducts(raw);
+
+        var items = normalizeSallaItems(prods);
+        var currency = ec.currencyCode || ec.currency || prod0.currency || 'SAR';
+
+        // Monetary field semantics — per-event, NOT generalized:
+        //   purchase          → ecommerce.value  (final order revenue / total)
+        //   view_item         → ecommerce.price  (single product price)
+        //   add_to_wishlist   → ecommerce.price  (single product price)
+        //   add_to_cart       → ecommerce.price  (unit price × quantity — line total)
+        //   remove_from_cart  → ecommerce.price  (line total of removed item)
+        //   view_cart         → ecommerce.price  (sum across all line items)
+        //   begin_checkout    → ecommerce.price  (sum across all line items at checkout)
+        //   view_item_list    → (no monetary field)
+        var ecBlock = { currency: currency, items: items };
+        var sumQty = items.reduce(function (s, it) { return s + (parseInt(it.quantity, 10) || 0); }, 0);
+        if (ga4Ev === 'purchase') {
+          ecBlock.value     = extractValue('purchase', items, ec, raw);
+          ecBlock.num_items = sumQty;
+        } else if (ga4Ev === 'view_item' || ga4Ev === 'add_to_wishlist') {
+          ecBlock.price     = extractValue(ga4Ev, items, ec, raw);
+          ecBlock.num_items = items.length ? (parseInt(items[0].quantity, 10) || 1) : 0;
+        } else if (ga4Ev === 'add_to_cart' || ga4Ev === 'remove_from_cart' ||
+                   ga4Ev === 'view_cart'   || ga4Ev === 'begin_checkout') {
+          ecBlock.price     = extractValue(ga4Ev, items, ec, raw);
+          ecBlock.num_items = sumQty;
+        }
+
+        var payload = {
+          event: ga4Ev,
+          event_id: generateEventId(raw, ga4Ev),
+          ecommerce: ecBlock
+        };
+
+        // purchase extras
+        if (ga4Ev === 'purchase') {
+          var af2 = (ec.purchase && ec.purchase.actionField) || {};
+          payload.ecommerce.transaction_id = String(af2.id || ec.event_id || raw.order_id || payload.event_id);
+          payload.ecommerce.tax = parseFloat(af2.tax || 0) || 0;
+          payload.ecommerce.shipping = parseFloat(af2.shipping || 0) || 0;
+          if (af2.coupon) payload.ecommerce.coupon = String(af2.coupon);
+        }
+        if (ga4Ev === 'view_item_list') {
+          payload.ecommerce.item_list_name = raw.title
+            ? String(raw.title).replace(/<[^>]+>/g, '').trim() : '';
+        }
+        if (ga4Ev === 'search') { payload.search_term = raw.searchTerm || raw.search_term || ''; delete payload.ecommerce; }
+        if (ga4Ev === 'login') { delete payload.ecommerce; payload.method = 'salla'; }
+        if (ga4Ev === 'sign_up') { delete payload.ecommerce; payload.method = 'salla'; }
+
+        if (raw.customer) payload.customer = raw.customer;
+        return payload;
+      }
+
+      // ── Normalize Zid raw push to GA4 structure ──
+      function normalizeZid(raw) {
+        if (!raw || !raw.event) return null;
+        var ga4Ev = ZID_TO_GA4[raw.event];
+        if (!ga4Ev) return null;
+
+        var ec = raw.ecommerce || {};
+
+        // Zid duplicate structure: ec might have both 'purchase' and 'items'
+        var items = [];
+        if (ec.items && Array.isArray(ec.items)) {
+          items = normalizeZidItems(ec.items);
+        } else if (ec.products && Array.isArray(ec.products)) {
+          items = normalizeZidItems(ec.products);
+        } else if (raw.items && Array.isArray(raw.items)) {
+          items = normalizeZidItems(raw.items);
+        }
+
+        var currency = ec.currency || ec.currencyCode || raw.currency || 'SAR';
+
+        // Per-event monetary field: purchase → value; all other ecommerce events → price.
+        var ecBlock = { currency: currency, items: items };
+        var sumQtyZ = items.reduce(function (s, it) { return s + (parseInt(it.quantity, 10) || 0); }, 0);
+        if (ga4Ev === 'purchase') {
+          ecBlock.value     = extractValue('purchase', items, ec, raw);
+          ecBlock.num_items = sumQtyZ;
+        } else if (ga4Ev === 'view_item' || ga4Ev === 'add_to_wishlist') {
+          ecBlock.price     = extractValue(ga4Ev, items, ec, raw);
+          ecBlock.num_items = items.length ? (parseInt(items[0].quantity, 10) || 1) : 0;
+        } else if (ga4Ev === 'add_to_cart' || ga4Ev === 'remove_from_cart' ||
+                   ga4Ev === 'view_cart'   || ga4Ev === 'begin_checkout') {
+          ecBlock.price     = extractValue(ga4Ev, items, ec, raw);
+          ecBlock.num_items = sumQtyZ;
+        }
+
+        var payload = {
+          event: ga4Ev,
+          event_id: generateEventId(raw, ga4Ev),
+          ecommerce: ecBlock
+        };
+
+        if (ga4Ev === 'purchase') {
+          payload.ecommerce.transaction_id = String(ec.transaction_id || ec.order_id || raw.order_id || payload.event_id);
+          // Remove duplicate purchase block if present
+          delete payload.ecommerce.purchase;
+        }
+        if (ga4Ev === 'search') { payload.search_term = raw.search_term || ec.search_term || ''; delete payload.ecommerce; }
+        if (ga4Ev === 'login') { delete payload.ecommerce; payload.method = 'zid'; }
+        if (ga4Ev === 'sign_up') { delete payload.ecommerce; payload.method = 'zid'; }
+
+        return payload;
+      }
+
+      // ══════════════════════════════════════════════════════
+      // 3. UNIQUE EVENT ID (Deduplication) — Meta / TikTok / CAPI
+      // ══════════════════════════════════════════════════════
+      // Priority: reuse existing id  →  order_id + ts  →  random ts.
+      // This id is sent on BOTH browser pixel & server CAPI so duplicates merge.
+      function generateEventId(raw, mapped) {
+        if (raw && typeof raw === 'object') {
+          var ec = raw.ecommerce || {};
+          if (ec.event_id)  return String(ec.event_id);
+          if (raw.event_id) return String(raw.event_id);
+          var af = (ec.purchase && ec.purchase.actionField) || {};
+          if (af.id)        return String(af.id) + '_' + Date.now();
+          if (raw.order_id) return String(raw.order_id) + '_' + Date.now();
+        }
+        var ts = Date.now().toString(36).toUpperCase();
+        var rand = Math.random().toString(36).slice(2, 8).toUpperCase();
+        return 'ET-' + (mapped ? String(mapped).toUpperCase() + '-' : '') + ts + '-' + rand;
+      }
+
+      // ══════════════════════════════════════════════════════
+      // 4. CLICK ID ATTRIBUTION
+      // ══════════════════════════════════════════════════════
+      var CLICK_ID_KEYS = ['gclid', 'fbclid', 'ttclid', 'scclid'];
+      var _clickIds = {};
+
+      function getCookie(name) {
+        var m = document.cookie.match('(^|;)\\s*et_' + name + '\\s*=\\s*([^;]+)');
+        return m ? decodeURIComponent(m[2]) : '';
+      }
+      function setCookie(name, val, days) {
+        var exp = new Date(Date.now() + days * 864e5).toUTCString();
+        document.cookie = 'et_' + name + '=' + encodeURIComponent(val) + ';expires=' + exp + ';path=/;SameSite=Lax';
+      }
+
+      function captureClickIds() {
+        var params = new URLSearchParams(window.location.search);
+        CLICK_ID_KEYS.forEach(function (k) {
+          var v = params.get(k);
+          if (v) {
+            _clickIds[k] = v;
+            setCookie(k, v, 90);
+          } else {
+            var cv = getCookie(k);
+            if (cv) _clickIds[k] = cv;
+          }
+        });
+      }
+
+      function getClickIds() {
+        var ids = {};
+        CLICK_ID_KEYS.forEach(function (k) {
+          var v = _clickIds[k] || getCookie(k);
+          if (v) ids[k] = v;
+        });
+        return ids;
+      }
+
+      // ══════════════════════════════════════════════════════
+      // 5. USER IDENTITY + SHA-256 HASHING
+      // ──────────────────────────────────────────────────────
+      // ⚠️ external_id : معرف خارجي ثابت من المنصة (سلة/زد)
+      //                  يُستخدم للـ identify على كل المنصات الـ ad/analytics
+      //                  ويُحفظ في cookie `external_id` للـ Server-Side
+      // ⚠️ user_id     : معرف داخلي للتطبيق (لو موجود) — منفصل تماماً
+      // ⚠️ كل PII (email, phone, first_name, last_name) بيتم هاش بـ SHA-256
+      //    قبل أي إرسال — لا يخرج plain text لأي منصة
+      // ══════════════════════════════════════════════════════
+      var _userIdentity = {
+        user_id: '',          // internal app user ID (separate from external_id)
+        external_id: '',      // external persistent ID from CMS (Salla / Zid)
+        email: '',            // raw — kept locally only, never sent
+        phone: '',            // raw — kept locally only, never sent
+        first_name: '',       // raw — kept locally only, never sent
+        last_name: '',        // raw — kept locally only, never sent
+        email_hashed: '',
+        phone_hashed: '',
+        first_name_hashed: '',
+        last_name_hashed: ''
+      };
+
+      async function sha256(str) {
+        if (!str) return '';
+        if (typeof crypto === 'undefined' || !crypto.subtle) return '';
+        var normalized = String(str).trim().toLowerCase();
+        if (!normalized) return '';
+        try {
+          var buf = new TextEncoder().encode(normalized);
+          var hash = await crypto.subtle.digest('SHA-256', buf);
+          return Array.from(new Uint8Array(hash)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+        } catch (e) {
+          // Graceful fallback when SubtleCrypto isn't available (HTTP, old browsers)
+          if (typeof console !== 'undefined') console.warn('[ET] sha256 failed:', e && e.message);
+          return '';
+        }
+      }
+
+      // Normalize phone numbers: strip non-digits + leading zeros, prepend `+` if E.164 already
+      function normalizePhone(p) {
+        if (!p) return '';
+        var s = String(p).replace(/[^0-9+]/g, '');
+        if (s.charAt(0) === '+') return s;
+        return s.replace(/^0+/, '');
+      }
+
+      // Accepts an object so additional PII fields don't break older callers.
+      // Backward-compatible: still accepts (userId, externalId, email, phone) positional args.
+      async function updateUserIdentity(arg1, externalId, email, phone) {
+        var p = (arg1 && typeof arg1 === 'object') ? arg1 : {
+          user_id: arg1, external_id: externalId, email: email, phone: phone
+        };
+        _userIdentity.user_id = p.user_id || '';
+        _userIdentity.external_id = p.external_id || '';
+        _userIdentity.email = p.email || '';
+        _userIdentity.phone = p.phone || '';
+        _userIdentity.first_name = p.first_name || '';
+        _userIdentity.last_name = p.last_name || '';
+
+        var phNorm = normalizePhone(_userIdentity.phone);
+        _userIdentity.email_hashed      = _userIdentity.email      ? await sha256(_userIdentity.email)      : '';
+        _userIdentity.phone_hashed      = phNorm                   ? await sha256(phNorm)                   : '';
+        _userIdentity.first_name_hashed = _userIdentity.first_name ? await sha256(_userIdentity.first_name) : '';
+        _userIdentity.last_name_hashed  = _userIdentity.last_name  ? await sha256(_userIdentity.last_name)  : '';
+
+        try { localStorage.setItem('et_identity', JSON.stringify(_userIdentity)); } catch (e) { }
+      }
+
+      // Returns ONLY hashed PII + IDs, never raw values.
+      // external_id is always the primary external user identifier.
+      function getUserData() {
+        var d = {};
+        if (_userIdentity.external_id)      d.external_id = _userIdentity.external_id;
+        if (_userIdentity.user_id)          d.user_id     = _userIdentity.user_id;
+        if (_userIdentity.email_hashed)     d.email       = _userIdentity.email_hashed;
+        if (_userIdentity.phone_hashed)     d.phone       = _userIdentity.phone_hashed;
+        if (_userIdentity.first_name_hashed) d.first_name = _userIdentity.first_name_hashed;
+        if (_userIdentity.last_name_hashed)  d.last_name  = _userIdentity.last_name_hashed;
+        return Object.keys(d).length ? d : null;
+      }
+
+      // ══════════════════════════════════════════════════════
+      // 6. PLATFORM PARAMETER MAPPING
+      // ══════════════════════════════════════════════════════
+      function buildPlatformPayload(platform, ga4Payload) {
+        var ev = ga4Payload.event;
+        var ec = ga4Payload.ecommerce || {};
+        var items = ec.items || [];
+        var clickIds = getClickIds();
+        var ud = getUserData();
+
+        var base = {
+          event_id: ga4Payload.event_id,
+          event_time: Math.floor(Date.now() / 1000)
+        };
+        if (clickIds[platform === 'google' ? 'gclid' : platform === 'meta' ? 'fbclid' :
+          platform === 'tiktok' ? 'ttclid' : platform === 'snapchat' ? 'scclid' : '']) {
+          base.click_id = clickIds[platform === 'google' ? 'gclid' :
+            platform === 'meta' ? 'fbclid' : platform === 'tiktok' ? 'ttclid' : 'scclid'];
+        }
+
+        switch (platform) {
+          case 'ga4':
+            return Object.assign({}, ga4Payload);
+
+          case 'meta':
+            var metaPayload = Object.assign({}, base, {
+              event_name: ET_EVENT_MAP.meta[ev] || ev,
+              custom_data: {
+                currency: ec.currency || 'SAR',
+                value: ec.value || 0,
+                content_ids: items.map(function (i) { return i.item_id; }),
+                content_type: 'product',
+                num_items: items.length
+              }
+            });
+            if (ud) { metaPayload.user_data = { external_id: ud.external_id, em: ud.email, ph: ud.phone }; }
+            if (clickIds.fbclid) metaPayload.user_data = Object.assign(metaPayload.user_data || {}, { fbc: 'fb.1.' + Date.now() + '.' + clickIds.fbclid });
+            return metaPayload;
+
+          case 'tiktok':
+            return Object.assign({}, base, {
+              event: ET_EVENT_MAP.tiktok[ev] || ev,
+              properties: {
+                currency: ec.currency || 'SAR',
+                value: ec.value || 0,
+                contents: items.map(function (i) { return { content_id: i.item_id, content_name: i.item_name, quantity: i.quantity, price: i.price }; }),
+                content_type: 'product'
+              },
+              user: ud ? { external_id: ud.external_id, email: ud.email, phone_number: ud.phone } : {}
+            });
+
+          case 'snapchat':
+            return Object.assign({}, base, {
+              event_type: ET_EVENT_MAP.snapchat[ev] || ev,
+              event_conversion_type: 'WEB',
+              price: ec.value || 0,
+              currency: ec.currency || 'SAR',
+              item_ids: items.map(function (i) { return i.item_id; }),
+              user_data: ud ? { external_id: ud.external_id } : {}
+            });
+
+          case 'google':
+            return Object.assign({}, base, {
+              event_type: ET_EVENT_MAP.google[ev] || ev,
+              value: ec.value || 0,
+              currency: ec.currency || 'SAR',
+              transaction_id: ec.transaction_id || '',
+              gclid: clickIds.gclid || ''
+            });
+
+          case 'mixpanel':
+            // ── Mixpanel: external_id is the canonical distinct_id ──
+            // user_id (internal app id) is sent as a SEPARATE custom prop
+            // PII is sent ONLY as hashed values via people.set
+            var mxDistinct = _userIdentity.external_id || _userIdentity.user_id || '';
+            var mxProps = {
+              currency: ec.currency || 'SAR',
+              revenue: ec.value || 0,
+              value: ec.value || 0,
+              transaction_id: ec.transaction_id || '',
+              num_items: items.length,
+              products: items,
+              distinct_id: mxDistinct,
+              $insert_id: ga4Payload.event_id  // dedup across client/server hybrid
+            };
+            if (_userIdentity.user_id) mxProps.user_id = _userIdentity.user_id;
+
+            var mxPeople = null;
+            if (ud) {
+              mxPeople = {};
+              if (ud.email)      mxPeople.$email             = ud.email;       // hashed
+              if (ud.phone)      mxPeople.$phone             = ud.phone;       // hashed
+              if (ud.first_name) mxPeople.$first_name_hashed = ud.first_name;  // hashed
+              if (ud.last_name)  mxPeople.$last_name_hashed  = ud.last_name;   // hashed
+              if (_userIdentity.user_id) mxPeople.user_id = _userIdentity.user_id;
+              mxPeople.external_id = mxDistinct;
+            }
+
+            return Object.assign({}, base, {
+              event: ET_EVENT_MAP.mixpanel[ev] || ev,
+              external_id: mxDistinct,
+              identify: { distinct_id: mxDistinct },
+              people_set: mxPeople,
+              properties: mxProps
+            });
+
+          default:
+            return Object.assign({}, base, ga4Payload);
+        }
+      }
+
+      // ── A3: Augment payload with SS routing fields when ssEnabled ─────────
+      // Wraps buildPlatformPayload to append transport_url + ss_user_data.
+      var _origBuildPlatformPayload = buildPlatformPayload;
+      buildPlatformPayload = function (platform, ga4Payload) {
+        var payload = _origBuildPlatformPayload(platform, ga4Payload);
+        if (window.ET && window.ET.ssEnabled && window.ET.ssUrl) {
+          payload.transport_url = window.ET.ssUrl + '/g/collect';
+          var ud = getUserData();
+          if (ud) payload.ss_user_data = ud;
+        }
+        return payload;
+      };
+
+      // ══════════════════════════════════════════════════════
+      // 7. PLATFORM ISOLATION DISPATCHER
+      // ══════════════════════════════════════════════════════
+      var _activePlatforms = ['ga4']; // defaults; updated from S.platforms when available
+
+      function dispatch(ga4Payload, activePlatforms) {
+        var plats = activePlatforms || _activePlatforms;
+        var results = {};
+        plats.forEach(function (p) {
+          try {
+            var mapped = buildPlatformPayload(p, ga4Payload);
+            results[p] = { status: 'ok', payload: mapped };
+          } catch (e) {
+            results[p] = { status: 'error', error: e.message };
+          }
+        });
+        return results;
+      }
+
+      // ══════════════════════════════════════════════════════
+      // 8. GLOBAL ENGINE STATE
+      // ══════════════════════════════════════════════════════
+      var ET = window.ET = {
+        cms: 'salla',
+        platforms: ['ga4'],
+        events: [],
+        clickIds: _clickIds,
+        identity: _userIdentity,
+        normalize: function (raw, cms) { return (cms || ET.cms) === 'salla' ? normalizeSalla(raw) : normalizeZid(raw); },
+        dispatch: dispatch,
+        generateId: generateEventId,
+        captureClickIds: captureClickIds,
+        sha256: sha256,
+        getUserData: getUserData,
+        // H4: Server-Side Tracking state — populated by the SS wizard on save
+        ssEnabled:   false,
+        ssUrl:       '',
+        ssPlatforms: {}   // { meta: true, tiktok: true, ... } — only enabled platforms
+      };
+
+      // Boot: capture click IDs immediately
+      captureClickIds();
+
+      // Load saved identity
+      try {
+        var saved = JSON.parse(localStorage.getItem('et_identity') || '{}');
+        if (saved.user_id) _userIdentity.user_id = saved.user_id;
+        if (saved.external_id) _userIdentity.external_id = saved.external_id;
+        if (saved.email) _userIdentity.email = saved.email;
+        if (saved.phone) _userIdentity.phone = saved.phone;
+        if (saved.email_hashed) _userIdentity.email_hashed = saved.email_hashed;
+        if (saved.phone_hashed) _userIdentity.phone_hashed = saved.phone_hashed;
+      } catch (e) { }
+
+
+
+
+
+      // ══════════════════════════════════════════════════════
+      // 11. SERVER-SIDE WIZARD (6-step flow)
+      // ══════════════════════════════════════════════════════
+
+      // ── Wizard state ──────────────────────────────────────
+      var _ssStep           = 1;
+      var _ssServerUrl      = '';
+      var _ssEnabledPlats   = [];   // server-side platforms  e.g. ['meta','tiktok']
+      var _ssSsEvents       = ['purchase'];  // server-side events (default: purchase)
+      var _ssGa4Id          = '';   // GA4 Measurement ID for SS
+      var _ssClientPlats    = ['google_ads','ga4'];  // client-side platforms
+      var _ssGa4Events      = ['purchase','add_to_cart','view_item','begin_checkout','page_view'];
+      var _ssGoogleAdsEvents= ['purchase','lead'];   // Google Ads conversion events
+      var _ssTokens         = {};   // { meta: 'raw...', tiktok: '...' } — in-memory only
+      var _ssConfigLoaded   = false;
+      var _ssJobId          = null;
+      var _ssJobPollTimer   = null;
+      // container IDs filled after step 1
+      var _ssWebGtmId       = '';
+      var _ssServerGtmId    = '';
+      var _ssContainerConfig= '';
+      var _ssWebSnippetHead = '';
+      var _ssWebSnippetBody = '';
+      var _ssContainersReady= false;
+      var _ssUrlValidated   = false;
+      // init guard
+      var _ssInit           = false;
+
+      // ── Platform definitions ──────────────────────────────
+      var _ssPlatDefs = [
+        { key: 'meta',     name: 'Meta CAPI',         sub: 'Conversions API',       icon: '👥', color: '#1877F2', ph: 'Access Token (EAABsbCS...)' },
+        { key: 'tiktok',   name: 'TikTok Events API', sub: 'Pixel Server-Side',     icon: '🎵', color: '#69C9D0', ph: 'Access Token (tta_...)' },
+        { key: 'snapchat', name: 'Snapchat CAPI',     sub: 'Conversions API',       icon: '👻', color: '#FFFC00', ph: 'Access Token' },
+        { key: 'linkedin', name: 'LinkedIn CAPI',     sub: 'Conversions API',       icon: '💼', color: '#0A66C2', ph: 'Access Token' },
+        { key: 'twitter',  name: 'Twitter CAPI',      sub: 'Conversions API',       icon: '🐦', color: '#1DA1F2', ph: 'Access Token' },
+        { key: 'ga4',      name: 'GA4 Measurement',  sub: 'Measurement Protocol',  icon: '📊', color: '#F9AB00', ph: 'API Secret' },
+      ];
+
+      // SS events catalogue
+      var _ssEventDefs = [
+        { key: 'purchase',         label: 'Purchase',          rec: true,  warn: false },
+        { key: 'add_to_cart',      label: 'AddToCart',         rec: false, warn: false },
+        { key: 'initiate_checkout',label: 'InitiateCheckout',  rec: false, warn: false },
+        { key: 'view_content',     label: 'ViewContent',       rec: false, warn: false },
+        { key: 'lead',             label: 'Lead',              rec: false, warn: false },
+        { key: 'sign_up',          label: 'SignUp',            rec: false, warn: false },
+        { key: 'page_view',        label: 'PageView',          rec: false, warn: true  },
+      ];
+
+      // Client-side platform defs
+      var _ssClientPlatDefs = [
+        { key: 'google_ads', name: 'Google Ads',      sub: 'Conversion Tracking مستقل',    icon: '🔵' },
+        { key: 'ga4',        name: 'GA4 (Data Layer)',sub: 'يبعت الداتا للسيرفر عبر transport_url', icon: '📊' },
+        { key: 'microsoft',  name: 'Microsoft Ads',   sub: 'UET Tag',                      icon: '🟦' },
+        { key: 'pinterest',  name: 'Pinterest Ads',   sub: 'Tag',                          icon: '📌' },
+      ];
+
+      // GA4 events for client-side
+      var _ssGa4EventDefs = [
+        { key: 'purchase',        label: 'purchase' },
+        { key: 'add_to_cart',     label: 'add_to_cart' },
+        { key: 'view_item',       label: 'view_item' },
+        { key: 'begin_checkout',  label: 'begin_checkout' },
+        { key: 'page_view',       label: 'page_view' },
+        { key: 'search',          label: 'search' },
+        { key: 'login',           label: 'login' },
+        { key: 'sign_up',         label: 'sign_up' },
+      ];
+
+      // Google Ads conversion events
+      var _ssGadsEventDefs = [
+        { key: 'purchase', label: 'Purchase (Conversion)' },
+        { key: 'lead',     label: 'Lead (Conversion)' },
+        { key: 'sign_up',  label: 'SignUp (Conversion)' },
+        { key: 'contact',  label: 'Contact (Conversion)' },
+      ];
+
+      // ── Helper: get Firebase ID token ────────────────────
+      async function _ssIdToken() {
+        try {
+          if (!window.firebase || !firebase.auth) return null;
+          var u = firebase.auth().currentUser;
+          if (!u) return null;
+          return await u.getIdToken(false);
+        } catch (e) { return null; }
+      }
+
+      function _ssClientId() {
+        return (window.ET && window.ET.clientId) || window._clientId || '';
+      }
+
+      // ── Generic authenticated API call ───────────────────
+      function _ssApi(method, path, body, cb) {
+        _ssIdToken().then(function (idToken) {
+          if (!idToken) { cb(new Error('غير مسجّل دخول — أعد تسجيل الدخول للمتابعة'), null); return; }
+          var opts = {
+            method: method,
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken, 'X-Client-Id': _ssClientId() },
+          };
+          if (body) opts.body = JSON.stringify(body);
+          fetch(path, opts)
+            .then(function (r) {
+              var status = r.status;
+              return r.text().then(function (text) {
+                var data;
+                try { data = JSON.parse(text); }
+                catch (_) {
+                  // Server returned non-JSON (likely HTML error page)
+                  var preview = text.slice(0, 120).replace(/\s+/g, ' ');
+                  cb(new Error('HTTP ' + status + ' — الخادم أرجع استجابة غير JSON: ' + preview), null);
+                  return null;
+                }
+                cb(null, { ok: r.ok, status: status, data: data });
+                return null;
+              });
+            })
+            .catch(function (err) { cb(err, null); });
+        });
+      }
+
+      // ── Step navigator ────────────────────────────────────
+      window.ss_goToStep = function (n) {
+        if (n < 1 || n > 6) return;
+        // Guard: can't skip past step 1 unless containers are ready
+        if (n > 1 && !_ssContainersReady) { showToast('أنشئ الـ Containers أولاً في الخطوة 1'); return; }
+        if (n > 2 && !_ssUrlValidated)    { showToast('تحقق من Server URL أولاً في الخطوة 2'); return; }
+        _ssStep = n;
+        for (var i = 1; i <= 6; i++) {
+          var ind = document.getElementById('ss-step-ind-' + i);
+          if (ind) { ind.classList.remove('active','done'); if (i < n) ind.classList.add('done'); else if (i === n) ind.classList.add('active'); }
+          var line = document.getElementById('ss-step-line-' + i);
+          if (line) line.classList.toggle('done', i < n);
+          var panel = document.getElementById('ss-panel-' + i);
+          if (panel) panel.style.display = (i === n) ? '' : 'none';
+        }
+        if (n === 3) ss_renderPlatList();
+        if (n === 4) ss_renderEventList();
+        if (n === 5) ss_renderClientConfig();
+        if (n === 6) ss_renderSummary();
+      };
+
+      // ── STEP 1: Create containers ─────────────────────────
+      window.ss_createContainers = function () {
+        var createBtn = document.getElementById('ss-p1-create-btn');
+        var progressEl = document.getElementById('ss-p1-progress');
+        var resultEl   = document.getElementById('ss-p1-result');
+        var errorEl    = document.getElementById('ss-p1-error');
+        var nextBtn    = document.getElementById('ss-p1-next-btn');
+
+        // Use _cachedGtmStr if available (from Pixel Config flow).
+        // If not present, the backend creates clean empty containers — no Pixel Config needed.
+        var configJson = null;
+        if (typeof _cachedGtmStr !== 'undefined' && _cachedGtmStr && _cachedGtmStr.trim()) {
+          try { configJson = JSON.parse(_cachedGtmStr); } catch (e) { configJson = null; }
+        }
+
+        if (errorEl) errorEl.style.display = 'none';
+        if (createBtn) { createBtn.disabled = true; createBtn.style.opacity = '.5'; }
+        if (progressEl) progressEl.style.display = 'block';
+        if (resultEl) resultEl.style.display = 'none';
+
+        var payload = {
+          projectName: (window.S && S.lead && S.lead.name)
+                       ? S.lead.name + ' — SS'
+                       : ((window.currentUser && currentUser.email) || 'Client') + ' — SS',
+          ssEvents:    _ssSsEvents,
+          ssPlatforms: _ssEnabledPlats,
+        };
+        // Only attach configJson if we have one (backend uses minimal template otherwise)
+        if (configJson) payload.configJson = configJson;
+
+        _ssApi('POST', '/api/ss/create-containers', payload, function (err, res) {
+          if (err || !res || !res.ok || !res.data || !res.data.ok) {
+            if (createBtn) { createBtn.disabled = false; createBtn.style.opacity = '1'; }
+            if (progressEl) progressEl.style.display = 'none';
+            var msg = (res && res.data && res.data.error) || (err && err.message) || 'فشل الإنشاء';
+            if (errorEl) { errorEl.style.display = 'block'; errorEl.textContent = '❌ ' + msg; }
+            return;
+          }
+          _ssJobId = res.data.jobId;
+          ss_pollJob(_ssJobId);
+        });
+      };
+
+      function ss_pollJob(jobId) {
+        if (!jobId) return;
+        var stageMsgs = {
+          queued:           'في الطابور...',
+          capacity_check:   'التحقق من السعة...',
+          gtm_provisioning: 'جارٍ إنشاء GTM Containers...',
+          saving:           'جارٍ الحفظ...',
+          done:             'اكتمل!',
+          error:            'حصل خطأ',
+        };
+        var progressEl  = document.getElementById('ss-p1-progress');
+        var stageEl     = document.getElementById('ss-p1-stage-msg');
+        var barEl       = document.getElementById('ss-p1-bar');
+        var createBtn   = document.getElementById('ss-p1-create-btn');
+        var resultEl    = document.getElementById('ss-p1-result');
+        var errorEl     = document.getElementById('ss-p1-error');
+        var nextBtn     = document.getElementById('ss-p1-next-btn');
+        var startedAt   = Date.now();
+        var maxWaitMs   = 15 * 60 * 1000;
+        var pollEveryMs = 4000;
+        var barPct      = 10;
+
+        function doPoll() {
+          if (Date.now() - startedAt > maxWaitMs) {
+            if (progressEl) progressEl.style.display = 'none';
+            if (errorEl)    { errorEl.style.display = 'block'; errorEl.textContent = '⏱️ انتهت مهلة الانتظار — حاول مرة أخرى'; }
+            if (createBtn)  { createBtn.disabled = false; createBtn.style.opacity = '1'; }
+            return;
+          }
+          fetch('/api/managed/job/' + encodeURIComponent(jobId))
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+              if (d.status === 'completed' && d.result && d.result.ok) {
+                // ── Success ──
+                barPct = 100;
+                if (barEl) barEl.style.width = '100%';
+                if (progressEl) progressEl.style.display = 'none';
+                if (createBtn)  { createBtn.disabled = false; createBtn.style.opacity = '1'; }
+
+                var res = d.result;
+                _ssWebGtmId       = res.gtmPublicId     || '';
+                _ssWebSnippetHead = res.snippetHead      || '';
+                _ssWebSnippetBody = res.snippetBody      || '';
+                _ssServerGtmId    = (res.server && res.server.publicId)        || '';
+                _ssContainerConfig= (res.server && res.server.containerConfig) || '';
+                _ssContainersReady= true;
+
+                // Fill UI
+                var webIdEl   = document.getElementById('ss-p1-web-id');
+                var srvIdEl   = document.getElementById('ss-p1-server-id');
+                var cfgEl     = document.getElementById('ss-p1-config-json');
+                if (webIdEl)  webIdEl.textContent  = _ssWebGtmId    || '—';
+                if (srvIdEl)  srvIdEl.textContent  = _ssServerGtmId || '—';
+                if (cfgEl)    cfgEl.textContent    = _ssContainerConfig || '(لا يوجد config — يُستخدم Auto-deploy)';
+                if (resultEl) resultEl.style.display = '';
+                if (nextBtn)  nextBtn.disabled = false;
+
+                // Refresh overview GTM card
+                try { ovRefreshGtmStatus(); } catch (_) {}
+              } else if (d.status === 'failed') {
+                if (progressEl) progressEl.style.display = 'none';
+                if (createBtn)  { createBtn.disabled = false; createBtn.style.opacity = '1'; }
+                var msg = d.error || 'فشل الإنشاء';
+                if (errorEl) { errorEl.style.display = 'block'; errorEl.textContent = '❌ ' + msg; }
+              } else {
+                // Still running — update progress
+                var stg = d.stage || '';
+                if (stageEl) stageEl.textContent = stageMsgs[stg] || ('جارٍ ' + stg + '...');
+                barPct = Math.min(barPct + 5, 90);
+                if (barEl) barEl.style.width = barPct + '%';
+                _ssJobPollTimer = setTimeout(doPoll, pollEveryMs);
+              }
+            })
+            .catch(function () { _ssJobPollTimer = setTimeout(doPoll, pollEveryMs + 2000); });
+        }
+        _ssJobPollTimer = setTimeout(doPoll, pollEveryMs);
+      }
+
+      window.ss_copyConfig = function () {
+        if (!_ssContainerConfig) return;
+        navigator.clipboard.writeText(_ssContainerConfig).then(function () { showToast('✅ تم نسخ Container Config'); }).catch(function () {});
+      };
+
+      // ── STEP 2: URL validation ────────────────────────────
+      window.ss_p2OnInput = function () {
+        var nextBtn = document.getElementById('ss-p2-next-btn');
+        if (nextBtn) nextBtn.disabled = true;
+        _ssUrlValidated = false;
+        var statusEl = document.getElementById('ss-p2-status');
+        if (statusEl) { statusEl.className = 'ss-url-status'; statusEl.textContent = ''; }
+      };
+
+      window.ss_validateUrl = function () {
+        var inp      = document.getElementById('ss-p2-url');
+        var statusEl = document.getElementById('ss-p2-status');
+        var nextBtn  = document.getElementById('ss-p2-next-btn');
+        var url      = inp ? inp.value.trim() : '';
+        if (!url) { if (statusEl) { statusEl.className = 'ss-url-status err'; statusEl.textContent = '⚠️ أدخل URL أولاً'; } return; }
+        if (!/^https?:\/\/.+\..+/.test(url)) { if (statusEl) { statusEl.className = 'ss-url-status err'; statusEl.textContent = '❌ URL غير صالح — يجب أن يبدأ بـ https://'; } return; }
+        if (statusEl) { statusEl.className = 'ss-url-status testing'; statusEl.textContent = '⏳ جارٍ الاختبار...'; }
+        _ssApi('POST', '/api/ss/validate-url', { url: url, provider: 'selfhosted' }, function (err, res) {
+          if (err || !res) { if (statusEl) { statusEl.className = 'ss-url-status err'; statusEl.textContent = '❌ تعذّر الاتصال'; } return; }
+          if (res.data && res.data.valid) {
+            var lat = res.data.latencyMs ? ' (' + res.data.latencyMs + 'ms)' : '';
+            if (statusEl) { statusEl.className = 'ss-url-status ok'; statusEl.textContent = '✅ متصل' + lat; }
+            _ssServerUrl = url;
+            _ssUrlValidated = true;
+            if (nextBtn) nextBtn.disabled = false;
+          } else {
+            var msg = (res.data && res.data.error) || 'الخادم لا يستجيب';
+            if (statusEl) { statusEl.className = 'ss-url-status err'; statusEl.textContent = '❌ ' + msg; }
+          }
+        });
+      };
+
+      // ── STEP 3: Platform list ─────────────────────────────
+      window.ss_renderPlatList = function () {
+        var container = document.getElementById('ss-p3-plat-list');
+        if (!container) return;
+        container.innerHTML = _ssPlatDefs.map(function (p) {
+          var enabled = _ssEnabledPlats.indexOf(p.key) !== -1;
+          return '<div class="ss-sel-row' + (enabled ? ' selected' : '') + '" id="ss-p3-row-' + p.key + '" onclick="ss_togglePlatRow(\'' + p.key + '\')">' +
+            '<div class="ss-sel-ico">' + p.icon + '</div>' +
+            '<div class="ss-sel-info"><div class="ss-sel-name">' + p.name + '</div><div class="ss-sel-sub">' + p.sub + '</div></div>' +
+            '<div style="width:22px;height:22px;border-radius:50%;border:2px solid ' + (enabled ? 'var(--acc)' : 'var(--bdr2)') + ';background:' + (enabled ? 'var(--acc)' : 'transparent') + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;" id="ss-p3-chk-' + p.key + '">' +
+            (enabled ? '<span style="color:#00382b;font-size:14px;font-weight:900;">✓</span>' : '') +
+            '</div>' +
+            '</div>';
+        }).join('');
+      };
+
+      window.ss_togglePlatRow = function (key) {
+        var idx = _ssEnabledPlats.indexOf(key);
+        if (idx === -1) _ssEnabledPlats.push(key);
+        else            _ssEnabledPlats.splice(idx, 1);
+        ss_renderPlatList();
+      };
+
+      // ── STEP 4: Event list ────────────────────────────────
+      window.ss_renderEventList = function () {
+        var container = document.getElementById('ss-p4-events-list');
+        if (!container) return;
+        container.innerHTML = _ssEventDefs.map(function (ev) {
+          var enabled = _ssSsEvents.indexOf(ev.key) !== -1;
+          var badge = ev.rec ? '<span class="ss-sel-badge rec">⭐ موصى به</span>' : (ev.warn ? '<span class="ss-sel-badge warn">⚠️ تكلفة عالية</span>' : '');
+          return '<div class="ss-sel-row' + (enabled ? ' selected' : '') + '" onclick="ss_toggleEvent(\'' + ev.key + '\')">' +
+            '<div class="ss-sel-info"><div class="ss-sel-name" style="font-size:13px;">' + ev.label + '</div></div>' +
+            badge +
+            '<div style="width:22px;height:22px;border-radius:50%;border:2px solid ' + (enabled ? 'var(--acc)' : 'var(--bdr2)') + ';background:' + (enabled ? 'var(--acc)' : 'transparent') + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;">' +
+            (enabled ? '<span style="color:#00382b;font-size:14px;font-weight:900;">✓</span>' : '') +
+            '</div>' +
+            '</div>';
+        }).join('');
+      };
+
+      window.ss_toggleEvent = function (key) {
+        var idx = _ssSsEvents.indexOf(key);
+        if (idx === -1) _ssSsEvents.push(key);
+        else            _ssSsEvents.splice(idx, 1);
+        ss_renderEventList();
+      };
+
+      // ── STEP 5: Client-side config ────────────────────────
+      window.ss_p5OnInput = function () {
+        var val = (document.getElementById('ss-p5-ga4-id') || {}).value || '';
+        _ssGa4Id = val.trim();
+      };
+
+      window.ss_renderClientConfig = function () {
+        // Client platforms
+        var cpEl = document.getElementById('ss-p5-client-plats');
+        if (cpEl) {
+          cpEl.innerHTML = _ssClientPlatDefs.map(function (p) {
+            var enabled = _ssClientPlats.indexOf(p.key) !== -1;
+            return '<div class="ss-ev-row' + (enabled ? ' checked' : '') + '" onclick="ss_toggleClientPlat(\'' + p.key + '\')">' +
+              '<input type="checkbox" id="ss-cp-' + p.key + '"' + (enabled ? ' checked' : '') + ' onclick="event.stopPropagation();ss_toggleClientPlat(\'' + p.key + '\')" style="accent-color:var(--acc);">' +
+              '<span style="font-size:16px;">' + p.icon + '</span>' +
+              '<div><div class="ss-ev-row-label">' + p.name + '</div><div style="font-size:10px;color:var(--mut);">' + p.sub + '</div></div>' +
+              '</div>';
+          }).join('');
+        }
+        // Google Ads events
+        var gaEl = document.getElementById('ss-p5-gads-events');
+        if (gaEl) {
+          gaEl.innerHTML = _ssGadsEventDefs.map(function (ev) {
+            var checked = _ssGoogleAdsEvents.indexOf(ev.key) !== -1;
+            return '<div class="ss-ev-row' + (checked ? ' checked' : '') + '" onclick="ss_toggleGadsEvent(\'' + ev.key + '\')">' +
+              '<input type="checkbox"' + (checked ? ' checked' : '') + ' onclick="event.stopPropagation();ss_toggleGadsEvent(\'' + ev.key + '\')" style="accent-color:#4285F4;">' +
+              '<span class="ss-ev-row-label">' + ev.label + '</span>' +
+              '</div>';
+          }).join('');
+        }
+        // GA4 events
+        var g4El = document.getElementById('ss-p5-ga4-events');
+        if (g4El) {
+          g4El.innerHTML = _ssGa4EventDefs.map(function (ev) {
+            var checked = _ssGa4Events.indexOf(ev.key) !== -1;
+            return '<div class="ss-ev-row' + (checked ? ' checked' : '') + '" onclick="ss_toggleGa4Event(\'' + ev.key + '\')">' +
+              '<input type="checkbox"' + (checked ? ' checked' : '') + ' onclick="event.stopPropagation();ss_toggleGa4Event(\'' + ev.key + '\')" style="accent-color:#F9AB00;">' +
+              '<span class="ss-ev-row-label">' + ev.label + '</span>' +
+              '</div>';
+          }).join('');
+        }
+        // Restore GA4 ID input
+        var idInp = document.getElementById('ss-p5-ga4-id');
+        if (idInp && _ssGa4Id) idInp.value = _ssGa4Id;
+      };
+
+      window.ss_toggleClientPlat = function (key) {
+        var idx = _ssClientPlats.indexOf(key);
+        if (idx === -1) _ssClientPlats.push(key); else _ssClientPlats.splice(idx, 1);
+        ss_renderClientConfig();
+      };
+      window.ss_toggleGadsEvent = function (key) {
+        var idx = _ssGoogleAdsEvents.indexOf(key);
+        if (idx === -1) _ssGoogleAdsEvents.push(key); else _ssGoogleAdsEvents.splice(idx, 1);
+        ss_renderClientConfig();
+      };
+      window.ss_toggleGa4Event = function (key) {
+        var idx = _ssGa4Events.indexOf(key);
+        if (idx === -1) _ssGa4Events.push(key); else _ssGa4Events.splice(idx, 1);
+        ss_renderClientConfig();
+      };
+
+      // ── STEP 6: Summary + Confirm ─────────────────────────
+      window.ss_renderSummary = function () {
+        var sumEl = document.getElementById('ss-p6-summary');
+        if (!sumEl) return;
+
+        // Read GA4 ID from input (may have been typed just now)
+        var idInp = document.getElementById('ss-p5-ga4-id');
+        if (idInp) _ssGa4Id = idInp.value.trim();
+
+        var rows = function (pairs) {
+          return pairs.map(function (p) {
+            return '<div class="ss-summary-row"><span class="ss-summary-key">' + p[0] + '</span><span class="ss-summary-val">' + p[1] + '</span></div>';
+          }).join('');
+        };
+
+        sumEl.innerHTML =
+          '<div class="ss-summary-block"><div class="ss-summary-label">Server-Side (sGTM)</div>' +
+          rows([
+            ['Server URL', _ssServerUrl || '—'],
+            ['Web GTM',    _ssWebGtmId    || '—'],
+            ['Server GTM', _ssServerGtmId || '—'],
+            ['المنصات',    _ssEnabledPlats.length ? _ssEnabledPlats.join(', ') : '—'],
+            ['SS Events',  _ssSsEvents.length     ? _ssSsEvents.join(', ')     : '—'],
+          ]) + '</div>' +
+          '<div class="ss-summary-block"><div class="ss-summary-label">Client-Side (Web GTM)</div>' +
+          rows([
+            ['GA4 ID',          _ssGa4Id || '—'],
+            ['المنصات',         _ssClientPlats.join(', ')],
+            ['Google Ads Conv.', _ssGoogleAdsEvents.length ? _ssGoogleAdsEvents.join(', ') : '—'],
+            ['GA4 Events',      _ssGa4Events.length        ? _ssGa4Events.join(', ')       : '—'],
+          ]) + '</div>';
+
+        // Token inputs for enabled SS platforms
+        var tokList = document.getElementById('ss-p6-tokens-list');
+        if (tokList) {
+          tokList.innerHTML = _ssPlatDefs.filter(function (p) { return _ssEnabledPlats.indexOf(p.key) !== -1; })
+            .map(function (p) {
+              var tok = _ssTokens[p.key] || '';
+              var isConf = tok === '***CONFIGURED***';
+              return '<div style="display:flex;align-items:center;gap:10px;background:var(--sur);border:1px solid var(--bdr2);border-radius:10px;padding:10px 12px;">' +
+                '<span style="font-size:18px;">' + p.icon + '</span>' +
+                '<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--wht);">' + p.name + '</div>' +
+                '<input type="password" id="ss-tok-' + p.key + '" class="ss-tok-input" placeholder="' + (isConf ? 'محفوظ — اتركه فارغاً للإبقاء عليه' : p.ph) + '">' +
+                (isConf ? '<div style="font-size:10px;color:var(--acc);margin-top:2px;">✓ مشفّر ومحفوظ</div>' : '') +
+                '</div></div>';
+            }).join('') || '<div style="font-size:12px;color:var(--mut);">لم تختر أي منصة Server-Side — يمكن إضافتها لاحقاً.</div>';
+        }
+      };
+
+      // ── Confirm & wire ────────────────────────────────────
+      window.ss_confirmSetup = function () {
+        var btn      = document.getElementById('ss-p6-confirm-btn');
+        var statusEl = document.getElementById('ss-p6-status');
+        var errorEl  = document.getElementById('ss-p6-error');
+
+        if (errorEl) errorEl.style.display = 'none';
+
+        // Read GA4 ID
+        var idInp = document.getElementById('ss-p5-ga4-id');
+        if (idInp) _ssGa4Id = idInp.value.trim();
+
+        // Collect tokens
+        var tokens = {};
+        _ssPlatDefs.forEach(function (p) {
+          var inp = document.getElementById('ss-tok-' + p.key);
+          if (inp && inp.value.trim()) tokens[p.key] = inp.value.trim();
+        });
+
+        if (!_ssServerUrl)        { if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">لا يوجد Server URL — ارجع للخطوة 2</span>'; return; }
+        if (!_ssContainersReady)  { if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">لم تُنشأ الـ Containers بعد — ارجع للخطوة 1</span>'; return; }
+
+        if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--acc);">⏳ جارٍ الربط والحفظ...</span>';
+
+        // Step 1: wire transport URL
+        var doSaveConfig = function () {
+          _ssApi('POST', '/api/ss/save-config', {
+            provider:         'selfhosted',
+            serverUrl:        _ssServerUrl,
+            platforms:        _ssEnabledPlats,
+            tokens:           tokens,
+            ga4MeasurementId: _ssGa4Id,
+            ga4Events:        _ssGa4Events,
+            googleAdsEvents:  _ssGoogleAdsEvents,
+            ssEvents:         _ssSsEvents,
+          }, function (err2, res2) {
+            if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+            if (err2 || !res2 || !res2.ok || !res2.data || !res2.data.ok) {
+              var m = (res2 && res2.data && res2.data.error) || (err2 && err2.message) || 'فشل الحفظ';
+              if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">❌ ' + m + '</span>';
+              if (errorEl) { errorEl.style.display = 'block'; errorEl.textContent = '❌ ' + m; }
+              return;
+            }
+            if (statusEl) statusEl.innerHTML = '<span style="color:var(--acc);">✅ تم الإعداد بالكامل</span>';
+            // Update ET global
+            if (window.ET) {
+              window.ET.ssEnabled = true; window.ET.ssUrl = _ssServerUrl;
+              window.ET.ssPlatforms = {};
+              _ssEnabledPlats.forEach(function (k) { window.ET.ssPlatforms[k] = true; });
+            }
+            document.cookie = 'et_ss_url=' + encodeURIComponent(_ssServerUrl) + ';path=/;max-age=31536000;SameSite=Lax';
+            ss_showDoneBanner();
+            try { ovRefreshGtmStatus(); } catch (_) {}
+            showToast('✅ Server-Side Tracking مفعّل بالكامل!');
+          });
+        };
+
+        // Wire transport URL first (links Web GTM → sGTM server)
+        _ssApi('POST', '/api/ss/wire-transport', { sgtmUrl: _ssServerUrl }, function (err, res) {
+          if (err || !res || !res.ok) {
+            // Wire may fail if already wired or containers not in expected state — non-fatal, continue to save
+            console.warn('[ss] wire-transport non-fatal:', err || (res && res.data && res.data.error));
+          }
+          doSaveConfig();
+        });
+      };
+
+      // ── Done banner ───────────────────────────────────────
+      function ss_showDoneBanner() {
+        var banner = document.getElementById('ss-done-banner');
+        var urlEl  = document.getElementById('ss-done-url');
+        var resetBtn = document.getElementById('ss-hdr-reset-btn');
+        if (banner) { banner.style.display = 'flex'; }
+        if (urlEl)  { urlEl.textContent = _ssServerUrl + ' — ' + (_ssEnabledPlats.join(', ') || 'لا منصات'); }
+        if (resetBtn) resetBtn.style.display = '';
+        // Hide step bar + panels
+        var bar = document.getElementById('ss-step-bar');
+        if (bar) bar.style.display = 'none';
+        for (var i = 1; i <= 6; i++) {
+          var p = document.getElementById('ss-panel-' + i);
+          if (p) p.style.display = 'none';
+        }
+      }
+
+      window.ss_editSetup = function () {
+        var banner = document.getElementById('ss-done-banner');
+        if (banner) banner.style.display = 'none';
+        var bar = document.getElementById('ss-step-bar');
+        if (bar) bar.style.display = '';
+        _ssContainersReady = !!_ssWebGtmId;
+        _ssUrlValidated    = !!_ssServerUrl;
+        ss_goToStep(_ssContainersReady ? (_ssUrlValidated ? 3 : 2) : 1);
+      };
+
+      // ── Reset ─────────────────────────────────────────────
+      window.ss_resetConfig = function () {
+        if (!confirm('حذف إعدادات Server-Side Tracking؟ لا يمكن التراجع.')) return;
+        _ssApi('DELETE', '/api/ss/config', null, function (err, res) {
+          if (err || !res || !res.ok) { showToast('❌ فشل الحذف'); return; }
+          _ssEnabledPlats = []; _ssSsEvents = ['purchase']; _ssServerUrl = '';
+          _ssGa4Id = ''; _ssTokens = {}; _ssContainersReady = false; _ssUrlValidated = false;
+          _ssWebGtmId = ''; _ssServerGtmId = ''; _ssContainerConfig = '';
+          if (window.ET) { window.ET.ssEnabled = false; window.ET.ssUrl = ''; window.ET.ssPlatforms = {}; }
+          document.cookie = 'et_ss_url=;path=/;max-age=0';
+          var banner = document.getElementById('ss-done-banner');
+          if (banner) banner.style.display = 'none';
+          var bar = document.getElementById('ss-step-bar'); if (bar) bar.style.display = '';
+          var resetBtn = document.getElementById('ss-hdr-reset-btn'); if (resetBtn) resetBtn.style.display = 'none';
+          ss_goToStep(1);
+          try { ovRefreshGtmStatus(); } catch (_) {}
+          showToast('تم حذف إعدادات Server-Side Tracking');
+        });
+      };
+
+      // ── Load saved config ─────────────────────────────────
+      window.ss_loadConfig = function (cb) {
+        _ssApi('GET', '/api/ss/config', null, function (err, res) {
+          if (err || !res || !res.ok || !res.data || !res.data.ok || !res.data.config) { if (cb) cb(false); return; }
+          var d = res.data.config;
+          _ssServerUrl    = d.serverUrl    || '';
+          _ssEnabledPlats = Array.isArray(d.platforms) ? d.platforms : [];
+          _ssGa4Id        = d.ga4MeasurementId || '';
+          _ssGa4Events    = Array.isArray(d.ga4Events)       ? d.ga4Events       : _ssGa4Events;
+          _ssGoogleAdsEvents = Array.isArray(d.googleAdsEvents) ? d.googleAdsEvents : _ssGoogleAdsEvents;
+          _ssSsEvents     = Array.isArray(d.ssEvents)        ? d.ssEvents        : _ssSsEvents;
+          _ssWebGtmId     = d.webPublicId    || '';
+          _ssServerGtmId  = d.serverPublicId || '';
+          _ssContainersReady = !!(d.webContainerId || d.webPublicId);
+          _ssUrlValidated    = !!_ssServerUrl;
+          // token sentinels
+          _ssTokens = {};
+          var et = d.encryptedTokens || {};
+          Object.keys(et).forEach(function (k) { if (et[k]) _ssTokens[k] = '***CONFIGURED***'; });
+          if (cb) cb(true);
+        });
+      };
+
+      // ── Overview GTM Status refresh ───────────────────────
+      window.ovRefreshGtmStatus = function () {
+        _ssApi('GET', '/api/ss/full-status', null, function (err, res) {
+          var webId    = _ssWebGtmId    || (res && res.data && res.data.container && res.data.container.webGtmId)    || null;
+          var srvId    = _ssServerGtmId || (res && res.data && res.data.container && res.data.container.serverGtmId) || null;
+          var snippet  = (res && res.data && res.data.container && res.data.container.snippetHead) || _ssWebSnippetHead || null;
+          var platforms= (res && res.data && res.data.container && res.data.container.platforms)   || [];
+          var ssCfg    = (res && res.data && res.data.ss)        || null;
+
+          var webIdEl     = document.getElementById('ovWebGtmId');
+          var srvIdEl     = document.getElementById('ovServerGtmId');
+          var webBadge    = document.getElementById('ovWebGtmBadge');
+          var srvBadge    = document.getElementById('ovServerGtmBadge');
+          var placeholder = document.getElementById('ovGtmPlaceholder');
+          var snippetWrap = document.getElementById('ovWebSnippetWrap');
+          var snippetCode = document.getElementById('ovWebSnippetCode');
+          var platWrap    = document.getElementById('ovActivePlatforms');
+          var platGrid    = document.getElementById('ovActivePlatGrid');
+
+          var hasAny = !!(webId || srvId);
+
+          if (placeholder) placeholder.style.display = hasAny ? 'none' : '';
+
+          if (webIdEl)  webIdEl.textContent  = webId  || '—';
+          if (srvIdEl)  srvIdEl.textContent  = srvId  || '—';
+
+          if (webBadge) {
+            webBadge.textContent = webId  ? '🟢 مُعدّ' : '🔴 غير مُعدّ';
+            webBadge.style.color = webId  ? 'var(--acc)' : 'var(--mut)';
+          }
+          if (srvBadge) {
+            var srvUrl = ssCfg && ssCfg.serverUrl ? ssCfg.serverUrl : null;
+            srvBadge.textContent = (srvId && srvUrl) ? '🟢 مُعدّ + مُنشور' : (srvId ? '🟡 منشور جزئياً' : '🔴 غير مُعدّ');
+            srvBadge.style.color = (srvId && srvUrl) ? 'var(--acc)' : (srvId ? '#fbbf24' : 'var(--mut)');
+          }
+
+          if (snippet && snippetWrap && snippetCode) {
+            snippetWrap.style.display = '';
+            snippetCode.textContent = snippet.length > 300 ? snippet.substring(0,300) + '…' : snippet;
+          } else if (snippetWrap) { snippetWrap.style.display = 'none'; }
+
+          // Active platforms (web + server combined)
+          var allPlats = [];
+          if (platforms && platforms.length) platforms.forEach(function (k) { allPlats.push({ key: k, side: 'client' }); });
+          if (ssCfg && Array.isArray(ssCfg.platforms)) ssCfg.platforms.forEach(function (k) { allPlats.push({ key: k, side: 'server' }); });
+          if (platWrap && platGrid && allPlats.length) {
+            platWrap.style.display = '';
+            var platIcons = { meta:'👥', tiktok:'🎵', snapchat:'👻', ga4:'📊', google:'🔵', google_ads:'🔵', linkedin:'💼', twitter:'🐦', mixpanel:'📈' };
+            var platNames = { meta:'Meta', tiktok:'TikTok', snapchat:'Snap', ga4:'GA4', google:'Google Ads', google_ads:'Google Ads', linkedin:'LinkedIn', twitter:'Twitter', mixpanel:'Mixpanel' };
+            platGrid.innerHTML = allPlats.map(function (p) {
+              return '<div style="display:inline-flex;align-items:center;gap:4px;background:var(--sur);border:1px solid var(--bdr2);border-radius:20px;padding:4px 10px;font-size:11px;font-family:var(--font-ui);font-weight:600;color:var(--wht2);">' +
+                (platIcons[p.key] || '📡') + ' ' + (platNames[p.key] || p.key) +
+                '<span style="font-size:9px;background:' + (p.side==='server'?'rgba(70,241,197,.15)':'rgba(66,133,244,.15)') + ';color:' + (p.side==='server'?'var(--acc)':'#93c5fd') + ';border-radius:4px;padding:1px 5px;margin-right:2px;">' +
+                (p.side==='server'?'SS':'CS') + '</span>' +
+                '</div>';
+            }).join('');
+          } else if (platWrap) { platWrap.style.display = 'none'; }
+        });
+      };
+
+      window.ovCopySnippet = function (type) {
+        var code = type === 'head' ? _ssWebSnippetHead : _ssWebSnippetBody;
+        if (!code) { showToast('لا يوجد snippet'); return; }
+        navigator.clipboard.writeText(code).then(function () { showToast('✅ تم نسخ الـ Snippet'); }).catch(function () {});
+      };
+
+      // ── Step 1 hint: show whether Pixel Config JSON is ready ────
+      function ss_updateConfigHint() {
+        var hintEl = document.getElementById('ss-p1-config-hint');
+        if (!hintEl) return;
+        var hasConfig = (typeof _cachedGtmStr !== 'undefined') && _cachedGtmStr && _cachedGtmStr.trim();
+        if (hasConfig) {
+          hintEl.innerHTML = '✅ GTM Config جاهز من Pixel Config — سيتم استخدامه تلقائياً.';
+          hintEl.style.color = 'var(--acc)';
+        } else {
+          hintEl.innerHTML = '💡 ستُنشأ Containers فارغة — يمكنك استيراد Pixel Config لاحقاً من قسم <strong>Pixel Config</strong>.';
+          hintEl.style.color = 'var(--mut)';
+        }
+      }
+
+      // ── Init on view activation ───────────────────────────
+      function initServerSideView() {
+        if (_ssInit) return;
+        _ssInit = true;
+        ss_updateConfigHint();
+        ss_loadConfig(function (found) {
+          if (found && _ssContainersReady) {
+            // Restore UI state
+            var p1Result = document.getElementById('ss-p1-result');
+            var p1Next   = document.getElementById('ss-p1-next-btn');
+            var p1WebId  = document.getElementById('ss-p1-web-id');
+            var p1SrvId  = document.getElementById('ss-p1-server-id');
+            var p1Cfg    = document.getElementById('ss-p1-config-json');
+            if (p1Result) p1Result.style.display = '';
+            if (p1Next)   p1Next.disabled = false;
+            if (p1WebId)  p1WebId.textContent  = _ssWebGtmId    || '—';
+            if (p1SrvId)  p1SrvId.textContent  = _ssServerGtmId || '—';
+            if (p1Cfg)    p1Cfg.textContent     = '(Container already created)';
+          }
+          if (found && _ssServerUrl && _ssEnabledPlats.length) {
+            // Config complete — show done banner
+            ss_showDoneBanner();
+            var resetBtn = document.getElementById('ss-hdr-reset-btn');
+            if (resetBtn) resetBtn.style.display = '';
+          }
+          if (window.ET) {
+            window.ET.ssEnabled   = found && !!_ssServerUrl;
+            window.ET.ssUrl       = _ssServerUrl;
+            window.ET.ssPlatforms = {};
+            _ssEnabledPlats.forEach(function (k) { window.ET.ssPlatforms[k] = true; });
+          }
+        });
+      }
+
+      // ── Hook into view switcher ───────────────────────────
+      var _origSwitchAppView2 = window.switchAppView;
+      window.switchAppView = function (viewKey, btnEl) {
+        if (_origSwitchAppView2) _origSwitchAppView2(viewKey, btnEl);
+        if (viewKey === 'serverside') { setTimeout(initServerSideView, 50); }
+        if (viewKey === 'overview')   { setTimeout(function () { try { ovRefreshGtmStatus(); } catch (_) {} }, 200); }
+      };
+
+
+      // 13. TOAST HELPER
+      // ══════════════════════════════════════════════════════
+      function showToast(msg, color) {
+        var t = document.createElement('div');
+        t.textContent = msg;
+        t.style.cssText = 'position:fixed;bottom:24px;right:50%;transform:translateX(50%);background:' + (color || '#191c22') + ';border:1px solid rgba(70,241,197,.3);color:var(--acc);padding:11px 20px;border-radius:12px;font-size:13px;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,.5);pointer-events:none;animation:pin .3s ease;font-family:var(--font-display);font-weight:600;';
+        document.body.appendChild(t);
+        setTimeout(function () { t.remove(); }, 2500);
+      }
+      window.showToast = showToast;
+
+      // ══════════════════════════════════════════════════════
+      // 14. Overview page — Pixel Scanner integration
+      // ══════════════════════════════════════════════════════
+      // Sync active platforms from S whenever generate() runs
+      var _origDispatch = window.generate;
+      if (_origDispatch) {
+        var _genHook = window.generate;
+        // After generate, sync to DLM engine
+        window.generate = function () {
+          _genHook.apply(this, arguments);
+          setTimeout(function () {
+            var plats = window.S && window.S.platforms;
+            if (plats && plats.length) {
+              _activePlatforms = plats.slice();
+              ET.platforms = plats.slice();
+            }
+          }, 200);
+        };
+      }
+
+      console.log('%c[Easy Track] Full Marketing Data Infrastructure Engine v4.0 loaded ✓', 'color:#46f1c5;font-size:13px;font-weight:bold;');
+      console.log('%c  DataLayer Normalizer · Attribution · Deduplication · Multi-Platform · Server-Side', 'color:#85948d;font-size:11px;');
+    })();
+  </script>
+
+  <!-- ═════════════════════════════════════════════
+       WhatsApp Floating Button
+  ═════════════════════════════════════════════ -->
+  <a href="https://wa.me/201552388174?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D8%8C%20%D8%A3%D8%B1%D9%8A%D8%AF%20%D8%A7%D9%84%D8%A7%D8%B3%D8%AA%D9%81%D8%B3%D8%A7%D8%B1%20%D8%B9%D9%86%20Easy%20Track"
+     target="_blank"
+     id="wa-float-btn"
+     title="تواصل معنا على واتسآب"
+     style="
+       position:fixed;
+       bottom:28px;
+       left:28px;
+       z-index:9998;
+       width:58px;
+       height:58px;
+       background:#25D366;
+       border-radius:50%;
+       display:flex;
+       align-items:center;
+       justify-content:center;
+       box-shadow:0 4px 24px rgba(37,211,102,0.55);
+       text-decoration:none;
+       transition:transform .25s, box-shadow .25s;
+     "
+     onmouseover="this.style.transform='scale(1.12)';this.style.boxShadow='0 8px 36px rgba(37,211,102,0.75)'"
+     onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 4px 24px rgba(37,211,102,0.55)'"
+  >
+    <!-- WhatsApp SVG icon -->
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+    </svg>
+  </a>
+
+</body>
+</html>
