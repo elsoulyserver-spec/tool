@@ -847,7 +847,14 @@ http.createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/api/sgtm-templates') {
     try {
       const TPL_DIR = path.join(__dirname, 'lib', 'server-side', 'sgtm-templates');
-      const read = (f) => fs.readFileSync(path.join(TPL_DIR, f), 'utf8');
+      // Sanitize on read: strip BOM, normalise CRLF->LF and drop NUL/control
+      // bytes. These .tpl files have been corrupted with NUL padding before;
+      // serving a single control byte inside templateData makes GTM reject the
+      // whole container import with "Unable to parse Sandboxed JavaScript code".
+      const read = (f) => fs.readFileSync(path.join(TPL_DIR, f), 'utf8')
+        .replace(/^\uFEFF/, '')
+        .replace(/\r\n?/g, '\n')
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
       res.setHeader('Cache-Control', 'public, max-age=3600');
       sendJSON(res, 200, {
         meta:   read('meta-capi.tpl'),
