@@ -7360,12 +7360,12 @@
       // ── Register custom templates ─────────────────────────────────────────
       // accountId/containerId MUST be '0' and templateId MUST match the fingerprint
       // used in the tag type 'cvt_<fingerprint>' — required by sGTM import parser.
-      // templateId MUST be a small sequential integer (GTM int32 limit — fingerprint overflows it).
-      // The fingerprint is what links tag type 'cvt_<fingerprint>' to the template, not templateId.
-      customTemplates.push({ accountId:'0', containerId:'0', templateId:'1', name:'Easy Track — Meta CAPI',          fingerprint: TPL_META,   templateData: META_TEMPLATE_CODE   });
-      customTemplates.push({ accountId:'0', containerId:'0', templateId:'2', name:'Easy Track — TikTok Events API',  fingerprint: TPL_TIKTOK, templateData: TIKTOK_TEMPLATE_CODE });
-      customTemplates.push({ accountId:'0', containerId:'0', templateId:'3', name:'Easy Track — Snapchat CAPI',      fingerprint: TPL_SNAP,   templateData: SNAP_TEMPLATE_CODE   });
-      customTemplates.push({ accountId:'0', containerId:'0', templateId:'4', name:'Easy Track — Google Ads Enhanced',fingerprint: TPL_GADS,   templateData: GADS_TEMPLATE_CODE   });
+      // templateId MUST equal the fingerprint — GTM resolves a tag's type 'cvt_<fingerprint>'
+      // by stripping 'cvt_' and matching it against templateId in the customTemplate array.
+      customTemplates.push({ accountId:'0', containerId:'0', templateId: TPL_META,   name:'Easy Track — Meta CAPI',          fingerprint: TPL_META,   templateData: META_TEMPLATE_CODE   });
+      customTemplates.push({ accountId:'0', containerId:'0', templateId: TPL_TIKTOK, name:'Easy Track — TikTok Events API',  fingerprint: TPL_TIKTOK, templateData: TIKTOK_TEMPLATE_CODE });
+      customTemplates.push({ accountId:'0', containerId:'0', templateId: TPL_SNAP,   name:'Easy Track — Snapchat CAPI',      fingerprint: TPL_SNAP,   templateData: SNAP_TEMPLATE_CODE   });
+      customTemplates.push({ accountId:'0', containerId:'0', templateId: TPL_GADS,   name:'Easy Track — Google Ads Enhanced',fingerprint: TPL_GADS,   templateData: GADS_TEMPLATE_CODE   });
 
       var varId = 1, tagId = 1, triggerId = 1, clientId = 1;
 
