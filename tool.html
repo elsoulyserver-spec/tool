@@ -9,6 +9,9 @@
   <meta http-equiv="Expires" content="0">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Easy Track — Pixel Config Generator</title>
+  <!-- Favicon — Easy Track Logo -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="alternate icon" type="image/svg+xml" href="data:image/svg+xml,<svg viewBox='0 0 64 64' fill='none' xmlns='http://www.w3.org/2000/svg'> <!-- Dark background --> <rect width='64' height='64' rx='14' fill='%230B0E14'/> <!-- Outer arcs --> <path d='M5 29.5 C5 14.5 17.5 2 32.5 2' stroke='rgba(70,241,197,0.4)' stroke-width='1.2' stroke-linecap='round'/> <path d='M59 29.5 C59 14.5 46.5 2 31.5 2' stroke='rgba(70,241,197,0.4)' stroke-width='1.2' stroke-linecap='round'/> <!-- Mid arcs --> <path d='M12 30 C12 19.8 20 12 30 12' stroke='rgba(70,241,197,0.65)' stroke-width='1.1' stroke-linecap='round'/> <path d='M52 30 C52 19.8 44 12 34 12' stroke='rgba(70,241,197,0.65)' stroke-width='1.1' stroke-linecap='round'/> <!-- Inner arcs --> <path d='M20 30 C20 24.5 24.5 20 30 20' stroke='%2346f1c5' stroke-width='1' stroke-linecap='round'/> <path d='M44 30 C44 24.5 39.5 20 34 20' stroke='%2346f1c5' stroke-width='1' stroke-linecap='round'/> <!-- Dot glow --> <circle cx='32' cy='30' r='8' fill='rgba(70,241,197,0.12)'/> <!-- Dot core --> <circle cx='32' cy='30' r='5'>  <defs>   <radialGradient id='g1' cx='50%25' cy='50%25' r='50%25'>    <stop offset='0%25' stop-color='%2346f1c5'/>    <stop offset='100%25' stop-color='%2300d4aa'/>   </radialGradient>  </defs>  <title>ET</title> </circle> <circle cx='32' cy='30' r='5' fill='%2346f1c5'/> <!-- Arrow down --> <path d='M27 38 L32 50 L37 38' stroke='%2346f1c5' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>">
   <link
     href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;900&family=IBM+Plex+Mono:wght@400;500;700&family=Syne:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap"
     rel="stylesheet" />
@@ -651,6 +654,30 @@
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
       gap: 12px;
+    }
+
+    /* Section header inside the grid — spans full row */
+    .pc-plat-group {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .pc-plat-group:first-child { margin-top: 0; }
+    .pc-plat-group-lbl {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.35);
+      white-space: nowrap;
+    }
+    .pc-plat-group::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(255,255,255,.06);
     }
 
     .cbtn {
@@ -3490,10 +3517,6 @@
           <span class="material-symbols-outlined" style="font-size:18px;">folder_open</span>
           <span>My Projects</span>
         </button>
-        <button class="sb-link" id="sbServerSide" type="button" onclick="switchAppView('serverside',this)">
-          <span class="material-symbols-outlined" style="font-size:18px;">dns</span>
-          <span>Server-Side Tracking</span>
-        </button>
         <button class="sb-link" type="button" onclick="toggleSettings()">
           <span class="material-symbols-outlined" style="font-size:18px;">settings</span>
           <span>Settings</span>
@@ -3660,7 +3683,6 @@
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
             <span class="material-symbols-outlined" style="font-size:17px;color:var(--acc);">code_blocks</span>
             <span style="font-family:var(--font-display);font-size:14px;font-weight:800;color:var(--wht);">GTM Snippets</span>
-            <button onclick="switchAppView('serverside',document.getElementById('sbServerSide'))" style="margin-right:auto;background:rgba(70,241,197,.08);border:1px solid rgba(70,241,197,.2);border-radius:8px;padding:3px 10px;font-size:11px;font-weight:700;color:var(--acc);cursor:pointer;font-family:var(--font-ui);">إعداد ←</button>
           </div>
           <!-- Web + Server GTM IDs -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
@@ -3692,7 +3714,7 @@
           <div id="ovGtmPlaceholder" style="text-align:center;padding:16px 0;color:var(--mut);font-size:12px;">
             <span class="material-symbols-outlined" style="font-size:28px;display:block;margin-bottom:6px;opacity:.4;">dns</span>
             لم يتم إعداد أي GTM Container بعد —
-            <button onclick="switchAppView('serverside',document.getElementById('sbServerSide'))" style="background:none;border:none;color:var(--acc);cursor:pointer;font-size:12px;font-family:var(--font-ui);font-weight:700;padding:0 4px;">ابدأ الإعداد ←</button>
+            
           </div>
         </div>
 
@@ -3721,8 +3743,383 @@
       </div>
       <!-- END OVERVIEW VIEW -->
 
+
+  <!-- ══ Server Side Card CSS ══ -->
+  <style>
+    /* ─── Card wrapper ─── */
+    .pc-ss-card {
+      background: linear-gradient(135deg, rgba(30,33,40,.9) 0%, rgba(22,25,31,.95) 100%);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 18px;
+      margin-bottom: 24px;
+      overflow: hidden;
+      transition: border-color .25s, box-shadow .25s;
+    }
+    .pc-ss-card.ss-on {
+      border-color: rgba(70,241,197,.3);
+      box-shadow: 0 0 0 1px rgba(70,241,197,.08), 0 8px 40px rgba(70,241,197,.05);
+    }
+
+    /* ─── Header ─── */
+    .pc-ss-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 20px;
+    }
+    .pc-ss-icon {
+      font-size: 22px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .pc-ss-title-wrap { flex: 1; min-width: 0; }
+    .pc-ss-title {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--wht);
+      line-height: 1.2;
+    }
+    .pc-ss-sub {
+      font-size: 11px;
+      color: var(--mut);
+      margin-top: 3px;
+      line-height: 1.45;
+    }
+
+    /* ─── Toggle switch ─── */
+    .pc-ss-toggle {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      background: rgba(255,255,255,.06);
+      border: 1.5px solid rgba(255,255,255,.1);
+      border-radius: 12px;
+      cursor: pointer;
+      flex-shrink: 0;
+      outline: none;
+      transition: background .2s, border-color .2s;
+    }
+    .pc-ss-toggle::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 14px;
+      height: 14px;
+      background: var(--mut);
+      border-radius: 50%;
+      transition: left .2s ease, background .2s;
+    }
+    .pc-ss-toggle.on {
+      background: rgba(70,241,197,.18);
+      border-color: rgba(70,241,197,.45);
+    }
+    .pc-ss-toggle.on::after {
+      left: calc(100% - 17px);
+      background: var(--acc);
+    }
+    .pc-ss-toggle-lbl {
+      font-size: 10px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      color: var(--mut);
+      min-width: 22px;
+      text-align: center;
+      letter-spacing: .5px;
+      transition: color .2s;
+      flex-shrink: 0;
+    }
+    .pc-ss-toggle-lbl.on { color: var(--acc); }
+
+    /* ─── Body ─── */
+    .pc-ss-body {
+      display: none;
+      padding: 4px 20px 20px;
+      border-top: 1px solid rgba(255,255,255,.06);
+    }
+    .pc-ss-body.open {
+      display: block;
+      animation: pcSSReveal .2s ease;
+    }
+    @keyframes pcSSReveal {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ─── Section ─── */
+    .pc-ss-section { margin-top: 16px; }
+    .pc-ss-sec-label {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: var(--mut);
+      text-transform: uppercase;
+      letter-spacing: .9px;
+      margin-bottom: 8px;
+      font-family: var(--font-ui);
+    }
+
+    /* ─── Inputs ─── */
+    .pc-ss-input {
+      width: 100%;
+      box-sizing: border-box;
+      background: rgba(255,255,255,.04);
+      border: 1.5px solid rgba(255,255,255,.08);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      color: var(--wht);
+      outline: none;
+      transition: border-color .15s, background .15s;
+    }
+    .pc-ss-input:focus {
+      border-color: rgba(70,241,197,.4);
+      background: rgba(70,241,197,.03);
+    }
+    .pc-ss-valid { margin-top: 5px; font-size: 11px; min-height: 14px; font-family: var(--font-ui); }
+    .pc-ss-hint {
+      font-size: 11px;
+      color: var(--mut);
+      margin-top: 6px;
+      line-height: 1.5;
+      opacity: .8;
+    }
+
+    /* ─── GA4 badge row ─── */
+    .pc-ss-ga4-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 10px;
+      padding: 9px 13px;
+    }
+    .pc-ss-ga4-badge {
+      background: rgba(70,241,197,.14);
+      color: var(--acc);
+      font-size: 9.5px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      padding: 2px 7px;
+      border-radius: 5px;
+      flex-shrink: 0;
+      letter-spacing: .5px;
+    }
+    .pc-ss-ga4-val {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      color: var(--wht);
+      flex: 1;
+    }
+
+    /* ─── Platform grid (inside SS card) ─── */
+    .pc-ss-plat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .pc-ss-plat-grid .cbtn {
+      padding: 14px 8px;
+      border-radius: 12px;
+      font-size: 11.5px;
+      gap: 7px;
+    }
+    .pc-ss-plat-grid .cicon svg { width: 20px !important; height: 20px !important; }
+
+    /* ─── Accordion ─── */
+    .pc-ss-acc {
+      background: rgba(255,255,255,.02);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 12px;
+      margin-bottom: 8px;
+      overflow: hidden;
+      transition: border-color .2s;
+    }
+    .pc-ss-acc.open { border-color: rgba(70,241,197,.2); }
+    .pc-ss-acc-hdr {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      cursor: pointer;
+      user-select: none;
+      transition: background .15s;
+    }
+    .pc-ss-acc-hdr:hover { background: rgba(255,255,255,.03); }
+    .pc-ss-acc-name {
+      flex: 1;
+      font-family: var(--font-ui);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--wht2);
+    }
+    .pc-ss-acc-arr {
+      font-size: 9px;
+      color: var(--mut);
+      transition: transform .2s;
+      display: inline-block;
+    }
+    .pc-ss-acc.open .pc-ss-acc-arr { transform: rotate(90deg); }
+    .pc-ss-acc-body {
+      display: none;
+      padding: 4px 14px 14px;
+      border-top: 1px solid rgba(255,255,255,.06);
+    }
+    .pc-ss-acc.open .pc-ss-acc-body {
+      display: block;
+      animation: pcSSReveal .15s ease;
+    }
+
+    /* ─── Event chips ─── */
+    .pc-ss-ev-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin: 10px 0 14px;
+    }
+    .pc-ss-ev-chip {
+      padding: 4px 9px;
+      border-radius: 20px;
+      font-size: 10.5px;
+      font-family: var(--font-ui);
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08);
+      color: var(--mut);
+      transition: all .15s;
+      white-space: nowrap;
+      line-height: 1.4;
+    }
+    .pc-ss-ev-chip:hover { border-color: rgba(70,241,197,.3); color: var(--wht2); }
+    .pc-ss-ev-chip.on {
+      background: rgba(70,241,197,.1);
+      border-color: rgba(70,241,197,.35);
+      color: var(--acc);
+    }
+    .pc-ss-ev-chip.forced { cursor: default; }
+
+    /* ─── Credentials ─── */
+    .pc-ss-cred-title {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--mut);
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      margin-bottom: 10px;
+      font-family: var(--font-ui);
+    }
+    .pc-ss-px-row { margin-bottom: 10px; }
+    .pc-ss-px-lbl {
+      font-size: 10.5px;
+      font-weight: 600;
+      color: rgba(255,255,255,.45);
+      margin-bottom: 5px;
+      font-family: var(--font-ui);
+    }
+    .pc-ss-pw-wrap { position: relative; display: flex; align-items: center; }
+    .pc-ss-pw-wrap .pc-ss-input { padding-left: 38px; }
+    .pc-ss-eye {
+      position: absolute;
+      left: 10px;
+      font-size: 16px;
+      color: var(--mut);
+      cursor: pointer;
+      user-select: none;
+      transition: color .15s;
+    }
+    .pc-ss-eye:hover { color: var(--acc); }
+
+    /* ─── Google Ads label rows ─── */
+    .pc-ss-label-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .pc-ss-label-ev {
+      font-size: 10.5px;
+      font-family: var(--font-mono);
+      color: var(--mut);
+      min-width: 120px;
+      flex-shrink: 0;
+    }
+    .pc-ss-label-row .pc-ss-input {
+      flex: 1;
+      padding: 7px 10px;
+      font-size: 11.5px;
+    }
+  </style>
+
       <!-- ══════ PIXEL CONFIG VIEW ══════ -->
       <div class="app-view" id="view-pixels">
+
+        <!-- ── Server Side Config Card ── -->
+        <div class="pc-ss-card" id="pc-ss-card">
+          <div class="pc-ss-header">
+            <span class="pc-ss-icon">🖥️</span>
+            <div class="pc-ss-title-wrap">
+              <div class="pc-ss-title">Server Side</div>
+              <div class="pc-ss-sub">يتفعّل لو الزبون عنده سيرفر — يدعم CAPI لكل المنصات بدون ad blockers</div>
+            </div>
+            <button class="pc-ss-toggle" id="pc-ss-toggle-btn" type="button" onclick="pcSS_toggle()" aria-label="تفعيل Server Side"></button>
+            <span class="pc-ss-toggle-lbl" id="pc-ss-toggle-lbl">OFF</span>
+          </div>
+          <div class="pc-ss-body" id="pc-ss-body">
+
+            <!-- 1. Server URL -->
+            <div class="pc-ss-section">
+              <div class="pc-ss-sec-label">رابط السيرفر (sGTM URL)</div>
+              <input class="pc-ss-input" id="pc-ss-url" type="url" placeholder="https://gtm.yourstore.com" dir="ltr" oninput="pcSS_validateUrl()" autocomplete="off">
+              <div class="pc-ss-valid" id="pc-ss-url-valid"></div>
+              <div class="pc-ss-hint">💡 مثال: https://gtm.yourstore.com — لازم يبدأ بـ https://</div>
+            </div>
+
+            <!-- 2. GA4 ID -->
+            <div class="pc-ss-section">
+              <div class="pc-ss-sec-label">GA4 Measurement ID (من الـ Client Side)</div>
+              <div id="pc-ss-ga4-display"></div>
+            </div>
+
+            <!-- 3. Platform Selection -->
+            <div class="pc-ss-section">
+              <div class="pc-ss-sec-label">منصات الإعلانات على السيرفر</div>
+              <div class="pc-ss-plat-grid" id="pc-ss-plat-grid">
+                <button class="cbtn" data-ss-plat="meta" onclick="pcSS_togglePlatform('meta')">
+                  <div class="cchk">✓</div>
+                  <span class="cicon"><svg viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:22px;height:22px;"><path d="M5 25c0-5.8 1.3-10.2 3.2-13.1C10.1 9 12.5 7.5 15 7.5c2 0 3.8.8 5.5 2.4 1.2 1.1 2.5 2.9 4.5 6.1 2-3.2 3.3-5 4.5-6.1 1.7-1.6 3.5-2.4 5.5-2.4 2.5 0 4.9 1.5 6.8 4.4C43.7 14.8 45 19.2 45 25c0 3.8-.7 7-2 9.4-1.6 2.9-3.9 4.6-6.3 4.6-1.5 0-2.9-.5-4.4-1.5-1.9-1.3-3.8-3.4-6.6-7.6-2.8 4.2-4.7 6.3-6.6 7.6-1.5 1-2.9 1.5-4.4 1.5-2.4 0-4.7-1.7-6.3-4.6C5.7 32 5 28.8 5 25z" fill="#1877F2"/></svg></span>
+                  Meta CAPI
+                </button>
+                <button class="cbtn" data-ss-plat="gads" onclick="pcSS_togglePlatform('gads')">
+                  <div class="cchk">✓</div>
+                  <span class="cicon"><svg viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:22px;height:22px;"><path d="M25 8A17 17 0 1 0 25 42A17 17 0 1 0 25 8Z" fill="white"/><path d="M33.5 20H25v5h4.9c-.4 2.5-2.6 4.3-4.9 4.3a5.8 5.8 0 0 1 0-11.6c1.4 0 2.7.5 3.7 1.4l3.5-3.5A10.5 10.5 0 0 0 25 12.5a12.5 12.5 0 0 0 0 25c7 0 11.5-4.9 11.5-12 0-.8-.1-1.7-.2-2.5H33.5z" fill="#4285F4"/><path d="M14.3 27.9l-4 3.1A12.5 12.5 0 0 0 25 37.5v-5c-4.1 0-7.7-2.3-9.4-5.8l-.3.2z" fill="#34A853"/><path d="M10.3 18.6A12.5 12.5 0 0 0 12.5 31l4-3.1c-.7-1.4-1-3-1-4.9 0-2 .4-3.8 1.1-5.4l-4.1-3.2a12.4 12.4 0 0 0-2.2 4.2z" fill="#FBBC05"/><path d="M25 12.5c2.7 0 5.1 1 6.9 2.5l3.6-3.6A12.4 12.4 0 0 0 25 8a12.5 12.5 0 0 0-10.7 6l4.1 3.2A7.5 7.5 0 0 1 25 12.5z" fill="#EA4335"/></svg></span>
+                  Google Ads
+                </button>
+                <button class="cbtn" data-ss-plat="snap" onclick="pcSS_togglePlatform('snap')">
+                  <div class="cchk">✓</div>
+                  <span class="cicon"><svg viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:22px;height:22px;"><rect width="50" height="50" rx="12" fill="#FFFC00"/><path d="M25 8c-5.6 0-9.5 3.8-9.5 9.3v1.5c-.6.3-1.4.4-2.1.2-.3 0-.4.1-.4.4 0 1.2 2.1 1.7 2.5 1.8.4 1.3 1.2 2.4 2.2 3.2-1.6.8-3.9 1.2-4.2 2.3 0 .2.2.4.4.4 2 .3 3.7 1.1 4.9 2.7.1.2.1.3-.1.4-1.5.6-3 .6-3 1.4 0 .5.7.7 1.3.7.9 0 1.8-.3 2.6-.6.5-.2.9-.2 1.3.1.8.6 1 1.7 1 2.7 0 .2.1.4.3.4 1 .1 2.1.1 2.8.1s1.8 0 2.8-.1c.2 0 .3-.2.3-.4 0-1 .2-2.1 1-2.7.4-.3.8-.3 1.3-.1.8.3 1.7.6 2.6.6.6 0 1.3-.2 1.3-.7 0-.8-1.5-.8-3-1.4-.2-.1-.2-.2-.1-.4 1.2-1.6 2.9-2.4 4.9-2.7.2 0 .4-.2.4-.4-.3-1.1-2.6-1.5-4.2-2.3 1-.8 1.8-1.9 2.2-3.2.4-.1 2.5-.6 2.5-1.8 0-.3-.1-.4-.4-.4-.7.2-1.5.1-2.1-.2v-1.5C34.5 11.8 30.6 8 25 8z" fill="#333"/></svg></span>
+                  Snapchat CAPI
+                </button>
+                <button class="cbtn" data-ss-plat="tiktok" onclick="pcSS_togglePlatform('tiktok')">
+                  <div class="cchk">✓</div>
+                  <span class="cicon"><svg viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:22px;height:22px;"><rect width="50" height="50" rx="12" fill="#010101"/><path d="M34.5 14.5a7.5 7.5 0 01-7.5-7.5h-5v22.3c0 2.1-1.7 3.7-3.8 3.7a3.75 3.75 0 01-3.7-3.7c0-2.1 1.7-3.7 3.7-3.7.4 0 .7.1 1 .2V20a8.9 8.9 0 00-1-.1c-4.8 0-8.7 3.9-8.7 8.7s3.9 8.7 8.7 8.7 8.7-3.9 8.7-8.7V21.4a12.6 12.6 0 007.5 2.4v-5a7.4 7.4 0 01-4.9-4.3h4.9V14.5z" fill="white"/></svg></span>
+                  TikTok Events API
+                </button>
+              </div>
+            </div>
+
+            <!-- 4. Per-platform Accordions (events + credentials) -->
+            <div class="pc-ss-section" id="pc-ss-acc-wrap" style="display:none;">
+              <div class="pc-ss-sec-label">إعدادات كل منصة — Events + Credentials</div>
+              <div id="pc-ss-accordions"></div>
+            </div>
+
+          </div>
+        </div>
+        <!-- END SS Card -->
 
         <div class="ptrack" id="ptrack">
           <div class="pstep">
@@ -3811,6 +4208,11 @@
           </div>
           <div class="cgrid" id="platGrid">
 
+            <!-- ── Advertising Platforms ── -->
+            <div class="pc-plat-group">
+              <div class="pc-plat-group-lbl">منصات الإعلانات</div>
+            </div>
+
             <!-- Meta -->
             <button class="cbtn" data-val="meta">
               <div class="cchk">✓</div>
@@ -3878,6 +4280,11 @@
               </span>
               Google Ads
             </button>
+
+            <!-- ── Analytics Platforms ── -->
+            <div class="pc-plat-group">
+              <div class="pc-plat-group-lbl">منصات التحليل</div>
+            </div>
 
             <!-- GA4 -->
             <button class="cbtn" data-val="ga4">
@@ -3950,6 +4357,12 @@
             </button>
 
 
+            <button class="otab" id="tabSsGtm" onclick="oTab('ss-gtm',this)">
+              <span class="material-symbols-outlined"
+                style="font-size:15px;font-variation-settings:'FILL' 1;">dns</span>
+              🖥️ Server Container
+            </button>
+
             <button class="otab" id="tabGuide" onclick="oTab('guide',this)">
               <span class="material-symbols-outlined"
                 style="font-size:15px;font-variation-settings:'FILL' 1;">auto_stories</span>
@@ -3960,6 +4373,46 @@
                 style="font-size:15px;font-variation-settings:'FILL' 1;">table_chart</span>
               Tracking Plan
             </button>
+          </div>
+
+          <!-- pane-ss-gtm: Server Container output — دايماً متاح زي الـ Web Container -->
+          <div class="opane" id="pane-ss-gtm">
+            <div class="pc-ss-out-banner">
+              <span class="pc-ss-out-icon">🖥️</span>
+              <div style="flex:1;">
+                <div style="font-family:var(--font-display);font-weight:700;font-size:14px;color:var(--wht);margin-bottom:3px;">Server Container — sGTM</div>
+                <div style="font-size:11px;color:var(--mut);">استورد الـ JSON ده في GTM → Admin → Import Container — ثم انسخ الـ Container Config لـ Stape/Cloud Run</div>
+              </div>
+            </div>
+            <div class="cwrap">
+              <div class="ctbar">
+                <div class="ctdots">
+                  <div class="ctdot" style="background:#ff5f57"></div>
+                  <div class="ctdot" style="background:#febc2e"></div>
+                  <div class="ctdot" style="background:#28c840"></div>
+                </div>
+                <span class="clang" id="ssGtmFileName">sgtm-container.json</span>
+                <div class="ctacts">
+                  <button class="dlbtn" id="dlSsGtm">⬇️ تحميل</button>
+                  <button class="cpybtn" id="cpySsGtm">نسخ</button>
+                </div>
+              </div>
+              <div class="cbody" id="ssGtmBody"></div>
+            </div>
+            <!-- Container Config section -->
+            <div class="pc-ss-config-section" id="pc-ss-config-section">
+              <div class="pc-ss-config-header">
+                <span class="material-symbols-outlined" style="font-size:16px;color:var(--acc);">key</span>
+                <span style="font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--wht);flex:1;">Container Config — للـ Stape / Cloud Run</span>
+                <button class="cpybtn" id="cpySsConfig">نسخ</button>
+              </div>
+              <div class="pc-ss-config-box" id="pc-ss-config-box">
+                <span style="color:var(--mut);">سيظهر هنا بعد توليد الـ Container…</span>
+              </div>
+              <div style="padding:10px 16px;font-size:11px;color:var(--mut);border-top:1px solid var(--bdr2);">
+                💡 افتح <strong style="color:var(--wht2);">Stape.io</strong> → New Container → Server GTM → الصق الـ Config هنا
+              </div>
+            </div>
           </div>
 
           <!-- pane-json hidden (download only, no tab) -->
@@ -4014,6 +4467,19 @@
               <button onclick="switchAppView('gtmview',document.getElementById('sbGtm'))"
                 style="margin-right:auto;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#00382b;border:none;border-radius:8px;padding:6px 14px;font-family:var(--font-ui);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;">
                 <span class="material-symbols-outlined" style="font-size:14px;">radar</span> Publish to GTM →
+              </button>
+            </div>
+            <!-- Cross-link banner — makes the Server Container tab impossible to miss -->
+            <div id="webToSsBanner" style="display:none;background:linear-gradient(90deg,rgba(0,224,170,.08),rgba(0,224,170,.02));border:1px solid rgba(0,224,170,.25);border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;">
+              <span class="material-symbols-outlined" style="color:var(--acc);font-size:20px;">dns</span>
+              <div style="flex:1;font-family:var(--font-ui);font-size:12px;color:var(--wht2);line-height:1.5;">
+                <strong style="color:var(--wht);">Server Container أيضاً جاهز</strong> — الـ transport_url ربط الـ GA4 الكلاينت ساي د بالـ sGTM
+                <span id="webToSsBannerUrl" style="font-family:var(--font-mono);font-size:11px;color:var(--acc);"></span>،
+                والـ CAPI tags لكل منصة موجودة في الـ Server Container.
+              </div>
+              <button onclick="oTab('ss-gtm',document.getElementById('tabSsGtm'))"
+                style="background:var(--acc);color:#00382b;border:none;border-radius:8px;padding:6px 12px;font-family:var(--font-ui);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">
+                🖥️ افتح الـ Server Container ←
               </button>
             </div>
             <div class="cwrap">
@@ -4096,35 +4562,33 @@
               </div>
             </div>
 
-            <!-- Server-Side toggle -->
-            <label for="mgdServerSideChk" style="display:flex;align-items:center;gap:10px;padding:12px 14px;
-              border-radius:12px;border:1px solid var(--bdr2);background:var(--sur);margin-bottom:8px;cursor:pointer;">
-              <input type="checkbox" id="mgdServerSideChk"
-                style="width:18px;height:18px;accent-color:var(--acc);cursor:pointer;flex-shrink:0;">
-              <div style="flex:1;min-width:0;">
-                <div style="font-size:13px;font-weight:700;color:var(--wht);">
-                  🚀 فعّل Server-Side Tracking (مستحسن)
-                </div>
-                <div style="font-size:11px;color:var(--mut);margin-top:2px;line-height:1.5;">
-                  Easy Track هيعمل لك <strong>كل حاجة تلقائياً</strong>: ينشئ sGTM container، ينشره على Stape، ويربطه بالـ web container. مفيش حاجة تعملها انت — هتطلع snippet جاهز يتلصق على الموقع وبس. يتجاوز ad blockers + يدعم Conversions APIs.
+            <!-- Server-Side section — always visible, used only when clicking server button -->
+            <div id="mgdCapiTokensBlock" style="margin-bottom:8px;padding:12px 14px;
+              border-radius:12px;border:1px solid rgba(70,241,197,.25);background:rgba(70,241,197,.04);">
+              <!-- header -->
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                <span class="material-symbols-outlined" style="font-size:16px;color:var(--acc);">dns</span>
+                <div style="font-size:12px;font-weight:700;color:var(--acc);">
+                  إعدادات Server-Side
+                  <span style="font-size:10px;font-weight:500;color:var(--mut);margin-right:6px;">(مطلوبة لو هتضغط Create Web + Server)</span>
                 </div>
               </div>
-            </label>
-
-            <!-- Publish toggle -->
-            <label for="mgdPublishChk" style="display:flex;align-items:center;gap:10px;padding:12px 14px;
-              border-radius:12px;border:1px solid var(--bdr2);background:var(--sur);margin-bottom:12px;cursor:pointer;">
-              <input type="checkbox" id="mgdPublishChk" checked
-                style="width:18px;height:18px;accent-color:var(--acc);cursor:pointer;flex-shrink:0;">
-              <div style="flex:1;min-width:0;">
-                <div style="font-size:13px;font-weight:700;color:var(--wht);">
-                  Publish to Live فوراً
-                </div>
-                <div style="font-size:11px;color:var(--mut);margin-top:2px;line-height:1.5;">
-                  لو مفعّل: الـ container يبقى شغال دلوقتي. لو مقفول: بيفضل Draft وانت تراجعه وتنشره بنفسك. <em>(يتم تجاهله لو فعّلت Server-Side — هنعمل publish تلقائي بعد wiring)</em>
-                </div>
+              <!-- sGTM URL -->
+              <div style="font-size:11px;color:var(--mut);margin-bottom:6px;line-height:1.5;">
+                🌐 رابط السيرفر بتاعك (sGTM URL)
               </div>
-            </label>
+              <input id="mgdSgtmUrlInput" type="url" dir="ltr" placeholder="https://gtm.your-domain.com"
+                style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--bdr2);
+                border-radius:8px;padding:9px 12px;color:var(--wht);font-family:var(--font-mono);
+                font-size:12px;margin-bottom:12px;outline:none;"
+                oninput="this.style.borderColor=this.value.trim()?'var(--acc)':'var(--bdr2)'">
+              <!-- CAPI Tokens -->
+              <div style="font-size:11px;color:var(--mut);margin-bottom:8px;line-height:1.5;">
+                🔑 CAPI Access Tokens
+                <span style="color:rgba(255,255,255,.35)"> — اختياري، هتتضاف تلقائياً في السيرفر كونتينر</span>
+              </div>
+              <div id="mgdCapiTokenFields"></div>
+            </div>
 
             <!-- Progress area -->
             <div id="mgdProgress"
@@ -4140,11 +4604,27 @@
               </div>
             </div>
 
-            <!-- Action button -->
-            <button class="gtm-deploy-btn" id="mgdCreateBtn" onclick="gtmManagedCreate()" style="width:100%;">
-              <span class="material-symbols-outlined" style="font-size:18px;">rocket_launch</span>
-              Create Managed Container
-            </button>
+            <!-- Two action buttons -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+
+              <!-- Web only -->
+              <button class="gtm-deploy-btn" id="mgdCreateBtn"
+                onclick="gtmManagedCreate('client')"
+                style="width:100%;background:var(--sur);border:1px solid var(--bdr2);
+                       font-size:12px;padding:11px 10px;gap:6px;">
+                <span class="material-symbols-outlined" style="font-size:16px;">language</span>
+                Create Web Container
+              </button>
+
+              <!-- Web + Server -->
+              <button class="gtm-deploy-btn" id="mgdCreateServerBtn"
+                onclick="gtmManagedCreate('client_server')"
+                style="width:100%;font-size:12px;padding:11px 10px;gap:6px;">
+                <span class="material-symbols-outlined" style="font-size:16px;">dns</span>
+                Create Web + Server
+              </button>
+
+            </div>
 
             <!-- Result area (populated after success) -->
             <div id="mgdResult" style="display:none;margin-top:14px;"></div>
@@ -4197,393 +4677,6 @@
         </div>
       </div>
       <!-- END MY PROJECTS VIEW -->
-
-
-
-      <!-- ══════ SERVER-SIDE VIEW ══════ -->
-      <div class="app-view" id="view-serverside">
-
-        <div class="page-hdr">
-          <div>
-            <h2 class="page-title">
-              <span class="material-symbols-outlined" style="color:var(--acc);">dns</span>
-              Server-Side Tracking
-            </h2>
-            <p class="page-sub">إعداد شامل — ينشئ Web + Server GTM Containers ويربطهم تلقائياً</p>
-          </div>
-          <button class="btn-ghost-sm" id="ss-hdr-reset-btn" onclick="ss_resetConfig()" style="display:none;color:#f87171;border-color:rgba(248,113,113,.3);">
-            <span class="material-symbols-outlined" style="font-size:14px;">delete</span>
-            إعادة ضبط
-          </button>
-        </div>
-
-        <!-- ── Completed Banner ── -->
-        <div id="ss-done-banner" style="display:none;margin-bottom:20px;padding:16px 20px;border-radius:14px;background:rgba(70,241,197,.08);border:1px solid rgba(70,241,197,.25);align-items:center;gap:12px;">
-          <span class="material-symbols-outlined" style="color:var(--acc);font-size:22px;flex-shrink:0;">check_circle</span>
-          <div style="flex:1;">
-            <div style="font-size:14px;font-weight:700;color:var(--acc);">Server-Side Tracking مفعّل ✓</div>
-            <div id="ss-done-url" style="font-size:11px;color:var(--mut);font-family:var(--font-mono);margin-top:2px;"></div>
-          </div>
-          <button class="btn-ghost-sm" onclick="ss_editSetup()" style="font-size:11px;flex-shrink:0;">تعديل</button>
-        </div>
-
-        <!-- ── Step Indicator (6 steps) ── -->
-        <div class="ss-wizard-bar" id="ss-step-bar">
-          <div class="ss-wstep active" id="ss-step-ind-1" onclick="ss_goToStep(1)" title="إنشاء Containers">
-            <span class="ss-wstep-num">1</span>
-            <span class="ss-wstep-label">Container</span>
-          </div>
-          <div class="ss-wstep-line" id="ss-step-line-1"></div>
-          <div class="ss-wstep" id="ss-step-ind-2">
-            <span class="ss-wstep-num">2</span>
-            <span class="ss-wstep-label">URL الخادم</span>
-          </div>
-          <div class="ss-wstep-line" id="ss-step-line-2"></div>
-          <div class="ss-wstep" id="ss-step-ind-3">
-            <span class="ss-wstep-num">3</span>
-            <span class="ss-wstep-label">المنصات</span>
-          </div>
-          <div class="ss-wstep-line" id="ss-step-line-3"></div>
-          <div class="ss-wstep" id="ss-step-ind-4">
-            <span class="ss-wstep-num">4</span>
-            <span class="ss-wstep-label">Events</span>
-          </div>
-          <div class="ss-wstep-line" id="ss-step-line-4"></div>
-          <div class="ss-wstep" id="ss-step-ind-5">
-            <span class="ss-wstep-num">5</span>
-            <span class="ss-wstep-label">Client-Side</span>
-          </div>
-          <div class="ss-wstep-line" id="ss-step-line-5"></div>
-          <div class="ss-wstep" id="ss-step-ind-6">
-            <span class="ss-wstep-num">6</span>
-            <span class="ss-wstep-label">مراجعة</span>
-          </div>
-        </div>
-
-        <!-- ════════════════════════════ STEP 1 ════════════════════════════ -->
-        <div class="ss-wizard-panel" id="ss-panel-1">
-          <div class="ss-panel-title">إنشاء GTM Containers (Web + Server)</div>
-          <div class="ss-panel-sub">الأداة ستنشئ Web Container وServer Container في GTM ثم تعطيك الـ Container Config لنشره على مزودك</div>
-
-          <!-- Progress area (hidden until job starts) -->
-          <div id="ss-p1-progress" style="display:none;margin-bottom:20px;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-              <div class="ss-spin"></div>
-              <div id="ss-p1-stage-msg" style="font-size:13px;color:var(--wht2);">جارٍ الإنشاء...</div>
-            </div>
-            <div style="height:4px;border-radius:4px;background:var(--sur);overflow:hidden;">
-              <div id="ss-p1-bar" style="height:100%;background:var(--acc);transition:width .4s;width:5%;border-radius:4px;"></div>
-            </div>
-          </div>
-
-          <!-- containerConfig result (hidden until done) -->
-          <div id="ss-p1-result" style="display:none;margin-bottom:20px;">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-              <span class="material-symbols-outlined" style="color:var(--acc);font-size:18px;">check_circle</span>
-              <span style="font-size:14px;font-weight:700;color:var(--acc);">تم إنشاء الـ Containers بنجاح!</span>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-              <div style="background:var(--sur);border:1px solid rgba(70,241,197,.2);border-radius:10px;padding:12px;">
-                <div style="font-size:10px;color:var(--mut);margin-bottom:4px;font-family:var(--font-mono);letter-spacing:1px;">WEB GTM</div>
-                <div id="ss-p1-web-id" style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--wht);">—</div>
-              </div>
-              <div style="background:var(--sur);border:1px solid rgba(70,241,197,.2);border-radius:10px;padding:12px;">
-                <div style="font-size:10px;color:var(--mut);margin-bottom:4px;font-family:var(--font-mono);letter-spacing:1px;">SERVER GTM</div>
-                <div id="ss-p1-server-id" style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--wht);">—</div>
-              </div>
-            </div>
-
-            <div style="margin-bottom:10px;">
-              <div style="font-size:12px;font-weight:700;color:var(--wht2);margin-bottom:6px;">Container Config الخاص بك:</div>
-              <div style="position:relative;">
-                <pre id="ss-p1-config-json" style="background:#0a0d11;border:1px solid var(--bdr);border-radius:10px;padding:14px;font-size:10px;color:#a8d8a8;overflow-x:auto;max-height:140px;overflow-y:auto;margin:0;white-space:pre-wrap;word-break:break-all;"></pre>
-                <button onclick="ss_copyConfig()" style="position:absolute;top:8px;left:8px;background:rgba(70,241,197,.1);border:1px solid rgba(70,241,197,.25);border-radius:6px;padding:3px 10px;font-size:10px;font-weight:700;color:var(--acc);cursor:pointer;font-family:var(--font-ui);">📋 نسخ</button>
-              </div>
-            </div>
-
-            <div style="background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.25);border-radius:10px;padding:12px 14px;font-size:12px;color:#fbbf24;line-height:1.7;">
-              <strong>📋 الخطوة التالية:</strong><br>
-              روح على <strong>Google Tag Manager ← Admin ← Install Google Tag Manager</strong><br>
-              اختر <strong>"Manually provision tagging server"</strong> والصق الكود أعلاه.<br>
-              أو انشر مباشرةً على Stape / Cloud Run / Docker.
-            </div>
-          </div>
-
-          <!-- Error area -->
-          <div id="ss-p1-error" style="display:none;padding:12px 14px;border-radius:10px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);font-size:12px;color:#f87171;margin-bottom:16px;"></div>
-
-          <!-- Initial create button -->
-          <div id="ss-p1-btn-wrap" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-            <button class="btn-acc-sm" id="ss-p1-create-btn" onclick="ss_createContainers()">
-              <span class="material-symbols-outlined" style="font-size:14px;">add_circle</span>
-              إنشاء Web + Server Containers
-            </button>
-            <div style="font-size:11px;color:var(--mut);">⏱️ يستغرق 60-120 ثانية</div>
-          </div>
-          <div id="ss-p1-config-hint" style="margin-top:10px;font-size:11px;color:var(--mut);"></div>
-
-          <div class="ss-wizard-nav">
-            <span></span>
-            <button class="btn-acc-sm" id="ss-p1-next-btn" onclick="ss_goToStep(2)" disabled>التالي ←</button>
-          </div>
-        </div>
-
-        <!-- ════════════════════════════ STEP 2 ════════════════════════════ -->
-        <div class="ss-wizard-panel" id="ss-panel-2" style="display:none;">
-          <div class="ss-panel-title">أدخل Server URL الخاص بك</div>
-          <div class="ss-panel-sub">بعد نشر الـ Container Config على مزودك، الصق الرابط هنا للتحقق منه</div>
-
-          <div style="margin-bottom:16px;">
-            <label style="font-size:12px;font-weight:600;color:var(--wht2);display:block;margin-bottom:6px;">Server URL</label>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;">
-              <input type="url" id="ss-p2-url" class="ss-url-input"
-                placeholder="https://your-sgtm-server.com"
-                oninput="ss_p2OnInput()"
-                onkeydown="if(event.key==='Enter'){ss_validateUrl();}" />
-              <button class="btn-ghost-sm" onclick="ss_validateUrl()" id="ss-p2-validate-btn">
-                <span class="material-symbols-outlined" style="font-size:14px;">wifi_tethering</span>
-                تحقق
-              </button>
-            </div>
-            <div id="ss-p2-status" class="ss-url-status" style="margin-top:8px;"></div>
-          </div>
-
-          <div style="background:var(--sur);border:1px solid var(--bdr2);border-radius:10px;padding:12px 14px;font-size:12px;color:var(--mut);line-height:1.7;margin-bottom:16px;">
-            💡 <strong style="color:var(--wht2);">مزودون موصى بهم:</strong>
-            <a href="https://stape.io" target="_blank" style="color:var(--acc);">Stape.io</a> ·
-            <a href="https://cloud.google.com/run" target="_blank" style="color:var(--acc);">Google Cloud Run</a> ·
-            Docker / VPS
-          </div>
-
-          <div class="ss-wizard-nav">
-            <button class="btn-ghost-sm" onclick="ss_goToStep(1)">← السابق</button>
-            <button class="btn-acc-sm" id="ss-p2-next-btn" onclick="ss_goToStep(3)" disabled>التالي ←</button>
-          </div>
-        </div>
-
-        <!-- ════════════════════════════ STEP 3 ════════════════════════════ -->
-        <div class="ss-wizard-panel" id="ss-panel-3" style="display:none;">
-          <div class="ss-panel-title">اختر المنصات للـ Server-Side</div>
-          <div class="ss-panel-sub">هذه المنصات ستستقبل الـ Events من الخادم مباشرةً عبر Conversions APIs</div>
-
-          <div style="background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.25);border-radius:10px;padding:10px 14px;font-size:12px;color:#fbbf24;margin-bottom:16px;">
-            ⚠️ <strong>تنبيه:</strong> كل Request على السيرفر بيكلف — اختار المنصات بحكمة.
-          </div>
-
-          <div id="ss-p3-plat-list" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;"></div>
-
-          <div class="ss-wizard-nav">
-            <button class="btn-ghost-sm" onclick="ss_goToStep(2)">← السابق</button>
-            <button class="btn-acc-sm" onclick="ss_goToStep(4)">التالي ←</button>
-          </div>
-        </div>
-
-        <!-- ════════════════════════════ STEP 4 ════════════════════════════ -->
-        <div class="ss-wizard-panel" id="ss-panel-4" style="display:none;">
-          <div class="ss-panel-title">اختر Events الـ Server-Side</div>
-          <div class="ss-panel-sub">Events اللي هتتتبع من الخادم — اختار بحكمة لأن كل event بيكلف request</div>
-
-          <div id="ss-p4-events-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;"></div>
-
-          <div style="background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.25);border-radius:10px;padding:10px 14px;font-size:12px;color:#fca5a5;margin-bottom:16px;">
-            🚫 <strong>PageView على السيرفر = تكلفة عالية + قيمة منخفضة</strong> — تجنبه إلا لو محتاجه بالضرورة.
-          </div>
-
-          <div class="ss-wizard-nav">
-            <button class="btn-ghost-sm" onclick="ss_goToStep(3)">← السابق</button>
-            <button class="btn-acc-sm" onclick="ss_goToStep(5)">التالي ←</button>
-          </div>
-        </div>
-
-        <!-- ════════════════════════════ STEP 5 ════════════════════════════ -->
-        <div class="ss-wizard-panel" id="ss-panel-5" style="display:none;">
-          <div class="ss-panel-title">إعداد Client-Side (Web GTM)</div>
-          <div class="ss-panel-sub">GA4 بيكون الـ Data Layer اللي يجمع الداتا ويبعتها للسيرفر — Google Ads مستقل تماماً</div>
-
-          <!-- 5A: GA4 ID -->
-          <div style="background:var(--sur);border:1px solid var(--bdr2);border-radius:12px;padding:16px;margin-bottom:14px;">
-            <div style="font-size:13px;font-weight:700;color:var(--wht);margin-bottom:4px;display:flex;align-items:center;gap:6px;">
-              <span style="font-size:16px;">📊</span> GA4 Measurement ID (جديدة للسيرفر)
-            </div>
-            <div style="font-size:11px;color:var(--mut);margin-bottom:10px;">أنشئ GA4 Property جديدة مخصصة للـ Server-Side — لا تستخدم نفس الـ GA4 القديمة</div>
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-              <input type="text" id="ss-p5-ga4-id" class="ss-url-input"
-                placeholder="G-XXXXXXXXXX"
-                oninput="ss_p5OnInput()"
-                style="max-width:220px;"
-                value="" />
-              <a href="https://analytics.google.com" target="_blank" style="font-size:11px;color:var(--acc);font-family:var(--font-ui);font-weight:700;">إنشاء Property ↗</a>
-            </div>
-            <div style="font-size:11px;color:var(--mut);margin-top:6px;">💡 الـ sGTM سيستقبل الداتا من GA4 ويوزعها على المنصات المختارة</div>
-          </div>
-
-          <!-- 5B: Client-Side Platforms -->
-          <div style="background:var(--sur);border:1px solid var(--bdr2);border-radius:12px;padding:16px;margin-bottom:14px;">
-            <div style="font-size:13px;font-weight:700;color:var(--wht);margin-bottom:4px;">منصات الـ Client-Side (Web GTM)</div>
-            <div style="font-size:11px;color:var(--mut);margin-bottom:12px;">هذه المنصات ستشتغل مباشرةً في المتصفح</div>
-            <div id="ss-p5-client-plats" style="display:flex;flex-direction:column;gap:8px;"></div>
-            <div style="margin-top:10px;padding:10px 12px;border-radius:8px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);font-size:11px;color:#fca5a5;">
-              🚨 <strong>قاعدة: Google Ads مستقل</strong> — لا تستخدم GA4 Events كـ Trigger لـ Google Ads أبداً.
-              كل Conversion Action لها Tag مستقل.
-            </div>
-          </div>
-
-          <!-- 5C: Events Selection -->
-          <div style="background:var(--sur);border:1px solid var(--bdr2);border-radius:12px;padding:16px;margin-bottom:14px;">
-            <div style="font-size:13px;font-weight:700;color:var(--wht);margin-bottom:12px;">Events Client-Side</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-              <div>
-                <div style="font-size:11px;font-weight:700;color:#4285F4;margin-bottom:8px;display:flex;align-items:center;gap:4px;">
-                  <span>🔵</span> Google Ads Conversions
-                </div>
-                <div id="ss-p5-gads-events" style="display:flex;flex-direction:column;gap:6px;"></div>
-              </div>
-              <div>
-                <div style="font-size:11px;font-weight:700;color:#F9AB00;margin-bottom:8px;display:flex;align-items:center;gap:4px;">
-                  <span>📊</span> GA4 Events (Data Layer)
-                </div>
-                <div id="ss-p5-ga4-events" style="display:flex;flex-direction:column;gap:6px;"></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="ss-wizard-nav">
-            <button class="btn-ghost-sm" onclick="ss_goToStep(4)">← السابق</button>
-            <button class="btn-acc-sm" id="ss-p5-next-btn" onclick="ss_goToStep(6)">التالي ←</button>
-          </div>
-        </div>
-
-        <!-- ════════════════════════════ STEP 6 ════════════════════════════ -->
-        <div class="ss-wizard-panel" id="ss-panel-6" style="display:none;">
-          <div class="ss-panel-title">مراجعة وتأكيد</div>
-          <div class="ss-panel-sub">راجع الإعدادات ثم اضغط تأكيد — الأداة ستربط الـ Web Container بالسيرفر وتحفظ كل شيء</div>
-
-          <div id="ss-p6-summary" style="margin-bottom:16px;"></div>
-
-          <!-- Platform Tokens (only for enabled SS platforms) -->
-          <div id="ss-p6-tokens-wrap" style="margin-bottom:16px;">
-            <div style="font-size:13px;font-weight:700;color:var(--wht);margin-bottom:4px;">🔑 Access Tokens للـ Server-Side</div>
-            <div style="font-size:11px;color:var(--mut);margin-bottom:10px;">مشفّرة بـ AES-256-GCM — لا تُخزن في المتصفح أبداً</div>
-            <div id="ss-p6-tokens-list" style="display:flex;flex-direction:column;gap:8px;"></div>
-          </div>
-
-          <!-- Action buttons -->
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-            <button class="btn-acc-sm" id="ss-p6-confirm-btn" onclick="ss_confirmSetup()" style="font-size:14px;padding:11px 24px;">
-              <span class="material-symbols-outlined" style="font-size:16px;">check_circle</span>
-              تأكيد وإنشاء الـ Containers ✓
-            </button>
-            <div id="ss-p6-status" style="font-size:12px;color:var(--mut);font-family:var(--font-mono);"></div>
-          </div>
-          <div id="ss-p6-error" style="display:none;margin-top:10px;padding:10px 14px;border-radius:10px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);font-size:12px;color:#f87171;"></div>
-
-          <div class="ss-wizard-nav">
-            <button class="btn-ghost-sm" onclick="ss_goToStep(5)">← السابق</button>
-            <span></span>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- ── Server-Side Wizard CSS ── -->
-      <style>
-        .ss-wizard-bar {
-          display: flex; align-items: center; gap: 0;
-          margin-bottom: 24px;
-          background: var(--sur2); border: 1px solid var(--bdr2); border-radius: 14px;
-          padding: 14px 16px; flex-wrap: nowrap; overflow-x: auto;
-        }
-        .ss-wstep {
-          display: flex; flex-direction: column; align-items: center; gap: 4px;
-          cursor: pointer; min-width: 48px;
-        }
-        .ss-wstep-num {
-          width: 26px; height: 26px; border-radius: 50%;
-          background: var(--sur); border: 2px solid var(--bdr2);
-          color: var(--mut); font-family: var(--font-display); font-weight: 800;
-          font-size: 11px; display: flex; align-items: center; justify-content: center;
-          transition: all .2s;
-        }
-        .ss-wstep.active .ss-wstep-num {
-          background: var(--acc); border-color: var(--acc); color: #00382b;
-          box-shadow: 0 0 0 3px rgba(70,241,197,.2);
-        }
-        .ss-wstep.done .ss-wstep-num { background: rgba(70,241,197,.15); border-color: var(--acc); color: var(--acc); }
-        .ss-wstep-label { font-size: 9px; color: var(--mut); font-family: var(--font-ui); font-weight: 600; white-space: nowrap; }
-        .ss-wstep.active .ss-wstep-label { color: var(--acc); }
-        .ss-wstep-line { flex: 1; height: 2px; background: var(--bdr2); margin-bottom: 12px; transition: background .3s; min-width: 10px; }
-        .ss-wstep-line.done { background: var(--acc); }
-        .ss-wizard-panel {
-          background: var(--sur2); border: 1px solid var(--bdr2); border-radius: 16px; padding: 24px;
-        }
-        .ss-panel-title { font-family: var(--font-display); font-size: 17px; font-weight: 800; color: var(--wht); margin-bottom: 6px; }
-        .ss-panel-sub { font-size: 12px; color: var(--mut); margin-bottom: 20px; }
-        .ss-wizard-nav {
-          display: flex; justify-content: space-between; align-items: center;
-          margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--bdr2);
-        }
-        /* URL input */
-        .ss-url-input {
-          flex: 1; min-width: 180px; background: var(--sur); border: 1.5px solid var(--bdr2);
-          border-radius: 10px; padding: 9px 14px; font-family: var(--font-mono); font-size: 12px;
-          color: var(--wht); outline: none; transition: border-color .15s; box-sizing: border-box;
-        }
-        .ss-url-input:focus { border-color: var(--acc); }
-        .ss-url-status { font-size: 12px; font-family: var(--font-mono); padding: 6px 10px; border-radius: 8px; display: none; }
-        .ss-url-status.ok  { color: #34d399; background: rgba(52,211,153,.08); border: 1px solid rgba(52,211,153,.2); display: block; }
-        .ss-url-status.err { color: #f87171; background: rgba(248,113,113,.08); border: 1px solid rgba(248,113,113,.2); display: block; }
-        .ss-url-status.testing { color: var(--acc); background: rgba(70,241,197,.06); border: 1px solid rgba(70,241,197,.15); display: block; }
-        /* Plat / event row */
-        .ss-sel-row {
-          display: flex; align-items: center; gap: 12px;
-          background: var(--sur); border: 1.5px solid var(--bdr2); border-radius: 12px;
-          padding: 10px 14px; cursor: pointer; transition: border-color .15s;
-        }
-        .ss-sel-row:hover { border-color: rgba(70,241,197,.3); }
-        .ss-sel-row.selected { border-color: var(--acc); background: rgba(70,241,197,.04); }
-        .ss-sel-ico { font-size: 20px; width: 32px; text-align: center; flex-shrink: 0; }
-        .ss-sel-info { flex: 1; min-width: 0; }
-        .ss-sel-name { font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--wht); }
-        .ss-sel-sub  { font-size: 11px; color: var(--mut); }
-        .ss-sel-badge { font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 4px; font-family: var(--font-display); flex-shrink: 0; }
-        .ss-sel-badge.rec { background: rgba(70,241,197,.15); color: var(--acc); border: 1px solid rgba(70,241,197,.25); }
-        .ss-sel-badge.warn { background: rgba(248,113,113,.1); color: #f87171; border: 1px solid rgba(248,113,113,.2); }
-        /* Event checkbox row (small) */
-        .ss-ev-row {
-          display: flex; align-items: center; gap: 8px;
-          padding: 6px 10px; border-radius: 8px; border: 1px solid var(--bdr2);
-          background: var(--sur); cursor: pointer; transition: border-color .15s;
-        }
-        .ss-ev-row:hover { border-color: rgba(70,241,197,.25); }
-        .ss-ev-row.checked { border-color: rgba(70,241,197,.3); background: rgba(70,241,197,.03); }
-        .ss-ev-row input[type=checkbox] { accent-color: var(--acc); flex-shrink: 0; }
-        .ss-ev-row-label { font-size: 12px; color: var(--wht2); font-family: var(--font-ui); font-weight: 600; }
-        /* Token input */
-        .ss-tok-input {
-          width: 100%; box-sizing: border-box; background: var(--sur2);
-          border: 1px solid var(--bdr2); border-radius: 8px; padding: 7px 10px;
-          font-family: var(--font-mono); font-size: 11px; color: var(--wht); outline: none;
-          transition: border-color .15s; margin-top: 6px;
-        }
-        .ss-tok-input:focus { border-color: var(--acc); }
-        /* Spinner */
-        .ss-spin {
-          width: 18px; height: 18px; border-radius: 50%;
-          border: 2px solid rgba(70,241,197,.2); border-top-color: var(--acc);
-          animation: ss-rotate 0.7s linear infinite; flex-shrink: 0;
-        }
-        @keyframes ss-rotate { to { transform: rotate(360deg); } }
-        /* Summary table */
-        .ss-summary-block { background: var(--sur); border: 1px solid var(--bdr2); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
-        .ss-summary-label { font-size: 10px; color: var(--mut); font-family: var(--font-mono); letter-spacing: .8px; text-transform: uppercase; margin-bottom: 6px; }
-        .ss-summary-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--bdr); }
-        .ss-summary-row:last-child { border-bottom: none; }
-        .ss-summary-key { font-size: 12px; color: var(--mut); }
-        .ss-summary-val { font-size: 12px; color: var(--wht); font-weight: 600; font-family: var(--font-ui); text-align: left; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        /* Active banner */
-        #ss-active-banner { display: none; }
-      </style>
-      <!-- END SERVER-SIDE VIEW -->
 
     </div>
   </div>
@@ -5448,8 +5541,42 @@
     // ===== STATE =====
     var S = { cms: null, platforms: [], events: [], platformEvents: {}, pixelIds: {}, lead: {} };
 
+    // ===== SERVER SIDE CONFIG STATE =====
+    var _pcSS = {
+      enabled:    false,           // toggle ON/OFF
+      serverUrl:  '',              // sGTM URL
+      ga4Id:      '',              // GA4 Measurement ID (auto from S or manual)
+      platforms:  [],              // ['meta','gads','snap','tiktok']
+      events:     {},              // { meta:['purchase','lead'], gads:['purchase'], ... }
+      pixelIds:   {},              // { meta:'XXXXXX', snap:'UUID', tiktok:'CXXX' }
+      tokens:     {},              // { meta:'EAAxx', snap:'eyJ', tiktok:'XXX' }
+      gadsConvId: '',              // AW-XXXXXXXXXX
+      gadsLabels: {},              // { purchase:'AbCd_xxx', lead:'XyZw_xxx' }
+      _pxOpen:    {}               // accordion open state per platform key
+    };
+
+    // SS platform definitions
+    var _pcSS_PLATS = {
+      meta:   { label:'Meta CAPI',         icon:'💙', idLabel:'Pixel ID',      tokLabel:'CAPI Access Token',       idPh:'1234567890123456', tokPh:'EAAxxxxx...',    hasToken:true  },
+      gads:   { label:'Google Ads',         icon:'🎯', idLabel:'Conversion ID', tokLabel:'',                        idPh:'AW-1234567890',    tokPh:'',               hasToken:false },
+      snap:   { label:'Snapchat CAPI',      icon:'👻', idLabel:'Pixel ID',      tokLabel:'CAPI Token',              idPh:'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx', tokPh:'eyJhbGci...', hasToken:true },
+      tiktok: { label:'TikTok Events API',  icon:'🎵', idLabel:'Pixel ID',      tokLabel:'Events API Access Token', idPh:'CXXXXXXXXXXXXXXXX', tokPh:'xxxxxxxx...', hasToken:true }
+    };
+
+    // SS event definitions
+    var _pcSS_EVENTS = [
+      { key:'purchase',          label:'Purchase',          icon:'💰', forced:true  },
+      { key:'add_to_cart',       label:'Add to Cart',       icon:'🛒', forced:false },
+      { key:'initiate_checkout', label:'Initiate Checkout', icon:'💳', forced:false },
+      { key:'view_content',      label:'View Content',      icon:'👁️', forced:false },
+      { key:'page_view',         label:'Page View',         icon:'📄', forced:false },
+      { key:'lead',              label:'Lead',              icon:'📋', forced:false },
+      { key:'sign_up',           label:'Sign Up',           icon:'✍️', forced:false },
+      { key:'search',            label:'Search',            icon:'🔍', forced:false }
+    ];
+
     // ===== APP VIEW SWITCHING =====
-    var APP_VIEWS = { overview: 'view-overview', pixels: 'view-pixels', gtmview: 'view-gtmview', projects: 'view-projects', serverside: 'view-serverside' };
+    var APP_VIEWS = { overview: 'view-overview', pixels: 'view-pixels', gtmview: 'view-gtmview', projects: 'view-projects' };
 
     // Cached GTM JSON string for sidebar view
     var _cachedGtmStr = null;
@@ -5483,6 +5610,8 @@
           if (gtmEmpty) gtmEmpty.style.display = 'flex';
           if (gtmViewContent) gtmViewContent.innerHTML = '';
         }
+        // Render CAPI token fields based on selected platforms
+        if (typeof _mgdRenderCapiTokens === 'function') _mgdRenderCapiTokens();
       }
 
       // If going to My Projects view — load projects into the sidebar list
@@ -6023,7 +6152,9 @@
       document.getElementById('outWrap').classList.remove('on');
       if (n <= 4) document.getElementById('s' + n).classList.add('on');
       updateProg(n);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      var ptrack = document.getElementById('ptrack');
+      if (ptrack) ptrack.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      else window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function updateProg(cur) {
@@ -6191,11 +6322,12 @@
           html += '<div class="pixhint">💡 Google Ads → Tools → Conversions → Settings → Conversion ID</div>';
           html += '</div>';
 
-          // Conversion Label per event
+          // Conversion Label per event (only events selected for Google Ads)
           html += '<div class="pixrow" style="margin-top:16px;">';
           html += '<label class="pixlabel">Conversion Label <span class="pixlabel-hint">لكل event منفصل</span></label>';
-          for (var ei = 0; ei < S.events.length; ei++) {
-            var ev = S.events[ei];
+          var _gadsEvs = (S.platformEvents && S.platformEvents['google'] && S.platformEvents['google'].length) ? S.platformEvents['google'] : S.events;
+          for (var ei = 0; ei < _gadsEvs.length; ei++) {
+            var ev = _gadsEvs[ei];
             var evLabel = GA4[ev] ? GA4[ev].label : ev;
             html += '<div class="pix-ev-row">';
             html += '<span class="pix-ev-name">' + evLabel + '</span>';
@@ -6289,6 +6421,203 @@
       };
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // ===== SERVER SIDE CONFIG — UI Functions =====
+    // ═══════════════════════════════════════════════════════════
+
+    function pcSS_toggle() {
+      _pcSS.enabled = !_pcSS.enabled;
+      var btn  = document.getElementById('pc-ss-toggle-btn');
+      var lbl  = document.getElementById('pc-ss-toggle-lbl');
+      var body = document.getElementById('pc-ss-body');
+      var card = document.getElementById('pc-ss-card');
+      if (btn)  btn.classList.toggle('on', _pcSS.enabled);
+      if (lbl)  { lbl.textContent = _pcSS.enabled ? 'ON' : 'OFF'; lbl.classList.toggle('on', _pcSS.enabled); }
+      if (body) body.classList.toggle('open', _pcSS.enabled);
+      if (card) card.classList.toggle('ss-on', _pcSS.enabled);
+      if (_pcSS.enabled) pcSS_refreshGA4Display();
+    }
+
+    function pcSS_validateUrl() {
+      var inp = document.getElementById('pc-ss-url');
+      var valid = document.getElementById('pc-ss-url-valid');
+      if (!inp || !valid) return;
+      var v = inp.value.trim();
+      _pcSS.serverUrl = v;
+      if (!v) { valid.textContent = ''; return; }
+      var ok = /^https:\/\/[A-Za-z0-9.\-]+(:\d+)?(\/[A-Za-z0-9._~%\-\/]*)?$/.test(v);
+      valid.textContent = ok ? '✅ رابط صحيح' : '❌ لازم يبدأ بـ https:// ويحتوي على domain صحيح';
+      valid.style.color = ok ? '#34d399' : '#f87171';
+    }
+
+    function pcSS_refreshGA4Display() {
+      var el = document.getElementById('pc-ss-ga4-display');
+      if (!el) return;
+      var id = (S.pixelIds && S.pixelIds['ga4']) ? S.pixelIds['ga4'] : _pcSS.ga4Id;
+      if (id) {
+        _pcSS.ga4Id = id;
+        el.innerHTML = '<div class="pc-ss-ga4-row">'
+          + '<span class="pc-ss-ga4-badge">GA4</span>'
+          + '<span class="pc-ss-ga4-val">' + id + '</span>'
+          + '<button class="pc-ss-ga4-edit" onclick="pcSS_editGA4()">تعديل</button>'
+          + '</div>';
+      } else {
+        el.innerHTML = '<input class="pc-ss-input" id="pc-ss-ga4-manual" type="text" placeholder="G-XXXXXXXXXX" dir="ltr" oninput="pcSS_onGA4Input()" autocomplete="off">'
+          + '<div class="pc-ss-hint">💡 GA4 Measurement ID — أضف GA4 في Step 2 أولاً أو اكتبه هنا يدوياً</div>';
+      }
+    }
+
+    window.pcSS_editGA4 = function() {
+      var el = document.getElementById('pc-ss-ga4-display');
+      if (!el) return;
+      el.innerHTML = '<input class="pc-ss-input" id="pc-ss-ga4-manual" type="text" placeholder="G-XXXXXXXXXX" dir="ltr" value="' + (_pcSS.ga4Id || '') + '" oninput="pcSS_onGA4Input()" autocomplete="off">';
+    };
+
+    window.pcSS_onGA4Input = function() {
+      var inp = document.getElementById('pc-ss-ga4-manual');
+      if (inp) _pcSS.ga4Id = inp.value.trim();
+    };
+
+    function pcSS_togglePlatform(key) {
+      var btn = document.querySelector('[data-ss-plat="' + key + '"]');
+      var idx = _pcSS.platforms.indexOf(key);
+      if (idx === -1) {
+        _pcSS.platforms.push(key);
+        if (btn) btn.classList.add('on');
+        if (!_pcSS.events[key]) {
+          _pcSS.events[key] = ['purchase']; // purchase forced by default
+        }
+      } else {
+        _pcSS.platforms.splice(idx, 1);
+        if (btn) btn.classList.remove('on');
+        delete _pcSS._pxOpen[key];
+      }
+      pcSS_renderAccordions();
+    }
+
+    function pcSS_renderAccordions() {
+      var wrap = document.getElementById('pc-ss-acc-wrap');
+      var container = document.getElementById('pc-ss-accordions');
+      if (!wrap || !container) return;
+      if (!_pcSS.platforms.length) { wrap.style.display = 'none'; return; }
+      wrap.style.display = '';
+      container.innerHTML = '';
+      _pcSS.platforms.forEach(function(key) {
+        var pd = _pcSS_PLATS[key];
+        if (!pd) return;
+        var isOpen = !!_pcSS._pxOpen[key];
+        var acc = document.createElement('div');
+        acc.className = 'pc-ss-acc' + (isOpen ? ' open' : '');
+        acc.id = 'pc-ss-acc-' + key;
+
+        // Build events chips HTML
+        var evChips = _pcSS_EVENTS.map(function(ev) {
+          var sel = (_pcSS.events[key] || []).indexOf(ev.key) !== -1;
+          return '<span class="pc-ss-ev-chip' + (sel ? ' on' : '') + (ev.forced ? ' forced' : '') + '" '
+            + 'onclick="pcSS_toggleEvent(\'' + key + '\',\'' + ev.key + '\')" '
+            + 'title="' + ev.label + '">'
+            + ev.icon + ' ' + ev.key + '</span>';
+        }).join('');
+
+        // Build credentials HTML
+        var credsHtml = '';
+        if (key === 'gads') {
+          // Google Ads: Conversion ID + Labels per event
+          credsHtml += '<div class="pc-ss-px-row">'
+            + '<div class="pc-ss-px-lbl">Conversion ID <span style="color:var(--mut);font-weight:400;">(مشترك لكل الـ events)</span></div>'
+            + '<input class="pc-ss-input" id="pc-ss-px-gads-id" type="text" placeholder="AW-1234567890" dir="ltr" value="' + (_pcSS.gadsConvId||'') + '" oninput="_pcSS.gadsConvId=this.value.trim()" autocomplete="off">'
+            + '</div>';
+          credsHtml += '<div class="pc-ss-px-row" id="pc-ss-gads-labels-wrap">'
+            + '<div class="pc-ss-px-lbl">Conversion Labels <span style="color:var(--mut);font-weight:400;">(لكل event)</span></div>'
+            + (_pcSS.events['gads'] || ['purchase']).map(function(ev) {
+                return '<div class="pc-ss-label-row">'
+                  + '<span class="pc-ss-label-ev">' + ev + '</span>'
+                  + '<input class="pc-ss-input" style="flex:1;" id="pc-ss-gads-lbl-' + ev + '" type="text" placeholder="AbCd_xxxxxxxx" dir="ltr" value="' + (_pcSS.gadsLabels[ev]||'') + '" oninput="_pcSS.gadsLabels[\'' + ev + '\']=this.value.trim()" autocomplete="off">'
+                  + '</div>';
+              }).join('');
+          credsHtml += '</div>';
+        } else {
+          // Meta, Snap, TikTok: Pixel ID + Token
+          credsHtml += '<div class="pc-ss-px-row">'
+            + '<div class="pc-ss-px-lbl">' + pd.idLabel + '</div>'
+            + '<input class="pc-ss-input" id="pc-ss-px-id-' + key + '" type="text" placeholder="' + pd.idPh + '" dir="ltr" value="' + (_pcSS.pixelIds[key]||'') + '" oninput="_pcSS.pixelIds[\'' + key + '\']=this.value.trim()" autocomplete="off">'
+            + '</div>';
+          if (pd.hasToken) {
+            credsHtml += '<div class="pc-ss-px-row">'
+              + '<div class="pc-ss-px-lbl">' + pd.tokLabel + '</div>'
+              + '<div class="pc-ss-pw-wrap">'
+              + '<input class="pc-ss-input" id="pc-ss-px-tok-' + key + '" type="password" placeholder="' + pd.tokPh + '" dir="ltr" value="' + (_pcSS.tokens[key]||'') + '" oninput="_pcSS.tokens[\'' + key + '\']=this.value.trim()" autocomplete="new-password">'
+              + '<span class="material-symbols-outlined pc-ss-eye" id="pc-ss-eye-' + key + '" onclick="pcSS_toggleEye(\'' + key + '\')">visibility</span>'
+              + '</div></div>';
+          }
+        }
+
+        acc.innerHTML = '<div class="pc-ss-acc-hdr" onclick="pcSS_toggleAccordion(\'' + key + '\')">'
+          + '<span style="font-size:18px;">' + pd.icon + '</span>'
+          + '<span class="pc-ss-acc-name">' + pd.label + '</span>'
+          + '<span class="pc-ss-acc-arr">▶</span>'
+          + '</div>'
+          + '<div class="pc-ss-acc-body">'
+          + '<div class="pc-ss-cred-title" style="margin-top:10px;">Events</div>'
+          + '<div class="pc-ss-ev-chips">' + evChips + '</div>'
+          + '<div class="pc-ss-cred-title">Credentials</div>'
+          + credsHtml
+          + '</div>';
+
+        container.appendChild(acc);
+      });
+    }
+
+    window.pcSS_toggleAccordion = function(key) {
+      _pcSS._pxOpen[key] = !_pcSS._pxOpen[key];
+      var acc = document.getElementById('pc-ss-acc-' + key);
+      if (acc) acc.classList.toggle('open', _pcSS._pxOpen[key]);
+    };
+
+    window.pcSS_toggleEvent = function(plat, evKey) {
+      var pd = _pcSS_EVENTS.find(function(e){ return e.key === evKey; });
+      if (pd && pd.forced) return; // purchase always on
+      if (!_pcSS.events[plat]) _pcSS.events[plat] = ['purchase'];
+      var arr = _pcSS.events[plat];
+      var idx = arr.indexOf(evKey);
+      if (idx === -1) arr.push(evKey);
+      else arr.splice(idx, 1);
+      // Re-render accordion to refresh chips + gads labels
+      pcSS_renderAccordions();
+      // Re-open the accordion
+      _pcSS._pxOpen[plat] = true;
+      var acc = document.getElementById('pc-ss-acc-' + plat);
+      if (acc) acc.classList.add('open');
+    };
+
+    window.pcSS_toggleEye = function(key) {
+      var inp = document.getElementById('pc-ss-px-tok-' + key);
+      var eye = document.getElementById('pc-ss-eye-' + key);
+      if (!inp) return;
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+      if (eye) eye.textContent = inp.type === 'password' ? 'visibility' : 'visibility_off';
+    };
+
+    function pcSS_collect() {
+      // URL
+      var urlInp = document.getElementById('pc-ss-url');
+      if (urlInp) _pcSS.serverUrl = urlInp.value.trim();
+      // GA4 ID — prefer S state, then manual input
+      var ga4Auto = (S.pixelIds && S.pixelIds['ga4']) ? S.pixelIds['ga4'] : '';
+      var ga4Manual = document.getElementById('pc-ss-ga4-manual');
+      _pcSS.ga4Id = ga4Auto || (ga4Manual ? ga4Manual.value.trim() : _pcSS.ga4Id);
+      // Pixel IDs + tokens — already wired via oninput on each input field
+      // Google Ads conv ID
+      var gadsIdInp = document.getElementById('pc-ss-px-gads-id');
+      if (gadsIdInp) _pcSS.gadsConvId = gadsIdInp.value.trim();
+      // Google Ads labels
+      (_pcSS.events['gads'] || []).forEach(function(ev) {
+        var inp = document.getElementById('pc-ss-gads-lbl-' + ev);
+        if (inp) _pcSS.gadsLabels[ev] = inp.value.trim();
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════
     // ===== GENERATE =====
     function generate() {
       try {
@@ -6300,10 +6629,11 @@
             var gRmk = document.getElementById('pf-google-rmk');
             S.pixelIds['google'] = gId ? gId.value.trim() : '';
             S.pixelIds['google_rmk'] = gRmk ? gRmk.value.trim() : '';
-            // Collect per-event conversion labels
+            // Collect per-event conversion labels (only Google Ads events)
             S.pixelIds['google_labels'] = {};
-            for (var ei = 0; ei < S.events.length; ei++) {
-              var ev = S.events[ei];
+            var _gadsCollEvs = (S.platformEvents && S.platformEvents['google'] && S.platformEvents['google'].length) ? S.platformEvents['google'] : S.events;
+            for (var ei = 0; ei < _gadsCollEvs.length; ei++) {
+              var ev = _gadsCollEvs[ei];
               var labelEl = document.getElementById('pf-google-label-' + ev);
               if (labelEl) S.pixelIds['google_labels'][ev] = labelEl.value.trim();
             }
@@ -6313,6 +6643,15 @@
           }
         }
 
+        // ── Step 1b: Collect SS config + set window.ET flags ──
+        try { pcSS_collect(); } catch(e) { console.warn('pcSS_collect error:', e); }
+        window.ET = window.ET || {};
+        window.ET.ssEnabled = _pcSS.enabled && !!_pcSS.serverUrl && /^https:\/\//.test(_pcSS.serverUrl);
+        window.ET.ssUrl     = _pcSS.serverUrl;
+        window.ET.ssGa4Id   = _pcSS.ga4Id;
+        window.ET.ssPlats   = _pcSS.platforms;
+        window.ET.ssEvents  = _pcSS.events;
+
         // ── Step 2: Show output panel & wire buttons FIRST so UI never stays blank ──
         for (var i = 1; i <= 4; i++) document.getElementById('s' + i).classList.remove('on');
         document.getElementById('outWrap').classList.add('on');
@@ -6320,11 +6659,103 @@
         if (gtmEmpty) gtmEmpty.style.display = 'none';
         updateProg(5);
         window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        // ── Server Container tab — دايماً ظاهر زي الـ Web Container ──
+        var tabSsEl = document.getElementById('tabSsGtm');
+        var paneSsEl = document.getElementById('pane-ss-gtm');
+        if (tabSsEl) tabSsEl.style.display = '';   // دايماً ظاهر بعد Generate
+        if (paneSsEl) paneSsEl.style.display = '';  // إزالة inline display:none
+
+        // ── Cross-link banner on the Web tab — surfaces the Server Container ──
+        // The Server Container pane lives behind a tab that's easy to miss; this
+        // banner sits at the top of the Web Container output and shouts that
+        // there's a second container to look at, with a button to jump to it.
+        try {
+          var webBanner = document.getElementById('webToSsBanner');
+          if (webBanner) {
+            if (window.ET && window.ET.ssEnabled && _pcSS.platforms && _pcSS.platforms.length) {
+              webBanner.style.display = 'flex';
+              var urlEl = document.getElementById('webToSsBannerUrl');
+              if (urlEl) urlEl.textContent = _pcSS.serverUrl ? (' (' + _pcSS.serverUrl + ')') : '';
+              // Add an animated badge on the SS tab so even users who don't read the banner notice
+              if (tabSsEl && !tabSsEl.querySelector('.ss-tab-badge')) {
+                var badge = document.createElement('span');
+                badge.className = 'ss-tab-badge';
+                badge.textContent = _pcSS.platforms.length;
+                badge.style.cssText = 'margin-right:6px;background:var(--acc);color:#00382b;border-radius:999px;padding:1px 7px;font-size:10px;font-weight:800;font-family:var(--font-mono);';
+                tabSsEl.appendChild(badge);
+              }
+            } else {
+              webBanner.style.display = 'none';
+              if (tabSsEl) {
+                var oldBadge = tabSsEl.querySelector('.ss-tab-badge');
+                if (oldBadge) oldBadge.remove();
+              }
+            }
+          }
+        } catch (e) { console.warn('webToSsBanner wiring error:', e); }
+
+        // ── تحديث banner الـ SS بناءً على الحالة ──
+        var _ssBannerSub = document.querySelector('#pane-ss-gtm .pc-ss-out-banner div > div:last-child');
+        if (_ssBannerSub) {
+          if (_pcSS.enabled && _pcSS.platforms.length) {
+            var _ssUrlTxt = _pcSS.serverUrl
+              ? ' · <span style="color:var(--acc);font-family:var(--font-mono);font-size:10px;">' + _pcSS.serverUrl + '</span>'
+              : ' · <span style="color:var(--red);font-size:10px;">⚠️ sGTM URL غير مُدخل</span>';
+            var _platNames = _pcSS.platforms.map(function(p){
+              return ({meta:'Meta',gads:'Google Ads',snap:'Snapchat',tiktok:'TikTok'})[p] || p;
+            }).join(' + ');
+            _ssBannerSub.innerHTML = '✅ <strong style="color:var(--acc);">' + _platNames + '</strong> مفعّلة' + _ssUrlTxt
+              + '<br><span style="font-size:10px;color:var(--mut);">• Web Container: GA4 سيرسل للسيرفر عبر transport_url ✓ &nbsp;|&nbsp; Server Container: Custom Templates جاهزة للـ CAPI ✓</span>';
+          } else {
+            _ssBannerSub.innerHTML = '⚙️ فعّل <strong style="color:var(--wht2);">Server Side</strong> من الكارت فوق واختار منصاتك'
+              + '<br><span style="font-size:10px;color:var(--mut);">الـ Container جاهز دايماً — فور التفعيل سيتضمن Custom Templates حقيقية لكل CAPI</span>';
+          }
+        }
+
         bindDownloads(); // wire early so buttons are always ready
 
         // ── Step 3: Build each output panel individually — one crash won't block the rest ──
         try { document.getElementById('jsonBody').textContent = JSON.stringify(buildJSON(), null, 2); }
         catch (e) { console.error('buildJSON error:', e); }
+
+        // ── Build Server Container JSON — دايماً زي الـ Web Container ──
+        try {
+          var ssContainerResult = buildSSContainer();
+          var ssContainerStr = JSON.stringify(ssContainerResult, null, 2);
+          var ssBody = document.getElementById('ssGtmBody');
+          if (ssBody) ssBody.textContent = ssContainerStr;
+          // Container Config: compact version for Stape
+          var ssConfigBox = document.getElementById('pc-ss-config-box');
+          if (ssConfigBox) ssConfigBox.textContent = JSON.stringify(ssContainerResult);
+          // Build filename from server URL hostname
+          var _ssFileName = 'sgtm-container.json';
+          try {
+            if (_pcSS.serverUrl) {
+              var _ssHostname = new URL(_pcSS.serverUrl).hostname.replace(/[^a-zA-Z0-9.-]/g, '_');
+              if (_ssHostname) _ssFileName = _ssHostname + '-container.json';
+            }
+          } catch(_) {}
+          var ssFileLabel = document.getElementById('ssGtmFileName');
+          if (ssFileLabel) ssFileLabel.textContent = _ssFileName;
+          // Wire download button
+          var dlSsBtn = document.getElementById('dlSsGtm');
+          if (dlSsBtn) {
+            (function(fname){ dlSsBtn.onclick = function() {
+              var blob = new Blob([ssContainerStr], { type: 'application/json' });
+              var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+              a.download = fname; a.click();
+            }; })(_ssFileName);
+          }
+          var cpySsBtn = document.getElementById('cpySsGtm');
+          if (cpySsBtn) cpySsBtn.onclick = function() { navigator.clipboard.writeText(ssContainerStr).catch(function(){}); };
+          var cpyCfgBtn = document.getElementById('cpySsConfig');
+          if (cpyCfgBtn) cpyCfgBtn.onclick = function() { navigator.clipboard.writeText(JSON.stringify(ssContainerResult)).catch(function(){}); };
+        } catch(e) {
+          console.error('buildSSContainer error:', e);
+          var ssBody2 = document.getElementById('ssGtmBody');
+          if (ssBody2) ssBody2.innerHTML = '<div style="padding:20px;color:#f87171;font-size:12px;font-family:monospace;">⚠️ خطأ في بناء Server Container: ' + (e.message||String(e)) + '</div>';
+        }
 
         try { document.getElementById('dlBody').textContent = buildDL(); }
         catch (e) { console.error('buildDL error:', e); }
@@ -6422,12 +6853,28 @@
         }
         platforms[p] = { platform_name: PM[p].name, pixel_id: S.pixelIds[p] || 'YOUR_PIXEL_ID', events: evList };
       }
-      return {
-        generated_by: 'Easy Track Easy Track · Pixel Config Generator',
+      var result = {
+        generated_by: 'Easy Track · Pixel Config Generator',
         generated_at: new Date().toISOString().split('T')[0],
         lead: S.lead || {}, cms: S.cms, cms_name: CMS[S.cms].name, cms_notes: CMS[S.cms].note,
         platforms: platforms
       };
+      // Append ss_config when Server Side is enabled
+      if (_pcSS.enabled) {
+        result.ss_config = {
+          enabled:    true,
+          server_url: _pcSS.serverUrl,
+          ga4_id:     _pcSS.ga4Id,
+          platforms:  _pcSS.platforms,
+          events:     _pcSS.events,
+          gads_conv_id: _pcSS.gadsConvId,
+          gads_labels:  _pcSS.gadsLabels
+          // tokens ommitted intentionally — sensitive
+        };
+      } else {
+        result.ss_config = { enabled: false };
+      }
+      return result;
     }
 
     // ── H3: Server-Side Relay Tag builder ──────────────────────────────────────
@@ -6486,6 +6933,706 @@
       return html.replace(/\[S\]/g, '<scr' + 'ipt>').replace(/\[\/S\]/g, '<\/scr' + 'ipt>');
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // ===== BUILD SERVER CONTAINER (sGTM) =====
+    // ═══════════════════════════════════════════════════════════════
+    function buildSSContainer() {
+      // Always generates — even when SS is off (empty container ready for use)
+      // Produces a fully importable sGTM container JSON with:
+      //   • GA4 Client
+      //   • customEvent Triggers (one per selected SS event, correct filter format)
+      //   • Custom Templates (real Sandboxed JS CAPI code for each platform)
+      //   • Tags referencing the custom templates via cvt_<fingerprint>
+
+      var ts = Date.now();
+      // Fingerprint must be ≤13 digits (sGTM int64 safe range)
+      function fp(id) { return String((ts % 9000000000000 + id * 7 + 1000000) % 9999999999999); }
+      function safeName(s) { return String(s).replace(/[:\/\\?*\[\]|<>]/g,'-').trim(); }
+      function sid(n) { return String(n); }
+
+      var varId = 1, tagId = 1, triggerId = 1, clientId = 1;
+      // ---- Output hygiene + validation helpers (added by GTM-sandbox audit) ----
+      // Never let a URL or object land in a credential field. Objects collapse
+      // to .id/.value/.token; URLs and easytrac.io values become the placeholder.
+      function credVal(raw, placeholder) {
+        var v = raw;
+        if (v && typeof v === 'object') v = v.id || v.value || v.token || '';
+        v = (v == null ? '' : String(v)).replace(/^\s+|\s+$/g, '');
+        if (!v) return placeholder;
+        var low = v.toLowerCase();
+        if (low.indexOf('http://') === 0 || low.indexOf('https://') === 0 ||
+            v.indexOf('://') !== -1 || low.indexOf('easytrac.io') !== -1) return placeholder;
+        return v;
+      }
+      // Deep ASCII fold for the entire export (em-dash/arrow -> ASCII, drop emojis/smart quotes/box chars).
+      function etAscii(str) {
+        return String(str)
+          .replace(/→/g, '->').replace(/[—–─]/g, '-')
+          .replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
+          .replace(/[^\x00-\x7F]/g, '');
+      }
+      function etAsciiDeep(o) {
+        if (typeof o === 'string') return etAscii(o);
+        if (Array.isArray(o)) { for (var i = 0; i < o.length; i++) o[i] = etAsciiDeep(o[i]); return o; }
+        if (o && typeof o === 'object') { for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) o[k] = etAsciiDeep(o[k]); return o; }
+        return o;
+      }
+      // Pre-export validation: JSON validity, schema, sandboxed-JS compat, credentials.
+      function validateSSContainer(c) {
+        var errors = [], warnings = [], checks = 0;
+        function isUrl(x){ x = String(x || '').toLowerCase(); return x.indexOf('http://')===0 || x.indexOf('https://')===0 || x.indexOf('://')!==-1 || x.indexOf('easytrac.io')!==-1; }
+        checks++; try { JSON.parse(JSON.stringify(c)); } catch (e) { errors.push('not JSON-serializable: ' + e); }
+        var cv = c && c.containerVersion;
+        checks++; if (!cv) { errors.push('missing containerVersion'); return { errors: errors, warnings: warnings, checks: checks }; }
+        checks++; if (!cv.container || (cv.container.usageContext || []).indexOf('SERVER') === -1) errors.push('container.usageContext must include SERVER');
+        var CRED = { pixelId:1, accessToken:1, apiToken:1, pixelCode:1, conversionId:1 };
+        var tpls = cv.customTemplate || [];
+        checks++; if (!tpls.length) warnings.push('no customTemplate[] present');
+        for (var i = 0; i < tpls.length; i++) {
+          var td = tpls[i].templateData || '', nm = tpls[i].name || ('template#' + i);
+          var parts = td.split('___SANDBOXED_JS_FOR_SERVER___');
+          var js = parts.length > 1 ? parts[1].split('___SERVER_PERMISSIONS___')[0] : '';
+          checks++; if (/\/\^|\.test\s*\(|new RegExp/.test(js)) errors.push(nm + ': regex literal / .test() / new RegExp in sandboxed JS');
+          checks++; if (/[^\x00-\x7F]/.test(td)) errors.push(nm + ': non-ASCII character in templateData');
+          checks++; if (/\btry\s*\{/.test(js) || /\}\s*catch/.test(js)) errors.push(nm + ': try/catch not supported in sandbox');
+          checks++; if (/\x00/.test(td)) errors.push(nm + ': NUL byte in templateData');
+          checks++; if (/Object\.keys\s*\(/.test(js) && js.indexOf("require('Object')") === -1) errors.push(nm + ": Object.keys without require('Object')");
+          checks++; if (/\bconst\s+\w/.test(js) || /\blet\s+\w/.test(js)) errors.push(nm + ': const/let in sandboxed JS (GTM parser rejects — use var)');
+          checks++; if (/\}\)\.catch\s*\(/.test(js) || /\.then\([^)]+\)\.catch\s*\(/.test(js)) errors.push(nm + ': .then().catch() chain — use two-arg .then(success, failure) instead');
+          checks++; if (/=>/.test(js)) errors.push(nm + ': arrow function => not supported in GTM sandbox');
+          checks++; if (/\basync\b/.test(js) || /\bawait\b/.test(js)) errors.push(nm + ': async/await not supported in GTM sandbox');
+          checks++; if (/\bclass\b/.test(js)) errors.push(nm + ': class keyword not supported in GTM sandbox');
+          checks++; if (/\?\s*\./.test(js)) errors.push(nm + ': optional chaining ?. not supported in GTM sandbox');
+          checks++; if (/\?\?/.test(js)) errors.push(nm + ': nullish coalescing ?? not supported in GTM sandbox');
+        }
+        var tags = cv.tag || [];
+        for (var t = 0; t < tags.length; t++) {
+          var ps = tags[t].parameter || [];
+          for (var p = 0; p < ps.length; p++) {
+            if (!CRED[ps[p].key]) continue;
+            checks++;
+            var val = ps[p].value;
+            if (isUrl(val)) errors.push((tags[t].name || ('tag#'+t)) + ': credential "' + ps[p].key + '" contains a URL (' + val + ')');
+            else if (!val || /^YOUR_|XXXX|^LABEL_/.test(String(val))) warnings.push((tags[t].name || ('tag#'+t)) + ': credential "' + ps[p].key + '" is a placeholder (' + val + ')');
+          }
+        }
+        checks++; if (/[^\x00-\x7F]/.test(JSON.stringify(c))) warnings.push('export still contains non-ASCII somewhere (names/notes)');
+        return { errors: errors, warnings: warnings, checks: checks };
+      }
+
+      var variables = [], tags = [], triggers = [], clients = [], customTemplates = [];
+
+      // ── Stable custom-template fingerprints for this session ──────────────
+      var TPL_META   = fp(50001);
+      var TPL_GADS   = fp(51001);
+      var TPL_SNAP   = fp(52001);
+      var TPL_TIKTOK = fp(53001);
+
+      // ══════════════════════════════════════════════════════════════════════
+      // SANDBOXED JS TEMPLATES — real HTTP request code for each CAPI
+      // ══════════════════════════════════════════════════════════════════════
+      //
+      // STRATEGY:
+      //   1. If window._ET_SGTM_TPL was populated by /api/sgtm-templates at
+      //      page load, embed the REAL .tpl source files verbatim. These are
+      //      production-ready templates with proper ___INFO___,
+      //      ___TEMPLATE_PARAMETERS___, ___SANDBOXED_JS_FOR_SERVER___ and
+      //      ___PERMISSIONS___ sections — sGTM will accept the import.
+      //   2. If the server didn't deliver the files (offline preview, static
+      //      hosting), fall back to a MINIMAL but STRUCTURALLY VALID inline
+      //      template. The previous fallback used wrong markers
+      //      (___SANDBOXED_JS_FOR_SERVER_SIDE_TEMPLATE___, ___WEB_PERMISSIONS___)
+      //      and skipped ___INFO___/___TEMPLATE_PARAMETERS___ entirely — GTM
+      //      silently dropped them on import, breaking every CAPI tag.
+
+      var _SGTM = (typeof window !== 'undefined' && window._ET_SGTM_TPL) || {};
+
+      function _makeFallbackTpl(opts) {
+        // opts: { id, name, description, params:[{name,displayName}...],
+        //         js, allowedHost }
+        var infoBlock = JSON.stringify({
+          type: 'TAG',
+          id:   opts.id,
+          version: 1,
+          securityGroups: [],
+          displayName: opts.name,
+          description: opts.description,
+          containerContexts: ['SERVER']
+        }, null, 2);
+
+        var paramsBlock = JSON.stringify(opts.params.map(function (p) {
+          return {
+            type: 'TEXT',
+            name: p.name,
+            displayName: p.displayName || p.name,
+            simpleValueType: true
+          };
+        }), null, 2);
+
+        var permsBlock = JSON.stringify([
+          {
+            instance: {
+              key:   { publicId: 'send_http', versionId: '1' },
+              param: [{ key: 'allowedUrls', value: { type: 1, string: 'any' } }]
+            },
+            clientAnnotations: { isEditedByUser: true },
+            isRequired: true
+          },
+          {
+            instance: {
+              key:   { publicId: 'read_event_data', versionId: '1' },
+              param: [{ key: 'eventDataAccess', value: { type: 1, string: 'any' } }]
+            },
+            clientAnnotations: { isEditedByUser: true },
+            isRequired: true
+          },
+          {
+            instance: {
+              key:   { publicId: 'logging', versionId: '1' },
+              param: [{ key: 'environments', value: { type: 1, string: 'debug' } }]
+            },
+            clientAnnotations: { isEditedByUser: true },
+            isRequired: false
+          }
+        ], null, 2);
+
+        return [
+          '___INFO___',  '', infoBlock, '',
+          '___TEMPLATE_PARAMETERS___', '', paramsBlock, '',
+          '___SANDBOXED_JS_FOR_SERVER___', '', opts.js, '',
+          '___SERVER_PERMISSIONS___', '', permsBlock
+        ].join('\n');
+      }
+
+      var META_TEMPLATE_CODE = _SGTM.meta || _makeFallbackTpl({
+        id: 'et_meta_capi',
+        name: 'Easy Track — Meta CAPI',
+        description: 'Forwards events to Meta Conversions API (graph.facebook.com).',
+        allowedHost: 'https://graph.facebook.com/',
+        params: [
+          { name: 'pixelId',     displayName: 'Meta Pixel ID' },
+          { name: 'accessToken', displayName: 'CAPI Access Token' },
+          { name: 'eventName',   displayName: 'Meta Event Name' },
+          { name: 'clientIp',    displayName: 'Client IP' },
+          { name: 'userAgent',   displayName: 'User Agent' }
+        ],
+        js: [
+          "var sendHttpRequest    = require('sendHttpRequest');",
+          "var JSON               = require('JSON');",
+          "var getEventData       = require('getEventData');",
+          "var encodeUriComponent = require('encodeUriComponent');",
+          "var getTimestampMillis = require('getTimestampMillis');",
+          "var Math               = require('Math');",
+          '',
+          "var eventId  = getEventData('event_id') || ('ET-' + getTimestampMillis());",
+          "var currency = getEventData('currency') || 'SAR';",
+          "var value    = getEventData('value')    || 0;",
+          "var orderId  = getEventData('transaction_id') || '';",
+          "var cIds     = getEventData('content_ids') || '';",
+          '',
+          'function clean(o){var r={};for(var k in o){if(o[k]!==""&&o[k]!=null)r[k]=o[k];}return r;}',
+          '',
+          'var ud = clean({',
+          "  em:                getEventData('user_data.em')  || getEventData('up.em'),",
+          "  ph:                getEventData('user_data.ph')  || getEventData('up.ph'),",
+          "  fn:                getEventData('user_data.fn')  || getEventData('up.fn'),",
+          "  ln:                getEventData('user_data.ln')  || getEventData('up.ln'),",
+          "  external_id:       getEventData('user_data.external_id') || getEventData('up.external_id'),",
+          "  fbp:               getEventData('up.fbp'),",
+          "  fbc:               getEventData('up.fbc'),",
+          '  client_ip_address: data.clientIp,',
+          '  client_user_agent: data.userAgent',
+          '});',
+          '',
+          'var cd = clean({',
+          '  currency:     currency,',
+          '  value:        value,',
+          '  order_id:     orderId,',
+          '  content_ids:  cIds ? [cIds] : undefined,',
+          "  content_type: 'product'",
+          '});',
+          '',
+          'var payload = JSON.stringify({ data: [{',
+          '  event_name:    data.eventName,',
+          '  event_time:    Math.floor(getTimestampMillis()/1000),',
+          '  event_id:      eventId,',
+          "  action_source: 'website',",
+          '  user_data:     ud,',
+          '  custom_data:   cd',
+          '}]});',
+          '',
+          "var url = 'https://graph.facebook.com/v18.0/' + encodeUriComponent(data.pixelId) +",
+          "            '/events?access_token=' + encodeUriComponent(data.accessToken);",
+          '',
+          "sendHttpRequest(url, {",
+          "  method:'POST',",
+          "  headers:{'Content-Type':'application/json'},",
+          "  timeout:8000,",
+          "  body:payload",
+          '}).then(function(r){',
+          '  if(r.statusCode>=200&&r.statusCode<300){ data.gtmOnSuccess(); }',
+          '  else{ data.gtmOnFailure(); }',
+          '}, data.gtmOnFailure);'
+        ].join('\n')
+      });
+
+      var TIKTOK_TEMPLATE_CODE = _SGTM.tiktok || _makeFallbackTpl({
+        id: 'et_tiktok_events',
+        name: 'Easy Track — TikTok Events API',
+        description: 'Forwards events to TikTok Events API (business-api.tiktok.com).',
+        allowedHost: 'https://business-api.tiktok.com/',
+        params: [
+          { name: 'pixelCode',   displayName: 'TikTok Pixel Code' },
+          { name: 'accessToken', displayName: 'Events API Access Token' },
+          { name: 'eventName',   displayName: 'TikTok Event Name' },
+          { name: 'clientIp',    displayName: 'Client IP' },
+          { name: 'userAgent',   displayName: 'User Agent' }
+        ],
+        js: [
+          "var sendHttpRequest    = require('sendHttpRequest');",
+          "var JSON               = require('JSON');",
+          "var getEventData       = require('getEventData');",
+          "var getTimestampMillis = require('getTimestampMillis');",
+          "var Math               = require('Math');",
+          '',
+          'function clean(o){var r={};for(var k in o){if(o[k]!==""&&o[k]!=null)r[k]=o[k];}return r;}',
+          '',
+          'var payload = JSON.stringify({',
+          "  event_source:    'web',",
+          '  event_source_id: data.pixelCode,',
+          '  data: [{',
+          '    event:      data.eventName,',
+          '    event_time: Math.floor(getTimestampMillis()/1000),',
+          "    event_id:   getEventData('event_id') || ('TT-' + getTimestampMillis()),",
+          '    user: clean({',
+          "      email:        getEventData('user_data.em') || getEventData('up.em'),",
+          "      phone_number: getEventData('user_data.ph') || getEventData('up.ph'),",
+          "      external_id:  getEventData('user_data.external_id') || getEventData('up.external_id'),",
+          "      ttclid:       getEventData('ep.ttclid'),",
+          "      ttp:          getEventData('up.ttp'),",
+          '      ip:           data.clientIp,',
+          '      user_agent:   data.userAgent',
+          '    }),',
+          '    properties: clean({',
+          "      currency:   getEventData('currency') || 'SAR',",
+          "      value:      getEventData('value')    || 0,",
+          "      content_id: getEventData('content_ids'),",
+          "      content_type:'product',",
+          "      order_id:   getEventData('transaction_id')",
+          '    })',
+          '  }]',
+          '});',
+          '',
+          "sendHttpRequest('https://business-api.tiktok.com/open_api/v1.3/event/track/', {",
+          "  method:'POST',",
+          "  headers:{'Content-Type':'application/json','Access-Token':data.accessToken},",
+          "  timeout:8000,",
+          "  body:payload",
+          '}).then(function(r){',
+          '  if(r.statusCode>=200&&r.statusCode<300){ data.gtmOnSuccess(); }',
+          '  else{ data.gtmOnFailure(); }',
+          '}, data.gtmOnFailure);'
+        ].join('\n')
+      });
+
+      var SNAP_TEMPLATE_CODE = _SGTM.snap || _makeFallbackTpl({
+        id: 'et_snap_capi',
+        name: 'Easy Track — Snapchat CAPI',
+        description: 'Forwards events to Snapchat Conversions API (tr.snapchat.com).',
+        allowedHost: 'https://tr.snapchat.com/',
+        params: [
+          { name: 'pixelId',   displayName: 'Snap Pixel ID' },
+          { name: 'apiToken',  displayName: 'Snap CAPI Token' },
+          { name: 'eventType', displayName: 'Snap Event Type' },
+          { name: 'clientIp',  displayName: 'Client IP' },
+          { name: 'userAgent', displayName: 'User Agent' }
+        ],
+        js: [
+          "var sendHttpRequest    = require('sendHttpRequest');",
+          "var JSON               = require('JSON');",
+          "var getEventData       = require('getEventData');",
+          "var getTimestampMillis = require('getTimestampMillis');",
+          "var Math               = require('Math');",
+          '',
+          'function clean(o){var r={};for(var k in o){if(o[k]!==""&&o[k]!=null)r[k]=o[k];}return r;}',
+          '',
+          'var payload = JSON.stringify({ data: [{',
+          "  event_conversion_type: 'WEB',",
+          '  event_type:   data.eventType,',
+          "  event_tag:    getEventData('event_id') || ('SNAP-' + getTimestampMillis()),",
+          '  timestamp:    Math.floor(getTimestampMillis()/1000),',
+          '  hashed_data_fields: clean({',
+          "    email:        getEventData('user_data.em') || getEventData('up.em'),",
+          "    phone_number: getEventData('user_data.ph') || getEventData('up.ph'),",
+          "    external_id:  getEventData('user_data.external_id') || getEventData('up.external_id')",
+          '  }),',
+          '  user_data: clean({',
+          "    sc_click_id: getEventData('ep.sccid'),",
+          "    uuid_c1:     getEventData('up.scid'),",
+          '    ip_address:  data.clientIp,',
+          '    user_agent:  data.userAgent',
+          '  }),',
+          '  custom_data: clean({',
+          "    currency:       getEventData('currency') || 'SAR',",
+          "    price:          getEventData('value')    || 0,",
+          "    transaction_id: getEventData('transaction_id'),",
+          "    content_ids:    (function(){var v=getEventData('content_ids');return v?[v]:undefined;})()",
+          '  })',
+          '}]});',
+          '',
+          "sendHttpRequest('https://tr.snapchat.com/v2/conversion', {",
+          "  method:'POST',",
+          "  headers:{'Content-Type':'application/json','Authorization':'Bearer '+data.apiToken},",
+          "  timeout:8000,",
+          "  body:payload",
+          '}).then(function(r){',
+          '  if(r.statusCode>=200&&r.statusCode<300){ data.gtmOnSuccess(); }',
+          '  else{ data.gtmOnFailure(); }',
+          '}, data.gtmOnFailure);'
+        ].join('\n')
+      });
+
+      var GADS_TEMPLATE_CODE = _SGTM.gads || _makeFallbackTpl({
+        id: 'et_gads_ec',
+        name: 'Easy Track — Google Ads Enhanced Conversions',
+        description: 'Forwards conversions to Google Ads Enhanced Conversions API.',
+        allowedHost: 'https://googleads.googleapis.com/',
+        params: [
+          { name: 'conversionId',    displayName: 'Conversion ID (digits, no AW-)' },
+          { name: 'conversionLabel', displayName: 'Conversion Label' },
+          { name: 'oauthToken',      displayName: 'OAuth2 Bearer Token' },
+          { name: 'developerToken',  displayName: 'Google Ads Developer Token' },
+          { name: 'clientIp',        displayName: 'Client IP' },
+          { name: 'userAgent',       displayName: 'User Agent' }
+        ],
+        js: [
+          "var sendHttpRequest    = require('sendHttpRequest');",
+          "var JSON               = require('JSON');",
+          "var getEventData       = require('getEventData');",
+          "var getTimestampMillis = require('getTimestampMillis');",
+          "var Math               = require('Math');",
+          '',
+          'var ts=Math.floor(getTimestampMillis()/1000);function p2(n){return n<10?"0"+n:""+n;}',
+          'var rem=ts%86400;var hh=Math.floor(rem/3600);rem=rem%3600;var mm=Math.floor(rem/60);var ss=rem%60;',
+          'var totalDays=Math.floor(ts/86400);var y=1970;while(true){var diy=(y%4===0&&(y%100!==0||y%400===0))?366:365;if(totalDays<diy)break;totalDays=totalDays-diy;y=y+1;}',
+          'var leap=(y%4===0&&(y%100!==0||y%400===0));var mD=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31];var mo=0;while(totalDays>=mD[mo]){totalDays=totalDays-mD[mo];mo=mo+1;}',
+          'var convTime=y+"-"+p2(mo+1)+"-"+p2(totalDays+1)+" "+p2(hh)+":"+p2(mm)+":"+p2(ss)+" +0000";',
+          '',
+          'var ids = [];',
+          "var em  = getEventData('user_data.em') || getEventData('up.em');",
+          "var ph  = getEventData('user_data.ph') || getEventData('up.ph');",
+          'if(em) ids.push({hashedEmail: em});',
+          'if(ph) ids.push({hashedPhoneNumber: ph});',
+          '',
+          'var payload = JSON.stringify({',
+          '  conversions: [{',
+          "    conversionAction:   'customers/' + data.conversionId + '/conversionActions/' + data.conversionLabel,",
+          '    conversionDateTime: convTime,',
+          "    conversionValue:    getEventData('value')    || 0,",
+          "    currencyCode:       getEventData('currency') || 'SAR',",
+          "    orderId:            getEventData('transaction_id'),",
+          "    gclid:              getEventData('ep.gclid')  || getEventData('up.gclid'),",
+          "    wbraid:             getEventData('ep.wbraid'),",
+          "    gbraid:             getEventData('ep.gbraid'),",
+          '    userIdentifiers:    ids',
+          '  }],',
+          '  partialFailure: true',
+          '});',
+          '',
+          '// OAuth2 Bearer token and developer-token are configured as template',
+          '// parameters (oauthToken, developerToken) — set them in the GTM UI.',
+          "sendHttpRequest('https://googleads.googleapis.com/v14/customers/' + data.conversionId + ':uploadConversions', {",
+          "  method:'POST',",
+          "  headers:{'Content-Type':'application/json','Authorization':'Bearer '+data.oauthToken,'developer-token':data.developerToken},",
+          "  timeout:8000,",
+          "  body:payload",
+          '}).then(function(r){',
+          '  if(r.statusCode>=200&&r.statusCode<300){ data.gtmOnSuccess(); }',
+          '  else{ data.gtmOnFailure(); }',
+          '}, data.gtmOnFailure);'
+        ].join('\n')
+      });
+
+      // ── _OBSOLETE_* blocks removed (used wrong markers:
+      //    ___SANDBOXED_JS_FOR_SERVER_SIDE_TEMPLATE___ / ___WEB_PERMISSIONS___).
+      //    Live templates above use _makeFallbackTpl() with correct markers.
+
+      // ── Register custom templates ─────────────────────────────────────────
+      // accountId/containerId MUST be '0' and templateId MUST match the fingerprint
+      // used in the tag type 'cvt_<fingerprint>' — required by sGTM import parser.
+      // templateId MUST be a small sequential integer (GTM int32 limit — fingerprint overflows it).
+      // The fingerprint is what links tag type 'cvt_<fingerprint>' to the template, not templateId.
+      customTemplates.push({ accountId:'0', containerId:'0', templateId:'1', name:'Easy Track — Meta CAPI',          fingerprint: TPL_META,   templateData: META_TEMPLATE_CODE   });
+      customTemplates.push({ accountId:'0', containerId:'0', templateId:'2', name:'Easy Track — TikTok Events API',  fingerprint: TPL_TIKTOK, templateData: TIKTOK_TEMPLATE_CODE });
+      customTemplates.push({ accountId:'0', containerId:'0', templateId:'3', name:'Easy Track — Snapchat CAPI',      fingerprint: TPL_SNAP,   templateData: SNAP_TEMPLATE_CODE   });
+      customTemplates.push({ accountId:'0', containerId:'0', templateId:'4', name:'Easy Track — Google Ads Enhanced',fingerprint: TPL_GADS,   templateData: GADS_TEMPLATE_CODE   });
+
+      var varId = 1, tagId = 1, triggerId = 1, clientId = 1;
+
+      // ── 1. GA4 Client ────────────────────────────────────────────
+      clients.push({
+        accountId:'000000000', containerId:'00000000', clientId: sid(clientId),
+        name: 'GA4 Client',
+        type: 'google-ga4',
+        parameter:[{ type:'TEMPLATE', key:'activationPage', value:'/' }],
+        priority: 0,
+        fingerprint: fp(clientId)
+      });
+      clientId++;
+
+      // ── 2. Server Model Variables — required for trigger filters + tag parameters ──
+      // {{Event Name}} is used in every CUSTOM_EVENT trigger filter.
+      // {{Client IP}} and {{User Agent}} are referenced by the Google Ads EC tag.
+      variables.push({ accountId:'000000000', containerId:'00000000', variableId: sid(varId),
+        name:'Event Name', type:'smm',
+        parameter:[{ type:'TEMPLATE', key:'varType', value:'event_name' }],
+        fingerprint: fp(varId) });
+      varId++;
+      variables.push({ accountId:'000000000', containerId:'00000000', variableId: sid(varId),
+        name:'Client IP', type:'smm',
+        parameter:[{ type:'TEMPLATE', key:'varType', value:'ip_override' }],
+        fingerprint: fp(varId) });
+      varId++;
+      variables.push({ accountId:'000000000', containerId:'00000000', variableId: sid(varId),
+        name:'User Agent', type:'smm',
+        parameter:[{ type:'TEMPLATE', key:'varType', value:'user_agent' }],
+        fingerprint: fp(varId) });
+      varId++;
+
+      // ── 3. Triggers ───────────────────────────────────────────────────────────
+      // Collect all unique events across all enabled SS platforms
+      var allSsEvents = {};
+      _pcSS.platforms.forEach(function(plat) {
+        (_pcSS.events[plat] || []).forEach(function(ev) { allSsEvents[ev] = true; });
+      });
+
+      // CMS-aware event name map: SS event key → actual GA4 event_name value sent by browser
+      var ssEvNameMap = {
+        purchase:          'purchase',
+        add_to_cart:       S.cms === 'salla' ? 'addToCart'       : 'add_to_cart',
+        initiate_checkout: S.cms === 'salla' ? 'cart::submitted'  : 'begin_checkout',
+        view_content:      S.cms === 'salla' ? 'Product Viewed'   : 'view_item',
+        page_view:         'page_view',
+        sign_up:           S.cms === 'salla' ? 'Signed In'        : 'sign_up',
+        lead:              'generate_lead',
+        search:            'search'
+      };
+
+      var ssEvTrigMap = {}; // { evKey: triggerId_string }
+
+      // Fallback: All Events trigger — CUSTOM_EVENT with wildcard regex fires on every server hit.
+      // sGTM does NOT support 'ALWAYS' — it is a web-only trigger type.
+      var allEvTrigId = sid(triggerId);
+      triggers.push({
+        accountId:'000000000', containerId:'00000000', triggerId: sid(triggerId),
+        name:'All Events', type:'CUSTOM_EVENT',
+        customEventFilter:[{ type:'MATCH_REGEX', parameter:[
+          { type:'TEMPLATE', key:'arg0', value:'{{Event Name}}' },
+          { type:'TEMPLATE', key:'arg1', value:'.*' }
+        ]}],
+        fingerprint: fp(triggerId)
+      });
+      triggerId++;
+
+      // One customEvent trigger per unique SS event — fires only when Event Name matches
+      Object.keys(allSsEvents).forEach(function(evKey) {
+        var finalEvName = ssEvNameMap[evKey] || evKey;
+        ssEvTrigMap[evKey] = sid(triggerId);
+        triggers.push({
+          accountId:'000000000', containerId:'00000000', triggerId: sid(triggerId),
+          name: safeName('SS Trigger — ' + evKey + ' [' + finalEvName + ']'),
+          // ✅ CORRECT sGTM trigger type: CUSTOM_EVENT fires when Event Name equals value
+          type: 'CUSTOM_EVENT',
+          customEventFilter:[{
+            type:'EQUALS',
+            parameter:[
+              { type:'TEMPLATE', key:'arg0', value:'{{Event Name}}' }, // built-in sGTM variable
+              { type:'TEMPLATE', key:'arg1', value: finalEvName }
+            ]
+          }],
+          fingerprint: fp(triggerId)
+        });
+        triggerId++;
+      });
+
+      // ── 4. Tags — one per platform × event, referencing custom templates ─────
+      // Meta CAPI event name mapping
+      var META_EV_MAP = {
+        purchase:'Purchase', add_to_cart:'AddToCart', initiate_checkout:'InitiateCheckout',
+        view_content:'ViewContent', page_view:'PageView', lead:'Lead',
+        sign_up:'CompleteRegistration', search:'Search'
+      };
+      // TikTok event name mapping
+      var TIKTOK_EV_MAP = {
+        purchase:'CompletePayment', add_to_cart:'AddToCart', initiate_checkout:'InitiateCheckout',
+        view_content:'ViewContent', page_view:'Pageview', lead:'SubmitForm',
+        sign_up:'CompleteRegistration', search:'Search'
+      };
+      // Snapchat event type mapping
+      var SNAP_EV_MAP = {
+        purchase:'PURCHASE', add_to_cart:'ADD_CART', initiate_checkout:'START_CHECKOUT',
+        view_content:'VIEW_CONTENT', page_view:'PAGE_VIEW', sign_up:'SIGN_UP',
+        lead:'SIGN_UP', search:'SEARCH'
+      };
+
+      _pcSS.platforms.forEach(function(plat) {
+        var platEvents = (_pcSS.events[plat] || []);
+        if (!platEvents.length) platEvents = ['purchase']; // safety fallback
+
+        if (plat === 'meta') {
+          var pixId = credVal(_pcSS.pixelIds['meta'], 'YOUR_META_PIXEL_ID');
+          var token = credVal(_pcSS.tokens['meta'], 'YOUR_CAPI_ACCESS_TOKEN');
+          platEvents.forEach(function(evKey) {
+            tags.push({
+              accountId:'000000000', containerId:'00000000', tagId: sid(tagId),
+              name: safeName('Meta CAPI | ' + evKey),
+              // ✅ type references the embedded custom template by fingerprint
+              type: 'cvt_' + TPL_META,
+              parameter:[
+                { type:'TEMPLATE', key:'pixelId',     value: pixId },
+                { type:'TEMPLATE', key:'accessToken', value: token },
+                { type:'TEMPLATE', key:'eventName',   value: META_EV_MAP[evKey] || evKey },
+                { type:'TEMPLATE', key:'clientIp',    value:'{{Client IP}}'   },
+                { type:'TEMPLATE', key:'userAgent',   value:'{{User Agent}}'  }
+              ],
+              firingTriggerId: [ ssEvTrigMap[evKey] || allEvTrigId ],
+              tagFiringOption: 'ONCE_PER_EVENT',
+              fingerprint: fp(tagId)
+            });
+            tagId++;
+          });
+
+        } else if (plat === 'gads') {
+          var convId = credVal(_pcSS.gadsConvId, 'AW-XXXXXXXXXX').replace(/^AW-/, '');
+          platEvents.forEach(function(evKey) {
+            var label = credVal(_pcSS.gadsLabels[evKey] || '', 'AbC-DefG1234');
+            tags.push({
+              accountId:'000000000', containerId:'00000000', tagId: sid(tagId),
+              name: safeName('Google Ads Enhanced | ' + evKey),
+              type: 'cvt_' + TPL_GADS,
+              parameter:[
+                { type:'TEMPLATE', key:'conversionId',    value: convId },
+                { type:'TEMPLATE', key:'conversionLabel', value: label  },
+                { type:'TEMPLATE', key:'clientIp',        value:'{{Client IP}}'  },
+                { type:'TEMPLATE', key:'userAgent',       value:'{{User Agent}}' }
+              ],
+              firingTriggerId: [ ssEvTrigMap[evKey] || allEvTrigId ],
+              tagFiringOption: 'ONCE_PER_EVENT',
+              fingerprint: fp(tagId)
+            });
+            tagId++;
+          });
+
+        } else if (plat === 'snap') {
+          var snapId  = credVal(_pcSS.pixelIds['snap'], 'YOUR_SNAP_PIXEL_ID');
+          var snapTok = credVal(_pcSS.tokens['snap'], 'YOUR_SNAP_CAPI_TOKEN');
+          platEvents.forEach(function(evKey) {
+            tags.push({
+              accountId:'000000000', containerId:'00000000', tagId: sid(tagId),
+              name: safeName('Snapchat CAPI | ' + evKey),
+              type: 'cvt_' + TPL_SNAP,
+              parameter:[
+                { type:'TEMPLATE', key:'pixelId',   value: snapId   },
+                { type:'TEMPLATE', key:'apiToken',  value: snapTok  },
+                { type:'TEMPLATE', key:'eventType', value: SNAP_EV_MAP[evKey] || 'CUSTOM' },
+                { type:'TEMPLATE', key:'clientIp',  value:'{{Client IP}}'   },
+                { type:'TEMPLATE', key:'userAgent', value:'{{User Agent}}'  }
+              ],
+              firingTriggerId: [ ssEvTrigMap[evKey] || allEvTrigId ],
+              tagFiringOption: 'ONCE_PER_EVENT',
+              notes: 'Snapchat CAPI — ' + evKey + ' | Pixel: ' + snapId + ' | Token: ' + (snapTok !== 'YOUR_SNAP_CAPI_TOKEN' ? 'set' : 'not set') + ' | Generated by Easy Track',
+              fingerprint: fp(tagId)
+            });
+            tagId++;
+          });
+
+        } else if (plat === 'tiktok') {
+          var ttId  = credVal(_pcSS.pixelIds['tiktok'], 'YOUR_TIKTOK_PIXEL_ID');
+          var ttTok = credVal(_pcSS.tokens['tiktok'], 'YOUR_TIKTOK_API_TOKEN');
+          platEvents.forEach(function(evKey) {
+            tags.push({
+              accountId:'000000000', containerId:'00000000', tagId: sid(tagId),
+              name: safeName('TikTok Events API | ' + evKey),
+              type: 'cvt_' + TPL_TIKTOK,
+              parameter:[
+                { type:'TEMPLATE', key:'pixelCode',   value: ttId  },
+                { type:'TEMPLATE', key:'accessToken', value: ttTok },
+                { type:'TEMPLATE', key:'eventName',   value: TIKTOK_EV_MAP[evKey] || evKey },
+                { type:'TEMPLATE', key:'clientIp',    value:'{{Client IP}}'  },
+                { type:'TEMPLATE', key:'userAgent',   value:'{{User Agent}}' }
+              ],
+              firingTriggerId: [ ssEvTrigMap[evKey] || allEvTrigId ],
+              tagFiringOption: 'ONCE_PER_EVENT',
+              notes: 'TikTok Events API — ' + evKey + ' | Pixel: ' + ttId + ' | Token: ' + (ttTok !== 'YOUR_TIKTOK_API_TOKEN' ? 'set' : 'not set') + ' | Generated by Easy Track',
+              fingerprint: fp(tagId)
+            });
+            tagId++;
+          });
+        }
+      });
+
+      // ── Summary note for container ───────────────────────────────────────────
+      var _ssNote = [
+        'Generated by Easy Track',
+        'sGTM URL: '     + (_pcSS.serverUrl || 'not set'),
+        'CMS: '          + (S.cms || 'unknown'),
+        'Platforms: '    + (_pcSS.platforms.length ? _pcSS.platforms.join(', ') : 'none'),
+        'Custom Templates included: Meta CAPI, TikTok Events API, Snapchat CAPI, Google Ads Enhanced',
+        'Import via GTM → Admin → Import Container (choose Merge or Overwrite)'
+      ].join(' | ');
+
+      // ── Normalize all entity-level accountId / containerId to '0' ──────────────
+      // Entity IDs MUST match containerVersion.accountId / containerId.
+      // Mismatched values (e.g. '000000000' vs '0') cause GTM's sGTM import
+      // processor to return "An unknown error has occurred" (HTTP 500).
+      function _ssNormId(o, idKey) {
+        o.accountId   = '0';
+        o.containerId = '0';
+        if (o[idKey] != null) o[idKey] = sid(o[idKey]);
+        return o;
+      }
+      tags.forEach(function(t)   { _ssNormId(t, 'tagId');     });
+      triggers.forEach(function(t){ _ssNormId(t, 'triggerId'); });
+      clients.forEach(function(c) { _ssNormId(c, 'clientId');  });
+      variables.forEach(function(v){ _ssNormId(v, 'variableId'); });
+
+      var _ssExport = {
+        exportFormatVersion: 2,
+        exportTime: new Date().toISOString().replace('T', ' ').replace(/\.\d+Z$/, ''),
+        containerVersion: {
+          accountId:          '0',           // required at containerVersion level for strict parsers
+          containerId:        '0',
+          containerVersionId: '0',
+          container: {
+            accountId:    '0',
+            containerId:  '0',
+            name:         'Easy Track - Server Container (sGTM)',
+            publicId:     'GTM-SS000000',
+            usageContext: ['SERVER'],
+            notes:        _ssNote
+          },
+          // NOTE: sGTM server containers do NOT use a builtInVariable array in the export.
+          // CLIENT_IP / HTTP_REQUEST_HEADER are web-container enum values and cause
+          // "Unrecognized value [CLIENT_IP]" on sGTM import. {{Client IP}} and
+          // {{User Agent}} in tag parameters resolve at runtime via getEventData() /
+          // getRequestHeader() inside the sandboxed JS templates.
+          variable:       variables,         // HTTP header variables (IP, UA)
+          trigger:        triggers,          // customEvent triggers per SS event
+          tag:            tags,              // CAPI tags referencing custom templates
+          client:         clients,           // GA4 Client
+          customTemplate: customTemplates    // Embedded Sandboxed JS templates for all CAPI platforms
+        }
+      };
+      etAsciiDeep(_ssExport);
+      try {
+        var _vr = validateSSContainer(_ssExport);
+        window.__ET_SS_VALIDATION = _vr;
+        if (_vr.errors.length) console.error('[ET] SS container validation FAILED:', _vr.errors);
+        else console.log('[ET] SS container validation passed (' + _vr.checks + ' checks, ' + _vr.warnings.length + ' warnings).');
+      } catch (_ve) { console.warn('[ET] validateSSContainer threw:', _ve); }
+      return _ssExport;
+    }
+
     // ===== BUILD GTM CONTAINER =====
     // ===== BUILD GTM CONTAINER =====
     function buildGTMContainer() {
@@ -6521,7 +7668,8 @@
       ];
       if (S.platforms.indexOf('google') !== -1) {
         dlKeys.push('google_conversion_id');
-        for (var gi = 0; gi < S.events.length; gi++) dlKeys.push('google_label_' + S.events[gi]);
+        var _gadsKeys = (S.platformEvents && S.platformEvents['google'] && S.platformEvents['google'].length) ? S.platformEvents['google'] : S.events;
+        for (var gi = 0; gi < _gadsKeys.length; gi++) dlKeys.push('google_label_' + _gadsKeys[gi]);
       }
       if (S.platforms.indexOf('ga4') !== -1) dlKeys.push('user_id');
 
@@ -6884,6 +8032,147 @@
         });
         varId++;
       }
+
+      // ── SS: Cookie + URL + Click-ID Variables (when SS enabled) ──────────────
+      if (window.ET && window.ET.ssEnabled) {
+
+        // ── Cookie Variables ──
+        var ssCookieVars = [
+          { name:'Cookie - _fbp',       cn:'_fbp'       },
+          { name:'Cookie - _fbc',       cn:'_fbc'       },
+          { name:'Cookie - _ttp',       cn:'_ttp'       },
+          { name:'Cookie - _scid',      cn:'_scid'      },
+          { name:'Cookie - _ttclid',    cn:'_ttclid'    },
+          { name:'Cookie - _ScCid',     cn:'_ScCid'     },
+          { name:'Cookie - _gclid',     cn:'_gclid'     },
+          { name:'Cookie - _wbraid',    cn:'_wbraid'    },
+          { name:'Cookie - _gbraid',    cn:'_gbraid'    },
+          { name:'Cookie - external_id',cn:'external_id'},
+          { name:'Cookie - et_em',      cn:'et_em'      },
+          { name:'Cookie - et_ph',      cn:'et_ph'      }
+        ];
+        ssCookieVars.forEach(function(cv) {
+          variables.push({
+            accountId:'000000000', containerId:'00000000', variableId: varId,
+            name: cv.name, type:'k',
+            parameter:[{ type:'TEMPLATE', key:'name', value: cv.cn }],
+            fingerprint: fp(varId)
+          });
+          varId++;
+        });
+
+        // ── URL Query-Param Variables (Click IDs) ──
+        var ssUrlVars = [
+          { name:'URL - fbclid',  param:'fbclid'  },
+          { name:'URL - gclid',   param:'gclid'   },
+          { name:'URL - wbraid',  param:'wbraid'  },
+          { name:'URL - gbraid',  param:'gbraid'  },
+          { name:'URL - ttclid',  param:'ttclid'  },
+          { name:'URL - ScCid',   param:'ScCid'   }
+        ];
+        ssUrlVars.forEach(function(uv) {
+          variables.push({
+            accountId:'000000000', containerId:'00000000', variableId: varId,
+            name: uv.name, type:'u',
+            parameter:[
+              { type:'TEMPLATE', key:'queryKey', value: uv.param },
+              { type:'TEMPLATE', key:'defaultPages', value:'specific' },
+              { type:'TEMPLATE', key:'customUrlSource', value:'URL' }
+            ],
+            fingerprint: fp(varId)
+          });
+          varId++;
+        });
+
+        // ── Customer DL Variables (Salla: hashed from customer.*, Zid: from customer.*) ──
+        if (S.cms === 'salla') {
+          // Salla passes customer data on purchase event via customer.email_hashed etc.
+          var ssExtraSalla = [
+            { name:'DL - ss.email_hashed', path:'customer.email_hashed' },
+            { name:'DL - ss.phone_hashed', path:'customer.phone_hashed' },
+            { name:'DL - ss.first_name',   path:'customer.first_name'   },
+            { name:'DL - ss.last_name',    path:'customer.last_name'    }
+          ];
+          ssExtraSalla.forEach(function(v) {
+            variables.push({
+              accountId:'000000000', containerId:'00000000', variableId: varId,
+              name: v.name, type:'v',
+              parameter:[
+                { type:'INTEGER', key:'dataLayerVersion', value:'2' },
+                { type:'BOOLEAN', key:'setDefaultValue', value:'false' },
+                { type:'TEMPLATE', key:'name', value: v.path }
+              ],
+              fingerprint: fp(varId)
+            });
+            varId++;
+          });
+        } else if (S.cms === 'zid') {
+          // Zid passes customer on all events via customer.*
+          var ssExtraZid = [
+            { name:'DL - ss.email_hashed',  path:'customer.email_hashed'  },
+            { name:'DL - ss.phone_hashed',  path:'customer.mobile_hashed' },
+            { name:'DL - ss.external_id',   path:'customer.external_id'   }
+          ];
+          ssExtraZid.forEach(function(v) {
+            variables.push({
+              accountId:'000000000', containerId:'00000000', variableId: varId,
+              name: v.name, type:'v',
+              parameter:[
+                { type:'INTEGER', key:'dataLayerVersion', value:'2' },
+                { type:'BOOLEAN', key:'setDefaultValue', value:'false' },
+                { type:'TEMPLATE', key:'name', value: v.path }
+              ],
+              fingerprint: fp(varId)
+            });
+            varId++;
+          });
+        }
+
+        // ── JS Variable: event_id generator ──
+        variables.push({
+          accountId:'000000000', containerId:'00000000', variableId: varId,
+          name:'JS - event_id_generator', type:'jsm',
+          parameter:[{ type:'TEMPLATE', key:'javascript', value:
+            'function() {\n' +
+            '  try {\n' +
+            '    var d = window.dataLayer || [];\n' +
+            '    for (var i = d.length-1; i >= 0; i--) {\n' +
+            '      if (d[i] && (d[i].event_id || (d[i].ecommerce && d[i].ecommerce.event_id))) {\n' +
+            '        return String(d[i].event_id || d[i].ecommerce.event_id);\n' +
+            '      }\n' +
+            '    }\n' +
+            '  } catch(e) {}\n' +
+            '  return window._et_eid || (window._et_eid = "ET-" + Date.now().toString(36).toUpperCase());\n' +
+            '}'
+          }],
+          fingerprint: fp(varId)
+        });
+        varId++;
+
+        // ── JS Variable: items as JSON (for CAPI content_ids) ──
+        var ssItemsPath = S.cms === 'salla' ? 'ecommerce.items' : 'ecommerce.items';
+        variables.push({
+          accountId:'000000000', containerId:'00000000', variableId: varId,
+          name:'JS - content_ids', type:'jsm',
+          parameter:[{ type:'TEMPLATE', key:'javascript', value:
+            'function() {\n' +
+            '  try {\n' +
+            '    var d = window.dataLayer || [];\n' +
+            '    for (var i = d.length-1; i >= 0; i--) {\n' +
+            '      var ec = d[i] && d[i].ecommerce;\n' +
+            '      if (!ec) continue;\n' +
+            '      var items = ec.items || (ec.add && ec.add.products) || (ec.purchase && ec.purchase.products) || [];\n' +
+            '      if (items.length) return items.map(function(it){ return String(it.item_id || it.id || ""); }).join(",");\n' +
+            '    }\n' +
+            '  } catch(e) {}\n' +
+            '  return "";\n' +
+            '}'
+          }],
+          fingerprint: fp(varId)
+        });
+        varId++;
+
+      } // end SS variables block
 
       // ── 2. BASE CODE TAGS (All Pages) ────────────────────────
       var META_BASE = function (id) {
@@ -7259,6 +8548,105 @@
         });
         tagId++;
       }
+
+      // ── SS: Click ID Capture Tag + Per-Platform Relay Tags ─────────────────
+      if (window.ET && window.ET.ssEnabled) {
+
+        // ① Click ID Capture — All Pages, captures fbclid/gclid/ttclid/ScCid into cookies
+        var clickIdHtml = '<script>\n'
+          + '(function(){\n'
+          + '  try {\n'
+          + '    var p = new URLSearchParams(location.search);\n'
+          + '    var maxAge = ";max-age=7776000;path=/;SameSite=Lax";\n'
+          + '    var ids = { fbclid:"_fbp_clid", gclid:"_gclid", ttclid:"_ttclid", ScCid:"_ScCid", wbraid:"_wbraid", gbraid:"_gbraid" };\n'
+          + '    Object.keys(ids).forEach(function(k){\n'
+          + '      var v = p.get(k); if(v) document.cookie = ids[k]+"="+v+maxAge;\n'
+          + '    });\n'
+          + '    // Build _fbc from fbclid (Meta standard format)\n'
+          + '    var fbclid = p.get("fbclid");\n'
+          + '    if (fbclid) document.cookie = "_fbc=fb.1."+Date.now()+"."+fbclid+maxAge;\n'
+          + '    // Capture user_data from dataLayer for SS forwarding\n'
+          + '    var d = window.dataLayer || [];\n'
+          + '    for (var i = d.length-1; i >= 0; i--) {\n'
+          + '      var c = d[i] && d[i].customer;\n'
+          + '      if (!c) continue;\n'
+          + '      var em = c.email_hashed || c.emailHashed || "";\n'
+          + '      var ph = c.phone_hashed || c.mobile_hashed || c.phoneHashed || "";\n'
+          + '      var extId = c.external_id || c.externalId || "";\n'
+          + '      if (em) document.cookie = "et_em="+em+maxAge;\n'
+          + '      if (ph) document.cookie = "et_ph="+ph+maxAge;\n'
+          + '      if (extId) document.cookie = "external_id="+extId+maxAge;\n'
+          + '      break;\n'
+          + '    }\n'
+          + '  } catch(e){}\n'
+          + '})();\n'
+          + '<\/script>';
+
+        tags.push({
+          accountId:'000000000', containerId:'00000000', tagId: tagId,
+          name: 'SS | Click ID Capture + Cookie Builder',
+          type: 'html',
+          parameter:[
+            { type:'TEMPLATE', key:'html', value: clickIdHtml },
+            { type:'BOOLEAN',  key:'supportDocumentWrite', value:'false' }
+          ],
+          firingTriggerId: [allPagesTrigId],
+          notes: 'SS — captures fbclid→_fbc, gclid, ttclid, ScCid, wbraid, gbraid into cookies. Also captures customer hashed data from dataLayer. | Generated by Easy Track',
+          fingerprint: fp(tagId)
+        });
+        tagId++;
+
+        // ② GA4 user_properties forwarding — enriches GA4 hits with SS data before they reach sGTM
+        // Injects user_properties on every event so sGTM can read em/ph/fbp/fbc/ttp/scid/click-ids
+        var ga4UserPropsHtml = '<script>\n'
+          + '(function(){\n'
+          + '  try {\n'
+          + '    function getCookie(n){var m=("; "+document.cookie).split("; "+n+"=");return m.length===2?m.pop().split(";")[0]:""}\n'
+          + '    function getLastDLCustomer(){\n'
+          + '      var d=window.dataLayer||[]; var c={};\n'
+          + '      for(var i=d.length-1;i>=0;i--){if(d[i]&&d[i].customer){c=d[i].customer;break;}} return c;\n'
+          + '    }\n'
+          + '    var c = getLastDLCustomer();\n'
+          + '    var props = {\n'
+          + '      em:        c.email_hashed||c.emailHashed||getCookie("et_em")||"",\n'
+          + '      ph:        c.phone_hashed||c.mobile_hashed||c.phoneHashed||getCookie("et_ph")||"",\n'
+          + '      fn:        c.first_name||c.firstName||"",\n'
+          + '      ln:        c.last_name||c.lastName||"",\n'
+          + '      external_id: c.external_id||c.externalId||getCookie("external_id")||"",\n'
+          + '      fbp:       getCookie("_fbp")||"",\n'
+          + '      fbc:       getCookie("_fbc")||"",\n'
+          + '      ttp:       getCookie("_ttp")||"",\n'
+          + '      scid:      getCookie("_scid")||"",\n'
+          + '      gclid:     getCookie("_gclid")||"",\n'
+          + '      wbraid:    getCookie("_wbraid")||"",\n'
+          + '      gbraid:    getCookie("_gbraid")||"",\n'
+          + '      ttclid:    getCookie("_ttclid")||"",\n'
+          + '      sccid:     getCookie("_ScCid")||""\n'
+          + '    };\n'
+          + '    // Only non-empty props\n'
+          + '    var up = {}; Object.keys(props).forEach(function(k){if(props[k])up[k]=props[k];});\n'
+          + '    if (Object.keys(up).length && window.gtag) {\n'
+          + '      window.gtag("set","user_properties", up);\n'
+          + '    }\n'
+          + '  } catch(e){}\n'
+          + '})();\n'
+          + '<\/script>';
+
+        tags.push({
+          accountId:'000000000', containerId:'00000000', tagId: tagId,
+          name: 'SS | User Properties Enrichment (GA4 → sGTM)',
+          type: 'html',
+          parameter:[
+            { type:'TEMPLATE', key:'html', value: ga4UserPropsHtml },
+            { type:'BOOLEAN',  key:'supportDocumentWrite', value:'false' }
+          ],
+          firingTriggerId: [allPagesTrigId],
+          notes: 'SS — enriches GA4 hits with user_properties (em, ph, fn, ln, external_id, fbp, fbc, ttp, scid, click IDs) so sGTM can read them. Reads from dataLayer.customer (Salla/Zid) + cookies. | Generated by Easy Track',
+          fingerprint: fp(tagId)
+        });
+        tagId++;
+
+      } // end SS base tags block
 
       // ── 3. EVENT TRIGGERS ────────────────────────────────────
       var cmsEvMap = CMS_DL_MAP[S.cms] && CMS_DL_MAP[S.cms].eventNames;
@@ -7701,6 +9089,163 @@
       // Assign variables to vars folder
       variables.forEach(function (v) { v.parentFolderId = folderMap['vars']; });
 
+      // ── SS: Per-Platform × Per-Event Relay Tags ──────────────────────────────
+      if (window.ET && window.ET.ssEnabled) {
+        var ssUrl = window.ET.ssUrl.replace(/\/$/, '');
+
+        // Helper: build relay payload script for a specific platform+event
+        // Reads full user_data from cookies + dataLayer.customer (Salla/Zid aware)
+        function buildRelayPayload(plat, ga4EvName, platEvName) {
+          // CMS-specific value/currency/transId paths
+          var valExpr, curExpr, txExpr, itemsExpr;
+          if (S.cms === 'salla') {
+            var sallaValMap = {
+              purchase:'(ec.purchase&&ec.purchase.actionField&&ec.purchase.actionField.total)||0',
+              add_to_cart:'(ec.add&&ec.add.products&&ec.add.products[0]&&ec.add.products[0].price)||0',
+              view_item:'(obj&&obj.price)||0',
+              initiate_checkout:'0',view_content:'(obj&&obj.price)||0',
+              page_view:'0',lead:'0',sign_up:'0',search:'0'
+            };
+            var sallaCurMap = {
+              purchase:'(ec.currencyCode)||"SAR"',
+              add_to_cart:'(ec.currencyCode)||"SAR"',
+              default:'"SAR"'
+            };
+            var sallaTxMap = {
+              purchase:'(ec.purchase&&ec.purchase.actionField&&ec.purchase.actionField.id)||""'
+            };
+            var sallaItemsMap = {
+              purchase:'JSON.stringify((ec.purchase&&ec.purchase.products)||[])',
+              add_to_cart:'JSON.stringify((ec.add&&ec.add.products)||[])',
+              default:'JSON.stringify([])'
+            };
+            valExpr   = sallaValMap[ga4EvName]   || sallaValMap[plat]   || '0';
+            curExpr   = sallaCurMap[ga4EvName]   || sallaCurMap['default'];
+            txExpr    = sallaTxMap[ga4EvName]    || '""';
+            itemsExpr = sallaItemsMap[ga4EvName] || sallaItemsMap['default'];
+          } else {
+            // Zid / generic GA4 schema
+            valExpr   = '(ec.value)||0';
+            curExpr   = '(ec.currency)||"SAR"';
+            txExpr    = '(ec.transaction_id)||""';
+            itemsExpr = 'JSON.stringify((ec.items)||[])';
+          }
+
+          return '<script>\n'
+            + '(function(){\n'
+            + '  try {\n'
+            + '    function getCk(n){var m=("; "+document.cookie).split("; "+n+"=");return m.length===2?m.pop().split(";")[0]:""}\n'
+            + '    var d=window.dataLayer||[]; var ec={}; var cust={}; var obj={};\n'
+            + '    for(var i=d.length-1;i>=0;i--){\n'
+            + '      if(d[i]&&d[i].ecommerce&&!ec.currency&&!ec.value){ec=d[i].ecommerce;}\n'
+            + '      if(d[i]&&d[i].customer&&!cust.email_hashed){cust=d[i].customer;}\n'
+            + '      if(d[i]&&d[i][0]&&!obj.price){obj=d[i][0];}\n'
+            + '    }\n'
+            + '    var em  = cust.email_hashed||cust.emailHashed||getCk("et_em")||"";\n'
+            + '    var ph  = cust.phone_hashed||cust.mobile_hashed||cust.phoneHashed||getCk("et_ph")||"";\n'
+            + '    var fn  = cust.first_name||cust.firstName||"";\n'
+            + '    var ln  = cust.last_name||cust.lastName||"";\n'
+            + '    var xid = cust.external_id||cust.externalId||getCk("external_id")||"";\n'
+            + '    var eid = (function(){\n'
+            + '      for(var i=d.length-1;i>=0;i--){\n'
+            + '        if(d[i]&&(d[i].event_id||(d[i].ecommerce&&d[i].ecommerce.event_id)))\n'
+            + '          return String(d[i].event_id||d[i].ecommerce.event_id);\n'
+            + '      } return "ET-"+Date.now().toString(36).toUpperCase();\n'
+            + '    })();\n'
+            + '    var items = (function(){try{return ' + itemsExpr + ';}catch(e){return "[]";}}());\n'
+            + '    var contentIds = (function(){\n'
+            + '      try{var arr=JSON.parse(items);return arr.map(function(x){return x.item_id||x.id||"";}).join(",");}\n'
+            + '      catch(e){return "";}\n'
+            + '    })();\n'
+            + '    var payload = {\n'
+            + '      "v":"2","en":"' + ga4EvName + '","ep_platform":"' + plat + '","ep_platform_event":"' + platEvName + '",\n'
+            + '      "ep_event_id":eid,\n'
+            + '      "epn_value":String(' + valExpr + '),\n'
+            + '      "ep_currency":' + curExpr + ',\n'
+            + '      "ep_transaction_id":' + txExpr + ',\n'
+            + '      "ep_content_ids":contentIds,\n'
+            + '      "ep_fbclid":getCk("_fbp_clid")||"","ep_gclid":getCk("_gclid")||"",\n'
+            + '      "ep_ttclid":getCk("_ttclid")||"","ep_sccid":getCk("_ScCid")||"",\n'
+            + '      "ep_wbraid":getCk("_wbraid")||"","ep_gbraid":getCk("_gbraid")||"",\n'
+            + '      "up_em":em,"up_ph":ph,"up_fn":fn,"up_ln":ln,"up_external_id":xid,\n'
+            + '      "up_fbp":getCk("_fbp")||"","up_fbc":getCk("_fbc")||"",\n'
+            + '      "up_ttp":getCk("_ttp")||"","up_scid":getCk("_scid")||""\n'
+            + '    };\n'
+            + '    var qs = Object.keys(payload).filter(function(k){return payload[k]!=="";}).map(function(k){\n'
+            + '      return encodeURIComponent(k)+"="+encodeURIComponent(payload[k]);\n'
+            + '    }).join("&");\n'
+            + '    var endpoint = "' + ssUrl + '/g/collect";\n'
+            + '    if(navigator.sendBeacon){navigator.sendBeacon(endpoint+"?"+qs);}\n'
+            + '    else{fetch(endpoint+"?"+qs,{method:"POST",keepalive:true}).catch(function(){});}\n'
+            + '  }catch(e){}\n'
+            + '})();\n'
+            + '<\/script>';
+        }
+
+        // SS relay event name map (GA4 event → CMS data layer event name)
+        var ssRelayEvMap = {
+          salla: {
+            purchase: 'purchase', add_to_cart: 'addToCart',
+            initiate_checkout: 'cart::submitted', view_content: 'Product Viewed',
+            page_view: 'page_view', lead: 'generate_lead',
+            sign_up: 'sign_up', search: 'search'
+          },
+          zid: {
+            purchase: 'purchase', add_to_cart: 'add_to_cart',
+            initiate_checkout: 'begin_checkout', view_content: 'view_item',
+            page_view: 'page_view', lead: 'generate_lead',
+            sign_up: 'sign_up', search: 'search'
+          }
+        };
+        var ssEvNameForCms = ssRelayEvMap[S.cms] || ssRelayEvMap['zid'];
+
+        // Platform event name map (SS event key → platform-specific name)
+        var ssPlEv = {
+          meta:   { purchase:'Purchase', add_to_cart:'AddToCart', initiate_checkout:'InitiateCheckout', view_content:'ViewContent', page_view:'PageView', lead:'Lead', sign_up:'CompleteRegistration', search:'Search' },
+          gads:   { purchase:'conversion', add_to_cart:'conversion', initiate_checkout:'conversion', view_content:'conversion', lead:'conversion', sign_up:'conversion' },
+          snap:   { purchase:'PURCHASE', add_to_cart:'ADD_CART', initiate_checkout:'START_CHECKOUT', view_content:'VIEW_CONTENT', page_view:'PAGE_VIEW', lead:'SIGN_UP', sign_up:'SIGN_UP', search:'SEARCH' },
+          tiktok: { purchase:'CompletePayment', add_to_cart:'AddToCart', initiate_checkout:'InitiateCheckout', view_content:'ViewContent', page_view:'Pageview', lead:'SubmitForm', sign_up:'CompleteRegistration', search:'Search' }
+        };
+
+        // Build relay tag for each SS platform × event
+        _pcSS.platforms.forEach(function(plat) {
+          var platEvs = _pcSS.events[plat] || [];
+          platEvs.forEach(function(evKey) {
+            var ga4Name  = ssEvNameForCms[evKey] || evKey;
+            var platName = (ssPlEv[plat] && ssPlEv[plat][evKey]) || evKey;
+
+            // Find matching trigger in trigMap (web container event triggers)
+            // trigMap keys are GA4 event keys — match by evKey
+            var relayTrigId = trigMap[evKey];
+            // If no matching trigger (e.g. view_content / initiate_checkout mapped differently), fall back to all pages
+            if (!relayTrigId) {
+              // Try view_item for view_content, begin_checkout for initiate_checkout
+              var fallback = { view_content:'view_item', initiate_checkout:'begin_checkout', sign_up:'sign_up', lead:'lead', page_view:'page_view' };
+              relayTrigId = trigMap[fallback[evKey]] || allPagesTrigId;
+            }
+
+            var relayHtml = buildRelayPayload(plat, ga4Name, platName);
+            tags.push({
+              accountId:'000000000', containerId:'00000000', tagId: tagId,
+              name: safeName(
+                (plat === 'meta' ? 'Meta' : plat === 'gads' ? 'Google Ads' : plat === 'snap' ? 'Snapchat' : 'TikTok')
+                + ' | SS Relay | ' + evKey
+              ),
+              type: 'html',
+              parameter:[
+                { type:'TEMPLATE', key:'html', value: relayHtml },
+                { type:'BOOLEAN',  key:'supportDocumentWrite', value:'false' }
+              ],
+              firingTriggerId: [ relayTrigId ],
+              notes: plat.toUpperCase() + ' SS Relay — fires on "' + ga4Name + '" → sends to sGTM (' + ssUrl + '). Platform event: ' + platName + ' | CMS: ' + (S.cms||'') + ' | Generated by Easy Track',
+              fingerprint: fp(tagId)
+            });
+            tagId++;
+          });
+        });
+
+      } // end SS relay tags block
+
       // ═══════════════════════════════════════════════════════════════
       // POST-PROCESS: normalize everything for GTM UI Import compatibility
       // ═══════════════════════════════════════════════════════════════
@@ -7718,7 +9263,9 @@
         if (Array.isArray(t.blockingTriggerId)) t.blockingTriggerId = t.blockingTriggerId.map(sid);
         if (!t.tagFiringOption) t.tagFiringOption = 'ONCE_PER_EVENT';
         // ⚠️ DO NOT add empty monitoringMetadata — UI importer rejects empty MAP here.
-        if (t.monitoringMetadata && Array.isArray(t.monitoringMetadata.map) && !t.monitoringMetadata.map.length) {
+        // Guard covers BOTH {type:'MAP',map:[]} AND {type:'MAP'} (map absent).
+        if (t.monitoringMetadata && t.monitoringMetadata.type === 'MAP' &&
+            (!t.monitoringMetadata.map || t.monitoringMetadata.map.length === 0)) {
           delete t.monitoringMetadata;
         }
         // ⚠️ gaawe: keep measurementIdOverride (tag needs SOME way to know the GA4
@@ -9403,6 +10950,45 @@
     // Creates a GTM container in Easy Track's managed account (server-side),
     // no OAuth needed. Calls /api/managed/create-container.
     // ══════════════════════════════════════════════════════════════════════
+    // CAPI token field labels per platform
+    var _MGD_CAPI_LABELS = {
+      meta:   { name: 'Meta',       ph: 'EAABsbCS4IIQBA...',       link: 'https://business.facebook.com/events_manager' },
+      tiktok: { name: 'TikTok',     ph: '91234abcd...',            link: 'https://ads.tiktok.com/i18n/events_manager' },
+      snap:   { name: 'Snapchat',   ph: 'eyJhbGciOiJIUzI1Ni...', link: 'https://ads.snapchat.com/organizations' },
+      gads:   { name: 'Google Ads', ph: 'ya29.a0AfH6SM...',        link: 'https://console.cloud.google.com/apis/credentials' },
+    };
+
+    // Renders CAPI token fields based on selected platforms — called on GTM view load
+    function _mgdRenderCapiTokens() {
+      var fields = document.getElementById('mgdCapiTokenFields');
+      if (!fields) return;
+
+      var activePlats = (window.S && S.platforms) ? S.platforms : [];
+      var capiPlats   = activePlats.filter(function(p) { return _MGD_CAPI_LABELS[p]; });
+
+      if (!capiPlats.length) {
+        fields.innerHTML = '<div style="font-size:11px;color:var(--mut);">مفيش منصات محتاجة CAPI tokens (Meta / TikTok / Snapchat) متاختارة.</div>';
+        return;
+      }
+
+      fields.innerHTML = capiPlats.map(function(p) {
+        var lbl = _MGD_CAPI_LABELS[p];
+        return '<div style="margin-bottom:8px;">'
+          + '<div style="font-size:11px;color:var(--wht);margin-bottom:4px;display:flex;align-items:center;gap:6px;">'
+          + '<span style="font-weight:600;">' + lbl.name + ' CAPI Token</span>'
+          + '<a href="' + lbl.link + '" target="_blank" rel="noopener" '
+          + 'style="font-size:10px;color:var(--acc);text-decoration:none;">أين أجده؟ ↗</a>'
+          + '</div>'
+          + '<input id="mgd-capi-tok-' + p + '" type="password" autocomplete="new-password" dir="ltr"'
+          + ' placeholder="' + lbl.ph + '"'
+          + ' style="width:100%;background:var(--bg);border:1px solid var(--bdr2);border-radius:8px;'
+          + 'padding:8px 10px;font-size:12px;color:var(--wht);outline:none;box-sizing:border-box;">'
+          + '</div>';
+      }).join('');
+    }
+    // Keep backward-compat alias (no-op toggle, fields always visible now)
+    function _mgdToggleCapiTokens() { _mgdRenderCapiTokens(); }
+
     function _mgdProgress(msg, show) {
       var el  = document.getElementById('mgdProgress');
       var txt = document.getElementById('mgdProgressText');
@@ -9622,6 +11208,31 @@
       }
     }
 
+    // ── Authenticated helper for /api/ss/* endpoints ──────────────────────────
+    // _ssApi(method, path, body, callback)
+    // Gets a fresh Firebase ID token, calls the server endpoint, and invokes
+    // callback(err, { ok, status, data }) — mirrors the old SS wizard helper.
+    function _ssApi(method, path, body, cb) {
+      try {
+        var user = firebase.auth().currentUser;
+        if (!user) { cb(new Error('يجب تسجيل الدخول أولاً')); return; }
+        user.getIdToken(false).then(function (token) {
+          var opts = {
+            method:  method,
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+          };
+          if (body && method !== 'GET') opts.body = JSON.stringify(body);
+          return fetch(path, opts);
+        }).then(function (r) {
+          return r.text().then(function (txt) {
+            var data = null;
+            try { data = JSON.parse(txt); } catch (_) {}
+            cb(null, { ok: r.ok, status: r.status, data: data });
+          });
+        }).catch(function (err) { cb(err); });
+      } catch (e) { cb(e); }
+    }
+
     // ── Wire the web container's GA4 transport_url to the deployed sGTM URL ──
     // Calls /api/ss/wire-transport via the authenticated _ssApi helper. After
     // success, the web container is auto-published with the new transport_url.
@@ -9666,7 +11277,11 @@
       } catch (_) { /* ignore */ }
     }
 
-    async function gtmManagedCreate() {
+    async function gtmManagedCreate(mode) {
+      // mode = 'client' (web only) | 'client_server' (web + server)
+      mode = mode || 'client';
+      var _wantServer = (mode === 'client_server');
+
       // 1. Preconditions
       if (typeof currentUser === 'undefined' || !currentUser || !currentUser.id) {
         _mgdShowError('محتاج تسجل دخول الأول', 'افتح الحساب من أعلى يمين.');
@@ -9682,8 +11297,61 @@
       catch (e) { _mgdShowError('الـ GTM JSON مش صحيح: ' + e.message); return; }
 
       // 2. Collect metadata from current session state (S) + currentUser
-      var _ssToggle = document.getElementById('mgdServerSideChk');
-      var _wantServer = !!(_ssToggle && _ssToggle.checked);
+
+      // Collect CAPI tokens + sGTM URL (only when server-side is on)
+      var _capiTokens = {};
+      var _sgtmUrl    = '';
+      if (_wantServer) {
+        var _capiPlatforms = ['meta', 'tiktok', 'snap', 'gads'];
+        _capiPlatforms.forEach(function(p) {
+          var el = document.getElementById('mgd-capi-tok-' + p);
+          if (el && el.value.trim()) _capiTokens[p] = el.value.trim();
+        });
+        var _urlEl = document.getElementById('mgdSgtmUrlInput');
+        if (_urlEl) _sgtmUrl = _urlEl.value.trim();
+      }
+
+      // ── CRITICAL: build the FULL Server Container JSON from buildSSContainer()
+      // and send it as serverConfigJson. Without this the server falls back to
+      // lib/gtm-config-builder.js's truncated buildServerConfig which returns
+      // an empty container — that's why previously the published Server
+      // Container only had the GA4 Forward tag and no CAPI tags / templates.
+      var _serverConfigJson = null;
+      if (_wantServer) {
+        try {
+          // Sync _pcSS with what the user just entered in the SS UI so
+          // buildSSContainer sees the same pixel IDs/tokens/sGTM URL.
+          if (typeof pcSS_collect === 'function') { try { pcSS_collect(); } catch(_){} }
+          _pcSS.tokens = Object.assign({}, _pcSS.tokens || {}, _capiTokens);
+          if (_sgtmUrl) _pcSS.serverUrl = _sgtmUrl;
+          if (!_pcSS.platforms || !_pcSS.platforms.length) {
+            _pcSS.platforms = Object.keys(_capiTokens || {});
+          }
+          // Pixel IDs for the SS container should mirror the Web container's
+          // pixel IDs — copy them across.
+          _pcSS.pixelIds = Object.assign({}, _pcSS.pixelIds || {}, (S.pixelIds || {}));
+          _pcSS.enabled  = true;
+
+          _serverConfigJson = buildSSContainer();
+          // HARD GATE (Agent-2 recommendation): never publish a container that
+          // fails validation. credVal() already strips URLs from credentials;
+          // this is the final belt-and-suspenders block so a bad export can
+          // never reach GTM import/publish.
+          var _ssVal = (typeof window !== 'undefined') && window.__ET_SS_VALIDATION;
+          if (_ssVal && _ssVal.errors && _ssVal.errors.length) {
+            _serverConfigJson = null;
+            throw new Error('Server container BLOCKED - failed validation: ' + _ssVal.errors.join('; '));
+          }
+          console.log('[ET] Built serverConfigJson for Direct Publish:',
+            'tags=', (_serverConfigJson.containerVersion.tag || []).length,
+            'templates=', (_serverConfigJson.containerVersion.customTemplate || []).length,
+            'triggers=', (_serverConfigJson.containerVersion.trigger || []).length);
+        } catch (sce) {
+          console.warn('[ET] buildSSContainer failed for Direct Publish:', sce);
+          // Continue without serverConfigJson — server will fall back to its builder.
+        }
+      }
+
       var payload = {
         clientId:    currentUser.id,
         clientEmail: currentUser.email || null,
@@ -9695,20 +11363,25 @@
         platforms:   S.platforms || [],
         events:      S.events    || [],
         pixelIds:    _serializePixelIds(S.pixelIds),
+        capiTokens:  _capiTokens,   // CAPI access tokens for server-side tags
+        sgtmUrl:     _sgtmUrl,      // user's sGTM server URL for transport_url wiring
         configJson:  configJson,
-        // When mode=client_server, the server defers publishing the web
-        // container until /api/ss/wire-transport runs — we override the user's
-        // publishLive choice in that case.
+        // FULL Server Container JSON the user saw in the UI — contains
+        // GA4 Client, customEvent triggers per event, customTemplate[] for
+        // each CAPI platform (Meta, TikTok, Snap, GADS), and CAPI tags wired
+        // with the user's pixel IDs + tokens. The server will import this
+        // verbatim instead of building a blank container.
+        serverConfigJson: _serverConfigJson,
         mode:        _wantServer ? 'client_server' : 'client',
-        publishLive: _wantServer ? false : !!document.getElementById('mgdPublishChk').checked,
+        publishLive: !_wantServer,   // web-only → publish live; server mode → publish after wiring
       };
 
-      // 3. UI → busy
-      var btn = document.getElementById('mgdCreateBtn');
+      // 3. UI → busy (only disable the clicked button — the other stays independent)
+      var btn = document.getElementById(_wantServer ? 'mgdCreateServerBtn' : 'mgdCreateBtn');
       var resultBox = document.getElementById('mgdResult');
       if (btn) { btn.disabled = true; btn.style.opacity = '.6'; btn.style.cursor = 'wait'; }
       if (resultBox) resultBox.style.display = 'none';
-      _mgdProgress('جاري إنشاء Container جديد على Easy Track GTM...', true);
+      _mgdProgress(_wantServer ? 'جاري إنشاء Web + Server Containers...' : 'جاري إنشاء Web Container...', true);
 
       // 4. Call server — kick off an async job, then poll for status.
       // Container provisioning takes 60-120s because of GTM write-quota pacing,
@@ -9747,15 +11420,28 @@
         // Poll the job endpoint
         var jobId = data.jobId;
         var _projectDisplayName = payload.projectName || 'Container';
+        var n = _projectDisplayName;
+        // Top-level job stages
         var stageMsgs = {
-          queued:            'في الطابور...',
-          capacity_check:    'جاري التحقق من السعة...',
-          gtm_provisioning:  'جاري إنشاء "' + _projectDisplayName + '"',
-          inviting_user:     'جاري إرسال دعوة "' + _projectDisplayName + '" لبريدك',
-          saving:            'جاري حفظ "' + _projectDisplayName + '"',
-          done:              'تم إنشاء "' + _projectDisplayName + '" بنجاح',
-          error:             'حصل خطأ في "' + _projectDisplayName + '"',
-          capacity_exceeded: 'السعة وصلت للحد الأقصى',
+          queued:               'في الطابور...',
+          capacity_check:       'جاري التحقق من السعة...',
+          gtm_provisioning:     'جاري إنشاء "' + n + '"',
+          inviting_user:        'جاري إرسال دعوة لبريدك...',
+          saving:               'جاري حفظ "' + n + '"',
+          stape_deploy:         'جاري نشر السيرفر على Stape...',
+          wiring_transport_url: 'جاري ربط السيرفر بالـ Web Container...',
+          done:                 'تم إنشاء "' + n + '" بنجاح ✓',
+          error:                'حصل خطأ في "' + n + '"',
+          capacity_exceeded:    'السعة وصلت للحد الأقصى',
+        };
+        // Inner progress stages (from gtm-service onProgress)
+        var innerMsgs = {
+          'web_container':    'جاري إنشاء الـ Web Container...',
+          'server_container': 'جاري إنشاء الـ Server Container (sGTM)...',
+          'capi_templates':   'جاري تركيب قوالب CAPI على السيرفر...',
+          'sgtm_import':      'جاري إضافة Variables & Tags للسيرفر...',
+          'sgtm_publish':     'جاري نشر الـ Server Container...',
+          'inviting_user':    'جاري إرسال دعوة لبريدك...',
         };
 
         var maxWaitMs   = 15 * 60 * 1000;  // 15 min hard cap
@@ -9781,6 +11467,11 @@
 
             // Build a rich progress message with counter if available
             var base = stageMsgs[j2.stage] || ('جاري العمل... (' + j2.stage + ')');
+            // If we're in gtm_provisioning, show the inner sub-stage label
+            if (j2.stage === 'gtm_provisioning' && j2.progress && j2.progress.stage) {
+              var inner = innerMsgs[j2.progress.stage] || j2.progress.stage;
+              base = inner;
+            }
             if (j2.progress && j2.progress.total) {
               base += ' (' + j2.progress.done + '/' + j2.progress.total + ')';
             }
@@ -11267,6 +12958,33 @@
     } else {
       initFirebase();
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Pre-load the REAL sGTM custom-template source files (.tpl) from the
+    // server. buildSSContainer() embeds these verbatim into the generated
+    // Server Container JSON. Without them the container falls back to a
+    // minimal inline template that is structurally valid but only sends a
+    // skeleton CAPI payload. Fetched once, cached in memory for the session.
+    // ════════════════════════════════════════════════════════════════════════
+    window._ET_SGTM_TPL = null;
+    window._ET_SGTM_TPL_PROMISE = (function _loadSgtmTpls() {
+      return fetch('/api/sgtm-templates', { credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          if (j && (j.meta || j.tiktok || j.snap || j.gads)) {
+            window._ET_SGTM_TPL = j;
+            console.log('[ET] Loaded real sGTM templates:',
+              ['meta', 'tiktok', 'snap', 'gads'].filter(function (k) { return !!j[k]; }).join(', '));
+          } else {
+            console.warn('[ET] /api/sgtm-templates returned no templates — buildSSContainer will use inline fallback');
+          }
+          return window._ET_SGTM_TPL;
+        })
+        .catch(function (e) {
+          console.warn('[ET] Could not pre-load sGTM templates — buildSSContainer will use inline fallback:', e.message);
+          return null;
+        });
+    })();
 
 
     // ══ PROJECT HISTORY ═══════════════════════════════════════
@@ -13567,52 +15285,6 @@
           var qty = parseInt(p.quantity || p.qty, 10);
           if (isNaN(qty) || qty < 1) qty = 1;
           return {
-            item_id: String(p.id || p.sku || p.product_id || ''),
-            item_name: p.name || p.title || '',
-            item_brand: p.brand || '',
-            item_category: cat || p.type || '',
-            item_variant: p.variant || p.variation || '',
-            price: Math.round(parseFloat(p.price || p.regular_price || p.unit_price || 0) * 100) / 100,
-            quantity: qty,
-            index: i
-          };
-        }).filter(function (x) { return x && x.item_id; });
-      }
-
-      // ── Dynamic product extractor — detects shape by MEANING, not fixed paths ──
-      function extractSallaProducts(raw) {
-        var out = [];
-        var ec = raw.ecommerce || {};
-        var slot0 = raw[0] || raw['0'];
-        [ec.add, ec.remove, ec.purchase, ec.checkout, ec.detail].forEach(function (box) {
-          if (box && Array.isArray(box.products) && box.products.length) out.push(box.products);
-        });
-        if (Array.isArray(ec.impressions) && ec.impressions.length) out.push(ec.impressions);
-        if (Array.isArray(ec.products) && ec.products.length) out.push(ec.products);
-        if (Array.isArray(raw.data) && raw.data.length) out.push(raw.data);
-        if (Array.isArray(raw.items) && raw.items.length) out.push(raw.items);
-        if (Array.isArray(raw.products) && raw.products.length) out.push(raw.products);
-        if (slot0 && typeof slot0 === 'object') {
-          if (Array.isArray(slot0.products) && slot0.products.length) out.push(slot0.products);
-          else if (slot0.id || slot0.sku || slot0.name) out.push([slot0]);
-        }
-        if (!out.length) {
-          Object.keys(raw).forEach(function (k) {
-            if (/^\d+$/.test(k) && raw[k] && (raw[k].id || raw[k].sku || raw[k].name)) {
-              out.push([raw[k]]);
-            }
-          });
-        }
-        for (var i = 0; i < out.length; i++) if (out[i] && out[i].length) return out[i];
-        return [];
-      }
-
-      function normalizeZidItems(rawItems) {
-        if (!Array.isArray(rawItems)) return [];
-        return rawItems.map(function (p, i) {
-          var qty = parseInt(p.quantity || p.qty || 1, 10);
-          if (isNaN(qty) || qty < 1) qty = 1;
-          return {
             item_id: String(p.id || p.product_id || p.sku || ''),
             item_name: p.name || p.title || '',
             item_brand: p.brand || '',
@@ -14879,4 +16551,4 @@
   >
     <!-- WhatsApp SVG icon -->
     <svg width="30" height="30" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
-      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.8
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.76                                                                                                                                                                                                                                             
