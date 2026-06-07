@@ -7192,8 +7192,15 @@
       clients.push({
         accountId:'000000000', containerId:'00000000', clientId: sid(clientId),
         name: 'GA4 Client',
-        type: 'google-ga4',
-        parameter:[{ type:'TEMPLATE', key:'activationPage', value:'/' }],
+        type: 'gaaw_client',
+        parameter:[
+          { type:'BOOLEAN',  key:'activateDefaultPaths', value:'true'   },
+          { type:'TEMPLATE', key:'cookieManagement',     value:'server' },
+          { type:'TEMPLATE', key:'cookieName',           value:'FPID'   },
+          { type:'TEMPLATE', key:'cookieDomain',         value:'auto'   },
+          { type:'TEMPLATE', key:'cookiePath',           value:'/'      },
+          { type:'TEMPLATE', key:'cookieMaxAgeInSec',    value:'63072000' }
+        ],
         priority: 0,
         fingerprint: fp(clientId)
       });
