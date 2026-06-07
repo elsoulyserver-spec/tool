@@ -7025,7 +7025,7 @@
       // ── ONE universal HTTP forwarder template for Meta, TikTok, Snapchat.
       // Google Ads uses native aw_ct — no custom template needed.
       // ID is a 10-digit int safely within the 32-bit signed limit.
-      var TPL_HTTP = '1780799001';
+      var TPL_HTTP = '1';
 
       // ══════════════════════════════════════════════════════════════════════
       // SANDBOXED JS TEMPLATES — real HTTP request code for each CAPI
@@ -7305,7 +7305,7 @@
             tags.push({
               accountId:'000000000', containerId:'00000000', tagId: sid(tagId),
               name: safeName('Meta CAPI | ' + evKey),
-              type: 'cvt_' + TPL_HTTP,
+              type: 'cvt_0_' + TPL_HTTP,
               parameter:[
                 { type:'TEMPLATE', key:'url',        value: 'https://graph.facebook.com/v22.0/' + pixId + '/events?access_token=' + token },
                 { type:'TEMPLATE', key:'authHeader', value: '' },
@@ -7350,7 +7350,7 @@
             tags.push({
               accountId:'000000000', containerId:'00000000', tagId: sid(tagId),
               name: safeName('Snapchat CAPI | ' + evKey),
-              type: 'cvt_' + TPL_HTTP,
+              type: 'cvt_0_' + TPL_HTTP,
               parameter:[
                 { type:'TEMPLATE', key:'url',        value: 'https://tr.snapchat.com/v2/conversion' },
                 { type:'TEMPLATE', key:'authHeader', value: snapTok },
@@ -7373,7 +7373,7 @@
             tags.push({
               accountId:'000000000', containerId:'00000000', tagId: sid(tagId),
               name: safeName('TikTok Events API | ' + evKey),
-              type: 'cvt_' + TPL_HTTP,
+              type: 'cvt_0_' + TPL_HTTP,
               parameter:[
                 { type:'TEMPLATE', key:'url',        value: 'https://business-api.tiktok.com/open_api/v1.3/event/track/' },
                 { type:'TEMPLATE', key:'authHeader', value: ttTok },
