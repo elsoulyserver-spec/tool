@@ -61,7 +61,25 @@ ___TEMPLATE_PARAMETERS___
     "displayName": "Enable Debug Logging",
     "simpleValueType": true,
     "defaultValue": false
-  }
+  },
+  { "type": "TEXT", "name": "userEmail",      "displayName": "User Email (hashed SHA-256)",     "simpleValueType": true },
+  { "type": "TEXT", "name": "userPhone",      "displayName": "User Phone (hashed SHA-256)",     "simpleValueType": true },
+  { "type": "TEXT", "name": "userFirstName",  "displayName": "User First Name (hashed)",        "simpleValueType": true },
+  { "type": "TEXT", "name": "userLastName",   "displayName": "User Last Name (hashed)",         "simpleValueType": true },
+  { "type": "TEXT", "name": "userExternalId", "displayName": "User External ID",                "simpleValueType": true },
+  { "type": "TEXT", "name": "fbp",            "displayName": "Meta _fbp Cookie",                "simpleValueType": true },
+  { "type": "TEXT", "name": "fbc",            "displayName": "Meta _fbc Cookie",                "simpleValueType": true },
+  { "type": "TEXT", "name": "ttp",            "displayName": "TikTok _ttp Cookie",              "simpleValueType": true },
+  { "type": "TEXT", "name": "scid",           "displayName": "Snapchat _scid Cookie",           "simpleValueType": true },
+  { "type": "TEXT", "name": "ttclid",         "displayName": "TikTok Click ID (ttclid)",        "simpleValueType": true },
+  { "type": "TEXT", "name": "scCid",          "displayName": "Snapchat Click ID (ScCid)",       "simpleValueType": true },
+  { "type": "TEXT", "name": "gclid",          "displayName": "Google Click ID (gclid)",         "simpleValueType": true },
+  { "type": "TEXT", "name": "pageLocation",   "displayName": "Page Location (URL)",             "simpleValueType": true },
+  { "type": "TEXT", "name": "pageReferrer",   "displayName": "Page Referrer",                   "simpleValueType": true },
+  { "type": "TEXT", "name": "eventValue",     "displayName": "Conversion Value",                "simpleValueType": true },
+  { "type": "TEXT", "name": "eventCurrency",  "displayName": "Currency Code",                   "simpleValueType": true },
+  { "type": "TEXT", "name": "orderId",        "displayName": "Order / Transaction ID",          "simpleValueType": true },
+  { "type": "TEXT", "name": "eventId",        "displayName": "Deduplication Event ID",          "simpleValueType": true }
 ]
 
 ___SANDBOXED_JS_FOR_SERVER___
@@ -83,25 +101,27 @@ function clean(o) {
   return r;
 }
 
+// Prefer explicit tag parameters (resolved from sGTM variables) with event data as fallback.
+// This supports both explicit parameter passing and direct Event Data extraction seamlessly.
 var ts      = Math.floor(getTimestampMillis() / 1000);
-var eventId = getEventData('event_id')        || ('ET-' + getTimestampMillis());
-var value   = getEventData('value')           || 0;
-var currency= getEventData('currency')        || 'SAR';
-var orderId = getEventData('transaction_id')  || '';
-var cIds    = getEventData('content_ids')     || '';
-var em      = getEventData('up.em')           || getEventData('user_data.em')           || '';
-var ph      = getEventData('up.ph')           || getEventData('user_data.ph')           || '';
-var fn      = getEventData('up.fn')           || getEventData('user_data.fn')           || '';
-var ln      = getEventData('up.ln')           || getEventData('user_data.ln')           || '';
-var extId   = getEventData('up.external_id')  || getEventData('user_data.external_id') || '';
-var fbp     = getEventData('up.fbp')          || '';
-var fbc     = getEventData('up.fbc')          || '';
-var pageUrl = getEventData('page_location')   || '';
-var pageRef = getEventData('page_referrer')   || '';
-var ttclid  = getEventData('ep.ttclid')       || '';
-var ttp     = getEventData('up.ttp')          || '';
-var scid    = getEventData('up.scid')         || '';
-var sccid   = getEventData('ep.ScCid')        || '';
+var eventId = data.eventId        || getEventData('event_id')        || ('ET-' + getTimestampMillis());
+var value   = data.eventValue     || getEventData('value')           || 0;
+var currency= data.eventCurrency  || getEventData('currency')        || 'SAR';
+var orderId = data.orderId        || getEventData('transaction_id')  || '';
+var cIds    = getEventData('content_ids') || '';
+var em      = data.userEmail      || getEventData('up.em')           || getEventData('user_data.em')           || '';
+var ph      = data.userPhone      || getEventData('up.ph')           || getEventData('user_data.ph')           || '';
+var fn      = data.userFirstName  || getEventData('up.fn')           || getEventData('user_data.fn')           || '';
+var ln      = data.userLastName   || getEventData('up.ln')           || getEventData('user_data.ln')           || '';
+var extId   = data.userExternalId || getEventData('up.external_id')  || getEventData('user_data.external_id') || '';
+var fbp     = data.fbp            || getEventData('up.fbp')          || '';
+var fbc     = data.fbc            || getEventData('up.fbc')          || '';
+var pageUrl = data.pageLocation   || getEventData('page_location')   || '';
+var pageRef = data.pageReferrer   || getEventData('page_referrer')   || '';
+var ttclid  = data.ttclid         || getEventData('ep.ttclid')       || '';
+var ttp     = data.ttp            || getEventData('up.ttp')          || '';
+var scid    = data.scid           || getEventData('up.scid')         || '';
+var sccid   = data.scCid          || getEventData('ep.ScCid')        || '';
 
 var url = data.url;
 var payload;
