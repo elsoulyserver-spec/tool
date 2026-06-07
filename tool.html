@@ -7322,26 +7322,8 @@
           });
 
         } else if (plat === 'gads') {
-          var convId = credVal(_pcSS.gadsConvId, 'AW-XXXXXXXXXX');
-          platEvents.forEach(function(evKey) {
-            var label = credVal(_pcSS.gadsLabels[evKey] || '', 'AbC-DefG1234');
-            tags.push({
-              accountId:'000000000', containerId:'00000000', tagId: sid(tagId),
-              name: safeName('Google Ads Enhanced | ' + evKey),
-              type: 'aw_ct',
-              parameter:[
-                { type:'TEMPLATE', key:'conversionId',    value: convId },
-                { type:'TEMPLATE', key:'conversionLabel', value: label  },
-                { type:'TEMPLATE', key:'conversionValue', value:'{{Value}}'    },
-                { type:'TEMPLATE', key:'currencyCode',    value:'{{Currency}}' },
-                { type:'TEMPLATE', key:'transactionId',   value:'{{Transaction ID}}' }
-              ],
-              firingTriggerId: [ ssEvTrigMap[evKey] || allEvTrigId ],
-              tagFiringOption: 'ONCE_PER_EVENT',
-              fingerprint: fp(tagId)
-            });
-            tagId++;
-          });
+          // Google Ads has no native tag type in sGTM server containers.
+          // aw_ct is web-container-only. Google Ads is handled client-side.
 
         } else if (plat === 'snap') {
           var snapId  = credVal(_pcSS.pixelIds['snap'], 'YOUR_SNAP_PIXEL_ID');
