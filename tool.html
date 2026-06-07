@@ -7182,9 +7182,10 @@
       //    ___SANDBOXED_JS_FOR_SERVER_SIDE_TEMPLATE___ / ___WEB_PERMISSIONS___).
       //    Live templates above use _makeFallbackTpl() with correct markers.
 
-      // ── ONE universal HTTP forwarder template (Meta + TikTok + Snapchat)
-      // templateId MUST equal fingerprint — GTM resolves cvt_<N> by matching N.
-      customTemplates.push({ accountId:'0', containerId:'0', templateId: TPL_HTTP, name:'Easy Track - Universal HTTP Forwarder', fingerprint: TPL_HTTP, templateData: UNIVERSAL_HTTP_CODE });
+      // ONE universal HTTP forwarder (Meta + TikTok + Snapchat).
+      // templateId drives the public ID: cvt_[accountId]_[templateId] = cvt_0_1.
+      // fingerprint uses fp() like all other entities (13-digit timestamp).
+      customTemplates.push({ accountId:'0', containerId:'0', templateId: TPL_HTTP, name:'Easy Track - Universal HTTP Forwarder', fingerprint: fp(50000), templateData: UNIVERSAL_HTTP_CODE });
 
       var varId = 1, tagId = 1, triggerId = 1, clientId = 1;
 
@@ -7386,7 +7387,7 @@
         'sGTM URL: '     + (_pcSS.serverUrl || 'not set'),
         'CMS: '          + (S.cms || 'unknown'),
         'Platforms: '    + (_pcSS.platforms.length ? _pcSS.platforms.join(', ') : 'none'),
-        'Custom Templates: 1 universal HTTP forwarder (Meta + TikTok + Snapchat) | Google Ads: native aw_ct',
+        'Custom Templates: 1 universal HTTP forwarder (Meta + TikTok + Snapchat) | Google Ads: client-side only',
         'Import via GTM → Admin → Import Container (choose Merge or Overwrite)'
       ].join(' | ');
 
@@ -7400,10 +7401,11 @@
         if (o[idKey] != null) o[idKey] = sid(o[idKey]);
         return o;
       }
-      tags.forEach(function(t)   { _ssNormId(t, 'tagId');     });
-      triggers.forEach(function(t){ _ssNormId(t, 'triggerId'); });
-      clients.forEach(function(c) { _ssNormId(c, 'clientId');  });
-      variables.forEach(function(v){ _ssNormId(v, 'variableId'); });
+      tags.forEach(function(t)          { _ssNormId(t, 'tagId');      });
+      triggers.forEach(function(t)      { _ssNormId(t, 'triggerId'); });
+      clients.forEach(function(c)       { _ssNormId(c, 'clientId');  });
+      variables.forEach(function(v)     { _ssNormId(v, 'variableId'); });
+      customTemplates.forEach(function(t){ _ssNormId(t, 'templateId'); });
 
       var _ssExport = {
         exportFormatVersion: 2,
