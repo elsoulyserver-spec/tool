@@ -7246,7 +7246,7 @@
         accountId:'000000000', containerId:'00000000', triggerId: sid(triggerId),
         name:'All Events', type:'CUSTOM_EVENT',
         customEventFilter:[{ type:'MATCH_REGEX', parameter:[
-          { type:'TEMPLATE', key:'arg0', value:'{{Event Name}}' },
+          { type:'TEMPLATE', key:'arg0', value:'{{_event}}' },
           { type:'TEMPLATE', key:'arg1', value:'.*' }
         ]}],
         fingerprint: fp(triggerId)
@@ -7265,7 +7265,7 @@
           customEventFilter:[{
             type:'EQUALS',
             parameter:[
-              { type:'TEMPLATE', key:'arg0', value:'{{Event Name}}' }, // built-in sGTM variable
+              { type:'TEMPLATE', key:'arg0', value:'{{_event}}' },
               { type:'TEMPLATE', key:'arg1', value: finalEvName }
             ]
           }],
