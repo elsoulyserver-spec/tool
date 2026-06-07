@@ -7578,9 +7578,8 @@
         { name:'Campaign Name',    varType:'campaign_name'      },
         { name:'Campaign Source',  varType:'campaign_source'    },
         { name:'Campaign Medium',  varType:'campaign_medium'    },
-        // 5. Ecommerce event parameters (for aw_ct Google Ads tag)
-        { name:'Value',            varType:'event_parameter', varName:'value'    },
-        { name:'Currency',         varType:'event_parameter', varName:'currency' }
+        // (Value / Currency variables removed — aw_ct is web-container-only and
+        //  rejected by sGTM. Google Ads tracking stays in the web container.)
       ];
       _sedVars.forEach(function(sv) {
         var params = [{ type:'TEMPLATE', key:'varType', value:sv.varType }];
@@ -7687,13 +7686,9 @@
         view_item:'VIEW_CONTENT', begin_checkout:'START_CHECKOUT',
         view_item_list:'VIEW_CONTENT', add_to_wishlist:'SAVE', view_cart:'VIEW_CONTENT'
       };
-      // Google Ads conversion action mapping
-      var GADS_EV_MAP = {
-        purchase:'purchase', add_to_cart:'add_to_cart',
-        initiate_checkout:'begin_checkout', begin_checkout:'begin_checkout',
-        view_content:'view_item', view_item:'view_item',
-        lead:'generate_lead',    sign_up:'sign_up'
-      };
+      // Note: Google Ads (gads) has no sGTM-compatible tag type.
+      // aw_ct is web-container-only and rejected on sGTM import.
+      // Conversion tracking for Google Ads stays in the web container.
 
       // Shared explicit user-data parameters passed to every CAPI tag.
       // The universal-http.tpl reads data.* first, then falls back to getEventData().
@@ -7744,34 +7739,9 @@
           });
 
         } else if (plat === 'gads') {
-          var gadsId    = credVal(_pcSS.gadsConvId || '', 'AW-REPLACE_ME');
-          platEvents.forEach(function(evKey) {
-            if (!GADS_EV_MAP[evKey]) return;
-            var evLabel = (_pcSS.gadsLabels && _pcSS.gadsLabels[evKey])
-              ? credVal(_pcSS.gadsLabels[evKey], 'LABEL_REPLACE_ME')
-              : 'LABEL_REPLACE_ME';
-            tags.push({
-              accountId:'0', containerId:'0', tagId: sid(tagId),
-              name: safeName('Google Ads EC | ' + evKey),
-              type: 'aw_ct',
-              parameter:[
-                { type:'TEMPLATE', key:'conversionId',          value: gadsId   },
-                { type:'TEMPLATE', key:'conversionLabel',       value: evLabel  },
-                { type:'TEMPLATE', key:'conversionValue',       value:'{{Value}}'    },
-                { type:'TEMPLATE', key:'currencyCode',          value:'{{Currency}}' },
-                { type:'BOOLEAN',  key:'enableConversionLinker',value:'true'    },
-                { type:'TEMPLATE', key:'userEmail',             value:'{{User Email}}'      },
-                { type:'TEMPLATE', key:'userPhone',             value:'{{User Phone}}'      },
-                { type:'TEMPLATE', key:'userFirstName',         value:'{{User First Name}}' },
-                { type:'TEMPLATE', key:'userLastName',          value:'{{User Last Name}}'  },
-                { type:'TEMPLATE', key:'gclid',                 value:'{{Click ID - gclid}}'}
-              ],
-              firingTriggerId: [ ssEvTrigMap[evKey] || allEvTrigId ],
-              tagFiringOption: 'ONCE_PER_EVENT',
-              fingerprint: fp(tagId)
-            });
-            tagId++;
-          });
+          // 'aw_ct' is a web-container-only tag type — sGTM rejects it on import
+          // ("Unknown entity type: aw_ct"). Google Ads conversion tracking is
+          // handled client-side by the web container. No sGTM tag generated.
 
         } else if (plat === 'snap') {
           var snapId  = credVal(_pcSS.pixelIds['snap'], 'YOUR_SNAP_PIXEL_ID');
