@@ -7022,13 +7022,10 @@
 
       var variables = [], tags = [], triggers = [], clients = [], customTemplates = [];
 
-      // ── Sequential template IDs — must be ≤2147483647 (32-bit signed int max)
-      // GTM matches tag type 'cvt_<N>' against templateId in customTemplate[].
-      // 13-digit timestamps overflow int32 and cause "Invalid template_id" on import.
-      var TPL_META   = '1780799001';
-      var TPL_GADS   = '1780799004';
-      var TPL_SNAP   = '1780799003';
-      var TPL_TIKTOK = '1780799002';
+      // ── ONE universal HTTP forwarder template for Meta, TikTok, Snapchat.
+      // Google Ads uses native aw_ct — no custom template needed.
+      // ID is a 10-digit int safely within the 32-bit signed limit.
+      var TPL_HTTP = '1780799001';
 
       // ══════════════════════════════════════════════════════════════════════
       // SANDBOXED JS TEMPLATES — real HTTP request code for each CAPI
@@ -7106,89 +7103,17 @@
         ].join('\n');
       }
 
-      var META_TEMPLATE_CODE = _SGTM.meta || _makeFallbackTpl({
-        id: 'et_meta_capi',
-        name: 'Easy Track — Meta CAPI',
-        description: 'Forwards events to Meta Conversions API (graph.facebook.com).',
-        allowedHost: 'https://graph.facebook.com/',
+      var UNIVERSAL_HTTP_CODE = _SGTM.universal || _makeFallbackTpl({
+        id: 'et_universal_http',
+        name: 'Easy Track - Universal HTTP Forwarder',
+        description: 'Forwards events to Meta CAPI, TikTok Events API, or Snapchat CAPI. Platform detected from endpoint URL.',
         params: [
-          { name: 'pixelId',     displayName: 'Meta Pixel ID' },
-          { name: 'accessToken', displayName: 'CAPI Access Token' },
-          { name: 'eventName',   displayName: 'Meta Event Name' },
-          { name: 'clientIp',    displayName: 'Client IP' },
-          { name: 'userAgent',   displayName: 'User Agent' }
-        ],
-        js: [
-          "var sendHttpRequest    = require('sendHttpRequest');",
-          "var JSON               = require('JSON');",
-          "var getEventData       = require('getEventData');",
-          "var encodeUriComponent = require('encodeUriComponent');",
-          "var getTimestampMillis = require('getTimestampMillis');",
-          "var Math               = require('Math');",
-          '',
-          "var eventId  = getEventData('event_id') || ('ET-' + getTimestampMillis());",
-          "var currency = getEventData('currency') || 'SAR';",
-          "var value    = getEventData('value')    || 0;",
-          "var orderId  = getEventData('transaction_id') || '';",
-          "var cIds     = getEventData('content_ids') || '';",
-          '',
-          'function clean(o){var r={};for(var k in o){if(o[k]!==""&&o[k]!=null)r[k]=o[k];}return r;}',
-          '',
-          'var ud = clean({',
-          "  em:                getEventData('user_data.em')  || getEventData('up.em'),",
-          "  ph:                getEventData('user_data.ph')  || getEventData('up.ph'),",
-          "  fn:                getEventData('user_data.fn')  || getEventData('up.fn'),",
-          "  ln:                getEventData('user_data.ln')  || getEventData('up.ln'),",
-          "  external_id:       getEventData('user_data.external_id') || getEventData('up.external_id'),",
-          "  fbp:               getEventData('up.fbp'),",
-          "  fbc:               getEventData('up.fbc'),",
-          '  client_ip_address: data.clientIp,',
-          '  client_user_agent: data.userAgent',
-          '});',
-          '',
-          'var cd = clean({',
-          '  currency:     currency,',
-          '  value:        value,',
-          '  order_id:     orderId,',
-          '  content_ids:  cIds ? [cIds] : undefined,',
-          "  content_type: 'product'",
-          '});',
-          '',
-          'var payload = JSON.stringify({ data: [{',
-          '  event_name:    data.eventName,',
-          '  event_time:    Math.floor(getTimestampMillis()/1000),',
-          '  event_id:      eventId,',
-          "  action_source: 'website',",
-          '  user_data:     ud,',
-          '  custom_data:   cd',
-          '}]});',
-          '',
-          "var url = 'https://graph.facebook.com/v18.0/' + encodeUriComponent(data.pixelId) +",
-          "            '/events?access_token=' + encodeUriComponent(data.accessToken);",
-          '',
-          "sendHttpRequest(url, {",
-          "  method:'POST',",
-          "  headers:{'Content-Type':'application/json'},",
-          "  timeout:8000,",
-          "  body:payload",
-          '}).then(function(r){',
-          '  if(r.statusCode>=200&&r.statusCode<300){ data.gtmOnSuccess(); }',
-          '  else{ data.gtmOnFailure(); }',
-          '}, data.gtmOnFailure);'
-        ].join('\n')
-      });
-
-      var TIKTOK_TEMPLATE_CODE = _SGTM.tiktok || _makeFallbackTpl({
-        id: 'et_tiktok_events',
-        name: 'Easy Track — TikTok Events API',
-        description: 'Forwards events to TikTok Events API (business-api.tiktok.com).',
-        allowedHost: 'https://business-api.tiktok.com/',
-        params: [
-          { name: 'pixelCode',   displayName: 'TikTok Pixel Code' },
-          { name: 'accessToken', displayName: 'Events API Access Token' },
-          { name: 'eventName',   displayName: 'TikTok Event Name' },
-          { name: 'clientIp',    displayName: 'Client IP' },
-          { name: 'userAgent',   displayName: 'User Agent' }
+          { name: 'url',        displayName: 'Endpoint URL' },
+          { name: 'authHeader', displayName: 'Auth Header Value (Bearer token; blank for Meta)' },
+          { name: 'eventName',  displayName: 'Platform Event Name' },
+          { name: 'platformId', displayName: 'Platform Pixel / Source ID' },
+          { name: 'clientIp',   displayName: 'Client IP' },
+          { name: 'userAgent',  displayName: 'User Agent' }
         ],
         js: [
           "var sendHttpRequest    = require('sendHttpRequest');",
@@ -7196,162 +7121,60 @@
           "var getEventData       = require('getEventData');",
           "var getTimestampMillis = require('getTimestampMillis');",
           "var Math               = require('Math');",
-          '',
-          'function clean(o){var r={};for(var k in o){if(o[k]!==""&&o[k]!=null)r[k]=o[k];}return r;}',
-          '',
-          'var payload = JSON.stringify({',
-          "  event_source:    'web',",
-          '  event_source_id: data.pixelCode,',
-          '  data: [{',
-          '    event:      data.eventName,',
-          '    event_time: Math.floor(getTimestampMillis()/1000),',
-          "    event_id:   getEventData('event_id') || ('TT-' + getTimestampMillis()),",
-          '    user: clean({',
-          "      email:        getEventData('user_data.em') || getEventData('up.em'),",
-          "      phone_number: getEventData('user_data.ph') || getEventData('up.ph'),",
-          "      external_id:  getEventData('user_data.external_id') || getEventData('up.external_id'),",
-          "      ttclid:       getEventData('ep.ttclid'),",
-          "      ttp:          getEventData('up.ttp'),",
-          '      ip:           data.clientIp,',
-          '      user_agent:   data.userAgent',
-          '    }),',
-          '    properties: clean({',
-          "      currency:   getEventData('currency') || 'SAR',",
-          "      value:      getEventData('value')    || 0,",
-          "      content_id: getEventData('content_ids'),",
-          "      content_type:'product',",
-          "      order_id:   getEventData('transaction_id')",
-          '    })',
-          '  }]',
-          '});',
-          '',
-          "sendHttpRequest('https://business-api.tiktok.com/open_api/v1.3/event/track/', {",
-          "  method:'POST',",
-          "  headers:{'Content-Type':'application/json','Access-Token':data.accessToken},",
-          "  timeout:8000,",
-          "  body:payload",
-          '}).then(function(r){',
-          '  if(r.statusCode>=200&&r.statusCode<300){ data.gtmOnSuccess(); }',
-          '  else{ data.gtmOnFailure(); }',
-          '}, data.gtmOnFailure);'
-        ].join('\n')
-      });
-
-      var SNAP_TEMPLATE_CODE = _SGTM.snap || _makeFallbackTpl({
-        id: 'et_snap_capi',
-        name: 'Easy Track — Snapchat CAPI',
-        description: 'Forwards events to Snapchat Conversions API (tr.snapchat.com).',
-        allowedHost: 'https://tr.snapchat.com/',
-        params: [
-          { name: 'pixelId',   displayName: 'Snap Pixel ID' },
-          { name: 'apiToken',  displayName: 'Snap CAPI Token' },
-          { name: 'eventType', displayName: 'Snap Event Type' },
-          { name: 'clientIp',  displayName: 'Client IP' },
-          { name: 'userAgent', displayName: 'User Agent' }
-        ],
-        js: [
-          "var sendHttpRequest    = require('sendHttpRequest');",
-          "var JSON               = require('JSON');",
-          "var getEventData       = require('getEventData');",
-          "var getTimestampMillis = require('getTimestampMillis');",
-          "var Math               = require('Math');",
-          '',
-          'function clean(o){var r={};for(var k in o){if(o[k]!==""&&o[k]!=null)r[k]=o[k];}return r;}',
-          '',
-          'var payload = JSON.stringify({ data: [{',
-          "  event_conversion_type: 'WEB',",
-          '  event_type:   data.eventType,',
-          "  event_tag:    getEventData('event_id') || ('SNAP-' + getTimestampMillis()),",
-          '  timestamp:    Math.floor(getTimestampMillis()/1000),',
-          '  hashed_data_fields: clean({',
-          "    email:        getEventData('user_data.em') || getEventData('up.em'),",
-          "    phone_number: getEventData('user_data.ph') || getEventData('up.ph'),",
-          "    external_id:  getEventData('user_data.external_id') || getEventData('up.external_id')",
-          '  }),',
-          '  user_data: clean({',
-          "    sc_click_id: getEventData('ep.sccid'),",
-          "    uuid_c1:     getEventData('up.scid'),",
-          '    ip_address:  data.clientIp,',
-          '    user_agent:  data.userAgent',
-          '  }),',
-          '  custom_data: clean({',
-          "    currency:       getEventData('currency') || 'SAR',",
-          "    price:          getEventData('value')    || 0,",
-          "    transaction_id: getEventData('transaction_id'),",
-          "    content_ids:    (function(){var v=getEventData('content_ids');return v?[v]:undefined;})()",
-          '  })',
-          '}]});',
-          '',
-          "sendHttpRequest('https://tr.snapchat.com/v2/conversion', {",
-          "  method:'POST',",
-          "  headers:{'Content-Type':'application/json','Authorization':'Bearer '+data.apiToken},",
-          "  timeout:8000,",
-          "  body:payload",
-          '}).then(function(r){',
-          '  if(r.statusCode>=200&&r.statusCode<300){ data.gtmOnSuccess(); }',
-          '  else{ data.gtmOnFailure(); }',
-          '}, data.gtmOnFailure);'
-        ].join('\n')
-      });
-
-      var GADS_TEMPLATE_CODE = _SGTM.gads || _makeFallbackTpl({
-        id: 'et_gads_ec',
-        name: 'Easy Track — Google Ads Enhanced Conversions',
-        description: 'Forwards conversions to Google Ads Enhanced Conversions API.',
-        allowedHost: 'https://googleads.googleapis.com/',
-        params: [
-          { name: 'conversionId',    displayName: 'Conversion ID (digits, no AW-)' },
-          { name: 'conversionLabel', displayName: 'Conversion Label' },
-          { name: 'oauthToken',      displayName: 'OAuth2 Bearer Token' },
-          { name: 'developerToken',  displayName: 'Google Ads Developer Token' },
-          { name: 'clientIp',        displayName: 'Client IP' },
-          { name: 'userAgent',       displayName: 'User Agent' }
-        ],
-        js: [
-          "var sendHttpRequest    = require('sendHttpRequest');",
-          "var JSON               = require('JSON');",
-          "var getEventData       = require('getEventData');",
-          "var getTimestampMillis = require('getTimestampMillis');",
-          "var Math               = require('Math');",
-          '',
-          'var ts=Math.floor(getTimestampMillis()/1000);function p2(n){return n<10?"0"+n:""+n;}',
-          'var rem=ts%86400;var hh=Math.floor(rem/3600);rem=rem%3600;var mm=Math.floor(rem/60);var ss=rem%60;',
-          'var totalDays=Math.floor(ts/86400);var y=1970;while(true){var diy=(y%4===0&&(y%100!==0||y%400===0))?366:365;if(totalDays<diy)break;totalDays=totalDays-diy;y=y+1;}',
-          'var leap=(y%4===0&&(y%100!==0||y%400===0));var mD=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31];var mo=0;while(totalDays>=mD[mo]){totalDays=totalDays-mD[mo];mo=mo+1;}',
-          'var convTime=y+"-"+p2(mo+1)+"-"+p2(totalDays+1)+" "+p2(hh)+":"+p2(mm)+":"+p2(ss)+" +0000";',
-          '',
-          'var ids = [];',
-          "var em  = getEventData('user_data.em') || getEventData('up.em');",
-          "var ph  = getEventData('user_data.ph') || getEventData('up.ph');",
-          'if(em) ids.push({hashedEmail: em});',
-          'if(ph) ids.push({hashedPhoneNumber: ph});',
-          '',
-          'var payload = JSON.stringify({',
-          '  conversions: [{',
-          "    conversionAction:   'customers/' + data.conversionId + '/conversionActions/' + data.conversionLabel,",
-          '    conversionDateTime: convTime,',
-          "    conversionValue:    getEventData('value')    || 0,",
-          "    currencyCode:       getEventData('currency') || 'SAR',",
-          "    orderId:            getEventData('transaction_id'),",
-          "    gclid:              getEventData('ep.gclid')  || getEventData('up.gclid'),",
-          "    wbraid:             getEventData('ep.wbraid'),",
-          "    gbraid:             getEventData('ep.gbraid'),",
-          '    userIdentifiers:    ids',
-          '  }],',
-          '  partialFailure: true',
-          '});',
-          '',
-          '// OAuth2 Bearer token and developer-token are configured as template',
-          '// parameters (oauthToken, developerToken) — set them in the GTM UI.',
-          "sendHttpRequest('https://googleads.googleapis.com/v14/customers/' + data.conversionId + ':uploadConversions', {",
-          "  method:'POST',",
-          "  headers:{'Content-Type':'application/json','Authorization':'Bearer '+data.oauthToken,'developer-token':data.developerToken},",
-          "  timeout:8000,",
-          "  body:payload",
-          '}).then(function(r){',
-          '  if(r.statusCode>=200&&r.statusCode<300){ data.gtmOnSuccess(); }',
-          '  else{ data.gtmOnFailure(); }',
-          '}, data.gtmOnFailure);'
+          'function clean(o){var r={};for(var k in o){if(o[k]!==""&&o[k]!==null&&o[k]!==undefined)r[k]=o[k];}return r;}',
+          'var ts=Math.floor(getTimestampMillis()/1000);',
+          "var eventId=getEventData('event_id')||('ET-'+getTimestampMillis());",
+          "var value=getEventData('value')||0;",
+          "var currency=getEventData('currency')||'SAR';",
+          "var orderId=getEventData('transaction_id')||'';",
+          "var cIds=getEventData('content_ids')||'';",
+          "var em=getEventData('up.em')||getEventData('user_data.em')||'';",
+          "var ph=getEventData('up.ph')||getEventData('user_data.ph')||'';",
+          "var fn=getEventData('up.fn')||getEventData('user_data.fn')||'';",
+          "var ln=getEventData('up.ln')||getEventData('user_data.ln')||'';",
+          "var extId=getEventData('up.external_id')||getEventData('user_data.external_id')||'';",
+          "var fbp=getEventData('up.fbp')||'';",
+          "var fbc=getEventData('up.fbc')||'';",
+          "var pageUrl=getEventData('page_location')||'';",
+          "var pageRef=getEventData('page_referrer')||'';",
+          "var ttclid=getEventData('ep.ttclid')||'';",
+          "var ttp=getEventData('up.ttp')||'';",
+          "var scid=getEventData('up.scid')||'';",
+          "var sccid=getEventData('ep.ScCid')||'';",
+          'var url=data.url;',
+          'var payload;',
+          "if(url.indexOf('tiktok.com')!==-1){",
+          '  payload=JSON.stringify({event_source:"web",event_source_id:data.platformId,data:[{',
+          '    event:data.eventName,event_time:ts,event_id:eventId,',
+          '    user:clean({email:em,phone_number:ph,external_id:extId,ttclid:ttclid,ttp:ttp,ip:data.clientIp,user_agent:data.userAgent}),',
+          '    properties:clean({currency:currency,value:value,content_id:cIds,content_type:"product",order_id:orderId}),',
+          '    page:{url:pageUrl,referrer:pageRef}',
+          '  }]});',
+          "} else if(url.indexOf('snapchat.com')!==-1){",
+          '  payload=JSON.stringify({data:[{',
+          '    event_conversion_type:"WEB",event_type:data.eventName,event_tag:eventId,timestamp:ts,',
+          '    hashed_data_fields:clean({email:em,phone_number:ph,external_id:extId}),',
+          '    user_data:clean({sc_click_id:sccid,uuid_c1:scid,ip_address:data.clientIp,user_agent:data.userAgent}),',
+          '    custom_data:clean({currency:currency,price:value,transaction_id:orderId,content_ids:cIds?[cIds]:undefined})',
+          '  }]});',
+          '} else {',
+          '  payload=JSON.stringify({data:[{',
+          '    event_name:data.eventName,event_time:ts,event_id:eventId,',
+          '    action_source:"website",event_source_url:pageUrl,',
+          '    user_data:clean({em:em,ph:ph,fn:fn,ln:ln,external_id:extId,fbp:fbp,fbc:fbc,client_ip_address:data.clientIp,client_user_agent:data.userAgent}),',
+          '    custom_data:clean({currency:currency,value:value,order_id:orderId,content_ids:cIds?[cIds]:undefined,content_type:"product"})',
+          '  }]});',
+          '}',
+          "var hdrs={'Content-Type':'application/json'};",
+          "if(url.indexOf('tiktok.com')!==-1){",
+          "  if(data.authHeader){hdrs['Access-Token']=data.authHeader;}",
+          '} else {',
+          "  if(data.authHeader){hdrs['Authorization']='Bearer '+data.authHeader;}",
+          '}',
+          'sendHttpRequest(url,{method:"POST",headers:hdrs,timeout:8000,body:payload}).then(function(r){',
+          '  if(r.statusCode>=200&&r.statusCode<300){data.gtmOnSuccess();}',
+          '  else{data.gtmOnFailure();}',
+          '},data.gtmOnFailure);'
         ].join('\n')
       });
 
@@ -7359,15 +7182,9 @@
       //    ___SANDBOXED_JS_FOR_SERVER_SIDE_TEMPLATE___ / ___WEB_PERMISSIONS___).
       //    Live templates above use _makeFallbackTpl() with correct markers.
 
-      // ── Register custom templates ─────────────────────────────────────────
-      // accountId/containerId MUST be '0' and templateId MUST match the fingerprint
-      // used in the tag type 'cvt_<fingerprint>' — required by sGTM import parser.
-      // templateId MUST equal the fingerprint — GTM resolves a tag's type 'cvt_<fingerprint>'
-      // by stripping 'cvt_' and matching it against templateId in the customTemplate array.
-      customTemplates.push({ accountId:'0', containerId:'0', templateId: TPL_META,   name:'Easy Track — Meta CAPI',          fingerprint: TPL_META,   templateData: META_TEMPLATE_CODE   });
-      customTemplates.push({ accountId:'0', containerId:'0', templateId: TPL_TIKTOK, name:'Easy Track — TikTok Events API',  fingerprint: TPL_TIKTOK, templateData: TIKTOK_TEMPLATE_CODE });
-      customTemplates.push({ accountId:'0', containerId:'0', templateId: TPL_SNAP,   name:'Easy Track — Snapchat CAPI',      fingerprint: TPL_SNAP,   templateData: SNAP_TEMPLATE_CODE   });
-      customTemplates.push({ accountId:'0', containerId:'0', templateId: TPL_GADS,   name:'Easy Track — Google Ads Enhanced',fingerprint: TPL_GADS,   templateData: GADS_TEMPLATE_CODE   });
+      // ── ONE universal HTTP forwarder template (Meta + TikTok + Snapchat)
+      // templateId MUST equal fingerprint — GTM resolves cvt_<N> by matching N.
+      customTemplates.push({ accountId:'0', containerId:'0', templateId: TPL_HTTP, name:'Easy Track - Universal HTTP Forwarder', fingerprint: TPL_HTTP, templateData: UNIVERSAL_HTTP_CODE });
 
       var varId = 1, tagId = 1, triggerId = 1, clientId = 1;
 
@@ -7488,14 +7305,14 @@
             tags.push({
               accountId:'000000000', containerId:'00000000', tagId: sid(tagId),
               name: safeName('Meta CAPI | ' + evKey),
-              // ✅ type references the embedded custom template by fingerprint
-              type: 'cvt_' + TPL_META,
+              type: 'cvt_' + TPL_HTTP,
               parameter:[
-                { type:'TEMPLATE', key:'pixelId',     value: pixId },
-                { type:'TEMPLATE', key:'accessToken', value: token },
-                { type:'TEMPLATE', key:'eventName',   value: META_EV_MAP[evKey] || evKey },
-                { type:'TEMPLATE', key:'clientIp',    value:'{{Client IP}}'   },
-                { type:'TEMPLATE', key:'userAgent',   value:'{{User Agent}}'  }
+                { type:'TEMPLATE', key:'url',        value: 'https://graph.facebook.com/v22.0/' + pixId + '/events?access_token=' + token },
+                { type:'TEMPLATE', key:'authHeader', value: '' },
+                { type:'TEMPLATE', key:'eventName',  value: META_EV_MAP[evKey] || evKey },
+                { type:'TEMPLATE', key:'platformId', value: pixId },
+                { type:'TEMPLATE', key:'clientIp',   value:'{{Client IP}}'  },
+                { type:'TEMPLATE', key:'userAgent',  value:'{{User Agent}}' }
               ],
               firingTriggerId: [ ssEvTrigMap[evKey] || allEvTrigId ],
               tagFiringOption: 'ONCE_PER_EVENT',
@@ -7505,18 +7322,19 @@
           });
 
         } else if (plat === 'gads') {
-          var convId = credVal(_pcSS.gadsConvId, 'AW-XXXXXXXXXX').replace(/^AW-/, '');
+          var convId = credVal(_pcSS.gadsConvId, 'AW-XXXXXXXXXX');
           platEvents.forEach(function(evKey) {
             var label = credVal(_pcSS.gadsLabels[evKey] || '', 'AbC-DefG1234');
             tags.push({
               accountId:'000000000', containerId:'00000000', tagId: sid(tagId),
               name: safeName('Google Ads Enhanced | ' + evKey),
-              type: 'cvt_' + TPL_GADS,
+              type: 'aw_ct',
               parameter:[
                 { type:'TEMPLATE', key:'conversionId',    value: convId },
                 { type:'TEMPLATE', key:'conversionLabel', value: label  },
-                { type:'TEMPLATE', key:'clientIp',        value:'{{Client IP}}'  },
-                { type:'TEMPLATE', key:'userAgent',       value:'{{User Agent}}' }
+                { type:'TEMPLATE', key:'conversionValue', value:'{{Value}}'    },
+                { type:'TEMPLATE', key:'currencyCode',    value:'{{Currency}}' },
+                { type:'TEMPLATE', key:'transactionId',   value:'{{Transaction ID}}' }
               ],
               firingTriggerId: [ ssEvTrigMap[evKey] || allEvTrigId ],
               tagFiringOption: 'ONCE_PER_EVENT',
@@ -7532,17 +7350,17 @@
             tags.push({
               accountId:'000000000', containerId:'00000000', tagId: sid(tagId),
               name: safeName('Snapchat CAPI | ' + evKey),
-              type: 'cvt_' + TPL_SNAP,
+              type: 'cvt_' + TPL_HTTP,
               parameter:[
-                { type:'TEMPLATE', key:'pixelId',   value: snapId   },
-                { type:'TEMPLATE', key:'apiToken',  value: snapTok  },
-                { type:'TEMPLATE', key:'eventType', value: SNAP_EV_MAP[evKey] || 'CUSTOM' },
-                { type:'TEMPLATE', key:'clientIp',  value:'{{Client IP}}'   },
-                { type:'TEMPLATE', key:'userAgent', value:'{{User Agent}}'  }
+                { type:'TEMPLATE', key:'url',        value: 'https://tr.snapchat.com/v2/conversion' },
+                { type:'TEMPLATE', key:'authHeader', value: snapTok },
+                { type:'TEMPLATE', key:'eventName',  value: SNAP_EV_MAP[evKey] || 'CUSTOM' },
+                { type:'TEMPLATE', key:'platformId', value: snapId },
+                { type:'TEMPLATE', key:'clientIp',   value:'{{Client IP}}'  },
+                { type:'TEMPLATE', key:'userAgent',  value:'{{User Agent}}' }
               ],
               firingTriggerId: [ ssEvTrigMap[evKey] || allEvTrigId ],
               tagFiringOption: 'ONCE_PER_EVENT',
-              notes: 'Snapchat CAPI — ' + evKey + ' | Pixel: ' + snapId + ' | Token: ' + (snapTok !== 'YOUR_SNAP_CAPI_TOKEN' ? 'set' : 'not set') + ' | Generated by Easy Track',
               fingerprint: fp(tagId)
             });
             tagId++;
@@ -7555,17 +7373,17 @@
             tags.push({
               accountId:'000000000', containerId:'00000000', tagId: sid(tagId),
               name: safeName('TikTok Events API | ' + evKey),
-              type: 'cvt_' + TPL_TIKTOK,
+              type: 'cvt_' + TPL_HTTP,
               parameter:[
-                { type:'TEMPLATE', key:'pixelCode',   value: ttId  },
-                { type:'TEMPLATE', key:'accessToken', value: ttTok },
-                { type:'TEMPLATE', key:'eventName',   value: TIKTOK_EV_MAP[evKey] || evKey },
-                { type:'TEMPLATE', key:'clientIp',    value:'{{Client IP}}'  },
-                { type:'TEMPLATE', key:'userAgent',   value:'{{User Agent}}' }
+                { type:'TEMPLATE', key:'url',        value: 'https://business-api.tiktok.com/open_api/v1.3/event/track/' },
+                { type:'TEMPLATE', key:'authHeader', value: ttTok },
+                { type:'TEMPLATE', key:'eventName',  value: TIKTOK_EV_MAP[evKey] || evKey },
+                { type:'TEMPLATE', key:'platformId', value: ttId },
+                { type:'TEMPLATE', key:'clientIp',   value:'{{Client IP}}'  },
+                { type:'TEMPLATE', key:'userAgent',  value:'{{User Agent}}' }
               ],
               firingTriggerId: [ ssEvTrigMap[evKey] || allEvTrigId ],
               tagFiringOption: 'ONCE_PER_EVENT',
-              notes: 'TikTok Events API — ' + evKey + ' | Pixel: ' + ttId + ' | Token: ' + (ttTok !== 'YOUR_TIKTOK_API_TOKEN' ? 'set' : 'not set') + ' | Generated by Easy Track',
               fingerprint: fp(tagId)
             });
             tagId++;
@@ -7579,7 +7397,7 @@
         'sGTM URL: '     + (_pcSS.serverUrl || 'not set'),
         'CMS: '          + (S.cms || 'unknown'),
         'Platforms: '    + (_pcSS.platforms.length ? _pcSS.platforms.join(', ') : 'none'),
-        'Custom Templates included: Meta CAPI, TikTok Events API, Snapchat CAPI, Google Ads Enhanced',
+        'Custom Templates: 1 universal HTTP forwarder (Meta + TikTok + Snapchat) | Google Ads: native aw_ct',
         'Import via GTM → Admin → Import Container (choose Merge or Overwrite)'
       ].join(' | ');
 
