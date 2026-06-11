@@ -9,7 +9,15 @@
       "Bash(node --check lib/ss-rate-limiter.js)",
       "Bash(node --check lib/providers/base.js)",
       "Bash(node --check lib/providers/stape.js)",
-      "Bash(node --check lib/providers/gcloud.js)"
+      "Bash(node --check lib/providers/gcloud.js)",
+      "Bash(git rebase *)",
+      "Bash(git stash *)",
+      "Bash(git checkout *)",
+      "Bash(git push *)",
+      "Bash(gh pr create --title 'fix: repair sGTM container JSON so GTM import succeeds' --body ' *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git remote *)"
     ]
   }
 }

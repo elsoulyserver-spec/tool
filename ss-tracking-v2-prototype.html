@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Easy Track — SS Tracking v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;900&family=IBM+Plex+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<style>
+:root {
+  --bg:#0B0E14; --sur:#10131a; --sur2:#191c22; --sur3:#272a31; --sur4:#32353c;
+  --acc:#46f1c5; --acc2:#00d4aa; --acc-dim:rgba(70,241,197,.10); --acc-glow:rgba(70,241,197,.22);
+  --wht:#e1e2eb; --wht2:#bacac2; --mut:#85948d; --mut2:#3b4a44;
+  --grn:#46f1c5; --red:#f87171; --blu:#adc6ff; --amber:#fbbf24; --purple:#c084fc;
+  --bdr:rgba(70,241,197,.18); --bdr2:rgba(255,255,255,.07); --bdr3:rgba(255,255,255,.04);
+  --font-display:'Plus Jakarta Sans',sans-serif;
+  --font-ui:'Inter',sans-serif; --font-mono:'IBM Plex Mono',monospace;
+  --text-xs:11px; --text-sm:12px; --text-base:14px; --text-md:15px; --text-lg:18px;
+  --r-sm:8px; --r-md:12px; --r-lg:16px;
+  --trans:.15s ease;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--wht2);font-family:var(--font-ui);font-size:var(--text-base);line-height:1.6;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;}
+
+body::before{content:'';position:fixed;inset:0;z-index:0;background:radial-gradient(ellipse 60% 40% at 80% 0%,rgba(70,241,197,.07),transparent 60%),radial-gradient(ellipse 40% 30% at 10% 100%,rgba(173,198,255,.04),transparent 55%);pointer-events:none;}
+body::after{content:'';position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(70,241,197,.013) 1px,transparent 1px),linear-gradient(90deg,rgba(70,241,197,.013) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;mask-image:radial-gradient(ellipse 70% 70% at 50% 50%,black 20%,transparent 100%);}
+
+.app{position:relative;z-index:1;max-width:800px;margin:0 auto;padding:28px 20px 80px;}
+
+/* ─── Material icons ─── */
+.material-symbols-outlined{font-family:'Material Symbols Outlined';font-style:normal;font-weight:normal;font-size:inherit;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;direction:ltr;font-feature-settings:'liga';-webkit-font-feature-settings:'liga';-webkit-font-smoothing:antialiased;}
+
+/* ─── Header ─── */
+.page-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;gap:12px;}
+.page-title{font-family:var(--font-display);font-size:22px;font-weight:800;color:var(--wht);letter-spacing:-.4px;display:flex;align-items:center;gap:8px;margin-bottom:3px;}
+.page-sub{font-size:12px;color:var(--mut);line-height:1.5;}
+
+/* ─── Stepper ─── */
+.ss-stepper{display:flex;align-items:center;gap:0;margin-bottom:24px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;}
+.ss-stepper::-webkit-scrollbar{display:none;}
+.ss-step{display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:8px;cursor:pointer;flex-shrink:0;transition:background var(--trans);}
+.ss-step:hover{background:var(--sur2);}
+.ss-step-circle{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:var(--font-mono);flex-shrink:0;transition:all .2s;}
+.ss-step-circle.idle{background:var(--sur3);color:var(--mut);border:1.5px solid var(--bdr2);}
+.ss-step-circle.active{background:var(--acc-dim);color:var(--acc);border:1.5px solid var(--acc);box-shadow:0 0 10px var(--acc-glow);}
+.ss-step-circle.done{background:rgba(70,241,197,.18);color:var(--acc);border:1.5px solid rgba(70,241,197,.35);}
+.ss-step-label{font-size:10px;font-weight:600;color:var(--mut);white-space:nowrap;}
+.ss-step-label.active{color:var(--acc);}
+.ss-step-label.done{color:var(--wht2);}
+.ss-step-sep{width:18px;height:1px;background:var(--bdr2);flex-shrink:0;}
+
+/* ─── Panels ─── */
+.ss-panel{display:none;animation:fadeUp .22s ease;}
+.ss-panel.active{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+.panel-title{font-family:var(--font-display);font-size:18px;font-weight:800;color:var(--wht);letter-spacing:-.3px;margin-bottom:3px;}
+.panel-sub{font-size:12px;color:var(--mut);margin-bottom:18px;line-height:1.6;}
+
+/* ─── Cards ─── */
+.card{background:var(--sur);border:1px solid var(--bdr2);border-radius:var(--r-lg);padding:16px 18px;margin-bottom:12px;}
+.card-sm{background:var(--sur2);border:1px solid var(--bdr3);border-radius:var(--r-md);padding:12px 14px;margin-bottom:8px;}
+
+/* ─── Inputs ─── */
+.field-label{font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.9px;margin-bottom:6px;}
+.inp{width:100%;background:var(--sur2);border:1px solid var(--bdr2);border-radius:var(--r-sm);padding:9px 13px;font-size:13px;color:var(--wht);font-family:var(--font-ui);outline:none;transition:border var(--trans),box-shadow var(--trans);}
+.inp:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(70,241,197,.08);}
+.inp::placeholder{color:var(--mut2);}
+.inp-sm{padding:7px 11px;font-size:12px;}
+
+/* ─── Buttons ─── */
+.btn-acc{background:var(--acc);color:#080b12;border:none;border-radius:var(--r-sm);padding:9px 20px;font-size:13px;font-weight:700;font-family:var(--font-ui);cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:opacity var(--trans),transform .1s,box-shadow var(--trans);}
+.btn-acc:hover{opacity:.88;box-shadow:0 4px 20px rgba(70,241,197,.25);}
+.btn-acc:active{transform:scale(.97);}
+.btn-acc:disabled{opacity:.35;cursor:not-allowed;}
+.btn-ghost{background:transparent;color:var(--wht2);border:1px solid var(--bdr2);border-radius:var(--r-sm);padding:9px 16px;font-size:13px;font-weight:600;font-family:var(--font-ui);cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all var(--trans);}
+.btn-ghost:hover{border-color:var(--acc);color:var(--acc);}
+.btn-ghost.danger{border-color:rgba(248,113,113,.3);color:var(--red);}
+.btn-ghost.danger:hover{border-color:var(--red);background:rgba(248,113,113,.05);}
+.btn-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px;}
+
+/* ─── Platform cards ─── */
+.plat-card{display:flex;align-items:center;gap:12px;padding:11px 15px;border-radius:var(--r-md);background:var(--sur2);border:1.5px solid var(--bdr3);cursor:pointer;transition:all var(--trans);user-select:none;}
+.plat-card:hover{border-color:var(--bdr2);}
+.plat-card.selected{border-color:var(--acc);background:rgba(70,241,197,.04);}
+.plat-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+.plat-name{font-size:13px;font-weight:700;color:var(--wht);}
+.plat-desc{font-size:11px;color:var(--mut);}
+.plat-check{width:17px;height:17px;border-radius:50%;border:1.5px solid var(--bdr2);margin-right:auto;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all var(--trans);}
+.plat-card.selected .plat-check{background:var(--acc);border-color:var(--acc);}
+
+/* ─── Pixel toggle rows ─── */
+.px-row{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:var(--r-md);background:var(--sur2);border:1.5px solid var(--bdr3);margin-bottom:8px;cursor:pointer;transition:all var(--trans);}
+.px-row.on{border-color:rgba(70,241,197,.3);background:rgba(70,241,197,.03);}
+.px-logo{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;flex-shrink:0;}
+.px-name{font-size:13px;font-weight:700;color:var(--wht);flex:1;}
+.px-badge{font-size:9px;font-weight:700;letter-spacing:.8px;padding:2px 7px;border-radius:4px;font-family:var(--font-mono);}
+.px-badge.web{background:rgba(173,198,255,.12);color:var(--blu);}
+.px-badge.server{background:rgba(70,241,197,.1);color:var(--acc);}
+.px-badge.both{background:rgba(245,158,11,.1);color:var(--amber);}
+.toggle{width:34px;height:19px;border-radius:10px;background:var(--sur3);border:none;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0;}
+.toggle.on{background:var(--acc);}
+.toggle::after{content:'';position:absolute;top:3px;right:3px;width:13px;height:13px;border-radius:50%;background:#fff;transition:transform .2s,right .2s;}
+.toggle.on::after{right:auto;left:3px;}
+
+/* ─── Pixel token expansion ─── */
+.px-expand{overflow:hidden;max-height:0;transition:max-height .3s ease,opacity .3s;opacity:0;}
+.px-expand.open{max-height:200px;opacity:1;}
+.px-token-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 14px 12px;}
+@media(max-width:540px){.px-token-grid{grid-template-columns:1fr;}}
+.px-token-block{background:var(--sur3);border:1px solid var(--bdr2);border-radius:var(--r-sm);padding:8px 10px;}
+.px-token-label{font-size:9px;font-weight:700;color:var(--mut);letter-spacing:.8px;text-transform:uppercase;margin-bottom:5px;}
+
+/* ─── Event chips ─── */
+.events-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
+.evt-chip{padding:7px 14px;border-radius:20px;border:1.5px solid var(--bdr2);font-size:12px;font-weight:600;font-family:var(--font-mono);cursor:pointer;transition:all var(--trans);color:var(--wht2);}
+.evt-chip.on{border-color:var(--acc);color:var(--acc);background:var(--acc-dim);}
+
+/* ─── Hybrid Architecture Panel ─── */
+.hybrid-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;}
+@media(max-width:600px){.hybrid-grid{grid-template-columns:1fr;}}
+.container-card{border-radius:var(--r-lg);padding:16px;border:1.5px solid;}
+.container-card.web{border-color:rgba(173,198,255,.25);background:rgba(173,198,255,.04);}
+.container-card.server{border-color:rgba(70,241,197,.25);background:rgba(70,241,197,.04);}
+.container-hdr{display:flex;align-items:center;gap:8px;margin-bottom:14px;}
+.container-badge{font-size:9px;font-weight:700;letter-spacing:1.2px;padding:3px 8px;border-radius:4px;font-family:var(--font-mono);}
+.container-badge.web{background:rgba(173,198,255,.15);color:var(--blu);}
+.container-badge.server{background:rgba(70,241,197,.12);color:var(--acc);}
+.container-title{font-family:var(--font-display);font-size:13px;font-weight:800;color:var(--wht);}
+.tag-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bdr3);font-size:11px;}
+.tag-row:last-child{border-bottom:none;}
+.tag-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.tag-name{flex:1;color:var(--wht2);font-family:var(--font-mono);}
+.tag-type{font-size:9px;color:var(--mut);background:var(--sur3);padding:1px 5px;border-radius:3px;}
+
+/* ─── Parallel Creation Screen ─── */
+.creation-split{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;}
+@media(max-width:600px){.creation-split{grid-template-columns:1fr;}}
+
+.prog-card{border-radius:var(--r-lg);padding:18px;border:1.5px solid;position:relative;transition:border-color .3s;}
+.prog-card.web{border-color:rgba(173,198,255,.2);background:rgba(173,198,255,.03);}
+.prog-card.web.done{border-color:rgba(173,198,255,.4);}
+.prog-card.server{border-color:rgba(70,241,197,.2);background:rgba(70,241,197,.03);}
+.prog-card.server.done{border-color:rgba(70,241,197,.45);box-shadow:0 0 24px rgba(70,241,197,.06);}
+
+.prog-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.prog-label{font-size:13px;font-weight:700;color:var(--wht);}
+.prog-pct{font-family:var(--font-mono);font-size:12px;font-weight:700;}
+.prog-pct.web{color:var(--blu);}
+.prog-pct.server{color:var(--acc);}
+
+.prog-bar-wrap{height:4px;background:var(--sur3);border-radius:3px;overflow:hidden;margin-bottom:12px;}
+.prog-bar{height:100%;border-radius:3px;transition:width .4s cubic-bezier(.4,0,.2,1);}
+.prog-bar.web{background:linear-gradient(90deg,#6fa8ff,var(--blu));}
+.prog-bar.server{background:linear-gradient(90deg,var(--acc2),var(--acc));}
+
+.stage-list{display:flex;flex-direction:column;gap:5px;}
+.stage-item{display:flex;align-items:center;gap:8px;font-size:11px;}
+.stage-ico{width:15px;height:15px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;flex-shrink:0;transition:all .25s;}
+.stage-ico.idle{background:var(--sur3);color:var(--mut);}
+.stage-ico.spin{background:rgba(173,198,255,.15);color:var(--blu);animation:spin .8s linear infinite;}
+.stage-ico.spin-grn{background:var(--acc-dim);color:var(--acc);animation:spin .8s linear infinite;}
+.stage-ico.done{background:rgba(70,241,197,.18);color:var(--acc);}
+@keyframes spin{to{transform:rotate(360deg)}}
+.stage-txt{color:var(--mut);transition:color .2s;}
+.stage-txt.active{color:var(--wht);}
+.stage-txt.done{color:var(--wht2);}
+
+/* ─── Server Deploy Sub-section ─── */
+.deploy-section{overflow:hidden;max-height:0;transition:max-height .4s ease,opacity .3s;opacity:0;}
+.deploy-section.open{max-height:600px;opacity:1;}
+.deploy-sep{height:1px;background:var(--bdr2);margin:14px 0;}
+.deploy-title{font-size:11px;font-weight:700;color:var(--acc);letter-spacing:.5px;margin-bottom:10px;display:flex;align-items:center;gap:5px;}
+.deploy-steps{display:flex;flex-direction:column;gap:8px;}
+.dep-step{display:flex;gap:10px;align-items:flex-start;}
+.dep-num{width:20px;height:20px;border-radius:50%;background:var(--sur3);border:1.5px solid var(--bdr2);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;font-family:var(--font-mono);color:var(--mut);flex-shrink:0;margin-top:1px;transition:all .3s;}
+.dep-num.active{background:var(--acc-dim);border-color:var(--acc);color:var(--acc);}
+.dep-num.done{background:rgba(70,241,197,.18);border-color:rgba(70,241,197,.35);color:var(--acc);}
+.dep-body{flex:1;}
+.dep-label{font-size:12px;font-weight:600;color:var(--wht2);margin-bottom:3px;}
+.dep-sub{font-size:10px;color:var(--mut);line-height:1.5;}
+
+.config-box{background:var(--sur3);border:1px solid var(--bdr2);border-radius:var(--r-sm);padding:8px 10px;font-size:10px;font-family:var(--font-mono);color:#a8d8c8;word-break:break-all;margin:6px 0;max-height:60px;overflow:hidden;}
+
+.url-row-sm{display:flex;gap:6px;margin-top:6px;}
+.url-row-sm .inp{flex:1;}
+.url-status{font-size:10px;font-family:var(--font-mono);margin-top:4px;}
+
+/* ─── Result after creation ─── */
+.creation-result{display:none;animation:fadeUp .25s ease;}
+.result-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.result-cell{background:var(--sur2);border:1px solid var(--bdr2);border-radius:var(--r-md);padding:11px 13px;}
+.result-cell-label{font-size:10px;color:var(--mut);margin-bottom:3px;font-family:var(--font-mono);letter-spacing:.4px;}
+.result-cell-val{font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--wht);}
+
+/* ─── Publish Step ─── */
+.publish-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;}
+@media(max-width:600px){.publish-grid{grid-template-columns:1fr;}}
+.pub-card{border-radius:var(--r-lg);padding:18px;border:1.5px solid;position:relative;overflow:hidden;transition:border-color .4s;}
+.pub-card.web{border-color:rgba(173,198,255,.25);background:rgba(173,198,255,.04);}
+.pub-card.server{border-color:rgba(70,241,197,.25);background:rgba(70,241,197,.04);}
+.pub-card.live{box-shadow:0 0 28px rgba(70,241,197,.07);}
+.pub-gtm-id{font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--wht);background:var(--sur3);padding:5px 10px;border-radius:6px;margin-bottom:12px;}
+.pub-status{display:flex;align-items:center;gap:6px;font-size:11px;margin-bottom:10px;}
+.pub-dot{width:7px;height:7px;border-radius:50%;}
+.pub-dot.draft{background:var(--amber);}
+.pub-dot.live{background:var(--grn);box-shadow:0 0 8px rgba(70,241,197,.6);animation:glow 2s infinite;}
+.pub-dot.publishing{background:var(--blu);animation:pulse 1s infinite;}
+@keyframes glow{0%,100%{box-shadow:0 0 8px rgba(70,241,197,.6)}50%{box-shadow:0 0 14px rgba(70,241,197,.9)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.pub-versions{font-size:10px;color:var(--mut);margin-bottom:12px;font-family:var(--font-mono);}
+
+/* ─── Done Screen ─── */
+.done-hero{text-align:center;padding:28px 20px 20px;}
+.done-icon{width:66px;height:66px;border-radius:50%;background:rgba(70,241,197,.1);border:2px solid rgba(70,241,197,.3);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:30px;box-shadow:0 0 40px rgba(70,241,197,.12);}
+.done-title{font-family:var(--font-display);font-size:22px;font-weight:800;color:var(--wht);margin-bottom:6px;}
+.done-sub{font-size:12px;color:var(--mut);max-width:380px;margin:0 auto;}
+
+.snippet-block{background:#060910;border:1px solid var(--bdr);border-radius:var(--r-md);padding:12px 14px;font-size:10px;color:#a8d8c8;overflow-x:auto;max-height:90px;overflow-y:auto;font-family:var(--font-mono);white-space:pre;line-height:1.65;margin-bottom:8px;}
+.sec-label{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--mut);text-transform:uppercase;margin-bottom:8px;}
+
+/* ─── Notices ─── */
+.notice{padding:10px 14px;border-radius:var(--r-md);font-size:11px;line-height:1.65;margin-bottom:12px;}
+.notice.info{background:rgba(70,241,197,.04);border:1px solid rgba(70,241,197,.13);color:var(--wht2);}
+.notice.warn{background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.18);color:#fde68a;}
+.notice.good{background:rgba(70,241,197,.07);border:1px solid rgba(70,241,197,.22);color:var(--acc);}
+.notice.blue{background:rgba(173,198,255,.05);border:1px solid rgba(173,198,255,.2);color:var(--blu);}
+
+/* ─── URL row ─── */
+.url-row{display:flex;gap:8px;align-items:stretch;}
+.url-row .inp{flex:1;}
+
+/* ─── Demo nav ─── */
+.demo-nav{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--sur2);border:1px solid var(--bdr2);border-radius:14px;padding:8px 16px;display:flex;align-items:center;gap:10px;z-index:100;box-shadow:0 8px 40px rgba(0,0,0,.7),0 0 0 1px var(--bdr3);}
+.demo-nav span{font-size:11px;color:var(--mut);font-family:var(--font-mono);}
+.dn-btn{background:var(--sur3);border:1px solid var(--bdr2);border-radius:8px;padding:5px 13px;font-size:12px;font-weight:600;color:var(--wht2);cursor:pointer;transition:all var(--trans);font-family:var(--font-ui);}
+.dn-btn:hover{border-color:var(--acc);color:var(--acc);}
+
+/* ─── Chip row (both badges) ─── */
+.both-badges{display:flex;gap:5px;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <div class="page-hdr">
+    <div>
+      <h2 class="page-title">
+        <span class="material-symbols-outlined" style="color:var(--acc);font-size:22px;">dns</span>
+        Server-Side Tracking
+      </h2>
+      <p class="page-sub">إعداد هايبريد شامل — Web + Server GTM بالتوازي مع نشر مباشر من الأداة</p>
+    </div>
+    <button class="btn-ghost danger" style="font-size:11px;" onclick="if(confirm('إعادة ضبط؟')){location.reload();}">
+      <span class="material-symbols-outlined" style="font-size:13px;">refresh</span>
+      إعادة
+    </button>
+  </div>
+
+  <!-- Stepper -->
+  <div class="ss-stepper" id="stepper"></div>
+
+  <!-- ════ PANELS ════ -->
+
+  <!-- STEP 1: GA4 -->
+  <div class="ss-panel active" id="panel-1">
+    <div class="panel-title">Google Analytics 4</div>
+    <div class="panel-sub">أدخل الـ Measurement ID — يُربط الـ Web Container بالـ Server عبر transport_url تلقائياً</div>
+
+    <div class="card">
+      <div class="field-label">GA4 Measurement ID</div>
+      <input class="inp" id="ga4-id" type="text" placeholder="G-XXXXXXXXXX" value="G-M38K29ZL1X" autocomplete="off" style="letter-spacing:.05em;font-family:var(--font-mono);"/>
+      <div id="ga4-hint" style="font-size:11px;color:var(--acc);margin-top:8px;display:flex;align-items:center;gap:6px;">
+        <span class="material-symbols-outlined" style="font-size:13px;">check_circle</span>
+        صحيح — GA4 Config Tag يُنشأ في Web Container مع transport_url للـ Server
+      </div>
+    </div>
+
+    <div class="notice info">
+      💡 <strong>كيف يعمل الهايبريد:</strong> الـ Web Container يرسل الأحداث للـ Server Container عبر transport_url — ثم الـ Server يرسلها لـ CAPI/API endpoints مع SHA-256 hashing
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-acc" onclick="goStep(2)">التالي <span class="material-symbols-outlined" style="font-size:14px;">arrow_back</span></button>
+      <span style="font-size:11px;color:var(--mut);">يمكن تخطيه وإضافته لاحقاً</span>
+    </div>
+  </div>
+
+  <!-- STEP 2: Platform -->
+  <div class="ss-panel" id="panel-2">
+    <div class="panel-title">منصة التجارة الإلكترونية</div>
+    <div class="panel-sub">حدد المنصة — يُولَّد DataLayer Code مخصص لها وتُضبط Triggers أوتوماتيك</div>
+
+    <div id="plat-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;"></div>
+
+    <div class="btn-row">
+      <button class="btn-ghost" onclick="goStep(1)"><span class="material-symbols-outlined" style="font-size:14px;">arrow_forward</span> السابق</button>
+      <button class="btn-acc" onclick="goStep(3)">التالي <span class="material-symbols-outlined" style="font-size:14px;">arrow_back</span></button>
+    </div>
+  </div>
+
+  <!-- STEP 3: Pixels + Tokens -->
+  <div class="ss-panel" id="panel-3">
+    <div class="panel-title">Pixels + Access Tokens</div>
+    <div class="panel-sub">فعّل الـ Pixels وأدخل الـ Access Tokens — لكل منها Tags في <span style="color:var(--blu);">Web</span> و<span style="color:var(--acc);">Server</span> Container</div>
+
+    <div id="px-list" style="margin-bottom:14px;"></div>
+
+    <div class="notice info" style="margin-bottom:14px;">
+      <strong style="color:var(--amber);">⚡ Deduplication:</strong> كل حدث يحصل على <code style="font-family:var(--font-mono);background:var(--sur3);padding:1px 5px;border-radius:3px;">event_id</code> موحد بين الـ Web والـ Server لمنع التكرار
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-ghost" onclick="goStep(2)"><span class="material-symbols-outlined" style="font-size:14px;">arrow_forward</span> السابق</button>
+      <button class="btn-acc" onclick="goStep(4)">التالي <span class="material-symbols-outlined" style="font-size:14px;">arrow_back</span></button>
+    </div>
+  </div>
+
+  <!-- STEP 4: Events -->
+  <div class="ss-panel" id="panel-4">
+    <div class="panel-title">اختر الأحداث</div>
+    <div class="panel-sub">الأحداث المختارة تُتبع في الـ Web Container والـ Server Container معاً مع deduplication تلقائي</div>
+
+    <div class="events-grid" id="events-grid"></div>
+
+    <div class="notice info" style="margin-bottom:14px;">
+      <strong style="color:var(--acc);">🎯 Hybrid Coverage:</strong> كل event له Tag في الـ Web (client-side trigger) والـ Server (CAPI relay)
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-ghost" onclick="goStep(3)"><span class="material-symbols-outlined" style="font-size:14px;">arrow_forward</span> السابق</button>
+      <button class="btn-acc" onclick="goStep(5)">مراجعة الهايبريد <span class="material-symbols-outlined" style="font-size:14px;">arrow_back</span></button>
+    </div>
+  </div>
+
+  <!-- STEP 5: Hybrid Architecture Preview -->
+  <div class="ss-panel" id="panel-5">
+    <div class="panel-title">معاينة الهيكل الهايبريد</div>
+    <div class="panel-sub">شوف بالضبط ايه اللي هيتنشأ في كل Container قبل الإنشاء</div>
+
+    <div class="hybrid-grid" id="hybrid-preview"></div>
+
+    <div class="notice info">
+      🔗 <strong>كيف الربط يشتغل:</strong> الـ Web Container يرسل جميع الأحداث عبر <code style="font-family:var(--font-mono);">transport_url</code> للـ Server — الـ Server يرسلها للـ CAPI APIs مع SHA-256
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-ghost" onclick="goStep(4)"><span class="material-symbols-outlined" style="font-size:14px;">arrow_forward</span> السابق</button>
+      <button class="btn-acc" onclick="goStep(6)">
+        <span class="material-symbols-outlined" style="font-size:14px;">rocket_launch</span>
+        إنشاء Web + Server معاً
+      </button>
+      <span style="font-size:11px;color:var(--mut);">⏱️ ~30 ثانية</span>
+    </div>
+  </div>
+
+  <!-- STEP 6: Parallel Creation + Server Deploy (COMBINED) -->
+  <div class="ss-panel" id="panel-6">
+    <div class="panel-title">إنشاء ونشر الـ Containers</div>
+    <div class="panel-sub">Web Container + Server Container يُنشآن في نفس الوقت — ثم يُنشر الـ Server مباشرة من الأداة</div>
+
+    <!-- Two-column creation progress -->
+    <div class="creation-split">
+
+      <!-- Web Container Column -->
+      <div class="prog-card web" id="pc-web">
+        <div class="prog-hdr">
+          <div>
+            <div class="container-badge web" style="margin-bottom:5px;">WEB CONTAINER</div>
+            <div class="prog-label">GTM Web</div>
+          </div>
+          <div class="prog-pct web" id="web-pct">0%</div>
+        </div>
+        <div class="prog-bar-wrap">
+          <div class="prog-bar web" id="web-bar" style="width:0%"></div>
+        </div>
+        <div class="stage-list" id="web-stages"></div>
+      </div>
+
+      <!-- Server Container Column -->
+      <div class="prog-card server" id="pc-server">
+        <div class="prog-hdr">
+          <div>
+            <div class="container-badge server" style="margin-bottom:5px;">SERVER CONTAINER</div>
+            <div class="prog-label">GTM Server</div>
+          </div>
+          <div class="prog-pct server" id="srv-pct">0%</div>
+        </div>
+        <div class="prog-bar-wrap">
+          <div class="prog-bar server" id="srv-bar" style="width:0%"></div>
+        </div>
+        <div class="stage-list" id="srv-stages"></div>
+
+        <!-- Server Deploy Sub-section (opens after container created) -->
+        <div class="deploy-section" id="deploy-section">
+          <div class="deploy-sep"></div>
+          <div class="deploy-title">
+            <span class="material-symbols-outlined" style="font-size:13px;">cloud_upload</span>
+            نشر الـ Server
+          </div>
+          <div class="deploy-steps">
+            <div class="dep-step">
+              <div class="dep-num active" id="dep-1">1</div>
+              <div class="dep-body">
+                <div class="dep-label">انسخ الـ Container Config</div>
+                <div class="config-box" id="config-blob">{"containerId":"GTM-S4M7R2Q","containerName":"EasyTrac Server"}</div>
+                <button class="btn-ghost" style="font-size:10px;padding:4px 10px;margin-top:4px;" onclick="copyConfig()">
+                  <span class="material-symbols-outlined" style="font-size:11px;">content_copy</span> نسخ
+                </button>
+              </div>
+            </div>
+            <div class="dep-step">
+              <div class="dep-num" id="dep-2">2</div>
+              <div class="dep-body">
+                <div class="dep-label">انشره على Stape أو Cloud Run</div>
+                <div class="dep-sub">الصق الـ Config في <a href="https://stape.io" target="_blank" style="color:var(--acc);">stape.io</a> أو انشر الـ Docker image على Cloud Run</div>
+              </div>
+            </div>
+            <div class="dep-step">
+              <div class="dep-num" id="dep-3">3</div>
+              <div class="dep-body">
+                <div class="dep-label">أدخل الـ Server URL</div>
+                <div class="url-row-sm">
+                  <input class="inp inp-sm" id="server-url" type="url" placeholder="https://sst.yourdomain.com" value="https://sst.myshop.com"/>
+                  <button class="btn-acc" style="padding:7px 12px;font-size:12px;" onclick="validateUrl()">تحقق</button>
+                </div>
+                <div class="url-status" id="url-status"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Result (shown after both done) -->
+    <div class="creation-result" id="creation-result">
+      <div class="result-grid">
+        <div class="result-cell">
+          <div class="result-cell-label">🌐 Web Container ID</div>
+          <div class="result-cell-val" id="res-web-id">GTM-W8K2P9X</div>
+        </div>
+        <div class="result-cell">
+          <div class="result-cell-label">🖥️ Server Container ID</div>
+          <div class="result-cell-val" id="res-srv-id">GTM-S4M7R2Q</div>
+        </div>
+        <div class="result-cell">
+          <div class="result-cell-label">🔗 Server URL</div>
+          <div class="result-cell-val" style="font-size:10px;">https://sst.myshop.com</div>
+        </div>
+        <div class="result-cell">
+          <div class="result-cell-label">📊 GA4 ID</div>
+          <div class="result-cell-val" id="res-ga4">G-M38K29ZL1X</div>
+        </div>
+      </div>
+      <div class="notice good">✅ كلا الـ Containers جاهزَين — الـ Web يرسل عبر transport_url للـ Server — الـ Server ينشر لـ CAPI</div>
+      <div class="btn-row">
+        <button class="btn-acc" onclick="goStep(7)">
+          <span class="material-symbols-outlined" style="font-size:14px;">publish</span>
+          نشر الـ Containers
+        </button>
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div id="creation-error" style="display:none;padding:12px 14px;border-radius:10px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);font-size:12px;color:#f87171;margin-bottom:12px;"></div>
+
+    <!-- Start button -->
+    <div id="creation-start-btn" class="btn-row">
+      <button class="btn-ghost" onclick="goStep(5)"><span class="material-symbols-outlined" style="font-size:14px;">arrow_forward</span> السابق</button>
+      <button class="btn-acc" onclick="startParallelCreation()">
+        <span class="material-symbols-outlined" style="font-size:14px;">play_circle</span>
+        ابدأ الإنشاء المتوازي
+      </button>
+      <span style="font-size:11px;color:var(--mut);">⏱️ ~30 ثانية</span>
+    </div>
+  </div>
+
+  <!-- STEP 7: Publish Both Containers -->
+  <div class="ss-panel" id="panel-7">
+    <div class="panel-title">نشر وتفعيل الـ Containers</div>
+    <div class="panel-sub">انشر كلا الـ Containers مباشرة — Web أولاً ثم Server ليكتمل الربط تلقائياً</div>
+
+    <div class="publish-grid" id="publish-grid"></div>
+
+    <div class="notice info" style="margin-bottom:14px;">
+      🔗 <strong>ترتيب النشر:</strong> الـ Web Container يُنشر أولاً مع transport_url — بعدها الـ Server Container يُنشر مع CAPI endpoint ← الربط يكتمل تلقائياً
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-ghost" onclick="goStep(6)"><span class="material-symbols-outlined" style="font-size:14px;">arrow_forward</span> السابق</button>
+      <button class="btn-acc" id="publish-both-btn" onclick="publishBoth()">
+        <span class="material-symbols-outlined" style="font-size:14px;">publish</span>
+        نشر Web + Server معاً
+      </button>
+    </div>
+  </div>
+
+  <!-- STEP 8: Done -->
+  <div class="ss-panel" id="panel-8">
+    <div class="done-hero">
+      <div class="done-icon">✅</div>
+      <div class="done-title">Server-Side Tracking مفعّل! 🎉</div>
+      <div class="done-sub">الـ Web Container والـ Server Container منشورَين ومربوطَين — الصق الكود أدناه في موقعك</div>
+    </div>
+
+    <div class="result-grid" style="margin-bottom:18px;">
+      <div class="result-cell">
+        <div class="result-cell-label">🌐 Web GTM</div>
+        <div class="result-cell-val">GTM-W8K2P9X</div>
+      </div>
+      <div class="result-cell">
+        <div class="result-cell-label">🖥️ Server GTM</div>
+        <div class="result-cell-val">GTM-S4M7R2Q</div>
+      </div>
+      <div class="result-cell">
+        <div class="result-cell-label">🔗 Server URL</div>
+        <div class="result-cell-val" style="font-size:10px;">https://sst.myshop.com</div>
+      </div>
+      <div class="result-cell">
+        <div class="result-cell-label">📊 GA4 ID</div>
+        <div class="result-cell-val">G-M38K29ZL1X</div>
+      </div>
+    </div>
+
+    <div class="sec-label">GTM Snippet — &lt;head&gt;</div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:4px;">
+      <button class="btn-ghost" style="font-size:11px;padding:4px 10px;" onclick="copySnippet('head')">
+        <span class="material-symbols-outlined" style="font-size:12px;">content_copy</span> نسخ
+      </button>
+    </div>
+    <div class="snippet-block"><!-- Google Tag Manager -->
+&lt;script&gt;(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://sst.myshop.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-W8K2P9X');&lt;/script&gt;
+<!-- End Google Tag Manager --></div>
+
+    <div class="sec-label" style="margin-top:14px;">DataLayer Push — Salla (purchase)</div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:4px;">
+      <button class="btn-ghost" style="font-size:11px;padding:4px 10px;" onclick="copySnippet('dl')">
+        <span class="material-symbols-outlined" style="font-size:12px;">content_copy</span> نسخ
+      </button>
+    </div>
+    <div class="snippet-block">// EasyTrac DataLayer — Salla + Hybrid Server-Side
+salla.event.on("order:created", async (order) => {
+  const em  = await sha256(order.customer?.email || "");
+  const ph  = await sha256(order.customer?.mobile || "");
+  const eid = order.id + "_" + Math.floor(Date.now()/1000);
+  window.dataLayer.push({
+    event: "purchase", event_id: eid,
+    transaction_id: String(order.id),
+    value: order.amounts?.total?.amount || 0,
+    currency: "SAR",
+    user_data: { em, ph,
+      fn: order.customer?.first_name || "",
+      ln: order.customer?.last_name  || "" }
+  });
+});</div>
+
+    <div class="notice good" style="margin-top:14px;">
+      ✅ Web → Server → Meta CAPI + Google Ads API + TikTok Events API مع SHA-256 hashing
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-acc" onclick="alert('✅ تم الحفظ والإنهاء!')">
+        <span class="material-symbols-outlined" style="font-size:14px;">check_circle</span>
+        حفظ وإنهاء
+      </button>
+      <button class="btn-ghost" onclick="goStep(7)"><span class="material-symbols-outlined" style="font-size:14px;">arrow_forward</span> السابق</button>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<!-- Demo Navigation -->
+<div class="demo-nav">
+  <button class="dn-btn" onclick="prevStep()">→ سابق</button>
+  <span id="demo-step-label">Step 1 / 8</span>
+  <button class="dn-btn" onclick="nextStep()">التالي ←</button>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────
+var STEP = 1, TOTAL = 8;
+var selectedPlat = 'salla';
+var enabledPx = { meta: true, gads: true, snap: false, tiktok: true };
+var selectedEvts = ['purchase','add_to_cart','initiate_checkout','view_content'];
+var webPublished = false, srvPublished = false;
+
+// ─── Data ────────────────────────────────────────────────────────
+var PLATFORMS = [
+  { id:'salla',   name:'Salla',          desc:'GTM Native · DataLayer تلقائي',    icon:'🛍️', color:'#1a7f5e' },
+  { id:'zid',     name:'Zid',            desc:'Events تلقائية · GTM Native',       icon:'⚡', color:'#7c3aed' },
+  { id:'shopify', name:'Shopify',        desc:'Theme app + DataLayer',              icon:'🟢', color:'#008060' },
+  { id:'woo',     name:'WooCommerce',    desc:'WordPress + DataLayer',              icon:'🟣', color:'#7f54b3' },
+  { id:'other',   name:'Custom / Other', desc:'DataLayer manual setup',             icon:'⚙️', color:'#64748b' },
+];
+
+var PIXELS = [
+  { id:'meta',   name:'Meta Pixel',   logo:'f',   color:'#1877f2', where:'both',
+    fields:[ {key:'pixelId',label:'Pixel ID',ph:'1234567890'},
+             {key:'token',  label:'Access Token',ph:'EAAxxxxxx...'} ] },
+  { id:'gads',   name:'Google Ads',   logo:'G',   color:'#4285f4', where:'both',
+    fields:[ {key:'convId', label:'Conversion ID',ph:'AW-123456789'},
+             {key:'label',  label:'Conversion Label',ph:'abcDEF1234'} ] },
+  { id:'snap',   name:'Snapchat',     logo:'👻',  color:'#fffc00', where:'server',
+    fields:[ {key:'pixelId',label:'Pixel ID',ph:'snap-xxxxx'},
+             {key:'token',  label:'API Token',ph:'Bearer xxxxx'} ] },
+  { id:'tiktok', name:'TikTok Pixel', logo:'♪',   color:'#ee1d52', where:'both',
+    fields:[ {key:'pixelId',label:'Pixel ID',ph:'C4xxxxxxxxxxxxx'},
+             {key:'token',  label:'Access Token',ph:'xxxxxxxx...'} ] },
+];
+
+var EVENTS = ['purchase','add_to_cart','initiate_checkout','view_content','search','page_view'];
+
+// ─── Hybrid Architecture Data ─────────────────────────────────────
+function getWebTags() {
+  var tags = [
+    {name:'GA4 Config',type:'TAG'},
+    {name:'GA4 Event — All Events',type:'TAG'},
+  ];
+  if (enabledPx.meta)   tags.push({name:'Meta Pixel Base',type:'TAG'},{name:'Meta Events ('+selectedEvts.slice(0,3).join(', ')+')',type:'TAG'});
+  if (enabledPx.gads)   tags.push({name:'Google Ads Conversion',type:'TAG'});
+  if (enabledPx.tiktok) tags.push({name:'TikTok Pixel Base',type:'TAG'});
+  tags.push({name:'transport_url → Server',type:'VAR'});
+  tags.push({name:'event_id Deduplication',type:'VAR'});
+  return tags;
+}
+function getSrvTags() {
+  var tags = [{name:'GA4 Measurement Protocol',type:'TAG'}];
+  if (enabledPx.meta)   tags.push({name:'Meta CAPI — Conversions API',type:'TAG'},{name:'SHA-256 Email Hash',type:'VAR'});
+  if (enabledPx.gads)   tags.push({name:'Google Ads API Conversion',type:'TAG'});
+  if (enabledPx.snap)   tags.push({name:'Snapchat CAPI',type:'TAG'});
+  if (enabledPx.tiktok) tags.push({name:'TikTok Events API',type:'TAG'});
+  tags.push({name:'event_id Match — Dedup',type:'TRG'});
+  tags.push({name:'User Data Enrichment',type:'VAR'});
+  return tags;
+}
+
+// ─── Render ───────────────────────────────────────────────────────
+function renderStepper() {
+  var steps = [
+    {n:1,label:'GA4'},{n:2,label:'المنصة'},{n:3,label:'Pixels'},
+    {n:4,label:'Events'},{n:5,label:'هيكل'},{n:6,label:'إنشاء'},
+    {n:7,label:'نشر'},{n:8,label:'تم ✅'},
+  ];
+  var html = '';
+  steps.forEach(function(s,i) {
+    var state = s.n < STEP ? 'done' : s.n === STEP ? 'active' : 'idle';
+    var ico = s.n < STEP
+      ? '<span class="material-symbols-outlined" style="font-size:11px;">check</span>'
+      : s.n;
+    html += '<div class="ss-step" onclick="goStep('+s.n+')">'
+      + '<div class="ss-step-circle '+state+'">'+ico+'</div>'
+      + '<span class="ss-step-label '+state+'">'+s.label+'</span>'
+      + '</div>';
+    if (i < steps.length-1) html += '<div class="ss-step-sep"></div>';
+  });
+  document.getElementById('stepper').innerHTML = html;
+  document.getElementById('demo-step-label').textContent = 'Step '+STEP+' / '+TOTAL;
+}
+
+function renderPlatforms() {
+  var html = '';
+  PLATFORMS.forEach(function(p) {
+    var sel = selectedPlat === p.id;
+    html += '<div class="plat-card'+(sel?' selected':'')+'" onclick="selectPlat(\''+p.id+'\')">'
+      + '<div class="plat-icon" style="background:'+p.color+'22;">'+p.icon+'</div>'
+      + '<div><div class="plat-name">'+p.name+'</div><div class="plat-desc">'+p.desc+'</div></div>'
+      + '<div class="plat-check">'+(sel?'<span style="font-size:9px;color:#080b12;font-weight:900;">✓</span>':'')+'</div>'
+      + '</div>';
+  });
+  document.getElementById('plat-list').innerHTML = html;
+}
+
+function renderPixels() {
+  var whereLabels = {web:'WEB',server:'SERVER',both:'HYBRID'};
+  var whereCls    = {web:'web',server:'server',both:'both'};
+  var html = '';
+  PIXELS.forEach(function(px) {
+    var on = enabledPx[px.id];
+    var logoStyle = px.color === '#fffc00'
+      ? 'background:#33320022;color:#f8e000;'
+      : 'background:'+px.color+'22;color:'+px.color+';';
+
+    // Token fields (collapsed by default, expanded when on)
+    var fieldHtml = '';
+    px.fields.forEach(function(f) {
+      fieldHtml += '<div><div class="px-token-label">'+f.label+'</div>'
+        + '<input class="inp inp-sm" placeholder="'+f.ph+'" style="font-family:var(--font-mono);font-size:11px;"/></div>';
+    });
+
+    html += '<div>'
+      + '<div class="px-row'+(on?' on':'')+'" onclick="togglePx(\''+px.id+'\')">'
+        + '<div class="px-logo" style="'+logoStyle+'">'+px.logo+'</div>'
+        + '<div class="px-name">'+px.name+'</div>'
+        + '<span class="px-badge '+whereCls[px.where]+'">'+whereLabels[px.where]+'</span>'
+        + '<button class="toggle'+(on?' on':'')+'" onclick="event.stopPropagation();togglePx(\''+px.id+'\')" aria-label="toggle"></button>'
+      + '</div>'
+      + '<div class="px-expand'+(on?' open':'')+'" id="px-exp-'+px.id+'">'
+        + '<div class="px-token-grid">'+fieldHtml+'</div>'
+      + '</div>'
+    + '</div>';
+  });
+  document.getElementById('px-list').innerHTML = html;
+}
+
+function renderEvents() {
+  var descs = {purchase:'أهم حدث',add_to_cart:'إضافة للسلة',initiate_checkout:'بدء الشراء',
+               view_content:'مشاهدة المنتج',search:'البحث',page_view:'زيارة الصفحة'};
+  var html = '';
+  EVENTS.forEach(function(e) {
+    var on = selectedEvts.indexOf(e) > -1;
+    html += '<div class="evt-chip'+(on?' on':'')+'" onclick="toggleEvt(\''+e+'\')" title="'+descs[e]+'">'+e+'</div>';
+  });
+  document.getElementById('events-grid').innerHTML = html;
+}
+
+function renderHybrid() {
+  var webTags = getWebTags(), srvTags = getSrvTags();
+  var typeColor = {TAG:'var(--blu)',VAR:'var(--amber)',TRG:'#c084fc'};
+  function tagRows(tags) {
+    return tags.map(function(t) {
+      return '<div class="tag-row">'
+        +'<div class="tag-dot" style="background:'+typeColor[t.type]+';"></div>'
+        +'<div class="tag-name">'+t.name+'</div>'
+        +'<div class="tag-type">'+t.type+'</div>'
+        +'</div>';
+    }).join('');
+  }
+  document.getElementById('hybrid-preview').innerHTML =
+    '<div class="container-card web">'
+      +'<div class="container-hdr"><span class="container-badge web">WEB CONTAINER</span></div>'
+      +'<div style="font-size:10px;color:var(--mut);margin-bottom:8px;font-family:var(--font-mono);">'+webTags.length+' items</div>'
+      +tagRows(webTags)
+    +'</div>'
+    +'<div class="container-card server">'
+      +'<div class="container-hdr"><span class="container-badge server">SERVER CONTAINER</span></div>'
+      +'<div style="font-size:10px;color:var(--mut);margin-bottom:8px;font-family:var(--font-mono);">'+srvTags.length+' items</div>'
+      +tagRows(srvTags)
+    +'</div>';
+}
+
+// ─── Stage data ───────────────────────────────────────────────────
+function getWebStages() {
+  return [
+    'إنشاء Web Container',
+    'Variables (transport_url, event_id)',
+    'GA4 Config + Event Tags',
+    'Pixel Tags ('+Object.keys(enabledPx).filter(function(k){return enabledPx[k];}).join(', ')+')',
+    'Triggers للـ Events المختارة',
+    'ربط transport_url بالـ Server',
+  ];
+}
+function getSrvStages() {
+  return [
+    'إنشاء Server Container',
+    'Variables (SHA-256, user_data)',
+    'GA4 Measurement Protocol Tag',
+    'CAPI Tags ('+Object.keys(enabledPx).filter(function(k){return enabledPx[k];}).join(' + ')+')',
+    'Trigger — HTTP Request',
+    'توليد Container Config',
+  ];
+}
+
+function renderStages(elId, stages) {
+  var html = '';
+  stages.forEach(function(s,i) {
+    html += '<div class="stage-item" id="'+elId+'-'+i+'">'
+      +'<div class="stage-ico idle" id="'+elId+'-ico-'+i+'">'+('0'+(i+1)).slice(-2)+'</div>'
+      +'<div class="stage-txt idle" id="'+elId+'-txt-'+i+'">'+s+'</div>'
+      +'</div>';
+  });
+  document.getElementById(elId).innerHTML = html;
+}
+
+// ─── Parallel creation ────────────────────────────────────────────
+function startParallelCreation() {
+  document.getElementById('creation-start-btn').style.display = 'none';
+  document.getElementById('creation-error').style.display = 'none';
+
+  var webStages = getWebStages();
+  var srvStages = getSrvStages();
+
+  renderStages('web-stages', webStages);
+  renderStages('srv-stages', srvStages);
+
+  // Reset bars
+  document.getElementById('web-bar').style.width = '0%';
+  document.getElementById('srv-bar').style.width = '0%';
+  document.getElementById('web-pct').textContent = '0%';
+  document.getElementById('srv-pct').textContent = '0%';
+
+  var webDone = false, srvDone = false;
+
+  function checkBothDone() {
+    if (webDone && srvDone) {
+      setTimeout(function() {
+        document.getElementById('creation-result').style.display = 'block';
+        document.getElementById('pc-web').classList.add('done');
+        document.getElementById('pc-server').classList.add('done');
+      }, 400);
+    }
+  }
+
+  // Web Container animation (faster: 380ms per stage)
+  animateStages('web-stages', 'web-bar', 'web-pct', webStages, 'spin', 380, function() {
+    webDone = true;
+    checkBothDone();
+  });
+
+  // Server Container animation (slight offset, 420ms per stage)
+  setTimeout(function() {
+    animateStages('srv-stages', 'srv-bar', 'srv-pct', srvStages, 'spin-grn', 420, function() {
+      // After server container created → show deploy section
+      setTimeout(function() {
+        var dep = document.getElementById('deploy-section');
+        dep.classList.add('open');
+        // Simulate URL validation after a short delay
+        setTimeout(function() {
+          document.getElementById('dep-2').classList.add('active');
+          setTimeout(function() {
+            document.getElementById('dep-2').classList.add('done');
+            document.getElementById('dep-3').classList.add('active');
+            setTimeout(function() {
+              autoValidateUrl();
+              srvDone = true;
+              checkBothDone();
+            }, 600);
+          }, 800);
+        }, 400);
+      }, 300);
+    });
+  }, 200);
+}
+
+function animateStages(stagesId, barId, pctId, stages, spinClass, delay, onDone) {
+  var barEl = document.getElementById(barId);
+  var pctEl = document.getElementById(pctId);
+
+  function runStage(i) {
+    if (i >= stages.length) {
+      if (barEl) { barEl.style.width = '100%'; }
+      if (pctEl) { pctEl.textContent = '100%'; }
+      if (onDone) onDone();
+      return;
+    }
+    var icoEl = document.getElementById(stagesId+'-ico-'+i);
+    var txtEl = document.getElementById(stagesId+'-txt-'+i);
+    if (icoEl) { icoEl.className = 'stage-ico '+spinClass; icoEl.textContent = '↻'; }
+    if (txtEl) { txtEl.className = 'stage-txt active'; }
+    var pct = Math.round((i / stages.length) * 90 + 5);
+    if (barEl) barEl.style.width = pct + '%';
+    if (pctEl) pctEl.textContent = pct + '%';
+    setTimeout(function() {
+      if (icoEl) { icoEl.className = 'stage-ico done'; icoEl.textContent = '✓'; }
+      if (txtEl) { txtEl.className = 'stage-txt done'; }
+      runStage(i + 1);
+    }, delay + Math.random() * 150);
+  }
+  runStage(0);
+}
+
+// ─── Publish step ─────────────────────────────────────────────────
+function renderPublish() {
+  function pubCard(type, id, label, published) {
+    var statusTxt = published ? 'Live — منشور ✅' : 'Draft — جاهز للنشر';
+    var btnTxt    = published ? '✅ منشور' : 'نشر '+label+' Container';
+    var dotCls    = published ? 'live' : 'draft';
+    var btnStyle  = published ? 'background:rgba(70,241,197,.15);color:var(--acc);border:1px solid rgba(70,241,197,.3);' : '';
+    return '<div class="pub-card '+type+(published?' live':'')+'" id="pub-card-'+type+'">'
+      +'<div style="margin-bottom:10px;"><div class="container-badge '+type+'">'+label.toUpperCase()+' CONTAINER</div></div>'
+      +'<div class="pub-gtm-id">'+id+'</div>'
+      +'<div class="pub-status"><div class="pub-dot '+dotCls+'"></div><span style="font-size:11px;color:var(--wht2);">'+statusTxt+'</span></div>'
+      +'<div class="pub-versions" id="pub-ver-'+type+'">'+(published?'Version: 1 — منشور':'Version: Draft')+'</div>'
+      +'<button class="btn-acc" id="pub-btn-'+type+'" onclick="publishOne(\''+type+'\')" style="width:100%;justify-content:center;'+btnStyle+'">'+(published?'<span class="material-symbols-outlined" style="font-size:14px;">check_circle</span>':'')+btnTxt+'</button>'
+      +'</div>';
+  }
+  document.getElementById('publish-grid').innerHTML =
+    pubCard('web',    'GTM-W8K2P9X', 'Web',    webPublished) +
+    pubCard('server', 'GTM-S4M7R2Q', 'Server', srvPublished);
+}
+
+function publishOne(type) {
+  var btn   = document.getElementById('pub-btn-'+type);
+  var verEl = document.getElementById('pub-ver-'+type);
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ جارٍ النشر...'; }
+  setTimeout(function() {
+    if (type === 'web') webPublished = true; else srvPublished = true;
+    renderPublish();
+    if (webPublished && srvPublished) {
+      var pbBtn = document.getElementById('publish-both-btn');
+      pbBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:14px;">check_circle</span> تم النشر — التالي';
+      pbBtn.onclick = function() { goStep(8); };
+    }
+  }, 1600);
+}
+
+function publishBoth() {
+  publishOne('web');
+  setTimeout(function() { publishOne('server'); }, 350);
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────
+function selectPlat(id) { selectedPlat = id; renderPlatforms(); }
+
+function togglePx(id) {
+  enabledPx[id] = !enabledPx[id];
+  var exp = document.getElementById('px-exp-'+id);
+  // Toggle expand class
+  if (exp) {
+    if (enabledPx[id]) exp.classList.add('open');
+    else exp.classList.remove('open');
+  }
+  renderPixels();
+}
+
+function toggleEvt(e) {
+  var i = selectedEvts.indexOf(e);
+  if (i > -1) selectedEvts.splice(i,1); else selectedEvts.push(e);
+  renderEvents();
+}
+
+function validateUrl() {
+  var st = document.getElementById('url-status');
+  st.style.color = 'var(--mut)';
+  st.textContent = '⏳ جارٍ التحقق...';
+  setTimeout(function() {
+    st.style.color = 'var(--acc)';
+    st.textContent = '✅ الخادم يستجيب (38ms)';
+    document.getElementById('dep-3').classList.add('done');
+  }, 900);
+}
+
+function autoValidateUrl() {
+  var st = document.getElementById('url-status');
+  if (st) {
+    st.style.color = 'var(--acc)';
+    st.textContent = '✅ الخادم يستجيب (38ms)';
+    var dep3 = document.getElementById('dep-3');
+    if (dep3) dep3.classList.add('done');
+  }
+}
+
+function copyConfig() {
+  var text = document.getElementById('config-blob').textContent;
+  navigator.clipboard && navigator.clipboard.writeText(text);
+  var dep1 = document.getElementById('dep-1');
+  if (dep1) dep1.classList.add('done');
+  document.getElementById('dep-2').classList.add('active');
+  alert('✅ تم نسخ الـ Container Config!');
+}
+
+function copySnippet(t) { alert('✅ تم نسخ الـ '+t+' Snippet!'); }
+
+function goStep(n) {
+  if (n < 1 || n > TOTAL) return;
+  document.getElementById('panel-'+STEP).classList.remove('active');
+  STEP = n;
+  document.getElementById('panel-'+STEP).classList.add('active');
+  renderStepper();
+  // Render dynamic panels
+  if (STEP === 2) renderPlatforms();
+  if (STEP === 3) renderPixels();
+  if (STEP === 4) renderEvents();
+  if (STEP === 5) renderHybrid();
+  if (STEP === 6) {
+    renderStages('web-stages', getWebStages());
+    renderStages('srv-stages', getSrvStages());
+    document.getElementById('creation-result').style.display = 'none';
+    document.getElementById('creation-start-btn').style.display = '';
+    document.getElementById('deploy-section').classList.remove('open');
+    document.getElementById('web-bar').style.width = '0%';
+    document.getElementById('srv-bar').style.width = '0%';
+    document.getElementById('web-pct').textContent = '0%';
+    document.getElementById('srv-pct').textContent = '0%';
+    document.getElementById('pc-web').classList.remove('done');
+    document.getElementById('pc-server').classList.remove('done');
+    webPublished = false; srvPublished = false;
+  }
+  if (STEP === 7) renderPublish();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function nextStep() { goStep(STEP+1); }
+function prevStep() { goStep(STEP-1); }
+
+// ─── Init ─────────────────────────────────────────────────────────
+renderStepper();
+</script>
+</body>
+</html>

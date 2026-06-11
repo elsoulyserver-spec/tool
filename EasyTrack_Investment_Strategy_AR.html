@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Easy Track — استراتيجية الاستثمار 2026</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap');
+  :root{
+    --dark-blue:#1B3A6B;--mid-blue:#2E5FA3;--accent:#C8962E;
+    --light-bg:#EEF3FB;--warn:#C0392B;--success:#1A6B3A;
+    --light-gold:#FDF3E3;--light-red:#FDEDEC;--white:#fff;
+    --gray:#555;--border:#CBD5E0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Cairo',Arial,sans-serif;background:#F4F6FA;color:#222;direction:rtl;text-align:right;line-height:1.7}
+
+  /* Print */
+  @media print{
+    body{background:#fff}
+    .no-print{display:none}
+    .page-break{page-break-before:always}
+    section{break-inside:avoid}
+  }
+
+  /* Cover */
+  .cover{background:linear-gradient(135deg,var(--dark-blue) 0%,var(--mid-blue) 100%);color:#fff;padding:80px 60px;text-align:center;min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;page-break-after:always}
+  .cover .logo{font-size:72px;font-weight:900;letter-spacing:2px;color:#fff;text-shadow:0 2px 20px rgba(0,0,0,0.3)}
+  .cover .subtitle{font-size:32px;font-weight:700;color:#93C5FD;margin:16px 0}
+  .cover .tagline{font-size:18px;color:#CBD5E0;border-top:3px solid var(--accent);padding-top:16px;margin-top:16px}
+  .cover-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:40px;max-width:700px}
+  .cover-card{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:8px;padding:16px 24px;text-align:center}
+  .cover-card .label{font-size:13px;color:#93C5FD;font-weight:600;margin-bottom:6px}
+  .cover-card .value{font-size:16px;color:#fff;font-weight:700}
+  .cover-badge{margin-top:40px;background:var(--accent);color:#fff;padding:12px 32px;border-radius:40px;font-size:18px;font-weight:700;letter-spacing:1px}
+
+  /* Main layout */
+  .container{max-width:960px;margin:0 auto;padding:40px 24px}
+
+  /* TOC */
+  .toc{background:#fff;border-radius:12px;padding:40px;margin-bottom:40px;box-shadow:0 2px 16px rgba(0,0,0,0.07);border-top:4px solid var(--accent)}
+  .toc h2{font-size:26px;font-weight:800;color:var(--dark-blue);margin-bottom:24px;padding-bottom:12px;border-bottom:2px solid var(--border)}
+  .toc-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px dashed var(--border);font-size:15px;color:#333}
+  .toc-item .toc-num{color:var(--mid-blue);font-weight:700;min-width:120px}
+  .toc-item .toc-title{flex:1;padding:0 12px}
+  .toc-item .toc-page{color:var(--gray);font-size:13px}
+
+  /* Sections */
+  .section{background:#fff;border-radius:12px;padding:48px;margin-bottom:32px;box-shadow:0 2px 16px rgba(0,0,0,0.06)}
+
+  /* Section header */
+  .sec-header{background:linear-gradient(135deg,var(--dark-blue),var(--mid-blue));color:#fff;border-radius:10px;padding:24px 32px;margin-bottom:32px;border-bottom:4px solid var(--accent)}
+  .sec-header h1{font-size:28px;font-weight:900;color:#fff;margin:0}
+  .sec-header p{font-size:15px;color:#93C5FD;margin-top:6px}
+
+  /* Headings */
+  h2.h2{font-size:22px;font-weight:800;color:var(--dark-blue);padding-bottom:10px;border-bottom:2px solid var(--mid-blue);margin:32px 0 16px}
+  h3.h3{font-size:18px;font-weight:700;color:var(--mid-blue);margin:24px 0 12px}
+  p.body-text{font-size:15px;color:#333;margin-bottom:12px;line-height:1.8}
+
+  /* Tables */
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px;direction:rtl}
+  th{background:var(--dark-blue);color:#fff;padding:12px 16px;font-weight:700;text-align:right}
+  td{padding:10px 16px;border-bottom:1px solid var(--border);text-align:right}
+  tr:nth-child(even) td{background:#F8FAFF}
+  tr:nth-child(odd) td{background:#fff}
+  td:first-child, th:first-child{font-weight:600;color:var(--dark-blue);background:var(--light-bg)}
+  th:first-child{background:var(--dark-blue);color:#fff}
+
+  /* Alert boxes */
+  .alert{border-radius:8px;padding:16px 20px;margin:16px 0;display:flex;align-items:flex-start;gap:12px;font-size:14px;line-height:1.7}
+  .alert-icon{font-size:20px;flex-shrink:0;margin-top:2px}
+  .alert.danger{background:var(--light-red);border-right:4px solid var(--warn);color:var(--warn)}
+  .alert.danger strong{color:var(--warn)}
+  .alert.info{background:var(--light-bg);border-right:4px solid var(--mid-blue);color:#1e3a5f}
+  .alert.info strong{color:var(--mid-blue)}
+  .alert.success{background:#E9F7EF;border-right:4px solid var(--success);color:#1a4a2a}
+  .alert.success strong{color:var(--success)}
+  .alert.gold{background:var(--light-gold);border-right:4px solid var(--accent);color:#5c3d00}
+  .alert.gold strong{color:var(--accent)}
+
+  /* Q&A Cards */
+  .qa-card{border-radius:10px;overflow:hidden;margin-bottom:24px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+  .qa-q{background:var(--dark-blue);color:#fff;padding:14px 20px;font-size:16px;font-weight:700}
+  .qa-wrong{background:var(--light-red);border-right:4px solid var(--warn);padding:12px 20px}
+  .qa-wrong .label{font-size:12px;font-weight:700;color:var(--warn);margin-bottom:6px}
+  .qa-wrong .text{font-size:14px;color:#666;font-style:italic}
+  .qa-right{background:#E9F7EF;border-right:4px solid var(--success);padding:12px 20px}
+  .qa-right .label{font-size:12px;font-weight:700;color:var(--success);margin-bottom:6px}
+  .qa-right .text{font-size:14px;color:#333}
+  .qa-why{background:var(--light-bg);padding:10px 20px;font-size:13px;color:var(--mid-blue);font-style:italic;border-top:1px solid var(--border)}
+
+  /* Red flags */
+  .flag-item{display:flex;gap:12px;align-items:flex-start;padding:14px 0;border-bottom:1px solid #f0e0e0;margin-bottom:6px}
+  .flag-icon{font-size:22px;flex-shrink:0}
+  .flag-content .flag-title{font-size:15px;font-weight:700;color:var(--warn);margin-bottom:4px}
+  .flag-content .flag-desc{font-size:14px;color:#555}
+
+  /* Valuation cards */
+  .val-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin:20px 0}
+  .val-card{border-radius:10px;padding:24px;text-align:center;border:2px solid}
+  .val-card.conservative{border-color:#3498DB;background:#EBF5FB}
+  .val-card.realistic{border-color:var(--success);background:#E9F7EF}
+  .val-card.aggressive{border-color:#8E44AD;background:#F4ECF7}
+  .val-card .val-label{font-size:13px;font-weight:700;margin-bottom:8px}
+  .val-card .val-range{font-size:22px;font-weight:900;margin-bottom:10px}
+  .val-card.conservative .val-label{color:#3498DB}
+  .val-card.conservative .val-range{color:#1A5276}
+  .val-card.realistic .val-label{color:var(--success)}
+  .val-card.realistic .val-range{color:#0D5325}
+  .val-card.aggressive .val-label{color:#8E44AD}
+  .val-card.aggressive .val-range{color:#5B2C6F}
+  .val-card .val-desc{font-size:13px;color:#555;line-height:1.6}
+
+  /* Score badges */
+  .score-badge{display:flex;justify-content:space-between;align-items:center;background:var(--light-bg);border:1px solid var(--border);border-radius:8px;padding:12px 20px;margin:8px 0}
+  .score-badge .score-label{font-size:14px;color:#333}
+  .score-badge .score-val{padding:4px 16px;border-radius:20px;color:#fff;font-size:13px;font-weight:700}
+  .score-val.high{background:var(--warn)}
+  .score-val.med{background:var(--mid-blue)}
+  .score-val.gold-v{background:var(--accent)}
+
+  /* Two-col comparison */
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:16px 0}
+  .col-box{border-radius:8px;padding:20px}
+  .col-box.good{background:#E9F7EF;border-top:3px solid var(--success)}
+  .col-box.bad{background:var(--light-red);border-top:3px solid var(--warn)}
+  .col-box h4{font-size:15px;font-weight:700;margin-bottom:12px}
+  .col-box h4.green{color:var(--success)}
+  .col-box h4.red{color:var(--warn)}
+  .col-box li{font-size:14px;color:#333;margin-bottom:8px;line-height:1.6;padding-right:6px}
+
+  /* Structure cards */
+  .struct-card{border-radius:10px;overflow:hidden;margin-bottom:20px}
+  .struct-header{padding:14px 20px;color:#fff;font-size:16px;font-weight:800}
+  .struct-body{padding:16px 20px;font-size:14px;line-height:1.8}
+  .struct-body li{margin-bottom:6px}
+  .green-header{background:var(--success)}
+  .blue-header{background:var(--mid-blue)}
+  .gold-header{background:var(--accent)}
+  .gray-header{background:#666}
+
+  /* Budget tables */
+  .budget-summary{background:linear-gradient(135deg,var(--success),#2ECC71);color:#fff;border-radius:10px;padding:20px 28px;margin-top:16px;text-align:center;font-size:18px;font-weight:700}
+
+  /* Steps */
+  .step-item{display:flex;gap:16px;align-items:flex-start;padding:14px 0;border-bottom:1px solid var(--border)}
+  .step-num{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;flex-shrink:0;color:#fff}
+  .step-text{font-size:14px;color:#333;line-height:1.7;padding-top:8px}
+
+  /* Principle box */
+  .principle{background:var(--dark-blue);color:#fff;border-radius:12px;padding:40px;text-align:center;margin-top:40px}
+  .principle h3{font-size:24px;font-weight:900;color:#fff;margin-bottom:16px}
+  .principle p{font-size:16px;color:#93C5FD;line-height:1.8}
+
+  /* Numbered list */
+  .num-list{counter-reset:num}
+  .num-list li{counter-increment:num;list-style:none;padding-right:36px;position:relative;margin-bottom:10px;font-size:15px;color:#333;line-height:1.7}
+  .num-list li::before{content:counter(num);position:absolute;right:0;top:0;width:26px;height:26px;background:var(--mid-blue);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+
+  /* Print button */
+  .print-btn{position:fixed;bottom:32px;left:32px;background:var(--accent);color:#fff;border:none;padding:14px 28px;border-radius:40px;font-family:'Cairo',sans-serif;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.2);z-index:999;transition:all 0.2s}
+  .print-btn:hover{background:var(--dark-blue);transform:translateY(-2px)}
+
+  /* Divider */
+  .divider{height:4px;background:linear-gradient(90deg,var(--accent),var(--mid-blue));border-radius:4px;margin:32px 0}
+
+  /* Footer */
+  .doc-footer{text-align:center;padding:32px;color:var(--gray);font-size:13px;border-top:2px solid var(--border);margin-top:40px}
+</style>
+</head>
+<body>
+
+<!-- PRINT BUTTON -->
+<button class="print-btn no-print" onclick="window.print()">🖨 طباعة / حفظ PDF</button>
+
+<!-- ═══════════════ COVER ═══════════════ -->
+<div class="cover">
+  <div class="logo">EASY TRACK</div>
+  <div class="subtitle">استراتيجية الاستثمار وحماية المؤسس</div>
+  <div class="tagline">وثيقة استراتيجية سرية — مستوى التفاوض مع المستثمر</div>
+  <div class="cover-grid">
+    <div class="cover-card"><div class="label">المنتج</div><div class="value">Easy Track SaaS</div></div>
+    <div class="cover-card"><div class="label">المرحلة</div><div class="value">Pre-Revenue / Pre-Seed</div></div>
+    <div class="cover-card"><div class="label">السوق المستهدف</div><div class="value">السعودية / الخليج</div></div>
+    <div class="cover-card"><div class="label">التاريخ</div><div class="value">مايو 2026</div></div>
+  </div>
+  <div class="cover-badge">📊 تتبع | تحليل | أتمتة | هيمنة</div>
+</div>
+
+<div class="container">
+
+<!-- ═══════════════ TOC ═══════════════ -->
+<div class="toc no-print">
+  <h2>📋 فهرس المحتويات</h2>
+  <div class="toc-item"><span class="toc-num">الجزء الأول</span><span class="toc-title">تحليل المستثمر وتقييم المخاطر</span></div>
+  <div class="toc-item"><span class="toc-num">الجزء الثاني</span><span class="toc-title">استراتيجية التفاوض وعلم نفس المؤسس</span></div>
+  <div class="toc-item"><span class="toc-num">الجزء الثالث</span><span class="toc-title">نماذج التقييم المالي قبل الإيرادات</span></div>
+  <div class="toc-item"><span class="toc-num">الجزء الرابع</span><span class="toc-title">هيكل حقوق الملكية وحماية المؤسس</span></div>
+  <div class="toc-item"><span class="toc-num">الجزء الخامس</span><span class="toc-title">استراتيجية طلب التمويل والميزانيات</span></div>
+  <div class="toc-item"><span class="toc-num">الجزء السادس</span><span class="toc-title">التحقق من السوق السعودي وفرص الخليج</span></div>
+  <div class="toc-item"><span class="toc-num">الجزء السابع</span><span class="toc-title">قائمة الأعلام الحمراء والأسئلة الاستراتيجية</span></div>
+  <div class="toc-item"><span class="toc-num">الملحق أ</span><span class="toc-title">سيناريوهات العروض المقترحة</span></div>
+  <div class="toc-item"><span class="toc-num">الملحق ب</span><span class="toc-title">الخطوات التالية الموصى بها</span></div>
+</div>
+
+<!-- ═══════════════ PART 1 ═══════════════ -->
+<div class="section page-break">
+  <div class="sec-header">
+    <h1>الجزء الأول: تحليل المستثمر وتقييم المخاطر</h1>
+    <p>من هو هذا المستثمر فعلاً، وما الذي يخاطر به المؤسس في هذه الصفقة</p>
+  </div>
+
+  <h2 class="h2">1.1 — نوع المستثمر: التشخيص الحقيقي</h2>
+  <p class="body-text">بناءً على تفاصيل العرض المقدم — تغطية التشغيل والبنية التحتية والعلامة التجارية والتسويق وإنشاء الشركة وطلب الهوية السعودية — هذا ليس مستثمراً ملاكاً كلاسيكياً. إليك التشخيص المفصّل:</p>
+  <table>
+    <tr><th>نوع المستثمر</th><th>التعريف</th><th>تقييم حالتك</th></tr>
+    <tr><td>مستثمر ملاك</td><td>يكتب شيكاً ويبقى صامتاً</td><td>غير متطابق — يريد تشغيلاً فعلياً</td></tr>
+    <tr><td>شريك استراتيجي</td><td>يجلب موارد + يريد توافق العلامة التجارية</td><td>متطابق جزئياً</td></tr>
+    <tr><td>شريك صامت</td><td>يموّل ويأخذ حصة، بدون تدخل</td><td>غير متطابق — يريد هيكل سعودي</td></tr>
+    <tr><td>مؤسس مشارك</td><td>انخراط تشغيلي كامل + توزيع الأسهم</td><td>خطر — بدون اتفاقية مكتوبة</td></tr>
+    <tr><td>حضانة وكالة SaaS</td><td>تبني تحت مظلته — تخاطر بفقدان الـ IP</td><td style="color:var(--warn);font-weight:700">⚠ التهديد الأكبر</td></tr>
+  </table>
+  <div class="alert danger">
+    <span class="alert-icon">🚨</span>
+    <div><strong>التشخيص الحقيقي:</strong> هذا أقرب إلى نموذج "حضانة وكالة + شريك استراتيجي". عبارة <em>"تعمل تحت هيكل الوكالة السعودية"</em> هي لغة استيعاب البنية التحتية، وليست لغة استثمار سلبي. هذا يغيّر كل شيء.</div>
+  </div>
+
+  <h2 class="h2">1.2 — نفوذك كمؤسس رغم صفر مستخدمين</h2>
+  <p class="body-text">يقلل المؤسسون باستمرار من تقدير نفوذهم قبل الإيرادات. إليك نفوذك الحقيقي:</p>
+
+  <div class="alert info"><span class="alert-icon">🔐</span><div><strong>أنت تمتلك الملكية الفكرية والبنية التقنية.</strong> بنية التتبع، منطق طبقة البيانات، Server-Side GTM، تكامل Conversions API — هذه ملكيتك. لا يستطيع استنساخها بدونك.</div></div>
+  <div class="alert info"><span class="alert-icon">💡</span><div><strong>لديك قدرة التنفيذ النادرة.</strong> الخليج يملك رأس المال. ما يفتقده بشكل مزمن هو المبنّون التقنيون الذين يفهمون بنية التتبع الحديثة. GA4 + Conversions API + Server-Side GTM خبرة نادرة حقاً في المنطقة.</div></div>
+  <div class="alert info"><span class="alert-icon">🥇</span><div><strong>أنت الأول في السوق.</strong> لا يوجد SaaS عربي-أول للتتبع. هذه الفجوة حقيقية. كونك الأول يخلق قيمة مركّبة لا تتطلب إيرادات لتوجد.</div></div>
+  <div class="alert info"><span class="alert-icon">♟</span><div><strong>أنت تحدد الشروط.</strong> أبدى اهتماماً قوياً — وهذا يعكس ديناميكية السلطة الافتراضية. المؤسسون ينسون هذا دائماً.</div></div>
+  <div class="alert info"><span class="alert-icon">⏱</span><div><strong>الوقت ليس عاجلاً من جانبك.</strong> لا التزامات إيرادية، لا ضغط فريق، لا موعد نهائي للمستثمر. صاحب رأس المال لديه مشكلة نشر رأس المال — أنت لا تملكها الآن.</div></div>
+
+  <h2 class="h2">1.3 — نفوذ المستثمر</h2>
+  <p class="body-text">كن صادقاً في تقييم هذا الجانب — إنكاره يضرّك أكثر مما يساعدك:</p>
+  <table>
+    <tr><th>مصدر النفوذ</th><th>التأثير عليك</th></tr>
+    <tr><td>رأس المال</td><td>أنت في مرحلة pre-revenue وهذا حقيقي</td></tr>
+    <tr><td>الشبكة في السوق السعودي</td><td>يمكنه تسريع الوصول للعملاء والوكالات</td></tr>
+    <tr><td>البنية التشغيلية (وكالة، موظفون، عملاء)</td><td>عرضه الشامل يبدو كطوق النجاة نفسياً</td></tr>
+    <tr><td>الضغط النفسي من الإلحاح</td><td>إذا كنت محتاجاً شخصياً فهو يعرف ذلك</td></tr>
+    <tr><td>التأطير: "كل شيء مشمول"</td><td>يخلق شعوراً بالامتنان يقلل من تفاوضك</td></tr>
+  </table>
+
+  <h2 class="h2">1.4 — الأعلام الحمراء: لا تتجاهل هذه الإشارات</h2>
+  <div class="flag-item"><span class="flag-icon">🚩</span><div class="flag-content"><div class="flag-title">"تشغيل تحت هيكل الشركة أو الوكالة السعودية"</div><div class="flag-desc">إذا سُجّلت الشركة باسم وكالته، فقد لا تملك EasyTrack قانونياً. ملكيتك الفكرية ستكون أصله.</div></div></div>
+  <div class="flag-item"><span class="flag-icon">🚩</span><div class="flag-content"><div class="flag-title">"سنحدد الأسهم لاحقاً"</div><div class="flag-desc">الفخ الأكثر شيوعاً في الخليج. تبدأ العمل، تُخلق القيمة، ثم يتفاوض من مركز قوة بينما أنت متعلق به تشغيلياً.</div></div></div>
+  <div class="flag-item"><span class="flag-icon">🚩</span><div class="flag-content"><div class="flag-title">طلب أسهم كبيرة مبكراً (أكثر من 30%) بدون إيرادات</div><div class="flag-desc">مبكر جداً ومكلف جداً. لا يوجد مستخدم واحد يدفع يستحق هذا الثمن من حصتك المستقبلية.</div></div></div>
+  <div class="flag-item"><span class="flag-icon">🚩</span><div class="flag-content"><div class="flag-title">يريد التحكم في العلامة التجارية والتموضع</div><div class="flag-desc">إذا تحكم في كيان العلامة التجارية، فهو يتحكم في علاقات العملاء ويمكنه استبدالك تقنياً في أي وقت.</div></div></div>
+  <div class="flag-item"><span class="flag-icon">🚩</span><div class="flag-content"><div class="flag-title">لا term sheet أو MOU مكتوب</div><div class="flag-desc">الالتزامات الشفهية في صفقات المرحلة المبكرة بالخليج شائعة وخطيرة للغاية. لا قيمة قانونية لأي وعد شفهي.</div></div></div>
+  <div class="flag-item"><span class="flag-icon">🚩</span><div class="flag-content"><div class="flag-title">اعتماد تشغيلي كامل</div><div class="flag-desc">إذا تحكّم في الاستضافة والعملاء والموظفين والعلامة التجارية، تصبح مقاولاً تقنياً داخل ما يبدو أنه شركتك الخاصة.</div></div></div>
+  <div class="flag-item"><span class="flag-icon">🚩</span><div class="flag-content"><div class="flag-title">استخدام كلمة "شراكة" بدون تعريف قانوني</div><div class="flag-desc">في الثقافة التجارية العربية، "الشريك" غالباً ما يعني سلطة تشغيلية أعمق مما يعنيه في الغرب. احرص على تعريف الأدوار قانونياً.</div></div></div>
+
+  <h2 class="h2">1.5 — الأخطاء الشائعة للمؤسسين في هذه المواقف</h2>
+  <ol class="num-list">
+    <li><strong>يظنون أن التمويل = التحقق.</strong> إنه ليس كذلك. مستثمر سعودي واحد يغطي العمليات ليس تحقق السوق — هو رهان شخص واحد.</li>
+    <li><strong>يمنحون الأسهم قبل وجود منتج.</strong> إعطاء 25–40% بدون إيرادات يعني التخلي عن قيمة الشركة المستقبلية بأرخص سعر ممكن — قبل أن تبني الشيء.</li>
+    <li><strong>يخلطون بين "يؤمن بي" و"يشاركني الرؤية".</strong> قد يؤمن بك حقاً وفي نفس الوقت يريد استيعاب منتجك في مكدس خدمات وكالته.</li>
+    <li><strong>لا يحمون الـ IP بشكل منفصل.</strong> الكود، القوالب، العلامة التجارية يجب أن تكون مملوكة لكيان قانوني تتحكم فيه أنت — قبل أي حديث عن هيكل مشترك.</li>
+    <li><strong>يتركون المستثمر يحدد هيكل الصفقة.</strong> من يكتب أول term sheet يتحكم في التأطير. يجب أن تضع شيئاً على الورق أنت أولاً.</li>
+  </ol>
+</div>
+
+<!-- ═══════════════ PART 2 ═══════════════ -->
+<div class="section page-break">
+  <div class="sec-header">
+    <h1>الجزء الثاني: استراتيجية التفاوض وعلم نفس المؤسس</h1>
+    <p>كيف تتحدث، ماذا تقول، وكيف تتموضع بدون أن تبدو يائساً أو متعجرفاً</p>
+  </div>
+
+  <h2 class="h2">2.1 — علم النفس أولاً</h2>
+  <div class="alert gold">
+    <span class="alert-icon">🧠</span>
+    <div><strong>القاعدة الذهبية:</strong> لا تتفاوض أبداً من الخوف. لحظة احتياجك لماله أكثر من احتياجه لمنتجك — تخسر. موقفك الداخلي يجب أن يكون: <em>"أنا أقيّم ما إذا كان الشريك المناسب، لا أتوسل للحصول على رأس ماله."</em></div>
+  </div>
+  <p class="body-text">تذكر: لديك منتج نادر في سوق لم يُخدم بعد. لديه رأس مال يبحث عن منزل تقني. أنتما تختاران بعضكما — ليس هو الذي يمنحك.</p>
+
+  <h2 class="h2">2.2 — دليل التفاوض: سؤال بسؤال</h2>
+
+  <div class="qa-card">
+    <div class="qa-q">❓ السؤال: "كم تحتاج؟"</div>
+    <div class="qa-wrong"><div class="label">❌ لا تقل:</div><div class="text">"لست متأكداً، ربما 50–100 ألف دولار... ما تراه مناسباً"</div></div>
+    <div class="qa-right"><div class="label">✅ قل بدلاً من ذلك:</div><div class="text">"لقد نمذجت ثلاثة سيناريوهات. المرحلة التشغيلية المنحسرة تتطلب مبلغاً محدداً للوصول للعملاء العشرة الأوائل وإيرادات قابلة للقياس. أريد التركيز على المرحلة الأولى مع معالم واضحة — وليس على جمع تمويل كبير. يمكنني تفصيل الأرقام."</div></div>
+    <div class="qa-why">💡 <em>لماذا يجدي: تبدو مستعداً. تضع إطار معالم لا رقم عشوائي. تُظهر أنك تفكر كمؤسس ناضج.</em></div>
+  </div>
+
+  <div class="qa-card">
+    <div class="qa-q">❓ السؤال: "ما التقييم الذي تعتقد أن الأداة تستحقه؟"</div>
+    <div class="qa-wrong"><div class="label">❌ لا تقل:</div><div class="text">"بصراحة لا أعرف، ربما 300 ألف دولار؟ ما يبدو عادلاً لك"</div></div>
+    <div class="qa-right"><div class="label">✅ قل بدلاً من ذلك:</div><div class="text">"التقييم في هذه المرحلة هو دالة توقيت السوق والتعقيد التقني ومخاطر التنفيذ. للـ SaaS قبل الإيرادات ببنية تحتية مبنية في فجوة سوقية، الصفقات المماثلة في MENA تتم بين $500K–$1.5M post-money. لكن أنا أقل تركيزاً على رقم التقييم وأكثر على هيكل الصفقة — SAFE note أو أسهم مبنية على معالم تحمينا أكثر من تقييم ثابت الآن."</div></div>
+    <div class="qa-why">💡 <em>لماذا يجدي: تُسمّي نطاقاً مع سياق. تتحول نحو الهيكل بدلاً من الرقم. تبدو متطوراً لا يائساً.</em></div>
+  </div>
+
+  <div class="qa-card">
+    <div class="qa-q">❓ السؤال: "ما النسبة التي أنت مستعد لإعطائها؟"</div>
+    <div class="qa-wrong"><div class="label">❌ لا تقل:</div><div class="text">"أنا منفتح، ما يبدو منطقياً... 30–40% يبدو معقولاً"</div></div>
+    <div class="qa-right"><div class="label">✅ قل بدلاً من ذلك:</div><div class="text">"أفكر في هذا بناءً على ما نبنيه معاً. إذا كانت المرحلة الأولى تمويلاً تشغيلياً فقط — بنية تحتية وأساسيات — فهذا شيك pre-seed لا حصة تحكم. في هذا السيناريو، 10–18% هو النطاق الصحيح. إذا كنت ستكون شريكاً استراتيجياً يقود النمو بفاعلية، نهيكل ذلك بشكل مختلف — مع vesting مبني على معالم، ليس منحاً مسطحاً مقدماً. النسبة تتبع الهيكل، وليس العكس."</div></div>
+    <div class="qa-why">💡 <em>لماذا يجدي: تربط الأسهم بالمساهمة. تمنعه من معاملة المال التشغيلي كأسهم مؤسس. تُحدد نطاقاً واضحاً.</em></div>
+  </div>
+
+  <div class="qa-card">
+    <div class="qa-q">❓ السؤال: "لماذا أستثمر وليس هناك مستخدمون يدفعون؟"</div>
+    <div class="qa-wrong"><div class="label">❌ لا تقل:</div><div class="text">"سيكون لدينا مستخدمون قريباً أعدك، المنتج على وشك الانتهاء..."</div></div>
+    <div class="qa-right"><div class="label">✅ قل بدلاً من ذلك:</div><div class="text">"للسبب ذاته الذي يجعلك تستثمر في البنية التحتية قبل الحاجة إليها — لأنه بعد الحاجة إليها يرتفع السعر. سوق التجارة الإلكترونية في الخليج يتجه نحو server-side tracking وConsent Mode V2 والبيانات من الطرف الأول. نافذة بناء أول أداة بنية تحتية عربية-المولد في هذا الفضاء هي الآن. بعد أن تبدأ أولى الوكالات العشرين في استخدامه لن يكون التقييم على هذا المستوى."</div></div>
+    <div class="qa-why">💡 <em>لماذا يجدي: تُعيد تأطير ما قبل الإيرادات كميزة لا عيب. سعر الدخول أقل الآن. الإلحاح مرتبط بتوقيت السوق لا بيأسك.</em></div>
+  </div>
+
+  <div class="qa-card">
+    <div class="qa-q">❓ السؤال: "ما الذي يجعل هذا قابلاً للدفاع عنه؟"</div>
+    <div class="qa-wrong"><div class="label">❌ لا تقل:</div><div class="text">"لدينا ميزات كثيرة ونعمل بجد ولدينا خطة تسويق..."</div></div>
+    <div class="qa-right"><div class="label">✅ قل بدلاً من ذلك:</div><div class="text">"ثلاث طبقات: أولاً، العمق التقني — Server-Side GTM الصحيح وتكامل Conversions API وهندسة طبقة البيانات ليست أشياء يمكن استنساخها في نهاية أسبوع. ثانياً، مكتبة قوالب GTM تخلق تكاليف تحويل بمجرد نشر الوكالة لها. ثالثاً، التعليم والتوثيق العربي في هذا المجال غير موجود فعلياً — نحن نبني طبقة المعرفة التي تجعل التبني لاصقاً."</div></div>
+    <div class="qa-why">💡 <em>لماذا يجدي: تجيب بطبقات لا بشعارات. كل طبقة قابلة للتحقق ومحددة.</em></div>
+  </div>
+
+  <div class="qa-card">
+    <div class="qa-q">❓ السؤال: "لماذا لن تقوم الوكالات بهذا يدوياً؟"</div>
+    <div class="qa-right"><div class="label">✅ قل:</div><div class="text">"هي تفعل ذلك بالفعل — وهذا بالضبط هو المشكلة. كل وكالة تعيد بناء نفس بنية التتبع من الصفر لكل عميل، محرقةً 15–40 ساعة لكل تنفيذ. منتجنا يحوّل ذلك إلى أقل من ساعتين. السؤال ليس ما إذا كانت الوكالات ستفعل هذا — بل هل ستستمر في دفع $2,000–5,000 تكلفة مهندس لكل عميل عندما يكون اشتراك SaaS موجوداً؟ لن تفعل."</div></div>
+    <div class="qa-why">💡 <em>لماذا يجدي: تحوّل نقطة الضعف الظاهرة إلى دليل على الطلب. الوكالات تفعله الآن = السوق موجود = فقط الأداة ناقصة.</em></div>
+  </div>
+
+  <div class="qa-card">
+    <div class="qa-q">❓ السؤال: "ما الذي يمنع المنافسين؟"</div>
+    <div class="qa-right"><div class="label">✅ قل:</div><div class="text">"لا شيء يمنعهم من المحاولة. لكن سوق الخليج تحديداً لديه عائقان يهمان: اللغة والثقة. أداة غربية بدون واجهة عربية ولا حالات إقليمية ولا دعم محلي لن تحظى بتبني الوكالات في السعودية أو الإمارات كما ستفعل منتجات ذات تموضع محلي. لدينا نافذة 12–18 شهراً لبناء حصن العلامة التجارية قبل أن تبدأ الأدوات الدولية بالتوطين بقوة. هذه النافذة هي أطروحة الاستثمار."</div></div>
+    <div class="qa-why">💡 <em>لماذا يجدي: لا تدّعي أنك محصّن. تُقدّم حجة الإطار الزمني التي تربط الاستثمار بالسرعة لا بالحماية المطلقة.</em></div>
+  </div>
+
+  <h2 class="h2">2.3 — جدول إعادة تأطير المحادثة</h2>
+  <table>
+    <tr><th>عندما يسأل عن...</th><th>أعد التأطير نحو...</th></tr>
+    <tr><td>الإيرادات الحالية</td><td>توقيت السوق ونافذة الريادة</td></tr>
+    <tr><td>عدد المستخدمين</td><td>البنية التحتية المبنية بالفعل</td></tr>
+    <tr><td>دليل الطلب</td><td>التحقق من نقطة الألم من الوكالات التي تحدثت معها</td></tr>
+    <tr><td>مخاطر المنافسة</td><td>حصن التوطين في الخليج وسرعة التنفيذ</td></tr>
+    <tr><td>تبرير التقييم</td><td>صفقات SaaS مماثلة قبل الإيرادات في MENA</td></tr>
+    <tr><td>لماذا السوق السعودي؟</td><td>Vision 2030 + PDPL + نمو 25%+ + فجوة التعليم العربي</td></tr>
+    <tr><td>لماذا الآن؟</td><td>انتهاء الكوكيز + Consent Mode V2 + نافذة الريادة 12–18 شهراً</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════ PART 3 ═══════════════ -->
+<div class="section page-break">
+  <div class="sec-header">
+    <h1>الجزء الثالث: نماذج التقييم المالي قبل الإيرادات</h1>
+    <p>كيف تُثمّن منتجاً لم يُولَد بعد — وتبرر الرقم بثقة</p>
+  </div>
+
+  <h2 class="h2">3.1 — منطق التقييم قبل الإيرادات</h2>
+  <p class="body-text">في SaaS قبل الإيرادات، التقييم مبني على مصفوفة العوامل — ليس فقط الأرقام المالية. إليك مصفوفة تقييم Easy Track:</p>
+  <table>
+    <tr><th>العامل</th><th>تقييم Easy Track</th><th>الوزن</th></tr>
+    <tr><td>خبرة المؤسس في التتبع / GTM</td><td>مرتفع جداً</td><td>20%</td></tr>
+    <tr><td>توقيت السوق (انتهاء الكوكيز، Consent Mode V2)</td><td>مرتفع جداً</td><td>25%</td></tr>
+    <tr><td>التعقيد التقني للمنتج</td><td>مرتفع</td><td>15%</td></tr>
+    <tr><td>TAM في التجارة الإلكترونية بالخليج</td><td>أكثر من $4 مليار</td><td>15%</td></tr>
+    <tr><td>قابلية الدفاع / الخندق التنافسي</td><td>متوسط–مرتفع</td><td>10%</td></tr>
+    <tr><td>التموضع الاستراتيجي (عربي-أول)</td><td>مرتفع</td><td>10%</td></tr>
+    <tr><td>اكتمال البنية التحتية</td><td>متوسط (قيد التطوير)</td><td>5%</td></tr>
+  </table>
+  <div class="alert info"><span class="alert-icon">📊</span><div><strong>سياق السوق:</strong> إجمالي مبيعات التجارة الإلكترونية السعودية ~$15 مليار بنمو 25%+ سنوياً. حتى 0.5% اختراق سوق بـ $200/شهر = $3–5M ARR محتملة. هذا الـ TAM هو أساس تقييمك، وليس مستخدمك الحالي (صفر).</div></div>
+
+  <h2 class="h2">3.2 — سيناريوهات التقييم الثلاثة</h2>
+  <div class="val-grid">
+    <div class="val-card conservative">
+      <div class="val-label">🔵 المحافظ</div>
+      <div class="val-range">$400K – $600K</div>
+      <div class="val-desc">قبل الإيرادات، بنية قيد الإنشاء. 3–5x ARR سنة أولى محتملة متحفظة. منطقي ببنية تحتية عملية وخبرة محققة.</div>
+    </div>
+    <div class="val-card realistic">
+      <div class="val-label">🟢 الواقعي</div>
+      <div class="val-range">$800K – $1.2M</div>
+      <div class="val-desc">خبرة نادرة + فجوة سوقية حقيقية + توقيت الخليج + حصن عربي. قابل للدفاع كـ post-money على SAFE بـ $150–200K.</div>
+    </div>
+    <div class="val-card aggressive">
+      <div class="val-label">🟣 المتفاءل</div>
+      <div class="val-range">$1.5M – $2.5M</div>
+      <div class="val-desc">تموضع يُعرّف فئة + خارطة طريق AI + نظام بيئي للوكالات. استخدم فقط مع LOIs أو التزامات تجريبية.</div>
+    </div>
+  </div>
+
+  <h2 class="h2">3.3 — نطاق الأسهم حسب دور المستثمر</h2>
+  <table>
+    <tr><th>دور المستثمر</th><th>نطاق الأسهم المناسب</th></tr>
+    <tr><td>عمليات فقط (بنية تحتية، استضافة، إعداد أساسي)</td><td><strong style="color:var(--success)">8% – 12%</strong></td></tr>
+    <tr><td>عمليات + تسويق + علامة تجارية</td><td><strong style="color:var(--mid-blue)">12% – 18%</strong></td></tr>
+    <tr><td>تمويل نمو كامل (فريق، تسويق، بنية تحتية)</td><td><strong style="color:var(--mid-blue)">18% – 25%</strong></td></tr>
+    <tr><td>شريك استراتيجي (GTM فعال، تقديم عملاء)</td><td><strong style="color:var(--accent)">20% – 28% مع vesting</strong></td></tr>
+    <tr><td>مشغّل نشط (يدير اليوميات، يجلب عملاء)</td><td><strong style="color:var(--warn)">25% – 35% مع vesting مؤسس مشارك</strong></td></tr>
+  </table>
+  <div class="alert danger"><span class="alert-icon">🚨</span><div><strong>قاعدة حرجة:</strong> لا تعطِ أبداً منحاً مسطحاً للأسهم لمستثمر يريد أن يكون مشغّلاً نشطاً. استخدم vesting مع cliff. إذا غادر بعد 6 أشهر، لا يجب أن تُستحق أسهمه بالكامل.</div></div>
+</div>
+
+<!-- ═══════════════ PART 4 ═══════════════ -->
+<div class="section page-break">
+  <div class="sec-header">
+    <h1>الجزء الرابع: هيكل حقوق الملكية وحماية المؤسس</h1>
+    <p>SAFE أم أسهم مباشرة؟ كيف تحمي نفسك من التخفيف المبكر والاستيعاب التشغيلي</p>
+  </div>
+
+  <h2 class="h2">4.1 — هل تعطي أسهماً الآن؟</h2>
+  <div class="alert gold"><span class="alert-icon">⚡</span><div><strong>الجواب القصير: ليس الآن. ليس بأسهم مسطحة. ليس بدون هيكل.</strong><br>عند صفر إيرادات وبنية تحتية مبكرة، إعطاء أسهم مباشرة الآن يعني تسعير الشركة عند أدنى مستوى مطلق. كل أسبوع تطوير، كل محادثة مع وكالة، كل سطر كود يرفع القيمة العادلة.</div></div>
+
+  <h2 class="h2">4.2 — خيارات الهيكل مرتبة بحسب حماية المؤسس</h2>
+
+  <div class="struct-card">
+    <div class="struct-header green-header">1. SAFE Note — ✅ الموصى به لمرحلتك</div>
+    <div class="struct-body" style="background:#E9F7EF">
+      <ul>
+        <li>اتفاقية بسيطة للأسهم المستقبلية — المستثمر يمول الآن، يتحول لأسهم عند جولة تسعير مستقبلية</li>
+        <li>لا تحدد تقييماً اليوم — تحدد سقفاً (valuation cap) مثل $800K–$1M</li>
+        <li>المستثمر يحصل على تحويل مناسب في الجولة القادمة؛ أنت تؤخر التخفيف</li>
+        <li><strong>الخطر:</strong> سقف التقييم هو تقييمك الفعلي — حدده بتفكير عميق</li>
+        <li><strong>الأنسب:</strong> الشيك الأول، أي شخص يريد الدخول قبل جولة مسعّرة</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="struct-card">
+    <div class="struct-header blue-header">2. سند قابل للتحويل (Convertible Note)</div>
+    <div class="struct-body" style="background:var(--light-bg)">
+      <ul>
+        <li>مثل SAFE لكن مهيكل كدين مع فائدة (عادة 6–8%)</li>
+        <li>يتحول عند جولة تسعير مستقبلية أو تاريخ استحقاق محدد</li>
+        <li>أكثر ملاءمة للمستثمر قليلاً من SAFE</li>
+        <li><strong>الخطر:</strong> تاريخ الاستحقاق يخلق ضغطاً إذا لم تجمع جولة في الوقت</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="struct-card">
+    <div class="struct-header gold-header">3. أسهم مباشرة مبنية على معالم</div>
+    <div class="struct-body" style="background:var(--light-gold)">
+      <ul>
+        <li>تُطلق الأسهم على دفعات مرتبطة بمعالم المنتج (مثلاً: 5% عند الإطلاق، 5% عند 10 عملاء، 5% عند $5K MRR)</li>
+        <li>تحميك من إعطاء أسهم كاملة لتنفيذ غير مكتمل</li>
+        <li>الأنسب إذا أصرّ المستثمر على أسهم لا سندات</li>
+        <li><strong>الخطر:</strong> مفاوضات تعريف المعالم يمكن أن تصبح خلافية</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="struct-card">
+    <div class="struct-header gray-header">4. تقاسم الإيرادات (Revenue Share)</div>
+    <div class="struct-body" style="background:#F8F9FA">
+      <ul>
+        <li>المستثمر يغطي التكاليف، يأخذ 15–25% من الإيرادات حتى يسترد 1.5–2x استثماره</li>
+        <li>لا تُعطى أسهم على الإطلاق — أقصى حماية للمؤسس</li>
+        <li>الأنسب إذا أراد تمويل العمليات فقط وتريد الاحتفاظ بـ 100% من الأسهم</li>
+        <li><strong>الخطر:</strong> عبء التدفق النقدي في المراحل الأولى من الإيرادات</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 class="h2">4.3 — الهيكل السعودي: المخاطر القانونية الحقيقية</h2>
+  <div class="alert danger"><span class="alert-icon">🚨</span><div><strong>التحذير الأكثر أهمية في هذه الوثيقة:</strong> إذا سُجّلت الشركة باسم وكالته أو كيانه السعودي، فقد لا تملك Easy Track قانونياً. ملكيتك الفكرية ستكون أصله — وليست أصلك أنت.</div></div>
+  <table>
+    <tr><th>الخطر</th><th>كيفية الحماية</th></tr>
+    <tr><td>IP مملوك للكيان لا للمؤسس</td><td>سجّل العلامة التجارية وأودع IP تحت كيان تملكه أنت</td></tr>
+    <tr><td>فقدان علاقات العملاء</td><td>احتفظ بعقود العملاء مع SaaS entity لا مع وكالته</td></tr>
+    <tr><td>الاستبدال التقني</td><td>وثّق كل الكود برخصة تمتلكها ووقّع اتفاقية تنازل IP</td></tr>
+    <tr><td>خلافات PDPL وهوية البيانات</td><td>حدد صاحب البيانات في اتفاقية الكيان منذ البداية</td></tr>
+    <tr><td>الخروج بدون أسهم قابلة للتسييل</td><td>تأكد من أن أسهمك في الكيان المسيطر لا الشركة التشغيلية</td></tr>
+  </table>
+
+  <div class="alert info"><span class="alert-icon">🏗</span><div><strong>الهيكل الموصى به — الكيانين:</strong><br>
+  <strong>شركة قابضة</strong> (أنت تملكها 100%) ← تملك IP وتُرخّصه ←<br>
+  <strong>شركة تشغيلية سعودية</strong> (حيث للمستثمر حصته) ← تُشغّل المنتج وتُقدّم الخدمة<br><br>
+  هذا هيكل قياسي في الصفقات الإقليمية المشروعة. أفضل التسجيل في: DIFC أو ADGM أو منطقة حرة دبي.</div></div>
+
+  <h2 class="h2">4.4 — هيكل Vesting الموصى به</h2>
+  <table>
+    <tr><th>البند</th><th>التفاصيل</th></tr>
+    <tr><td>مدة Vesting</td><td>4 سنوات</td></tr>
+    <tr><td>Cliff</td><td>سنة واحدة (لا شيء يُستحق قبل 12 شهراً)</td></tr>
+    <tr><td>جدول التوزيع</td><td>25% بعد السنة الأولى، ثم شهري أو ربعي</td></tr>
+    <tr><td>ينطبق على</td><td>أي شريك تشغيلي نشط أو مستثمر مشارك</td></tr>
+    <tr><td>أسهم المؤسس</td><td>يجب أن تكتسب هي أيضاً — يُظهر الاحتراف ويحمي الطرفين</td></tr>
+    <tr><td>Acceleration</td><td>اكتساب كامل فوري في حالة Acquisition أو تغيير سيطرة جوهري</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════ PART 5 ═══════════════ -->
+<div class="section page-break">
+  <div class="sec-header">
+    <h1>الجزء الخامس: استراتيجية طلب التمويل والميزانيات</h1>
+    <p>كم تطلب؟ متى تطلبه؟ وكيف تُبرر الرقم دون أن تبدو عشوائياً</p>
+  </div>
+
+  <h2 class="h2">5.1 — ميزانية المرحلة الأولى: 6 أشهر (المرحلة الضيقة)</h2>
+  <p class="body-text">الهدف: إثبات المفهوم مع أول 10 عملاء من الوكالات وإيرادات شهرية قابلة للقياس.</p>
+  <table>
+    <tr><th>البند</th><th>شهرياً (USD)</th><th>6 أشهر (USD)</th></tr>
+    <tr><td>استضافة سحابية وبنية تحتية</td><td>$300</td><td>$1,800</td></tr>
+    <tr><td>تكاليف Server-Side GTM</td><td>$200</td><td>$1,200</td></tr>
+    <tr><td>أدوات المنتج وSaaS stack</td><td>$300</td><td>$1,800</td></tr>
+    <tr><td>إعداد الكيان القانوني (مرة واحدة)</td><td>—</td><td>$3,000</td></tr>
+    <tr><td>إنشاء المحتوى والتوثيق العربي</td><td>$500</td><td>$3,000</td></tr>
+    <tr><td>تسويق أداء أساسي (LinkedIn/Meta)</td><td>$1,000</td><td>$6,000</td></tr>
+    <tr><td>تغطية المؤسس / النفقات الشخصية</td><td>$2,000</td><td>$12,000</td></tr>
+    <tr><td>احتياطي طوارئ (15%)</td><td>—</td><td>$4,200</td></tr>
+    <tr><td style="font-weight:800;color:var(--dark-blue)">المجموع</td><td style="font-weight:800">~$4,300</td><td style="font-weight:800">~$33,000</td></tr>
+  </table>
+  <div class="budget-summary">✅ مبلغ الطلب الموصى به للمرحلة الأولى: $35,000 – $45,000</div>
+
+  <h2 class="h2">5.2 — ميزانية النمو: 12 شهراً (نحو $10K MRR)</h2>
+  <table>
+    <tr><th>البند</th><th>شهرياً (USD)</th><th>12 شهراً (USD)</th></tr>
+    <tr><td>استضافة سحابية وبنية تحتية</td><td>$600</td><td>$7,200</td></tr>
+    <tr><td>مطوّر بدوام جزئي / CS</td><td>$2,000</td><td>$24,000</td></tr>
+    <tr><td>أدوات المنتج وSaaS</td><td>$500</td><td>$6,000</td></tr>
+    <tr><td>تسويق مدفوع + محتوى</td><td>$2,500</td><td>$30,000</td></tr>
+    <tr><td>شراكات وكالات وفعاليات</td><td>$1,000</td><td>$12,000</td></tr>
+    <tr><td>قانوني + تسجيل كيان</td><td>—</td><td>$5,000</td></tr>
+    <tr><td>تغطية المؤسس</td><td>$2,500</td><td>$30,000</td></tr>
+    <tr><td>علامة تجارية وتصميم</td><td>—</td><td>$5,000</td></tr>
+    <tr><td>احتياطي (15%)</td><td>—</td><td>$17,850</td></tr>
+    <tr><td style="font-weight:800;color:var(--dark-blue)">المجموع</td><td style="font-weight:800">~$9,100</td><td style="font-weight:800">~$137,050</td></tr>
+  </table>
+  <div class="budget-summary">✅ مبلغ الطلب الموصى به للمرحلة الثانية: $130,000 – $150,000</div>
+
+  <h2 class="h2">5.3 — ميزانية التوسع العدواني: 12 شهراً (حضور إقليمي)</h2>
+  <table>
+    <tr><th>البند</th><th>12 شهراً (USD)</th><th>ملاحظة</th></tr>
+    <tr><td>توظيف تقني штатный</td><td>$48,000</td><td>مهندس كامل الوقت</td></tr>
+    <tr><td>تسويق ونمو</td><td>$60,000</td><td>مدفوع + محتوى + SEO</td></tr>
+    <tr><td>BD / مبيعات في الخليج</td><td>$36,000</td><td>شريك تطوير أعمال محلي</td></tr>
+    <tr><td>بنية تحتية واستضافة</td><td>$15,000</td><td>نطاق واسع</td></tr>
+    <tr><td>فعاليات وشراكات</td><td>$20,000</td><td>GITEX, Step وغيرها</td></tr>
+    <tr><td>قانوني وحماية IP</td><td>$10,000</td><td>تسجيل علامة تجارية دولي</td></tr>
+    <tr><td>علامة تجارية وتصميم</td><td>$12,000</td><td>هوية بصرية كاملة</td></tr>
+    <tr><td>تغطية المؤسس</td><td>$36,000</td><td>مؤسس بدوام كامل</td></tr>
+    <tr><td style="font-weight:800;color:var(--dark-blue)">المجموع</td><td style="font-weight:800">~$237,000</td><td></td></tr>
+  </table>
+  <div class="budget-summary">✅ مبلغ الطلب الموصى به للتوسع: $250,000</div>
+
+  <h2 class="h2">5.4 — ما الذي يجب طلبه أولاً؟</h2>
+  <div class="alert gold"><span class="alert-icon">⚡</span>
+  <div><strong>اطلب $45,000 – $60,000 في المرحلة الأولى.</strong> هذا الرقم الاستراتيجي لأنه:
+  <ul style="margin-top:12px">
+    <li>منخفض بما يكفي حتى لا يحتاج لسيطرة على مجلس الإدارة أو حصة كبيرة لتبريره</li>
+    <li>مرتفع بما يكفي للوصول فعلاً إلى 10 عملاء يدفعون</li>
+    <li>صغير بما يكفي لطلب تمويل المرحلة 2 بتقييم أعلى بعده</li>
+    <li>هيكله كـ SAFE note بسقف $800K–$1M — نظيف، احترافي، حد أدنى للتخفيف الآن</li>
+  </ul></div></div>
+  <div class="alert info"><span class="alert-icon">💬</span><div><strong>كيف تُبرره:</strong> "هذا يموّل 6 أشهر من التنفيذ المنظم: إنهاء البنية التحتية، أول 3 تجارب مع وكالات، توثيق عربي، ووصول إقليمي. في نهاية 6 أشهر سنملك بيانات تبني قابلة للقياس. لست أطلب منك تمويل رؤية بـ $500K بناءً على الثقة — أطلب تمويل إثبات مفهوم بـ $50K."</div></div>
+</div>
+
+<!-- ═══════════════ PART 6 ═══════════════ -->
+<div class="section page-break">
+  <div class="sec-header">
+    <h1>الجزء السادس: التحقق من السوق السعودي وفرص الخليج</h1>
+    <p>التحقق الواقعي — ليس النشوة التسويقية — من قوة السوق المستهدف</p>
+  </div>
+
+  <h2 class="h2">6.1 — هل السعودية سوق إطلاق قوي؟</h2>
+  <p class="body-text">نعم — ولكن بشروط محددة. إليك التحليل الصادق:</p>
+  <div class="two-col">
+    <div class="col-box good">
+      <h4 class="green">✅ لماذا تنجح السعودية</h4>
+      <ul>
+        <li>Vision 2030: أكبر تسارع رقمي مدعوم حكومياً في العالم</li>
+        <li>نمو التجارة الإلكترونية 25%+ سنوياً؛ البنية التحتية لا تزال ناضجة</li>
+        <li>كثافة وكالات التسويق الرقمي في الرياض وجدة مرتفعة وتتزايد</li>
+        <li>إنفاق رقمي نما من $1.2B إلى $2.5B+ بين 2020–2024</li>
+        <li>iOS 14+ وانتهاء الكوكيز أضرّا بالوكالات — وليس لديهم حلول</li>
+        <li>PDPL يُلزم بنية تتبع مناسبة — دفع ريح مباشر لمنتجك</li>
+      </ul>
+    </div>
+    <div class="col-box bad">
+      <h4 class="red">⚠ التحديات الحقيقية</h4>
+      <ul>
+        <li>دورات مبيعات B2B السعودية أبطأ من الغرب — العلاقات قبل المنتج</li>
+        <li>المبيعات الباردة ستكون بطيئة بدون شبكة محلية أو شريك وكالة</li>
+        <li>حساسية السعر تتباين: كبيرة تدفع، صغيرة تحتاج تعليماً</li>
+        <li>الوكالات الصغيرة تحتاج تعليماً قبل الشراء — احسب وقت الدورة</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 class="h2">6.2 — هل للوكالات السعودية ألم حقيقي مع بنية التتبع؟</h2>
+  <div class="score-badge"><span class="score-label">كل وكالة تعيد بناء بنية التتبع من الصفر لكل عميل — 15–40 ساعة لكل تنفيذ</span><span class="score-val high">ألم مرتفع جداً</span></div>
+  <div class="score-badge"><span class="score-label">Conversions API و Server-Side GTM معقدان والخبرة المحلية نادرة</span><span class="score-val high">ألم مرتفع جداً</span></div>
+  <div class="score-badge"><span class="score-label">لا توثيق عربي موحد — كل فريق يتعلم بطريقته الخاصة</span><span class="score-val med">ألم عالٍ</span></div>
+  <div class="score-badge"><span class="score-label">PDPL يضع ضغطاً تنظيمياً جديداً لا تعرف الوكالات كيف تمتثل له تقنياً</span><span class="score-val gold-v">ألم ناشئ</span></div>
+  <div class="score-badge"><span class="score-label">لا يوجد SaaS خليجي أصلي للتتبع — الفجوة موثّقة وحقيقية</span><span class="score-val med">فرصة غير مشغولة</span></div>
+
+  <h2 class="h2">6.3 — التموضع: هل "SaaS البنية التحتية للتتبع السعودية-أولاً" قوي؟</h2>
+  <div class="alert success"><span class="alert-icon">🎯</span><div><strong>الحكم النهائي:</strong> السعودية-أولاً هي زاوية تموضع قوية — لكنها تتطلب مشغّلاً أو شبكة وكالات محلية لتسريع التبني. إذا كان المستثمر يملك هذه الشبكة، فقيمته التوزيعية حقيقية. لكن هذه القيمة يجب أن تُعوَّض كشريك توزيع — ليس كحامل 40% من الأسهم.</div></div>
+  <table>
+    <tr><th>عامل التموضع</th><th>التقييم</th></tr>
+    <tr><td>فجوة المنافسة (صفر منافس خليجي أصلي)</td><td>✅ قوي جداً</td></tr>
+    <tr><td>اللغة والثقافة المحلية</td><td>✅ ميزة تشغيلية</td></tr>
+    <tr><td>PDPL كدافع امتثال إلزامي</td><td>✅ دفع ريح</td></tr>
+    <tr><td>قاعدة الوكالات في الخليج</td><td>✅ سوق كبير وواضح</td></tr>
+    <tr><td>دورة المبيعات وبناء الثقة</td><td>⚠ يحتاج وقتاً وشبكة</td></tr>
+    <tr><td>التوسع خارج الخليج</td><td>✅ قابل للتكرار إقليمياً</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════ PART 7 ═══════════════ -->
+<div class="section page-break">
+  <div class="sec-header">
+    <h1>الجزء السابع: قائمة الأعلام الحمراء والأسئلة الاستراتيجية</h1>
+    <p>ما تحفظه يحميك — ما تتجاهله قد يكلفك الشركة</p>
+  </div>
+
+  <h2 class="h2">7.1 — قائمة مراجعة الأعلام الحمراء</h2>
+  <table>
+    <tr><th>العلم الأحمر</th><th>ما تسمعه</th><th>ما يعنيه فعلاً</th></tr>
+    <tr><td>طلب كيان سعودي مبكراً</td><td>"ستعمل تحت شركتنا"</td><td>قد تنتقل ملكية الـ IP إليه</td></tr>
+    <tr><td>تأجيل الأسهم</td><td>"نتفق على الأسهم لاحقاً"</td><td>سيتفاوض بعد أن تخلق القيمة</td></tr>
+    <tr><td>أسهم >30% بدون إيرادات</td><td>"هذا سعر عادل لمساهمتي"</td><td>أسهم مبكرة جداً بأرخص سعر</td></tr>
+    <tr><td>التحكم في العلامة التجارية</td><td>"العلامة يجب أن تبدو وكالتنا"</td><td>يمكنه استبدالك والاحتفاظ بالعملاء</td></tr>
+    <tr><td>لا وثيقة مكتوبة</td><td>"ثق بي، نحن أصدقاء/شركاء"</td><td>ليس قانونياً. لا حماية مطلقاً</td></tr>
+    <tr><td>اعتماد تشغيلي كامل</td><td>يسيطر على الاستضافة والعملاء والعلامة</td><td>أنت موظف تقني في شركتك الخاصة</td></tr>
+    <tr><td>"شريك" بدون تعريف قانوني</td><td>"ستكون شريكي"</td><td>سلطة تشغيلية غير محدودة ضمنياً</td></tr>
+    <tr><td>تسريع القرار بضغط وهمي</td><td>"هذا عرضي الآن أو أتراجع"</td><td>تكتيك للمنع من التفكير والتشاور</td></tr>
+  </table>
+
+  <h2 class="h2">7.2 — الأسئلة التي يجب أن تطرحها على المستثمر</h2>
+  <p class="body-text">لا تدخل أي اجتماع بدون هذه الأسئلة مُعدّة. من يسأل يُدير — من لا يسأل يُدار:</p>
+  <ol class="num-list">
+    <li>من سيمتلك الـ IP والكود المصدري لـ Easy Track بعد هذه الصفقة؟</li>
+    <li>هل ستُسجَّل الشركة باسمك أو وكالتك — أم تحت كيان جديد أتحكم فيه أنا؟</li>
+    <li>كيف تتخيل هيكل الأسهم؟ ما الجدول الزمني وآلية Vesting؟</li>
+    <li>ماذا يحدث لحصتك إذا لم تُوفِ بالالتزامات التشغيلية في 12 شهراً؟</li>
+    <li>هل لديك وكالات أو عملاء حاليون يمكنهم أن يكونوا أول مستخدمين؟</li>
+    <li>ما الخط الفاصل بين دورك التشغيلي وقراراتي كمؤسس؟</li>
+    <li>هل أنت مستعد لتوقيع SAFE note أو سند قابل للتحويل — أم تريد أسهماً مباشرة الآن؟</li>
+    <li>ما هو أفق الخروج الخاص بك؟ 3 سنوات؟ 5 سنوات؟ IPO محلي؟ استحواذ؟</li>
+    <li>هل لديك استثمارات SaaS أخرى؟ كيف انتهت؟</li>
+    <li>ما الذي سيتغير في تعاملك معي إذا لم نحقق الأهداف في 6 أشهر الأولى؟</li>
+  </ol>
+</div>
+
+<!-- ═══════════════ APPENDIX A ═══════════════ -->
+<div class="section page-break">
+  <div class="sec-header">
+    <h1>الملحق أ: سيناريوهات العروض المقترحة</h1>
+    <p>ثلاثة هياكل جاهزة للتفاوض — اختر بناءً على ما يريده المستثمر</p>
+  </div>
+
+  <h2 class="h2">السيناريو 1 — التمويل التشغيلي النظيف (الأكثر أماناً)</h2>
+  <table>
+    <tr><th>البند</th><th>التفاصيل</th></tr>
+    <tr><td>نوع الأداة</td><td>SAFE Note</td></tr>
+    <tr><td>المبلغ</td><td>$45,000</td></tr>
+    <tr><td>سقف التقييم</td><td>$800,000</td></tr>
+    <tr><td>الأسهم الفورية</td><td>لا شيء — يتحول عند جولة مسعّرة</td></tr>
+    <tr><td>دور المستثمر</td><td>تغطية العمليات فقط — بدون تدخل تشغيلي</td></tr>
+    <tr><td>ملكية الـ IP</td><td>100% للمؤسس في جميع الأحوال</td></tr>
+    <tr><td>هيكل الشركة</td><td>كيان إماراتي (قابضة) + كيان سعودي (تشغيلي)</td></tr>
+    <tr><td>متى يناسب</td><td>إذا أراد وضع مال وانتظار النتائج</td></tr>
+  </table>
+  <div class="divider"></div>
+
+  <h2 class="h2">السيناريو 2 — الشريك الاستراتيجي مع Vesting</h2>
+  <table>
+    <tr><th>البند</th><th>التفاصيل</th></tr>
+    <tr><td>نوع الأداة</td><td>أسهم مباشرة مبنية على معالم</td></tr>
+    <tr><td>المبلغ</td><td>$130,000</td></tr>
+    <tr><td>الأسهم الممنوحة</td><td>20% — على 4 سنوات مع cliff سنة</td></tr>
+    <tr><td>دور المستثمر</td><td>شريك GTM نشط + تقديم شبكة وكالات</td></tr>
+    <tr><td>ملكية الـ IP</td><td>مملوكة للشركة القابضة (أنت تملكها 100%)</td></tr>
+    <tr><td>معالم الأسهم</td><td>5% عند الإطلاق ← 5% عند 10 عملاء ← 5% عند $5K MRR ← 5% عند $15K MRR</td></tr>
+    <tr><td>متى يناسب</td><td>إذا يجلب شبكة وكالات ويشارك فعلياً في النمو</td></tr>
+  </table>
+  <div class="divider"></div>
+
+  <h2 class="h2">السيناريو 3 — النموذج الهجين (الأكثر حمايةً للمؤسس)</h2>
+  <table>
+    <tr><th>البند</th><th>التفاصيل</th></tr>
+    <tr><td>نوع الأداة</td><td>تقاسم إيرادات + SAFE</td></tr>
+    <tr><td>المبلغ مرحلة 1</td><td>$45,000</td></tr>
+    <tr><td>تقاسم الإيرادات</td><td>15% من MRR حتى استرداد $67,500 (1.5x)</td></tr>
+    <tr><td>تحويل SAFE</td><td>يتحول إلى 10% عند جولة Series A أو عند $15K MRR</td></tr>
+    <tr><td>دور المستثمر</td><td>دعم تشغيلي فقط في المرحلة الأولى</td></tr>
+    <tr><td>ملكية الـ IP</td><td>100% للمؤسس في جميع الأحوال</td></tr>
+    <tr><td>متى يناسب</td><td>إذا أردت الاحتفاظ بأكبر قدر من السيطرة الآن</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════ APPENDIX B ═══════════════ -->
+<div class="section page-break">
+  <div class="sec-header">
+    <h1>الملحق ب: الخطوات التالية الموصى بها</h1>
+    <p>ما تفعله الأسبوع القادم يحدد قوة موقفك في الشهر القادم</p>
+  </div>
+
+  <h2 class="h2">الأسبوع القادم — قبل الاجتماع القادم</h2>
+
+  <div class="step-item">
+    <div class="step-num" style="background:var(--warn)">1</div>
+    <div class="step-text"><strong>سجّل النطاق والعلامة التجارية لـ Easy Track</strong> — قبل أي محادثة عن هيكل الشركة. هذه الخطوة الأهم والأعجل في القائمة كلها.</div>
+  </div>
+  <div class="step-item">
+    <div class="step-num" style="background:var(--mid-blue)">2</div>
+    <div class="step-text"><strong>حدّد محامياً محلياً</strong> في السعودية أو الإمارات يفهم هياكل SaaS وصفقات الاستثمار المبكر. المشورة القانونية المبكرة أرخص دائماً من التصحيح اللاحق.</div>
+  </div>
+  <div class="step-item">
+    <div class="step-num" style="background:var(--dark-blue)">3</div>
+    <div class="step-text"><strong>أعدّ ورقة Term Sheet بسيطة من جانبك</strong> — وضع الإطار أولاً يمنحك زمام المبادرة. من يكتب أول مسودة يتحكم في التأطير.</div>
+  </div>
+  <div class="step-item">
+    <div class="step-num" style="background:var(--warn)">4</div>
+    <div class="step-text"><strong>وثّق الكود والبنية التحتية تحت اسمك الشخصي أو شركتك</strong> — قبل نقل أي شيء لكيان مشترك. هذا يُرسّخ ملكيتك الفكرية قانونياً.</div>
+  </div>
+  <div class="step-item">
+    <div class="step-num" style="background:var(--mid-blue)">5</div>
+    <div class="step-text"><strong>جهّز قائمة بـ 5–10 وكالات</strong> في السعودية يمكن التواصل معها للتجربة الأولى — يُظهر لك ولنفسك ولمستثمر مدى جدية شبكته.</div>
+  </div>
+
+  <h2 class="h2" style="margin-top:40px">في غضون الشهر القادم — بناء الموقف التفاوضي</h2>
+  <ol class="num-list">
+    <li>أجرِ 5 محادثات مستكشفة مع وكالات — حتى محادثة واحدة تُبدي اهتماماً تقوي موقفك التفاوضي بشكل كبير.</li>
+    <li>أنهِ MVP أو نموذج أولي لجانب واحد من Easy Track — حتى demo بسيط يقول "شيء موجود وقابل للتجربة".</li>
+    <li>ابحث عن مستثمر بديل أو برنامج تسريع في الخليج — الحصول على خيار بديل هو أقوى أداة تفاوضية تملكها.</li>
+    <li>جهّز pitch deck مكوّن من 10 شرائح — ليس للعرض فقط، بل لإظهار أنك منظم ومحترف ومُعدّ.</li>
+  </ol>
+
+  <div class="principle">
+    <h3>المبدأ الأساسي الذي لا تتفاوض عليه أبداً</h3>
+    <p>الملكية الفكرية ليست للبيع — مهما كان المبلغ. Easy Track هو ما تبنيه. ليس فقط الكود — الرؤية والمعرفة والهندسة التي خلقتها. يمكن أن يستثمر في رحلتك. لا يمكن أن يمتلك الرحلة. الفرق بين هذين الموقفين سيحدد ما إذا كنت ستؤسس شركة — أو ستكون موظفاً تقنياً يرتدي قميص مؤسس.</p>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="doc-footer">
+  <strong>Easy Track</strong> — وثيقة استراتيجية الاستثمار | سري وخاص<br>
+  إعداد: يوسف | مايو 2026 | للاستخدام الداخلي فقط
+</div>
+
+</div><!-- /container -->
+
+</body>
+</html>
