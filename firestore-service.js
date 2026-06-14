@@ -47,6 +47,12 @@ function init() {
       });
     }
     _db = admin.firestore();
+    // Tolerate undefined fields in writes. Provisioning results (job docs +
+    // container records) can legitimately carry undefined keys — e.g. a GTM
+    // versionId the API didn't return — and Firestore otherwise rejects the
+    // ENTIRE write with "Cannot use undefined as a Firestore value". settings()
+    // must run before any read/write and only once; this is that point.
+    try { _db.settings({ ignoreUndefinedProperties: true }); } catch (_) { /* already configured */ }
   } catch (e) {
     _initError = e;
   }
@@ -264,6 +270,58 @@ async function deleteSSConfig(clientId) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// PROVISIONING JOBS  —  collection: `provisioning_jobs`
+// Durable, cross-instance replacement for the in-memory managedJobs Map.
+//
+// WHY: container provisioning returns a jobId (202) and the client polls
+// GET /api/managed/job/:id. With Cloud Run --max-instances>1 the poll lands on
+// a random instance, so an in-memory Map 404s whenever the poll hits a different
+// instance than the one that created the job. Firestore makes the job readable
+// from ANY instance.
+//
+// documentId = jobId
+// fields:     status, stage, clientId, result?, error?, progress?, ...
+//             updatedAt   — server timestamp, written on every patch
+//             expiresAt   — Timestamp; used by a Firestore TTL policy for cleanup
+//
+// ⚠️  ONE-TIME SETUP — enable automatic cleanup so finished jobs self-delete:
+//     gcloud firestore fields ttls update expiresAt \
+//       --collection-group=provisioning_jobs --enable-ttl
+//     (or Firebase console → Firestore → TTL → add policy on `expiresAt`)
+//     Without the policy, getJob() still treats expired docs as gone, but the
+//     documents are not physically removed.
+// ══════════════════════════════════════════════════════════════════════════════
+
+const JOBS_COLLECTION = 'provisioning_jobs';
+const JOB_TTL_MS      = 30 * 60 * 1000;   // 30 min — generous vs. 60-120s job runtime
+
+// Upsert a partial patch onto a job document. merge:true preserves prior fields,
+// matching the old `{ ...cur, ...patch }` Map semantics. Each write refreshes the
+// TTL so a job that is still progressing is never pruned mid-flight.
+async function saveJob(jobId, patch) {
+  if (!jobId) throw new Error('saveJob: jobId is required');
+  const now       = admin.firestore.FieldValue.serverTimestamp();
+  const expiresAt = admin.firestore.Timestamp.fromMillis(Date.now() + JOB_TTL_MS);
+  await db().collection(JOBS_COLLECTION).doc(jobId).set(
+    { ...patch, updatedAt: now, expiresAt },
+    { merge: true },
+  );
+}
+
+// Read a job document. Returns null when missing OR past its TTL (defensive —
+// covers the window before the TTL policy physically deletes the doc).
+async function getJob(jobId) {
+  if (!jobId) throw new Error('getJob: jobId is required');
+  const snap = await db().collection(JOBS_COLLECTION).doc(jobId).get();
+  if (!snap.exists) return null;
+  const data = snap.data();
+  const exp  = (data.expiresAt && typeof data.expiresAt.toMillis === 'function')
+    ? data.expiresAt.toMillis() : 0;
+  if (exp && Date.now() > exp) return null;
+  return data;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // AUTH — Firebase ID token verification
 // Called by server.js auth middleware to authenticate /api/ss/* requests.
 // Throws on:
@@ -297,6 +355,9 @@ module.exports = {
   getSSConfig,
   getSSConfigPublic,
   deleteSSConfig,
+  // Provisioning jobs (durable, cross-instance)
+  saveJob,
+  getJob,
   // Auth
   verifyIdToken,
 };

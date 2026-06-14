@@ -22,6 +22,11 @@ substitutions:
   _REGION: me-central1
   _SERVICE_NAME: easytrac
   _IMAGE: ${_REGION}-docker.pkg.dev/${_PROJECT_ID}/easytrac/${_SERVICE_NAME}
+  # Cloud Tasks (C3) — queue id + the service account whose OIDC token Cloud Tasks
+  # attaches to the worker request. Create both once via the gcloud commands in
+  # docs (see "Cloud Tasks setup"). _TASKS_SA defaults to the Cloud Run runtime SA.
+  _TASKS_QUEUE: provisioning-jobs
+  _TASKS_SA: ${_SERVICE_NAME}-tasks@${_PROJECT_ID}.iam.gserviceaccount.com
 
 steps:
   # ── Step 1: Build Docker image ──────────────────────────────────────────────
@@ -58,18 +63,30 @@ steps:
       - '--platform=managed'
       - '--allow-unauthenticated'
       - '--port=3000'
-      - '--memory=512Mi'
+      - '--memory=1Gi'
       - '--cpu=1'
       - '--min-instances=0'
       - '--max-instances=10'
       - '--concurrency=80'
-      - '--timeout=60'
+      # Worker (Cloud Tasks) requests run the full 60-120s provisioning job, so the
+      # Cloud Run request timeout MUST exceed it. CPU is allocated for the whole
+      # request — no --no-cpu-throttling needed because the work is an active request.
+      - '--timeout=900'
       # Secrets injected as environment variables from Secret Manager
       - '--update-secrets=ADMIN_TOKEN=easytrac-admin-token:latest'
       - '--update-secrets=FIREBASE_SA_KEY_JSON=easytrac-firebase-key:latest'
       - '--update-secrets=GTM_SA_KEY_JSON=easytrac-gtm-key:latest'
+      - '--update-secrets=INTERNAL_WORKER_SECRET=easytrac-worker-secret:latest'
       - '--update-env-vars=NODE_ENV=production'
       - '--update-env-vars=ALLOWED_ORIGIN=https://${_SERVICE_NAME}-${_PROJECT_ID}.${_REGION}.run.app'
+      # ── Cloud Tasks wiring (C3) ──────────────────────────────────────────────
+      # WORKER_BASE_URL must be this service's own public URL (verify after first
+      # deploy — Cloud Run prints the real URL; update if the pattern differs).
+      - '--update-env-vars=WORKER_BASE_URL=https://${_SERVICE_NAME}-${_PROJECT_ID}.${_REGION}.run.app'
+      - '--update-env-vars=CLOUD_TASKS_PROJECT=${_PROJECT_ID}'
+      - '--update-env-vars=CLOUD_TASKS_LOCATION=${_REGION}'
+      - '--update-env-vars=CLOUD_TASKS_QUEUE=${_TASKS_QUEUE}'
+      - '--update-env-vars=CLOUD_TASKS_OIDC_SA=${_TASKS_SA}'
     waitFor: ['Push']
 
 images:
