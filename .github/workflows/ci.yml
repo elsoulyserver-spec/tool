@@ -1,0 +1,44 @@
+name: CI
+
+# Guards against shipping a syntax error: every push / PR parses all of our
+# own JS with `node --check` and runs the test suite. node_modules is excluded
+# automatically because `git ls-files` only lists tracked files.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'   # matches Dockerfile (node:20-slim); engines = >=18
+
+      # package-lock.json is gitignored, so use `npm install` (not `npm ci`).
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Syntax-check all tracked JS (node --check)
+        run: |
+          set -e
+          fail=0
+          for f in $(git ls-files '*.js'); do
+            if node --check "$f"; then
+              echo "ok   $f"
+            else
+              echo "FAIL $f"
+              fail=1
+            fi
+          done
+          exit $fail
+
+      - name: Run tests
+        run: npm test

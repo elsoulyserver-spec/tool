@@ -1,7 +1,9 @@
-const http  = require('http');
-const https = require('https');
-const fs    = require('fs');
-const path  = require('path');
+const http   = require('http');
+const https  = require('https');
+const fs     = require('fs');
+const path   = require('path');
+const zlib   = require('zlib');
+const crypto = require('crypto');
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Zero-dependency .env loader — runs BEFORE any service modules that read
@@ -34,6 +36,14 @@ const path  = require('path');
 let puppeteer = null;
 try { puppeteer = require('puppeteer'); } catch (_) {}
 
+// ── Pixel-scanner concurrency guard ────────────────────────────────────────
+// Each Puppeteer scan launches a headless Chrome (~150-300 MB resident). Without
+// a ceiling, concurrent /api/scan-url calls OOM-kill the Cloud Run instance.
+// We reject with 429 once the cap is reached instead of piling up browsers.
+// Tune via MAX_CONCURRENT_SCANS (keep it low — memory, not CPU, is the limit).
+const MAX_CONCURRENT_SCANS = parseInt(process.env.MAX_CONCURRENT_SCANS || '3', 10);
+let scanInFlight = 0;
+
 // ── Managed GTM services (optional — endpoints return 503 if not set up) ──
 const gtmService       = require('./gtm-service');
 const firestoreService = require('./firestore-service');
@@ -44,6 +54,16 @@ const rateLimiter  = require('./lib/ss-rate-limiter');
 const { StapeProvider }      = require('./lib/providers/stape');
 const { GoogleCloudProvider } = require('./lib/providers/gcloud');
 const { SelfHostedProvider }  = require('./lib/providers/selfhosted');
+// SSRF guard — reused from the providers layer to validate the pixel-scanner
+// target (blocks private/loopback/link-local/cloud-metadata hosts + bad ports).
+const { assertSafeUrl }       = require('./lib/providers/base');
+// Cloud Tasks client — offloads long provisioning jobs to a worker request so
+// Cloud Run keeps CPU allocated for their full duration (see C3 / lib/cloud-tasks.js).
+const cloudTasks              = require('./lib/cloud-tasks');
+// Server-config blob store (Phase-1) — serverConfigJson is too large for a
+// Firestore job doc (1 MB limit + embedded customTemplate JS), so it is staged
+// in a private GCS bucket and the job carries only a small { bucket, object } ref.
+const configBlobStore         = require('./lib/config-blob-store');
 
 // ── Startup dependency check ──────────────────────────────────────────────
 // Surface missing deps loudly. The providers do `try { require('axios') } catch{}`
@@ -62,29 +82,540 @@ const { SelfHostedProvider }  = require('./lib/providers/selfhosted');
   }
 })();
 
+// ── Startup ENV check ─────────────────────────────────────────────────────
+// The #1 deploy mistake: forgetting to set secrets on the host (Railway / Cloud
+// Run) — .env is gitignored, so it is NEVER shipped. Without this banner the only
+// symptom is a 503 "not configured" at request time, with nothing in the logs.
+// We print exactly which vars are missing and which routes that breaks. Values
+// are never logged.
+(function envCheck() {
+  const REQUIRED = [
+    { key: 'GTM_SA_KEY_JSON',      breaks: '/api/managed/* and /api/ss/create-containers (GTM provisioning)' },
+    { key: 'GTM_ACCOUNT_ID',       breaks: '/api/managed/* and /api/ss/create-containers (GTM provisioning)' },
+    { key: 'FIREBASE_SA_KEY_JSON', breaks: '/api/ss/* auth + ALL job storage (jobs are Firestore-backed)' },
+    { key: 'MASTER_ENCRYPTION_KEY',breaks: '/api/ss/save-config (token encryption)' },
+  ];
+  const missing = REQUIRED.filter(r => !((process.env[r.key] || '').trim()));
+  if (missing.length) {
+    console.warn('');
+    console.warn('⚠️  STARTUP WARNING: missing required environment variables:');
+    missing.forEach(r => console.warn('   • ' + r.key.padEnd(22) + '→ breaks ' + r.breaks));
+    console.warn('   On Railway: Service → Variables. On Cloud Run: --update-secrets / Secret Manager.');
+    console.warn('   (.env is gitignored and is NOT deployed — host vars must be set explicitly.)');
+    console.warn('');
+  } else {
+    console.log('✓ All required environment variables are set.');
+  }
+})();
+
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
 
 // ══════════════════════════════════════════════════════════════════════════════
-// MANAGED GTM JOBS — in-memory async job tracker
-// Container creation can take 60-120 seconds because of GTM write-quota pacing
-// (20 writes/min). That exceeds Cloudflare / Railway proxy timeouts, so we run
-// the work in the background and let the client poll /api/managed/job/:id.
-// Jobs are cleaned up 10 minutes after they finish.
+// PHASE-1 FEATURE FLAG — import managed server containers via versions:import
+// When MANAGED_IMPORT_SERVER_CONFIG=1, /api/managed/create-container stages the
+// client-built serverConfigJson in GCS and the worker imports it full-fidelity
+// (preserving client + customTemplate / CAPI). OFF (default) = unchanged static
+// GA4-only path. Re-checked at worker time so flipping OFF rolls back instantly.
 // ══════════════════════════════════════════════════════════════════════════════
-const managedJobs = new Map();
+function _serverConfigImportEnabled() {
+  const v = (process.env.MANAGED_IMPORT_SERVER_CONFIG || '').trim().toLowerCase();
+  return v === '1' || v === 'true';
+}
 
+// Minimal structural guard before we stage a client-supplied config into our OWN
+// GTM account (defense-in-depth; full validation is a later phase).
+const SERVER_CONFIG_MAX_BYTES = 700 * 1024;   // stay well under the GCS/job limits
+function _validateServerConfig(cfg) {
+  if (!cfg || typeof cfg !== 'object')        return { ok: false, error: 'not an object' };
+  if (cfg.exportFormatVersion === undefined)  return { ok: false, error: 'missing exportFormatVersion' };
+  if (!cfg.containerVersion || typeof cfg.containerVersion !== 'object') {
+    return { ok: false, error: 'missing containerVersion' };
+  }
+  let bytes = 0;
+  try { bytes = Buffer.byteLength(JSON.stringify(cfg)); }
+  catch (_) { return { ok: false, error: 'not serializable' }; }
+  if (bytes > SERVER_CONFIG_MAX_BYTES) return { ok: false, error: 'too large (' + bytes + ' bytes)' };
+  return { ok: true, bytes };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MANAGED GTM JOBS — durable, cross-instance async job tracker (Firestore-backed)
+// Container creation can take 60-120 seconds because of GTM write-quota pacing
+// (~25 writes/min). That exceeds Cloudflare / Railway proxy timeouts, so we run
+// the work in the background and let the client poll /api/managed/job/:id.
+//
+// Job state lives in Firestore (collection `provisioning_jobs`) — NOT in process
+// memory — so that with Cloud Run --max-instances>1 a poll can be answered by
+// ANY instance, not just the one that created the job. Cleanup is handled by a
+// Firestore TTL policy on the `expiresAt` field (see firestore-service.js).
+//
+// ⚠️  CPU NOTE (Cloud Run): the background provisioning work runs AFTER the 202
+//     response is sent. Cloud Run throttles instance CPU to ~0 once a request
+//     completes, UNLESS the service is deployed with CPU always allocated
+//     (--no-cpu-throttling) or the work is moved to a Cloud Tasks worker.
+//     This Firestore swap fixes durability + cross-instance reads; it does NOT
+//     by itself fix CPU throttling. See the C3 recommendation below.
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Cryptographically-random job id — the poll route is unauthenticated, so ids
+// must be unguessable (a job doc can carry container snippets / config).
 function _newJobId() {
-  return 'job_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+  return 'job_' + Date.now().toString(36) + '_' + crypto.randomBytes(9).toString('hex');
 }
 
-function _setJob(id, patch) {
-  const cur = managedJobs.get(id) || {};
-  managedJobs.set(id, { ...cur, ...patch, updatedAt: Date.now() });
+// Best-effort, per-instance throttle for high-frequency progress-only writes.
+// Firestore soft-limits sustained writes to ~1/sec per document; the GTM import
+// progress callback fires far faster than that. Correctness lives in Firestore —
+// this Map only suppresses redundant cosmetic writes and is safe to lose on
+// restart. Status/stage transitions are NEVER throttled.
+const _jobProgressWriteAt = new Map();
+const PROGRESS_WRITE_MIN_INTERVAL_MS = 2000;
+
+// Persist a partial job patch to Firestore. Async + best-effort: a transient
+// Firestore error is logged, not thrown, so it can never crash a background job.
+// Pass { progressOnly: true } for cosmetic progress pings so they get throttled.
+async function _setJob(id, patch, opts = {}) {
+  if (opts.progressOnly) {
+    const last = _jobProgressWriteAt.get(id) || 0;
+    if (Date.now() - last < PROGRESS_WRITE_MIN_INTERVAL_MS) return;
+    _jobProgressWriteAt.set(id, Date.now());
+  }
+  try {
+    await firestoreService.saveJob(id, patch);
+  } catch (e) {
+    console.warn('[jobs] saveJob failed for ' + id + ':', e.message);
+  }
 }
 
-function _scheduleJobCleanup(id) {
-  setTimeout(() => managedJobs.delete(id), 10 * 60 * 1000).unref?.();
+// ── Dry-run helpers (C3 local testing) ──────────────────────────────────────
+// Synthetic provisioning result so the enqueue → worker → poll flow can be
+// exercised locally WITHOUT real GTM/Stape calls or credentials. Reached only
+// when the route accepts dryRun (gated by ALLOW_DRY_RUN=1) — never in normal prod.
+function _fakeProvision(mode, clientId) {
+  const tag = (clientId || 'anon').slice(0, 8);
+  const rnd = () => Math.random().toString(36).slice(2, 8).toUpperCase();
+  const webResult = {
+    gtmAccountId: 'DRYRUN', gtmContainerId: '0', gtmPublicId: 'GTM-DRY' + rnd(),
+    gtmWorkspaceId: '1', gtmVersionId: '1', published: false, publishedAt: null,
+    importedTagCount: 0, importedTriggerCount: 0, importedVariableCount: 0,
+    snippetHead: '<!-- dry-run snippet -->', snippetBody: '<!-- dry-run snippet -->',
+    invited: false, inviteEmail: null, inviteError: null,
+    containerName: 'DRY RUN — ' + tag,
+  };
+  const serverResult = mode === 'client_server' ? {
+    gtmAccountId: 'DRYRUN', containerId: '1', publicId: 'GTM-DRYS' + rnd(),
+    workspaceId: '1', versionId: '1', containerName: 'DRY RUN Server — ' + tag,
+    containerConfig: null, importedTagCount: 0, importedTriggerCount: 0, importedVariableCount: 0,
+  } : null;
+  return { webResult, serverResult };
+}
+
+// Small delay so a polling client can actually observe the state transitions.
+function _dryRunSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PROVISIONING JOB RUNNERS  (C3)
+// The heavy GTM provisioning work, extracted out of the request handlers so it
+// can run EITHER inside a Cloud Tasks worker request (Cloud Run keeps CPU on for
+// the whole request) OR in-process as a fallback off-GCP. Each runner loads its
+// input from the Firestore job doc, so the Cloud Tasks payload only needs
+// { jobType, jobId } and stays well under the per-task size limit. Runners record
+// their own terminal status (completed/failed) and do not throw on business errors.
+//
+// ⚠️  NOT idempotent — each run creates fresh GTM containers. The Cloud Tasks queue
+//     MUST be created with --max-attempts=1 so a retry can't duplicate containers.
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function _runManagedProvisionJob(jobId) {
+  const job = await firestoreService.getJob(jobId);
+  if (!job) throw new Error('run managed job: not found or expired: ' + jobId);
+  const input = job.input || {};
+  const { clientId, clientEmail, projectName, domain, cmsType,
+          platforms, events, pixelIds, configJson, publishLive } = input;
+  const mode = input.mode === 'client_server' ? 'client_server' : 'client';
+  const dryRun = input.dryRun === true;
+
+  try {
+    // Dry-run: walk the state machine without touching GTM/Stape/saveContainer.
+    if (dryRun) {
+      await _setJob(jobId, { status: 'running', stage: 'gtm_provisioning', mode, dryRun: true });
+      await _dryRunSleep(400);
+      await _setJob(jobId, { stage: 'saving' });
+      await _dryRunSleep(300);
+      const { webResult, serverResult } = _fakeProvision(mode, clientId);
+      await _setJob(jobId, {
+        status: 'completed', stage: 'done',
+        result: { ok: true, mode, dryRun: true, ...webResult, server: serverResult },
+        finishedAt: Date.now(),
+      });
+      return;
+    }
+
+    await _setJob(jobId, { status: 'running', stage: 'capacity_check' });
+
+    // 1. Capacity guard — GTM caps at 500 containers per account
+    const activeCount = await firestoreService.countActiveContainers();
+    if (activeCount >= 490) {
+      await _setJob(jobId, {
+        status: 'failed',
+        stage:  'capacity_exceeded',
+        error:  'Managed GTM account is near capacity',
+        hint:   'Provision a new GTM_ACCOUNT_ID and route new clients there',
+        httpStatus: 507,
+        activeContainers: activeCount,
+      });
+      return;
+    }
+
+    // 2. Provision via GTM API. Branch on mode:
+    //    - 'client'        → existing single-container flow (publishes live).
+    //    - 'client_server' → web + server containers; web is left
+    //                        UNPUBLISHED so /api/ss/wire-transport can
+    //                        patch the GA4 transport_url and republish
+    //                        once the user confirms the sGTM URL.
+    await _setJob(jobId, { stage: 'gtm_provisioning', mode });
+
+    // C-P1: load the staged server config (if any) and pass it to the GTM layer
+    // so the server container is imported full-fidelity via versions:import. The
+    // flag is RE-CHECKED here, so flipping MANAGED_IMPORT_SERVER_CONFIG=0 rolls
+    // back in-flight jobs to the static path. Any load failure degrades to static.
+    let serverConfigJson = null;
+    if (mode === 'client_server' && input.serverConfigRef && _serverConfigImportEnabled()) {
+      try {
+        serverConfigJson = await configBlobStore.get(input.serverConfigRef);
+        await _setJob(jobId, { serverConfigSource: 'versions_import' });
+      } catch (e) {
+        console.warn('[managed/create][job ' + jobId + '] serverConfig load failed (' + e.message + ') — static path');
+        await _setJob(jobId, { serverConfigLoadError: e.message });
+      }
+    }
+
+    const provisionOpts = {
+      projectName: projectName || `${clientEmail || 'client'} — ${cmsType || 'site'}`,
+      domain,
+      configJson,
+      serverConfigJson,
+      publishLive: mode === 'client_server' ? false : !!publishLive,
+      inviteEmail: clientEmail || null,
+      onProgress: (p) => { _setJob(jobId, { stage: 'gtm_provisioning', progress: p }, { progressOnly: true }); },
+    };
+
+    let webResult;
+    let serverResult = null;
+    if (mode === 'client_server') {
+      const both    = await gtmService.provisionForClientWithServer(provisionOpts);
+      webResult     = both.web;
+      serverResult  = both.server;
+    } else {
+      webResult = await gtmService.provisionForClient(provisionOpts);
+    }
+
+    // 3. Persist web container to Firestore (existing collection)
+    await _setJob(jobId, { stage: 'saving' });
+    await firestoreService.saveContainer({
+      clientId,
+      clientEmail: clientEmail || null,
+      projectName: projectName  || null,
+      domain:      domain       || null,
+      cmsType:     cmsType      || null,
+      platforms:   platforms    || [],
+      events:      events       || [],
+      pixelIds:    pixelIds     || {},
+      gtmAccountId:   webResult.gtmAccountId,
+      gtmContainerId: webResult.gtmContainerId,
+      gtmPublicId:    webResult.gtmPublicId,
+      gtmWorkspaceId: webResult.gtmWorkspaceId,
+      gtmVersionId:   webResult.gtmVersionId,
+      published:      webResult.published,
+      publishedAt:    webResult.publishedAt,
+      snippetHead:    webResult.snippetHead,
+      snippetBody:    webResult.snippetBody,
+      containerName:  webResult.containerName || null,
+      invited:        !!webResult.invited,
+      inviteEmail:    webResult.inviteEmail || null,
+      inviteError:    webResult.inviteError || null,
+      importedCounts: {
+        tags:      webResult.importedTagCount,
+        triggers:  webResult.importedTriggerCount,
+        variables: webResult.importedVariableCount,
+      },
+      mode,
+      serverContainerPublicId: serverResult ? serverResult.publicId : null,
+    });
+
+    // 4. client_server flow — auto-deploy to Stape + auto-wire transport_url.
+    //    The Stape API key is a PLATFORM credential (set via STAPE_API_KEY env
+    //    var) — clients never see or enter it. If the env var is missing or
+    //    the deploy fails, we fall back to "manual mode": save the
+    //    containerConfig blob in Firestore so the frontend can show it and
+    //    /api/ss/wire-transport remains available for manual recovery.
+    let stapeDeployed   = null;
+    let stapeDeployErr  = null;
+    let webRepublished  = false;
+
+    if (mode === 'client_server' && serverResult) {
+      const platformStapeKey = (process.env.STAPE_API_KEY || '').trim();
+      const stapeRegion      = process.env.STAPE_REGION === 'eu' ? 'eu' : 'global';
+
+      if (platformStapeKey && serverResult.containerConfig) {
+        try {
+          await _setJob(jobId, { stage: 'stape_deploy' });
+          const stape = new StapeProvider({ stapeRegion });
+          const dep = await stape.deployContainer({
+            stapeApiKey:   platformStapeKey,
+            containerName: serverResult.containerName ||
+                           ('Easy Track sGTM — ' + (clientId || '').slice(0, 8)),
+            gtmConfigBody: serverResult.containerConfig,
+          });
+          stapeDeployed = {
+            serverUrl:   dep.serverUrl,
+            containerId: dep.containerId,
+            status:      dep.status,
+            region:      stapeRegion,
+          };
+
+          // Wire the web container's GA4 tag → the deployed sGTM URL.
+          // setGA4TransportUrl creates a new web container version + publishes
+          // it, so this single call covers both wiring and going-live.
+          if (dep.serverUrl) {
+            await _setJob(jobId, { stage: 'wiring_transport_url' });
+            try {
+              await gtmService.setGA4TransportUrl(
+                webResult.gtmContainerId,
+                webResult.gtmWorkspaceId,
+                dep.serverUrl,
+              );
+              webRepublished = true;
+              // Refresh local snippet flags so the success UI shows LIVE.
+              webResult.published   = true;
+              webResult.publishedAt = new Date().toISOString();
+            } catch (wireErr) {
+              console.warn('[managed/create] wire transport_url failed:', wireErr.message);
+              stapeDeployErr = 'Stape deployed but wiring failed: ' + wireErr.message;
+            }
+          }
+        } catch (depErr) {
+          console.warn('[managed/create] Stape deploy failed:', depErr.message);
+          stapeDeployErr = depErr.message;
+        }
+      } else if (!platformStapeKey) {
+        stapeDeployErr = 'STAPE_API_KEY env var is not set on the server — manual deploy required';
+      }
+
+      // Persist the SS config regardless of deploy outcome.
+      try {
+        const existingSs = await firestoreService.getSSConfig(clientId).catch(() => null);
+        await firestoreService.saveSSConfig(clientId, {
+          provider:         'stape',
+          serverUrl:        (stapeDeployed && stapeDeployed.serverUrl) || '',
+          platforms:        (existingSs && existingSs.platforms)        || (platforms || []),
+          encryptedTokens:  (existingSs && existingSs.encryptedTokens)  || {},
+          stapeApiKey:      null,
+          stapeContainerId: stapeDeployed ? stapeDeployed.containerId : null,
+          mode:                 'client_server',
+          webContainerId:       webResult.gtmContainerId,
+          webPublicId:          webResult.gtmPublicId,
+          webWorkspaceId:       webResult.gtmWorkspaceId,
+          serverContainerId:    serverResult.containerId,
+          serverPublicId:       serverResult.publicId,
+          serverWorkspaceId:    serverResult.workspaceId,
+          serverVersionId:      serverResult.versionId,
+          // Keep the blob ONLY when auto-deploy didn't succeed — saves
+          // Firestore space and prevents stale blobs after redeploys.
+          containerConfig:      stapeDeployed ? null : (serverResult.containerConfig || null),
+          transportUrlWired:    webRepublished,
+          transportUrlWiredAt:  webRepublished ? new Date() : null,
+          stapeAutoDeployed:    !!stapeDeployed,
+          stapeDeployError:     stapeDeployErr || null,
+        });
+      } catch (saveErr) {
+        console.warn('[managed/create] saveSSConfig failed (non-fatal):', saveErr.message);
+      }
+    }
+
+    // Attach deploy info to serverResult before returning to the client
+    if (serverResult && (stapeDeployed || stapeDeployErr)) {
+      serverResult.deployedUrl       = stapeDeployed ? stapeDeployed.serverUrl   : null;
+      serverResult.stapeContainerId  = stapeDeployed ? stapeDeployed.containerId : null;
+      serverResult.stapeStatus       = stapeDeployed ? stapeDeployed.status      : null;
+      serverResult.transportUrlWired = webRepublished;
+      serverResult.deployError       = stapeDeployErr || null;
+      // For manual-fallback path: keep the blob in the response only if
+      // auto-deploy didn't happen, so the frontend can still render it.
+      if (stapeDeployed) delete serverResult.containerConfig;
+    }
+
+    await _setJob(jobId, {
+      status:     'completed',
+      stage:      'done',
+      result:     {
+        ok: true,
+        mode,
+        ...webResult,
+        server: serverResult,                  // null when mode=client
+      },
+      finishedAt: Date.now(),
+    });
+  } catch (e) {
+    console.error('[managed/create][job ' + jobId + ']', e);
+    await _setJob(jobId, {
+      status:     'failed',
+      stage:      'error',
+      error:      e.message,
+      details:    e.details || null,
+      code:       e.code    || null,
+      httpStatus: (e.status && e.status >= 400 && e.status < 600) ? e.status : 502,
+      finishedAt: Date.now(),
+    });
+  } finally {
+    // C-P1: the staged server config is secret-bearing (embeds CAPI tokens) —
+    // delete it as soon as provisioning reaches a terminal state. The bucket
+    // lifecycle TTL is the backstop for any path that skips this.
+    if (input && input.serverConfigRef) {
+      try { await configBlobStore.del(input.serverConfigRef); }
+      catch (e2) { console.warn('[managed/create][job ' + jobId + '] blob cleanup failed:', e2.message); }
+    }
+  }
+}
+
+async function _runSsProvisionJob(jobId) {
+  const job = await firestoreService.getJob(jobId);
+  if (!job) throw new Error('run ss job: not found or expired: ' + jobId);
+  const input = job.input || {};
+  const { clientId, email, projectName,
+          ssEvents, ssPlatforms, ga4MeasurementId, ga4Events, googleAdsEvents } = input;
+  const finalConfigJson = input.configJson ||
+    { containerVersion: { variable: [], trigger: [], tag: [] } };
+  const dryRun = input.dryRun === true;
+
+  try {
+    // Dry-run: walk the state machine without touching GTM/Stape/saveContainer.
+    if (dryRun) {
+      await _setJob(jobId, { status: 'running', stage: 'gtm_provisioning', mode: 'client_server', dryRun: true });
+      await _dryRunSleep(400);
+      await _setJob(jobId, { stage: 'saving' });
+      await _dryRunSleep(300);
+      const { webResult, serverResult } = _fakeProvision('client_server', clientId);
+      await _setJob(jobId, {
+        status: 'completed', stage: 'done',
+        result: { ok: true, mode: 'client_server', dryRun: true, ...webResult, server: serverResult },
+        finishedAt: Date.now(),
+      });
+      return;
+    }
+
+    await _setJob(jobId, { status: 'running', stage: 'gtm_provisioning', mode: 'client_server' });
+
+    const both = await gtmService.provisionForClientWithServer({
+      projectName: projectName || ((email || clientId.slice(0, 8)) + ' — SS Setup'),
+      configJson:   finalConfigJson,
+      publishLive:  false,
+      inviteEmail:  email || null,
+      onProgress:   (p) => { _setJob(jobId, { stage: 'gtm_provisioning', progress: p }, { progressOnly: true }); },
+    });
+
+    const { web, server } = both;
+    await _setJob(jobId, { stage: 'saving' });
+
+    // Persist web container record
+    await firestoreService.saveContainer({
+      clientId,
+      clientEmail:    email || null,
+      projectName:    projectName || null,
+      platforms:      ssPlatforms || [],
+      events:         ssEvents    || [],
+      gtmAccountId:   web.gtmAccountId,
+      gtmContainerId: web.gtmContainerId,
+      gtmPublicId:    web.gtmPublicId,
+      gtmWorkspaceId: web.gtmWorkspaceId,
+      gtmVersionId:   web.gtmVersionId,
+      published:      false,
+      snippetHead:    web.snippetHead,
+      snippetBody:    web.snippetBody,
+      mode:           'client_server',
+      serverContainerPublicId: server ? server.publicId : null,
+    });
+
+    // Persist SS config with step-1 results (no URL yet)
+    try {
+      const existing = await firestoreService.getSSConfig(clientId).catch(() => null);
+      await firestoreService.saveSSConfig(clientId, {
+        provider:           'pending',
+        serverUrl:          '',
+        platforms:          ssPlatforms   || [],
+        encryptedTokens:    (existing && existing.encryptedTokens) || {},
+        stapeApiKey:        null,
+        stapeContainerId:   null,
+        mode:               'client_server',
+        webContainerId:     web.gtmContainerId,
+        webPublicId:        web.gtmPublicId,
+        webWorkspaceId:     web.gtmWorkspaceId,
+        serverContainerId:  server ? server.containerId  : null,
+        serverPublicId:     server ? server.publicId     : null,
+        serverWorkspaceId:  server ? server.workspaceId  : null,
+        serverVersionId:    server ? server.versionId    : null,
+        containerConfig:    server ? (server.containerConfig || null) : null,
+        transportUrlWired:  false,
+        ga4MeasurementId:   ga4MeasurementId || null,
+        ga4Events:          ga4Events        || [],
+        googleAdsEvents:    googleAdsEvents  || [],
+        ssEvents:           ssEvents         || [],
+      });
+    } catch (saveErr) {
+      console.warn('[ss/create-containers] saveSSConfig failed (non-fatal):', saveErr.message);
+    }
+
+    await _setJob(jobId, {
+      status:    'completed',
+      stage:     'done',
+      result:    { ok: true, mode: 'client_server', ...web, server },
+      finishedAt: Date.now(),
+    });
+  } catch (e) {
+    console.error('[ss/create-containers][job ' + jobId + ']', e);
+    await _setJob(jobId, {
+      status:    'failed',
+      stage:     'error',
+      error:     e.message,
+      code:      e.code    || null,
+      httpStatus: (e.status >= 400 && e.status < 600) ? e.status : 502,
+      finishedAt: Date.now(),
+    });
+  }
+}
+
+// Dispatch a saved job to the worker. On Cloud Run (Cloud Tasks configured) this
+// enqueues a task that POSTs the worker route as a fresh request, so CPU is
+// allocated for the full job. Off-GCP (local / Railway) CPU is not throttled, so
+// we run in-process. Either way the job doc already exists before this is called.
+async function _dispatchProvisionJob(jobType, jobId) {
+  if (cloudTasks.isConfigured()) {
+    await cloudTasks.enqueueProvisionJob({ jobType, jobId });
+    return;
+  }
+  const runner = jobType === 'ss' ? _runSsProvisionJob : _runManagedProvisionJob;
+  Promise.resolve()
+    .then(() => runner(jobId))
+    .catch(err => console.error('[jobs] inline run failed for ' + jobId + ':', err));
+}
+
+// Shared-secret auth for the internal Cloud Tasks worker route. The public
+// service runs --allow-unauthenticated, so Cloud Run does not verify the task's
+// OIDC token for us — this header check is the enforced gate. INTERNAL_WORKER_SECRET
+// must equal the value the enqueuer attaches as the X-Internal-Token header.
+function _authorizeInternal(req, res) {
+  const expected = process.env.INTERNAL_WORKER_SECRET;
+  if (!expected) {
+    sendJSON(res, 503, { error: 'Worker not configured (INTERNAL_WORKER_SECRET missing)' });
+    return false;
+  }
+  const got = (req.headers['x-internal-token'] || '').trim();
+  const a = Buffer.from(got);
+  const b = Buffer.from(expected);
+  const ok = a.length === b.length && crypto.timingSafeEqual(a, b);
+  if (!ok) { sendJSON(res, 401, { error: 'Unauthorized' }); return false; }
+  return true;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -623,17 +1154,40 @@ function fetchWithHttp(targetUrl, redirects) {
   return new Promise((resolve, reject) => {
     if (redirects > 5) { reject(new Error('Too many redirects')); return; }
     const lib = targetUrl.startsWith('https') ? https : http;
-    lib.get(targetUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; EasyTrackScanner/1.0)' } }, res => {
-      if ([301,302,303,307,308].includes(res.statusCode) && res.headers.location) {
-        const loc  = res.headers.location;
-        const next = loc.startsWith('http') ? loc : new URL(loc, targetUrl).href;
-        return resolve(fetchWithHttp(next, redirects + 1));
+    const req = lib.get(targetUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; EasyTrackScanner/1.0)' },
+      timeout: 15000,
+    }, res => {
+      // ── Redirect: re-validate EVERY hop through the SSRF guard ──────────────
+      // The first-hop check in /api/scan-url is not enough: an allow-looking host
+      // can 302 into localhost / a private IP / the cloud-metadata endpoint.
+      if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
+        res.resume(); // drain the redirect body so the socket is released
+        let next;
+        try {
+          const loc = res.headers.location;
+          next = /^https?:\/\//i.test(loc) ? loc : new URL(loc, targetUrl).href;
+        } catch (_) { reject(new Error('Invalid redirect location')); return; }
+        assertSafeUrl(next)
+          .then(() => resolve(fetchWithHttp(next, redirects + 1)))
+          .catch(e => reject(new Error('Redirect blocked by SSRF guard: ' + e.message)));
+        return;
       }
+
       let html = '';
       res.setEncoding('utf8');
-      res.on('data', c => { if (html.length < 800000) html += c; });
+      res.on('data', c => {
+        html += c;
+        if (html.length >= 800000) {           // hard cap — stop reading oversize bodies
+          html = html.slice(0, 800000);
+          res.destroy();
+          resolve({ html, url: targetUrl, pixels: [], method: 'http' });
+        }
+      });
       res.on('end', () => resolve({ html, url: targetUrl, pixels: [], method: 'http' }));
-    }).on('error', reject);
+    });
+    req.on('timeout', () => req.destroy(new Error('Scan request timed out')));
+    req.on('error', reject);
   });
 }
 
@@ -669,6 +1223,39 @@ const STATIC_ALLOW_EXT = new Set([
   '.woff', '.woff2', '.ttf', '.otf',
   '.txt', '.map',
 ]);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// STATIC ASSET CACHE  (C6)
+// Each file is read + compressed ONCE and kept for the process lifetime. On
+// Cloud Run the container image is immutable, so files never change without a
+// redeploy — and a redeploy starts a fresh process with an empty cache, so
+// staleness is a non-issue. Each entry carries the raw bytes plus pre-computed
+// gzip + brotli buffers and a strong ETag, so a hit costs zero disk reads and
+// zero re-compression — critical for the ~825 KB tool.html under load.
+// ══════════════════════════════════════════════════════════════════════════════
+const _staticCache  = new Map();   // absolute fp → { etag, ext, isHtml, raw, gzip, br }
+const _COMPRESSIBLE = new Set(['.html', '.css', '.svg', '.txt', '.map', '.json', '.js']);
+
+function _loadStatic(fp) {
+  let data;
+  try { data = fs.readFileSync(fp); }
+  catch (_) { return null; }                 // missing/unreadable → caller 404s
+  const ext    = path.extname(fp).toLowerCase();
+  const isHtml = ext === '.html';
+  const etag   = '"' + crypto.createHash('sha1').update(data).digest('base64').slice(0, 22) + '"';
+  const entry  = { etag, ext, isHtml, raw: data, gzip: null, br: null };
+  // Pre-compress text assets only — images/fonts are already compressed.
+  if (_COMPRESSIBLE.has(ext) && data.length > 1024) {
+    try { entry.gzip = zlib.gzipSync(data, { level: 6 }); } catch (_) {}
+    try {
+      entry.br = zlib.brotliCompressSync(data, {
+        params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 5 },   // 5 = strong but fast
+      });
+    } catch (_) {}
+  }
+  _staticCache.set(fp, entry);
+  return entry;
+}
 
 // Default 1 MB body cap (covers full GTM container imports). Override per-call
 // by passing a maxBytes argument. /api/ss/* endpoints use a 64 KB cap because
@@ -747,12 +1334,60 @@ function sendJSON(res, code, obj) {
 // ══════════════════════════════════════════════════════════════════════════════
 // HTTP SERVER
 // ══════════════════════════════════════════════════════════════════════════════
-http.createServer((req, res) => {
+const server = http.createServer((req, res) => {
 
   // ── CORS preflight ──────────────────────────────────────────
   if (req.method === 'OPTIONS') {
     res.writeHead(204, { ...corsHeaders(), ...securityHeaders() });
     res.end();
+    return;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // INTERNAL WORKER  —  POST /api/internal/run-provision-job   (C3)
+  // Invoked by Cloud Tasks (not the browser). Runs the provisioning job
+  // SYNCHRONOUSLY inside this request, so Cloud Run keeps CPU allocated for the
+  // full 60-120s — the whole reason for the Cloud Tasks hop. Auth is the
+  // X-Internal-Token shared secret (see _authorizeInternal).
+  //
+  // Body (from the Cloud Tasks payload): { jobType: 'managed' | 'ss', jobId }
+  // The heavy input lives in the Firestore job doc, loaded by the runner.
+  //
+  // Always ACKs 2xx once a terminal state is reached (success OR recorded
+  // failure): provisioning is NOT idempotent, so a Cloud Tasks retry would
+  // create duplicate GTM containers. The queue is also set to --max-attempts=1.
+  // ══════════════════════════════════════════════════════════════════════════
+  if (req.method === 'POST' && req.url === '/api/internal/run-provision-job') {
+    if (!_authorizeInternal(req, res)) return;
+    if (!firestoreService.isConfigured()) {
+      return sendJSON(res, 503, { error: 'Firestore is not configured' });
+    }
+    parseJsonBody(req, res, async body => {
+      const jobId   = body && body.jobId;
+      const jobType = (body && body.jobType) === 'ss' ? 'ss' : 'managed';
+      if (!jobId) return sendJSON(res, 400, { error: 'Missing jobId' });
+
+      let job;
+      try { job = await firestoreService.getJob(jobId); }
+      catch (e) { return sendJSON(res, 500, { error: e.message }); }
+      if (!job) return sendJSON(res, 404, { error: 'Job not found or expired' });
+
+      // Idempotency guard — if a prior attempt already finished, ACK so Cloud
+      // Tasks stops without re-running (which would duplicate containers).
+      if (job.status === 'completed' || job.status === 'failed') {
+        return sendJSON(res, 200, { ok: true, alreadyDone: true, status: job.status });
+      }
+
+      try {
+        if (jobType === 'ss') await _runSsProvisionJob(jobId);
+        else                  await _runManagedProvisionJob(jobId);
+        sendJSON(res, 200, { ok: true, jobId });
+      } catch (e) {
+        // Runner records 'failed' itself; ACK 200 anyway (non-idempotent — no retry).
+        console.error('[worker] job ' + jobId + ' crashed:', e);
+        sendJSON(res, 200, { ok: false, jobId, error: e.message });
+      }
+    }, SS_BODY_LIMIT);
     return;
   }
 
@@ -812,6 +1447,27 @@ http.createServer((req, res) => {
       if (!targetUrl) { sendJSON(res, 400, { error: 'Missing url' }); return; }
       if (!/^https?:\/\//i.test(targetUrl)) targetUrl = 'https://' + targetUrl;
 
+      // ── SSRF guard ─────────────────────────────────────────────────────────
+      // This endpoint is unauthenticated, so an unguarded fetch is a server-side
+      // request forgery + cloud-metadata exfiltration vector. Reject private /
+      // loopback / link-local / metadata hosts and disallowed ports BEFORE we
+      // fetch. fetchWithHttp re-checks every redirect hop as well.
+      try {
+        await assertSafeUrl(targetUrl);
+      } catch (e) {
+        return sendJSON(res, 400, { error: 'URL rejected (SSRF guard): ' + e.message });
+      }
+
+      // ── Concurrency cap ────────────────────────────────────────────────────
+      // Reject rather than launch an unbounded number of headless Chromes.
+      if (scanInFlight >= MAX_CONCURRENT_SCANS) {
+        return sendJSON(res, 429, {
+          error:        'Scanner is at capacity — please retry shortly',
+          retryAfterMs: 3000,
+        });
+      }
+
+      scanInFlight++;
       try {
         let result;
         if (puppeteer) {
@@ -824,6 +1480,8 @@ http.createServer((req, res) => {
       } catch (e) {
         console.error('[scanner] Error:', e.message);
         sendJSON(res, 502, { error: e.message });
+      } finally {
+        scanInFlight--;     // always release the slot, even on error/timeout
       }
     });
     return;
@@ -866,9 +1524,13 @@ http.createServer((req, res) => {
   // that would blow past Cloudflare / Railway proxy timeouts. Client must poll
   // GET /api/managed/job/:jobId until status === 'completed' or 'failed'.
   if (req.method === 'POST' && req.url === '/api/managed/create-container') {
-    parseJsonBody(req, res, body => {
+    parseJsonBody(req, res, async body => {
 
-      if (!gtmService.isConfigured()) {
+      // dryRun: simulate provisioning without real GTM/Stape calls. Opt-in and
+      // gated by ALLOW_DRY_RUN=1 so it can never be triggered in normal prod.
+      const dryRun = body.dryRun === true && process.env.ALLOW_DRY_RUN === '1';
+
+      if (!dryRun && !gtmService.isConfigured()) {
         return sendJSON(res, 503, {
           error: 'Managed GTM is not configured on this server',
           hint:  'Set GTM_SA_KEY_JSON and GTM_ACCOUNT_ID env vars',
@@ -883,245 +1545,91 @@ http.createServer((req, res) => {
 
       const { clientId, clientEmail, projectName, domain, cmsType,
               platforms, events, pixelIds, configJson, publishLive } = body;
+      // C-P1: full client-built server config (staged to GCS, not the job doc).
+      const serverConfigJson = body.serverConfigJson || null;
 
       // Tracking mode picker — 'client' (default) or 'client_server'.
       // Anything else is normalised to 'client' so old callers keep working.
       const mode = (body.mode === 'client_server') ? 'client_server' : 'client';
 
-      if (!clientId)    return sendJSON(res, 400, { error: 'Missing clientId' });
-      if (!configJson)  return sendJSON(res, 400, { error: 'Missing configJson' });
+      if (!clientId)               return sendJSON(res, 400, { error: 'Missing clientId' });
+      if (!configJson && !dryRun)  return sendJSON(res, 400, { error: 'Missing configJson' });
 
-      // Spawn background job and respond immediately
+      // Bundle everything the worker needs into the job doc; the Cloud Tasks
+      // payload then carries only { jobType, jobId } (heavy configJson stays here).
+      const input = { clientId, clientEmail, projectName, domain, cmsType,
+                      platforms, events, pixelIds, configJson, publishLive, mode, dryRun };
+
+      // Create the job doc BEFORE responding so an immediate poll can never 404.
+      // Direct saveJob (not _setJob) so a write failure fails the request loudly
+      // instead of handing back a jobId that was never persisted.
       const jobId = _newJobId();
-      _setJob(jobId, {
-        status:    'pending',
-        stage:     'queued',
-        clientId,
-        startedAt: Date.now(),
-      });
 
-      // Fire-and-forget — errors are captured into the job record, not thrown.
-      (async () => {
-        try {
-          _setJob(jobId, { status: 'running', stage: 'capacity_check' });
-
-          // 1. Capacity guard — GTM caps at 500 containers per account
-          const activeCount = await firestoreService.countActiveContainers();
-          if (activeCount >= 490) {
-            _setJob(jobId, {
-              status: 'failed',
-              stage:  'capacity_exceeded',
-              error:  'Managed GTM account is near capacity',
-              hint:   'Provision a new GTM_ACCOUNT_ID and route new clients there',
-              httpStatus: 507,
-              activeContainers: activeCount,
-            });
-            _scheduleJobCleanup(jobId);
-            return;
+      // C-P1: stage the full server config in a private GCS bucket (NOT the 1 MB
+      // Firestore doc). Flag-gated; on ANY failure we omit the ref and the worker
+      // uses the existing static GA4-only path — graceful degrade, never blocks.
+      if (!dryRun && mode === 'client_server' && serverConfigJson && _serverConfigImportEnabled()) {
+        const v = _validateServerConfig(serverConfigJson);
+        if (!v.ok) {
+          console.warn('[managed/create] serverConfigJson rejected by guard (' + v.error + ') — static path');
+        } else if (!configBlobStore.isConfigured()) {
+          console.warn('[managed/create] PROVISIONING_BUCKET not configured — static path');
+        } else {
+          try {
+            input.serverConfigRef = await configBlobStore.put(jobId, serverConfigJson);
+          } catch (e) {
+            console.warn('[managed/create] serverConfig blob upload failed (' + e.message + ') — static path');
           }
-
-          // 2. Provision via GTM API. Branch on mode:
-          //    - 'client'        → existing single-container flow (publishes live).
-          //    - 'client_server' → web + server containers; web is left
-          //                        UNPUBLISHED so /api/ss/wire-transport can
-          //                        patch the GA4 transport_url and republish
-          //                        once the user confirms the sGTM URL.
-          _setJob(jobId, { stage: 'gtm_provisioning', mode });
-
-          const provisionOpts = {
-            projectName: projectName || `${clientEmail || 'client'} — ${cmsType || 'site'}`,
-            domain,
-            configJson,
-            publishLive: mode === 'client_server' ? false : !!publishLive,
-            inviteEmail: clientEmail || null,
-            onProgress: (p) => _setJob(jobId, { stage: 'gtm_provisioning', progress: p }),
-          };
-
-          let webResult;
-          let serverResult = null;
-          if (mode === 'client_server') {
-            const both    = await gtmService.provisionForClientWithServer(provisionOpts);
-            webResult     = both.web;
-            serverResult  = both.server;
-          } else {
-            webResult = await gtmService.provisionForClient(provisionOpts);
-          }
-
-          // 3. Persist web container to Firestore (existing collection)
-          _setJob(jobId, { stage: 'saving' });
-          await firestoreService.saveContainer({
-            clientId,
-            clientEmail: clientEmail || null,
-            projectName: projectName  || null,
-            domain:      domain       || null,
-            cmsType:     cmsType      || null,
-            platforms:   platforms    || [],
-            events:      events       || [],
-            pixelIds:    pixelIds     || {},
-            gtmAccountId:   webResult.gtmAccountId,
-            gtmContainerId: webResult.gtmContainerId,
-            gtmPublicId:    webResult.gtmPublicId,
-            gtmWorkspaceId: webResult.gtmWorkspaceId,
-            gtmVersionId:   webResult.gtmVersionId,
-            published:      webResult.published,
-            publishedAt:    webResult.publishedAt,
-            snippetHead:    webResult.snippetHead,
-            snippetBody:    webResult.snippetBody,
-            containerName:  webResult.containerName || null,
-            invited:        !!webResult.invited,
-            inviteEmail:    webResult.inviteEmail || null,
-            inviteError:    webResult.inviteError || null,
-            importedCounts: {
-              tags:      webResult.importedTagCount,
-              triggers:  webResult.importedTriggerCount,
-              variables: webResult.importedVariableCount,
-            },
-            mode,
-            serverContainerPublicId: serverResult ? serverResult.publicId : null,
-          });
-
-          // 4. client_server flow — auto-deploy to Stape + auto-wire transport_url.
-          //    The Stape API key is a PLATFORM credential (set via STAPE_API_KEY env
-          //    var) — clients never see or enter it. If the env var is missing or
-          //    the deploy fails, we fall back to "manual mode": save the
-          //    containerConfig blob in Firestore so the frontend can show it and
-          //    /api/ss/wire-transport remains available for manual recovery.
-          let stapeDeployed   = null;
-          let stapeDeployErr  = null;
-          let webRepublished  = false;
-
-          if (mode === 'client_server' && serverResult) {
-            const platformStapeKey = (process.env.STAPE_API_KEY || '').trim();
-            const stapeRegion      = process.env.STAPE_REGION === 'eu' ? 'eu' : 'global';
-
-            if (platformStapeKey && serverResult.containerConfig) {
-              try {
-                _setJob(jobId, { stage: 'stape_deploy' });
-                const stape = new StapeProvider({ stapeRegion });
-                const dep = await stape.deployContainer({
-                  stapeApiKey:   platformStapeKey,
-                  containerName: serverResult.containerName ||
-                                 ('Easy Track sGTM — ' + (clientId || '').slice(0, 8)),
-                  gtmConfigBody: serverResult.containerConfig,
-                });
-                stapeDeployed = {
-                  serverUrl:   dep.serverUrl,
-                  containerId: dep.containerId,
-                  status:      dep.status,
-                  region:      stapeRegion,
-                };
-
-                // Wire the web container's GA4 tag → the deployed sGTM URL.
-                // setGA4TransportUrl creates a new web container version + publishes
-                // it, so this single call covers both wiring and going-live.
-                if (dep.serverUrl) {
-                  _setJob(jobId, { stage: 'wiring_transport_url' });
-                  try {
-                    await gtmService.setGA4TransportUrl(
-                      webResult.gtmContainerId,
-                      webResult.gtmWorkspaceId,
-                      dep.serverUrl,
-                    );
-                    webRepublished = true;
-                    // Refresh local snippet flags so the success UI shows LIVE.
-                    webResult.published   = true;
-                    webResult.publishedAt = new Date().toISOString();
-                  } catch (wireErr) {
-                    console.warn('[managed/create] wire transport_url failed:', wireErr.message);
-                    stapeDeployErr = 'Stape deployed but wiring failed: ' + wireErr.message;
-                  }
-                }
-              } catch (depErr) {
-                console.warn('[managed/create] Stape deploy failed:', depErr.message);
-                stapeDeployErr = depErr.message;
-              }
-            } else if (!platformStapeKey) {
-              stapeDeployErr = 'STAPE_API_KEY env var is not set on the server — manual deploy required';
-            }
-
-            // Persist the SS config regardless of deploy outcome.
-            try {
-              const existingSs = await firestoreService.getSSConfig(clientId).catch(() => null);
-              await firestoreService.saveSSConfig(clientId, {
-                provider:         'stape',
-                serverUrl:        (stapeDeployed && stapeDeployed.serverUrl) || '',
-                platforms:        (existingSs && existingSs.platforms)        || (platforms || []),
-                encryptedTokens:  (existingSs && existingSs.encryptedTokens)  || {},
-                stapeApiKey:      null,
-                stapeContainerId: stapeDeployed ? stapeDeployed.containerId : null,
-                mode:                 'client_server',
-                webContainerId:       webResult.gtmContainerId,
-                webPublicId:          webResult.gtmPublicId,
-                webWorkspaceId:       webResult.gtmWorkspaceId,
-                serverContainerId:    serverResult.containerId,
-                serverPublicId:       serverResult.publicId,
-                serverWorkspaceId:    serverResult.workspaceId,
-                serverVersionId:      serverResult.versionId,
-                // Keep the blob ONLY when auto-deploy didn't succeed — saves
-                // Firestore space and prevents stale blobs after redeploys.
-                containerConfig:      stapeDeployed ? null : (serverResult.containerConfig || null),
-                transportUrlWired:    webRepublished,
-                transportUrlWiredAt:  webRepublished ? new Date() : null,
-                stapeAutoDeployed:    !!stapeDeployed,
-                stapeDeployError:     stapeDeployErr || null,
-              });
-            } catch (saveErr) {
-              console.warn('[managed/create] saveSSConfig failed (non-fatal):', saveErr.message);
-            }
-          }
-
-          // Attach deploy info to serverResult before returning to the client
-          if (serverResult && (stapeDeployed || stapeDeployErr)) {
-            serverResult.deployedUrl       = stapeDeployed ? stapeDeployed.serverUrl   : null;
-            serverResult.stapeContainerId  = stapeDeployed ? stapeDeployed.containerId : null;
-            serverResult.stapeStatus       = stapeDeployed ? stapeDeployed.status      : null;
-            serverResult.transportUrlWired = webRepublished;
-            serverResult.deployError       = stapeDeployErr || null;
-            // For manual-fallback path: keep the blob in the response only if
-            // auto-deploy didn't happen, so the frontend can still render it.
-            if (stapeDeployed) delete serverResult.containerConfig;
-          }
-
-          _setJob(jobId, {
-            status:     'completed',
-            stage:      'done',
-            result:     {
-              ok: true,
-              mode,
-              ...webResult,
-              server: serverResult,                  // null when mode=client
-            },
-            finishedAt: Date.now(),
-          });
-          _scheduleJobCleanup(jobId);
-        } catch (e) {
-          console.error('[managed/create][job ' + jobId + ']', e);
-          _setJob(jobId, {
-            status:     'failed',
-            stage:      'error',
-            error:      e.message,
-            details:    e.details || null,
-            code:       e.code    || null,
-            httpStatus: (e.status && e.status >= 400 && e.status < 600) ? e.status : 502,
-            finishedAt: Date.now(),
-          });
-          _scheduleJobCleanup(jobId);
         }
-      })();
+      }
 
-      // Return jobId immediately (202 Accepted)
+      try {
+        await firestoreService.saveJob(jobId, {
+          status:    'pending',
+          stage:     'queued',
+          clientId,
+          jobType:   'managed',
+          input,
+          startedAt: Date.now(),
+        });
+      } catch (e) {
+        return sendJSON(res, 500, { error: 'Failed to create provisioning job: ' + e.message });
+      }
+
+      // Hand off to the worker: a Cloud Task on GCP (CPU stays allocated for the
+      // whole job) or an in-process run off-GCP (local / Railway).
+      try {
+        await _dispatchProvisionJob('managed', jobId);
+      } catch (e) {
+        await _setJob(jobId, {
+          status: 'failed', stage: 'enqueue_error',
+          error:  'Failed to enqueue provisioning job: ' + e.message,
+          finishedAt: Date.now(),
+        });
+        return sendJSON(res, 502, { error: 'Failed to enqueue provisioning job: ' + e.message });
+      }
+
+      // 202 Accepted — job doc already exists, so the client's first poll is safe.
       sendJSON(res, 202, { ok: true, jobId, status: 'pending' });
     });
     return;
   }
 
-  // GET /api/managed/job/:jobId — poll status of a provisioning job
+  // GET /api/managed/job/:jobId — poll status of a provisioning job.
+  // Reads from Firestore so ANY Cloud Run instance can answer the poll, not just
+  // the instance that created the job.
   if (req.method === 'GET' && req.url.startsWith('/api/managed/job/')) {
     const jobId = req.url.substring('/api/managed/job/'.length).split('?')[0];
     if (!jobId) return sendJSON(res, 400, { error: 'Missing jobId' });
-    const job = managedJobs.get(jobId);
-    if (!job) return sendJSON(res, 404, { error: 'Job not found or expired' });
-    sendJSON(res, 200, { ok: true, jobId, ...job });
+    if (!firestoreService.isConfigured()) {
+      return sendJSON(res, 503, { error: 'Firestore is not configured' });
+    }
+    firestoreService.getJob(jobId)
+      .then(job => {
+        if (!job) return sendJSON(res, 404, { error: 'Job not found or expired' });
+        sendJSON(res, 200, { ok: true, jobId, ...job });
+      })
+      .catch(e => sendJSON(res, 500, { error: e.message }));
     return;
   }
 
@@ -1714,14 +2222,18 @@ http.createServer((req, res) => {
         const { clientId, email } = auth;
         if (!ssRequireFirestore()) return;
 
-        if (!gtmService.isConfigured()) {
-          return sendJSON(res, 503, {
-            error: 'GTM غير مُهيَّأ على هذا الخادم',
-            hint:  'اضبط GTM_SA_KEY_JSON و GTM_ACCOUNT_ID في .env',
-          });
-        }
-
         ssParseBody(async body => {
+          // dryRun: simulate provisioning without real GTM/Stape calls. Opt-in
+          // and gated by ALLOW_DRY_RUN=1 so it's never reachable in normal prod.
+          const dryRun = body.dryRun === true && process.env.ALLOW_DRY_RUN === '1';
+
+          if (!dryRun && !gtmService.isConfigured()) {
+            return sendJSON(res, 503, {
+              error: 'GTM غير مُهيَّأ على هذا الخادم',
+              hint:  'اضبط GTM_SA_KEY_JSON و GTM_ACCOUNT_ID في .env',
+            });
+          }
+
           const {
             configJson, projectName,
             ga4MeasurementId, ga4Events, googleAdsEvents,
@@ -1737,93 +2249,34 @@ http.createServer((req, res) => {
             return sendJSON(res, 507, { error: 'حساب GTM وصل للحد الأقصى (490 container)' });
           }
 
+          // Bundle the worker's input into the job doc; the Cloud Tasks payload
+          // then carries only { jobType, jobId }.
+          const input = {
+            clientId, email, projectName,
+            configJson: finalConfigJson,
+            ssEvents, ssPlatforms, ga4MeasurementId, ga4Events, googleAdsEvents,
+            dryRun,
+          };
+
+          // Create the job doc BEFORE responding so an immediate poll can't 404.
           const jobId = _newJobId();
-          _setJob(jobId, { status: 'pending', stage: 'queued', clientId, startedAt: Date.now() });
+          try {
+            await firestoreService.saveJob(jobId, { status: 'pending', stage: 'queued', clientId, jobType: 'ss', input, startedAt: Date.now() });
+          } catch (e) {
+            return sendJSON(res, 500, { error: 'Failed to create provisioning job: ' + e.message });
+          }
 
-          // Fire-and-forget provisioning
-          (async () => {
-            try {
-              _setJob(jobId, { status: 'running', stage: 'gtm_provisioning', mode: 'client_server' });
-
-              const both = await gtmService.provisionForClientWithServer({
-                projectName: projectName || ((email || clientId.slice(0, 8)) + ' — SS Setup'),
-                configJson:   finalConfigJson,
-                publishLive:  false,
-                inviteEmail:  email || null,
-                onProgress:   (p) => _setJob(jobId, { stage: 'gtm_provisioning', progress: p }),
-              });
-
-              const { web, server } = both;
-              _setJob(jobId, { stage: 'saving' });
-
-              // Persist web container record
-              await firestoreService.saveContainer({
-                clientId,
-                clientEmail:    email || null,
-                projectName:    projectName || null,
-                platforms:      ssPlatforms || [],
-                events:         ssEvents    || [],
-                gtmAccountId:   web.gtmAccountId,
-                gtmContainerId: web.gtmContainerId,
-                gtmPublicId:    web.gtmPublicId,
-                gtmWorkspaceId: web.gtmWorkspaceId,
-                gtmVersionId:   web.gtmVersionId,
-                published:      false,
-                snippetHead:    web.snippetHead,
-                snippetBody:    web.snippetBody,
-                mode:           'client_server',
-                serverContainerPublicId: server ? server.publicId : null,
-              });
-
-              // Persist SS config with step-1 results (no URL yet)
-              try {
-                const existing = await firestoreService.getSSConfig(clientId).catch(() => null);
-                await firestoreService.saveSSConfig(clientId, {
-                  provider:           'pending',
-                  serverUrl:          '',
-                  platforms:          ssPlatforms   || [],
-                  encryptedTokens:    (existing && existing.encryptedTokens) || {},
-                  stapeApiKey:        null,
-                  stapeContainerId:   null,
-                  mode:               'client_server',
-                  webContainerId:     web.gtmContainerId,
-                  webPublicId:        web.gtmPublicId,
-                  webWorkspaceId:     web.gtmWorkspaceId,
-                  serverContainerId:  server ? server.containerId  : null,
-                  serverPublicId:     server ? server.publicId     : null,
-                  serverWorkspaceId:  server ? server.workspaceId  : null,
-                  serverVersionId:    server ? server.versionId    : null,
-                  containerConfig:    server ? (server.containerConfig || null) : null,
-                  transportUrlWired:  false,
-                  ga4MeasurementId:   ga4MeasurementId || null,
-                  ga4Events:          ga4Events        || [],
-                  googleAdsEvents:    googleAdsEvents  || [],
-                  ssEvents:           ssEvents         || [],
-                });
-              } catch (saveErr) {
-                console.warn('[ss/create-containers] saveSSConfig failed (non-fatal):', saveErr.message);
-              }
-
-              _setJob(jobId, {
-                status:    'completed',
-                stage:     'done',
-                result:    { ok: true, mode: 'client_server', ...web, server },
-                finishedAt: Date.now(),
-              });
-              _scheduleJobCleanup(jobId);
-            } catch (e) {
-              console.error('[ss/create-containers][job ' + jobId + ']', e);
-              _setJob(jobId, {
-                status:    'failed',
-                stage:     'error',
-                error:     e.message,
-                code:      e.code    || null,
-                httpStatus: (e.status >= 400 && e.status < 600) ? e.status : 502,
-                finishedAt: Date.now(),
-              });
-              _scheduleJobCleanup(jobId);
-            }
-          })();
+          // Hand off to the worker (Cloud Task on GCP; in-process off-GCP).
+          try {
+            await _dispatchProvisionJob('ss', jobId);
+          } catch (e) {
+            await _setJob(jobId, {
+              status: 'failed', stage: 'enqueue_error',
+              error:  'Failed to enqueue provisioning job: ' + e.message,
+              finishedAt: Date.now(),
+            });
+            return sendJSON(res, 502, { error: 'Failed to enqueue provisioning job: ' + e.message });
+          }
 
           sendJSON(res, 202, { ok: true, jobId });
         });
@@ -1902,34 +2355,116 @@ http.createServer((req, res) => {
     res.writeHead(403, securityHeaders()); res.end('Forbidden'); return;
   }
 
-  function serveFile(fp, triedFallback) {
-    fs.readFile(fp, (err, data) => {
-      if (err) {
-        // Extensionless URLs (e.g. /tool) → try <name>.html once
-        if (!triedFallback && !path.extname(fp)) return serveFile(fp + '.html', true);
-        res.writeHead(404, securityHeaders()); res.end('Not found');
-        return;
-      }
-      const ext    = path.extname(fp).toLowerCase();
+  function serveStatic(fp, triedFallback) {
+    const entry = _staticCache.get(fp) || _loadStatic(fp);
+    if (!entry) {
+      // Extensionless URLs (e.g. /tool) → try <name>.html once
+      if (!triedFallback && !path.extname(fp)) return serveStatic(fp + '.html', true);
+      res.writeHead(404, securityHeaders()); res.end('Not found');
+      return;
+    }
 
-      // Extension allowlist — blocks server.js / package.json / Dockerfile / etc.
-      if (!STATIC_ALLOW_EXT.has(ext)) {
-        res.writeHead(403, securityHeaders()); res.end('Forbidden');
-        return;
-      }
+    // Extension allowlist — blocks server.js / package.json / Dockerfile / etc.
+    if (!STATIC_ALLOW_EXT.has(entry.ext)) {
+      res.writeHead(403, securityHeaders()); res.end('Forbidden');
+      return;
+    }
 
-      const isHtml = ext === '.html';
-      res.writeHead(200, {
-        'Content-Type': mime[ext] || 'text/plain',
-        ...securityHeaders({ html: isHtml }),
+    const cacheControl = entry.isHtml
+      ? 'no-cache'                                   // HTML: always revalidate via ETag
+      : 'public, max-age=31536000, immutable';       // assets: cache hard (content-hashed via ETag)
+
+    // Conditional request — client already holds this exact content → 304.
+    if (req.headers['if-none-match'] === entry.etag) {
+      res.writeHead(304, {
+        'ETag':          entry.etag,
+        'Cache-Control': cacheControl,
+        ...securityHeaders({ html: entry.isHtml }),
       });
-      res.end(data);
-    });
-  }
-  serveFile(filePath);
+      res.end();
+      return;
+    }
 
-}).listen(PORT, () => {
+    // Negotiate encoding against what we pre-compressed. Brotli preferred.
+    const accept = req.headers['accept-encoding'] || '';
+    let body = entry.raw, encoding = null;
+    if (entry.br && /\bbr\b/.test(accept))            { body = entry.br;   encoding = 'br'; }
+    else if (entry.gzip && /\bgzip\b/.test(accept))   { body = entry.gzip; encoding = 'gzip'; }
+
+    const headers = {
+      'Content-Type':   mime[entry.ext] || 'text/plain',
+      'ETag':           entry.etag,
+      'Cache-Control':  cacheControl,
+      'Vary':           'Accept-Encoding',
+      'Content-Length': Buffer.byteLength(body),
+      ...securityHeaders({ html: entry.isHtml }),
+    };
+    if (encoding) headers['Content-Encoding'] = encoding;
+
+    res.writeHead(200, headers);
+    res.end(req.method === 'HEAD' ? undefined : body);
+  }
+  serveStatic(filePath);
+
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HTTP SERVER TUNING + PROCESS SAFETY NET  (C7)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// keepAliveTimeout MUST be < the upstream LB/proxy idle timeout, and
+// headersTimeout MUST be slightly greater than keepAliveTimeout (Node guidance)
+// so a socket isn't reused at the exact moment the server is closing it — the
+// classic cause of sporadic 502s behind Cloud Run / Cloudflare / Railway.
+server.keepAliveTimeout = 65000;   // 65s
+server.headersTimeout   = 66000;   // 66s — must exceed keepAliveTimeout
+server.requestTimeout   = 30000;   // 30s — kill slowloris-style stalled requests
+server.maxConnections   = 2000;    // hard ceiling on concurrent sockets per instance
+
+// Malformed HTTP (bad TLS, garbage bytes) — answer once and drop the socket
+// instead of throwing inside the server.
+server.on('clientError', (err, socket) => {
+  if (socket.writable && !socket.destroyed) {
+    socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n');
+  } else {
+    socket.destroy();
+  }
+});
+
+server.listen(PORT, () => {
   const mode = puppeteer ? '🟢 Puppeteer (headless Chrome)' : '🟡 HTTP fallback (install puppeteer for full analysis)';
   console.log(`Easy Track server running at http://localhost:${PORT}`);
   console.log(`Scanner mode: ${mode}`);
+});
+
+// ── Global process guards ─────────────────────────────────────────────────────
+// A single unhandled error must not silently wedge the process. We log, stop
+// accepting new connections, drain briefly, then exit non-zero so the platform
+// (Cloud Run / Railway) restarts a clean instance.
+let _shuttingDown = false;
+function _fatalShutdown(label, errOrReason) {
+  console.error('[fatal] ' + label + ':', (errOrReason && errOrReason.stack) || errOrReason);
+  if (_shuttingDown) return;
+  _shuttingDown = true;
+  try {
+    server.close(() => process.exit(1));
+  } catch (_) {
+    process.exit(1);
+  }
+  // Hard backstop — never hang forever waiting for in-flight sockets to drain.
+  setTimeout(() => process.exit(1), 5000).unref();
+}
+
+process.on('uncaughtException', (err) => _fatalShutdown('uncaughtException', err));
+process.on('unhandledRejection', (reason) => _fatalShutdown('unhandledRejection', reason));
+
+// Graceful shutdown on platform stop signals (SIGTERM on Cloud Run / Railway).
+['SIGTERM', 'SIGINT'].forEach((sig) => {
+  process.on(sig, () => {
+    console.log('[shutdown] received ' + sig + ' — closing server');
+    if (_shuttingDown) return;
+    _shuttingDown = true;
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 5000).unref();
+  });
 });

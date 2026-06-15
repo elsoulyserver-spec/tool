@@ -17,7 +17,26 @@
       "Bash(gh pr create --title 'fix: repair sGTM container JSON so GTM import succeeds' --body ' *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git remote *)"
+      "Bash(git remote *)",
+      "Bash(ping -n 2 8.8.8.8)",
+      "Bash(nslookup github.com)",
+      "Bash(git -c http.lowSpeedLimit=0 -c http.lowSpeedTime=120 push origin fix/sgtm-container-import)",
+      "Bash(git -c credential.helper= -c http.lowSpeedLimit=0 -c http.lowSpeedTime=120 push origin fix/sgtm-container-import)",
+      "Bash(sed -n '11520,11580p' tool.html)",
+      "Bash(sed -n '300,330p' lib/gtm-config-builder.js)",
+      "Bash(node --test tests/*.test.js)",
+      "PowerShell($py = Get-Command python -ErrorAction SilentlyContinue; if \\(-not $py\\) { $py = Get-Command python3 -ErrorAction SilentlyContinue }; if \\(-not $py\\) { $py = Get-Command py -ErrorAction SilentlyContinue }; if \\($py\\) { Write-Output \"PYTHON=$\\($py.Source\\)\"; & $py.Source --version } else { Write-Output \"PYTHON_NOT_FOUND\" })",
+      "Bash(cp server.js /tmp/server.js.bak)",
+      "Bash(sed -i '1379,1583d' server.js)",
+      "Bash(cd \"/c/Users/Yousef/Downloads/easytrac.io-main/easytrac.io-main\" && diff /tmp/server.js.bak server.js)",
+      "Bash(cd \"/c/Users/Yousef/Downloads/easytrac.io-main/easytrac.io-main\" && echo \"CR byte count \\(current\\):\" && tr -cd '\\\\r' < server.js | wc -c && echo \"CR byte count \\(backup\\):\" && tr -cd '\\\\r' < /tmp/server.js.bak | wc -c && echo \"=== changed-hunk summary \\(strip CR\\) ===\" && diff --strip-trailing-cr /tmp/server.js.bak server.js | grep -E '^[0-9]' )",
+      "Bash(cd \"/c/Users/Yousef/Downloads/easytrac.io-main/easytrac.io-main\" && tail -25 .env.example)",
+      "Bash(xargs wc -l)",
+      "Bash(grep -oE \"fetch\\\\\\(['\\\\\\\\\\\\`][^'\\\\\\\\\\\\`]*['\\\\\\\\\\\\`]|/api/[a-zA-Z0-9/_:-]+\" tool.html)",
+      "Bash(node -e \"const https=require\\('https'\\);const r=https.request\\({hostname:'oauth2.googleapis.com',path:'/',method:'HEAD',timeout:5000},res=>{console.log\\('oauth2.googleapis.com reachable, HTTP',res.statusCode\\);process.exit\\(0\\)}\\);r.on\\('timeout',\\(\\)=>{console.log\\('TIMEOUT — no outbound network'\\);process.exit\\(0\\)}\\);r.on\\('error',e=>{console.log\\('NETWORK ERROR:',e.code||e.message\\);process.exit\\(0\\)}\\);r.end\\(\\)\")",
+      "PowerShell(node --version)",
+      "PowerShell(node -e \"const https=require\\('https'\\);const r=https.request\\({hostname:'oauth2.googleapis.com',path:'/',method:'HEAD',timeout:6000},res=>{console.log\\('oauth2 reachable HTTP',res.statusCode\\);process.exit\\(0\\)}\\);r.on\\('timeout',\\(\\)=>{console.log\\('TIMEOUT-no-egress'\\);process.exit\\(0\\)}\\);r.on\\('error',e=>{console.log\\('NETERR',e.code||e.message\\);process.exit\\(0\\)}\\);r.end\\(\\)\")",
+      "PowerShell($n = \\(Get-Command node -ErrorAction SilentlyContinue\\); if \\($n\\) { Write-Output \"node FOUND: $\\($n.Source\\)\" } else { Write-Output \"node NOT on PATH\" }; $paths = @\\(\"$env:ProgramFiles\\\\nodejs\\\\node.exe\",\"$env:LOCALAPPDATA\\\\nvm\",\"$env:APPDATA\\\\npm\\\\node.exe\",\"$env:ProgramFiles\\\\nodejs\"\\); foreach \\($p in $paths\\) { if \\(Test-Path $p\\) { Write-Output \"exists: $p\" } })"
     ]
   }
 }
