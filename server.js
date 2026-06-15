@@ -60,6 +60,10 @@ const { assertSafeUrl }       = require('./lib/providers/base');
 // Cloud Tasks client — offloads long provisioning jobs to a worker request so
 // Cloud Run keeps CPU allocated for their full duration (see C3 / lib/cloud-tasks.js).
 const cloudTasks              = require('./lib/cloud-tasks');
+// Server-config blob store (Phase-1) — serverConfigJson is too large for a
+// Firestore job doc (1 MB limit + embedded customTemplate JS), so it is staged
+// in a private GCS bucket and the job carries only a small { bucket, object } ref.
+const configBlobStore         = require('./lib/config-blob-store');
 
 // ── Startup dependency check ──────────────────────────────────────────────
 // Surface missing deps loudly. The providers do `try { require('axios') } catch{}`
@@ -78,8 +82,62 @@ const cloudTasks              = require('./lib/cloud-tasks');
   }
 })();
 
+// ── Startup ENV check ─────────────────────────────────────────────────────
+// The #1 deploy mistake: forgetting to set secrets on the host (Railway / Cloud
+// Run) — .env is gitignored, so it is NEVER shipped. Without this banner the only
+// symptom is a 503 "not configured" at request time, with nothing in the logs.
+// We print exactly which vars are missing and which routes that breaks. Values
+// are never logged.
+(function envCheck() {
+  const REQUIRED = [
+    { key: 'GTM_SA_KEY_JSON',      breaks: '/api/managed/* and /api/ss/create-containers (GTM provisioning)' },
+    { key: 'GTM_ACCOUNT_ID',       breaks: '/api/managed/* and /api/ss/create-containers (GTM provisioning)' },
+    { key: 'FIREBASE_SA_KEY_JSON', breaks: '/api/ss/* auth + ALL job storage (jobs are Firestore-backed)' },
+    { key: 'MASTER_ENCRYPTION_KEY',breaks: '/api/ss/save-config (token encryption)' },
+  ];
+  const missing = REQUIRED.filter(r => !((process.env[r.key] || '').trim()));
+  if (missing.length) {
+    console.warn('');
+    console.warn('⚠️  STARTUP WARNING: missing required environment variables:');
+    missing.forEach(r => console.warn('   • ' + r.key.padEnd(22) + '→ breaks ' + r.breaks));
+    console.warn('   On Railway: Service → Variables. On Cloud Run: --update-secrets / Secret Manager.');
+    console.warn('   (.env is gitignored and is NOT deployed — host vars must be set explicitly.)');
+    console.warn('');
+  } else {
+    console.log('✓ All required environment variables are set.');
+  }
+})();
+
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PHASE-1 FEATURE FLAG — import managed server containers via versions:import
+// When MANAGED_IMPORT_SERVER_CONFIG=1, /api/managed/create-container stages the
+// client-built serverConfigJson in GCS and the worker imports it full-fidelity
+// (preserving client + customTemplate / CAPI). OFF (default) = unchanged static
+// GA4-only path. Re-checked at worker time so flipping OFF rolls back instantly.
+// ══════════════════════════════════════════════════════════════════════════════
+function _serverConfigImportEnabled() {
+  const v = (process.env.MANAGED_IMPORT_SERVER_CONFIG || '').trim().toLowerCase();
+  return v === '1' || v === 'true';
+}
+
+// Minimal structural guard before we stage a client-supplied config into our OWN
+// GTM account (defense-in-depth; full validation is a later phase).
+const SERVER_CONFIG_MAX_BYTES = 700 * 1024;   // stay well under the GCS/job limits
+function _validateServerConfig(cfg) {
+  if (!cfg || typeof cfg !== 'object')        return { ok: false, error: 'not an object' };
+  if (cfg.exportFormatVersion === undefined)  return { ok: false, error: 'missing exportFormatVersion' };
+  if (!cfg.containerVersion || typeof cfg.containerVersion !== 'object') {
+    return { ok: false, error: 'missing containerVersion' };
+  }
+  let bytes = 0;
+  try { bytes = Buffer.byteLength(JSON.stringify(cfg)); }
+  catch (_) { return { ok: false, error: 'not serializable' }; }
+  if (bytes > SERVER_CONFIG_MAX_BYTES) return { ok: false, error: 'too large (' + bytes + ' bytes)' };
+  return { ok: true, bytes };
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // MANAGED GTM JOBS — durable, cross-instance async job tracker (Firestore-backed)
@@ -218,10 +276,26 @@ async function _runManagedProvisionJob(jobId) {
     //                        once the user confirms the sGTM URL.
     await _setJob(jobId, { stage: 'gtm_provisioning', mode });
 
+    // C-P1: load the staged server config (if any) and pass it to the GTM layer
+    // so the server container is imported full-fidelity via versions:import. The
+    // flag is RE-CHECKED here, so flipping MANAGED_IMPORT_SERVER_CONFIG=0 rolls
+    // back in-flight jobs to the static path. Any load failure degrades to static.
+    let serverConfigJson = null;
+    if (mode === 'client_server' && input.serverConfigRef && _serverConfigImportEnabled()) {
+      try {
+        serverConfigJson = await configBlobStore.get(input.serverConfigRef);
+        await _setJob(jobId, { serverConfigSource: 'versions_import' });
+      } catch (e) {
+        console.warn('[managed/create][job ' + jobId + '] serverConfig load failed (' + e.message + ') — static path');
+        await _setJob(jobId, { serverConfigLoadError: e.message });
+      }
+    }
+
     const provisionOpts = {
       projectName: projectName || `${clientEmail || 'client'} — ${cmsType || 'site'}`,
       domain,
       configJson,
+      serverConfigJson,
       publishLive: mode === 'client_server' ? false : !!publishLive,
       inviteEmail: clientEmail || null,
       onProgress: (p) => { _setJob(jobId, { stage: 'gtm_provisioning', progress: p }, { progressOnly: true }); },
@@ -394,6 +468,14 @@ async function _runManagedProvisionJob(jobId) {
       httpStatus: (e.status && e.status >= 400 && e.status < 600) ? e.status : 502,
       finishedAt: Date.now(),
     });
+  } finally {
+    // C-P1: the staged server config is secret-bearing (embeds CAPI tokens) —
+    // delete it as soon as provisioning reaches a terminal state. The bucket
+    // lifecycle TTL is the backstop for any path that skips this.
+    if (input && input.serverConfigRef) {
+      try { await configBlobStore.del(input.serverConfigRef); }
+      catch (e2) { console.warn('[managed/create][job ' + jobId + '] blob cleanup failed:', e2.message); }
+    }
   }
 }
 
@@ -1463,6 +1545,8 @@ const server = http.createServer((req, res) => {
 
       const { clientId, clientEmail, projectName, domain, cmsType,
               platforms, events, pixelIds, configJson, publishLive } = body;
+      // C-P1: full client-built server config (staged to GCS, not the job doc).
+      const serverConfigJson = body.serverConfigJson || null;
 
       // Tracking mode picker — 'client' (default) or 'client_server'.
       // Anything else is normalised to 'client' so old callers keep working.
@@ -1480,6 +1564,25 @@ const server = http.createServer((req, res) => {
       // Direct saveJob (not _setJob) so a write failure fails the request loudly
       // instead of handing back a jobId that was never persisted.
       const jobId = _newJobId();
+
+      // C-P1: stage the full server config in a private GCS bucket (NOT the 1 MB
+      // Firestore doc). Flag-gated; on ANY failure we omit the ref and the worker
+      // uses the existing static GA4-only path — graceful degrade, never blocks.
+      if (!dryRun && mode === 'client_server' && serverConfigJson && _serverConfigImportEnabled()) {
+        const v = _validateServerConfig(serverConfigJson);
+        if (!v.ok) {
+          console.warn('[managed/create] serverConfigJson rejected by guard (' + v.error + ') — static path');
+        } else if (!configBlobStore.isConfigured()) {
+          console.warn('[managed/create] PROVISIONING_BUCKET not configured — static path');
+        } else {
+          try {
+            input.serverConfigRef = await configBlobStore.put(jobId, serverConfigJson);
+          } catch (e) {
+            console.warn('[managed/create] serverConfig blob upload failed (' + e.message + ') — static path');
+          }
+        }
+      }
+
       try {
         await firestoreService.saveJob(jobId, {
           status:    'pending',

@@ -340,6 +340,21 @@ async function verifyIdToken(idToken) {
   return await admin.auth().verifyIdToken(idToken, true);
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// STORAGE — provisioning config blob bucket (used by lib/config-blob-store.js)
+// Reuses the same Admin app (firebase-admin bundles @google-cloud/storage → no
+// new dependency). Bucket name comes from PROVISIONING_BUCKET and MUST be a
+// private, same-region bucket (the staged blobs are secret-bearing).
+// ══════════════════════════════════════════════════════════════════════════════
+function getStorageBucket(name) {
+  init();
+  if (_initError) throw _initError;
+  if (!admin) throw new Error('firebase-admin is not installed');
+  const b = (name || process.env.PROVISIONING_BUCKET || '').trim();
+  if (!b) throw new Error('PROVISIONING_BUCKET is not set');
+  return admin.storage().bucket(b);
+}
+
 module.exports = {
   isConfigured,
   saveContainer,
@@ -360,4 +375,6 @@ module.exports = {
   getJob,
   // Auth
   verifyIdToken,
+  // Storage (provisioning config blobs)
+  getStorageBucket,
 };

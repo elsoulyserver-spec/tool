@@ -508,6 +508,29 @@ async function getContainerConfig(containerId) {
   return c && c.containerConfig ? c.containerConfig : null;
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// FULL-FIDELITY SERVER IMPORT  (Phase-1)  —  versions:import
+// Mirrors the BYO flow's /api/gtm/import proxy EXACTLY (same path + body wrapping,
+// see server.js) but server-side, authenticated with the managed Service Account
+// token via gtmRequest. Unlike importContainerJSON (which only creates
+// variable/trigger/tag), versions:import preserves the FULL container —
+// variable, trigger, tag, CLIENT, and customTemplate — i.e. the Meta/TikTok/Snap
+// CAPI entities. Returns the GTM response (a ContainerVersion).
+async function importServerContainerVersion(containerId, configJson) {
+  if (!containerId) throw new Error('importServerContainerVersion: containerId required');
+  if (!configJson)  throw new Error('importServerContainerVersion: configJson required');
+  const acc = getAccountId();
+  // Same wrapping the BYO proxy applies for full GTM container exports.
+  const apiBody = (configJson.exportFormatVersion !== undefined)
+    ? { containerConfigJSON: JSON.stringify(configJson) }
+    : configJson;
+  return gtmRequest(
+    'POST',
+    `/accounts/${acc}/containers/${containerId}/versions:import`,
+    JSON.stringify(apiBody),
+  );
+}
+
 // Patches the GA4 Configuration tag on the WEB container to set transport_url
 // so the browser sends GA4 hits through the user's sGTM instead of straight to
 // Google. Then bumps the version + republishes — otherwise the change stays
@@ -601,25 +624,52 @@ async function provisionForClientWithServer(opts) {
   const serverWs = await getDefaultWorkspace(serverContainerId);
   const serverWorkspaceId = serverWs.workspaceId;
 
-  let sgtmConfig;
-  try {
-    sgtmConfig = require('./lib/sgtm-default-config.json');
-  } catch (e) {
-    sgtmConfig = { containerVersion: { variable: [], trigger: [], tag: [] } };
-    console.warn('[gtm] lib/sgtm-default-config.json missing — server container will be empty');
+  let importResult;
+  let serverVersionId;
+
+  if (opts.serverConfigJson) {
+    // PHASE 1 (feature-flagged upstream in server.js): import the full,
+    // client-built server config via the SAME versions:import path the BYO flow
+    // uses — preserves client + customTemplate (Meta/TikTok/Snap CAPI), which the
+    // per-entity importContainerJSON drops. The static path below is the fallback.
+    onProgress({ stage: 'sgtm_import', done: 0, total: 1 });
+    const imp = await importServerContainerVersion(serverContainerId, opts.serverConfigJson);
+    const cv  = opts.serverConfigJson.containerVersion || {};
+    importResult = {
+      importedTagCount:      (cv.tag      || []).length,
+      importedTriggerCount:  (cv.trigger  || []).length,
+      importedVariableCount: (cv.variable || []).length,
+    };
+    // versions:import returns a ContainerVersion; tolerate either response shape.
+    serverVersionId = (imp && (imp.containerVersionId ||
+      (imp.containerVersion && imp.containerVersion.containerVersionId))) || null;
+    if (!serverVersionId) {
+      console.warn('[gtm] versions:import returned no version id — server container may be unpublished');
+    }
+    onProgress({ stage: 'sgtm_import', done: 1, total: 1 });
+  } else {
+    // Static fallback (UNCHANGED): per-entity import of the GA4-only default.
+    let sgtmConfig;
+    try {
+      sgtmConfig = require('./lib/sgtm-default-config.json');
+    } catch (e) {
+      sgtmConfig = { containerVersion: { variable: [], trigger: [], tag: [] } };
+      console.warn('[gtm] lib/sgtm-default-config.json missing — server container will be empty');
+    }
+
+    onProgress({ stage: 'sgtm_import', done: 0, total: 1 });
+    importResult = await importContainerJSON(
+      serverContainerId, serverWorkspaceId, sgtmConfig, null,
+      p => onProgress({ stage: 'sgtm_import', ...p }),
+    );
+
+    const verResp  = await createVersion(serverContainerId, serverWorkspaceId,
+      'sGTM initial — ' + new Date().toISOString().split('T')[0]);
+    serverVersionId = verResp.containerVersion && verResp.containerVersion.containerVersionId;
   }
 
-  onProgress({ stage: 'sgtm_import', done: 0, total: 1 });
-  const importResult = await importContainerJSON(
-    serverContainerId, serverWorkspaceId, sgtmConfig, null,
-    p => onProgress({ stage: 'sgtm_import', ...p }),
-  );
-
-  // 4. Version + publish the server container so containerConfig is generated.
+  // 4. Publish the server container so containerConfig is generated.
   onProgress({ stage: 'sgtm_publish', done: 0, total: 1 });
-  const verResp  = await createVersion(serverContainerId, serverWorkspaceId,
-    'sGTM initial — ' + new Date().toISOString().split('T')[0]);
-  const serverVersionId = verResp.containerVersion && verResp.containerVersion.containerVersionId;
   if (serverVersionId) {
     await publishVersion(serverContainerId, serverVersionId);
   }
@@ -659,6 +709,7 @@ module.exports = {
   // Server-side (client + server flow)
   createServerContainer,
   getContainerConfig,
+  importServerContainerVersion,
   setGA4TransportUrl,
   provisionForClientWithServer,
 };
