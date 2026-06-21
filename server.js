@@ -64,7 +64,36 @@ const cloudTasks              = require('./lib/cloud-tasks');
 // Firestore job doc (1 MB limit + embedded customTemplate JS), so it is staged
 // in a private GCS bucket and the job carries only a small { bucket, object } ref.
 const configBlobStore         = require('./lib/config-blob-store');
-const provisionQueue          = require('./lib/provision-queue');
+
+// Inlined concurrency limiter (mirror of lib/provision-queue.js, kept in sync) —
+// defined here, NOT require()'d, because the deploy ships only existing tracked
+// files. Global FIFO + bounded queue for the in-process provisioning fallback so a
+// burst can't fan out into hundreds of parallel GTM import sequences.
+const provisionQueue = (function createProvisionQueueSingleton() {
+  function createLimiter(max, queueMax) {
+    const cap  = Math.max(1, parseInt(max, 10) || 1);
+    const qMax = Math.max(0, parseInt(queueMax, 10) || 0);   // 0 = unlimited
+    let   active = 0;
+    const queue  = [];
+    function pump() {
+      while (active < cap && queue.length) {
+        const job = queue.shift();           // FIFO
+        active++;
+        Promise.resolve()
+          .then(job.fn)
+          .then(job.resolve, job.reject)
+          .finally(() => { active--; pump(); });   // always free the slot + backfill
+      }
+    }
+    function isFull() { return qMax > 0 && queue.length >= qMax; }
+    function run(fn) {
+      return new Promise((resolve, reject) => { queue.push({ fn, resolve, reject }); pump(); });
+    }
+    function stats() { return { active, queued: queue.length, max: cap, queueMax: qMax }; }
+    return { run, stats, isFull };
+  }
+  return createLimiter(process.env.MANAGED_MAX_CONCURRENCY || '5', process.env.MANAGED_QUEUE_MAX || '1000');
+})();
 
 // ── Startup dependency check ──────────────────────────────────────────────
 // Surface missing deps loudly. The providers do `try { require('axios') } catch{}`
@@ -192,6 +221,11 @@ async function _setJob(id, patch, opts = {}) {
     await firestoreService.saveJob(id, patch);
   } catch (e) {
     console.warn('[jobs] saveJob failed for ' + id + ':', e.message);
+  }
+  // Prevent unbounded growth of the progress-throttle map: a terminal job will
+  // never emit another progress ping, so drop its entry once it finishes.
+  if (patch && (patch.status === 'completed' || patch.status === 'failed')) {
+    _jobProgressWriteAt.delete(id);
   }
 }
 
@@ -663,6 +697,16 @@ async function _dispatchProvisionJob(jobType, jobId) {
   if (cloudTasks.isConfigured()) {
     await cloudTasks.enqueueProvisionJob({ jobType, jobId });
     return;
+  }
+  // Bounded backpressure: refuse new work when the in-process queue is saturated
+  // instead of growing it (and memory) without limit. Throwing here routes to the
+  // request handler's catch, which marks the job failed, cleans any staged blob,
+  // and returns 503.
+  if (provisionQueue.isFull()) {
+    const e = new Error('Provisioning queue is full (' + provisionQueue.stats().queued + ' waiting) — retry shortly');
+    e.status = 503;
+    e.code   = 'QUEUE_FULL';
+    throw e;
   }
   const runner = jobType === 'ss' ? _runSsProvisionJob : _runManagedProvisionJob;
   // In-process fallback (local / Railway): cap global concurrency + FIFO-queue the
@@ -1699,7 +1743,7 @@ const server = http.createServer((req, res) => {
           error:  'Failed to enqueue provisioning job: ' + e.message,
           finishedAt: Date.now(),
         });
-        return sendJSON(res, 502, { error: 'Failed to enqueue provisioning job: ' + e.message });
+        return sendJSON(res, (e.status && e.status >= 400 && e.status < 600) ? e.status : 502, { error: 'Failed to enqueue provisioning job: ' + e.message });
       }
 
       // 202 Accepted — job doc already exists, so the client's first poll is safe.
@@ -2368,7 +2412,7 @@ const server = http.createServer((req, res) => {
               error:  'Failed to enqueue provisioning job: ' + e.message,
               finishedAt: Date.now(),
             });
-            return sendJSON(res, 502, { error: 'Failed to enqueue provisioning job: ' + e.message });
+            return sendJSON(res, (e.status && e.status >= 400 && e.status < 600) ? e.status : 502, { error: 'Failed to enqueue provisioning job: ' + e.message });
           }
 
           sendJSON(res, 202, { ok: true, jobId });

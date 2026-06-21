@@ -18,7 +18,51 @@
 
 const https = require('https');
 const crypto = require('crypto');
-const { requestWithTimeouts } = require('./lib/http-timeout');
+// Inlined timeout transport (https-only variant of the reference in
+// lib/http-timeout.js, kept in sync). Defined here — NOT require()'d — because the
+// deploy ships only existing tracked files, so runtime code must stay self-contained.
+// Three bounded layers (connect / response-inactivity / overall), all our own timers
+// → cleared on settle (no leak), single-settle guarded, request aborted on breach.
+function requestWithTimeouts(opts, body, timeouts) {
+  const { connectMs = 0, responseMs = 0, overallMs = 0 } = timeouts || {};
+  return new Promise((resolve, reject) => {
+    let settled = false, connectTimer = null, idleTimer = null, overallTimer = null;
+    const clearAll = () => {
+      if (connectTimer) { clearTimeout(connectTimer); connectTimer = null; }
+      if (idleTimer)    { clearTimeout(idleTimer);    idleTimer    = null; }
+      if (overallTimer) { clearTimeout(overallTimer); overallTimer = null; }
+    };
+    const finish = (cb, val) => { if (settled) return; settled = true; clearAll(); cb(val); };
+    const fail = (msg) => {
+      const e = new Error(msg); e.code = 'ETIMEDOUT'; e.timeout = true;
+      try { if (req) req.destroy(); } catch (_) {}
+      finish(reject, e);
+    };
+    const armIdle = () => {
+      if (responseMs <= 0 || settled) return;
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => fail('response/inactivity timeout after ' + responseMs + 'ms'), responseMs);
+    };
+    const req = https.request(opts, (res) => {
+      if (connectTimer) { clearTimeout(connectTimer); connectTimer = null; }
+      armIdle();
+      let data = '';
+      res.setEncoding('utf8');
+      res.on('data',  (c)   => { data += c; armIdle(); });
+      res.on('end',   ()    => finish(resolve, { status: res.statusCode, data }));
+      res.on('error', (err) => { try { req.destroy(); } catch (_) {} finish(reject, err); });
+    });
+    if (connectMs > 0) connectTimer = setTimeout(() => fail('connect timeout after ' + connectMs + 'ms'), connectMs);
+    req.on('socket', (socket) => {
+      const onConnect = () => { if (connectTimer) { clearTimeout(connectTimer); connectTimer = null; } armIdle(); };
+      if (socket.connecting) socket.once('connect', onConnect); else onConnect();
+    });
+    if (overallMs > 0) overallTimer = setTimeout(() => fail('overall deadline exceeded ' + overallMs + 'ms'), overallMs);
+    req.on('error', (err) => { if (!settled) finish(reject, err); });
+    if (body) req.write(body);
+    req.end();
+  });
+}
 
 // Bounded outbound timeouts for EVERY GTM API call (connect / response / overall)
 // so a stalled Google endpoint can never hang a worker forever. Defaults are well
@@ -180,11 +224,13 @@ async function gtmRequest(method, path, body, attempt = 0) {
   if (attempt < MAX_RETRIES) {
     let waitMs = 0;
     if (status === 429) {
-      // 429 means we're past the minute quota — wait the full window + jitter.
-      // Schedule: 20s → 40s → 70s → 90s (covers up to 2 full quota windows).
+      // 429 = rejected by the per-minute quota → the request did NOT execute, so
+      // retrying is duplicate-SAFE for ANY method. Wait the full quota window.
       waitMs = [20000, 40000, 70000, 90000][attempt];
-    } else if (status >= 500 && status < 600) {
-      // Transient 5xx — shorter exponential backoff
+    } else if (status >= 500 && status < 600 && method === 'GET') {
+      // 5xx MAY have partially executed server-side. Retry ONLY idempotent GETs —
+      // retrying a 5xx'd POST (createContainer / versions:import / createVersion /
+      // entity create) could DUPLICATE a provision step. Writes surface the 5xx.
       waitMs = [2000, 5000, 10000, 20000][attempt];
     }
 
