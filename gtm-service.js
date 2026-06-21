@@ -18,6 +18,15 @@
 
 const https = require('https');
 const crypto = require('crypto');
+const { requestWithTimeouts } = require('./lib/http-timeout');
+
+// Bounded outbound timeouts for EVERY GTM API call (connect / response / overall)
+// so a stalled Google endpoint can never hang a worker forever. Defaults are well
+// above normal GTM latency — and the 429 backoff sleeps live in gtmRequest,
+// OUTSIDE a single HTTP call, so they don't count against these. All env-tunable.
+const GTM_CONNECT_TIMEOUT_MS  = parseInt(process.env.GTM_CONNECT_TIMEOUT_MS  || '15000',  10);
+const GTM_RESPONSE_TIMEOUT_MS = parseInt(process.env.GTM_RESPONSE_TIMEOUT_MS || '60000',  10);
+const GTM_OVERALL_TIMEOUT_MS  = parseInt(process.env.GTM_OVERALL_TIMEOUT_MS  || '120000', 10);
 
 // Shared keep-alive agent — reuses TLS connections across all GTM API calls.
 // Without this, each request pays ~200ms for TCP+TLS handshake. With it, that
@@ -92,22 +101,18 @@ function buildSignedJWT() {
 }
 
 function httpsJSON(opts, body) {
-  return new Promise((resolve, reject) => {
-    // Inject the shared keep-alive agent so every call reuses the TLS socket
-    const withAgent = { agent: keepAliveAgent, ...opts };
-    const req = https.request(withAgent, res => {
-      let data = '';
-      res.setEncoding('utf8');
-      res.on('data', c => { data += c; });
-      res.on('end', () => {
-        let parsed = null;
-        try { parsed = data ? JSON.parse(data) : {}; } catch (_) { parsed = { raw: data }; }
-        resolve({ status: res.statusCode, data: parsed });
-      });
-    });
-    req.on('error', reject);
-    if (body) req.write(body);
-    req.end();
+  // Inject the shared keep-alive agent so every call reuses the TLS socket, then
+  // run it through the bounded-timeout transport. JSON parsing is unchanged — same
+  // { status, data } contract (and the same { raw } fallback on non-JSON bodies).
+  const withAgent = { agent: keepAliveAgent, protocol: 'https:', ...opts };
+  return requestWithTimeouts(withAgent, body, {
+    connectMs:  GTM_CONNECT_TIMEOUT_MS,
+    responseMs: GTM_RESPONSE_TIMEOUT_MS,
+    overallMs:  GTM_OVERALL_TIMEOUT_MS,
+  }).then(({ status, data }) => {
+    let parsed = null;
+    try { parsed = data ? JSON.parse(data) : {}; } catch (_) { parsed = { raw: data }; }
+    return { status, data: parsed };
   });
 }
 
@@ -144,27 +149,44 @@ async function gtmRequest(method, path, body, attempt = 0) {
   const MAX_RETRIES = 4;
 
   const token = await getAccessToken();
-  const { status, data } = await httpsJSON({
-    hostname: GTM_HOST,
-    path: API_BASE + path,
-    method,
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'Content-Type': 'application/json',
-      ...(body ? { 'Content-Length': Buffer.byteLength(body) } : {}),
-    },
-  }, body);
+  let status, data;
+  try {
+    ({ status, data } = await httpsJSON({
+      hostname: GTM_HOST,
+      path: API_BASE + path,
+      method,
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/json',
+        ...(body ? { 'Content-Length': Buffer.byteLength(body) } : {}),
+      },
+    }, body));
+  } catch (e) {
+    // Bounded timeouts (NEW) can reject here. Retrying a timed-out WRITE risks a
+    // duplicate side-effect (provisioning is non-idempotent), so only idempotent
+    // GETs are retried; writes surface the timeout to fail the job. Non-timeout
+    // socket errors keep propagating exactly as before (no behavior change).
+    if (e && e.timeout && method === 'GET' && attempt < MAX_RETRIES) {
+      const waitMs = [2000, 5000, 10000, 20000][attempt];
+      console.warn(`[gtm] timeout on ${method} ${path} — retry ${attempt + 1}/${MAX_RETRIES} in ${waitMs}ms`);
+      await sleep(waitMs);
+      return gtmRequest(method, path, body, attempt + 1);
+    }
+    throw e;
+  }
 
   if (status >= 200 && status < 300) return data;
 
   if (attempt < MAX_RETRIES) {
     let waitMs = 0;
     if (status === 429) {
-      // 429 means we're past the minute quota — wait the full window + jitter.
-      // Schedule: 20s → 40s → 70s → 90s (covers up to 2 full quota windows).
+      // 429 = rejected by the per-minute quota → the request did NOT execute, so
+      // retrying is duplicate-SAFE for ANY method. Wait the full quota window.
       waitMs = [20000, 40000, 70000, 90000][attempt];
-    } else if (status >= 500 && status < 600) {
-      // Transient 5xx — shorter exponential backoff
+    } else if (status >= 500 && status < 600 && method === 'GET') {
+      // 5xx MAY have partially executed server-side. Retry ONLY idempotent GETs —
+      // retrying a 5xx'd POST (createContainer / versions:import / createVersion /
+      // entity create) could DUPLICATE a provision step. Writes surface the 5xx.
       waitMs = [2000, 5000, 10000, 20000][attempt];
     }
 

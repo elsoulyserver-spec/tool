@@ -322,6 +322,25 @@ async function getJob(jobId) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// PROVISION AUDIT TRAIL  —  collection: `provision_audit`
+// Durable, append-only record of every finished provision. UNLIKE
+// provisioning_jobs this has NO expiresAt → it is never auto-pruned by the TTL
+// policy, so it survives as a real audit log.
+//
+// Best-effort by contract: callers MUST treat a rejection as non-fatal (a failed
+// audit must never fail a provision). NEVER pass secrets/tokens in `record`.
+// ══════════════════════════════════════════════════════════════════════════════
+const AUDIT_COLLECTION = 'provision_audit';
+
+async function saveAudit(record) {
+  const at  = admin.firestore.FieldValue.serverTimestamp();
+  // Auto-id document, no expiresAt → permanent. ignoreUndefinedProperties (set in
+  // init) tolerates any undefined fields in the record.
+  const ref = await db().collection(AUDIT_COLLECTION).add({ ...record, at });
+  return ref.id;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // AUTH — Firebase ID token verification
 // Called by server.js auth middleware to authenticate /api/ss/* requests.
 // Throws on:
@@ -373,6 +392,8 @@ module.exports = {
   // Provisioning jobs (durable, cross-instance)
   saveJob,
   getJob,
+  // Permanent provision audit trail
+  saveAudit,
   // Auth
   verifyIdToken,
   // Storage (provisioning config blobs)

@@ -64,6 +64,7 @@ const cloudTasks              = require('./lib/cloud-tasks');
 // Firestore job doc (1 MB limit + embedded customTemplate JS), so it is staged
 // in a private GCS bucket and the job carries only a small { bucket, object } ref.
 const configBlobStore         = require('./lib/config-blob-store');
+const provisionQueue          = require('./lib/provision-queue');
 
 // ── Startup dependency check ──────────────────────────────────────────────
 // Surface missing deps loudly. The providers do `try { require('axios') } catch{}`
@@ -122,6 +123,12 @@ function _serverConfigImportEnabled() {
   const v = (process.env.MANAGED_IMPORT_SERVER_CONFIG || '').trim().toLowerCase();
   return v === '1' || v === 'true';
 }
+
+// Most-recent managed server-config import outcome on THIS instance — surfaced
+// (mode only) by /api/managed/health as lastImportMode. In-memory by design:
+// zero I/O on the health path. Per-instance and resets on restart (documented);
+// the durable record is the provision_audit collection.
+let _lastManagedImport = null;
 
 // Minimal structural guard before we stage a client-supplied config into our OWN
 // GTM account (defense-in-depth; full validation is a later phase).
@@ -186,6 +193,11 @@ async function _setJob(id, patch, opts = {}) {
   } catch (e) {
     console.warn('[jobs] saveJob failed for ' + id + ':', e.message);
   }
+  // Prevent unbounded growth of the progress-throttle map: a terminal job will
+  // never emit another progress ping, so drop its entry once it finishes.
+  if (patch && (patch.status === 'completed' || patch.status === 'failed')) {
+    _jobProgressWriteAt.delete(id);
+  }
 }
 
 // ── Dry-run helpers (C3 local testing) ──────────────────────────────────────
@@ -236,6 +248,40 @@ async function _runManagedProvisionJob(jobId) {
   const mode = input.mode === 'client_server' ? 'client_server' : 'client';
   const dryRun = input.dryRun === true;
 
+  // ── Audit / observability trackers ──────────────────────────────────────────
+  // Declared in function scope so the catch can still record a failure audit with
+  // whatever context we reached before throwing.
+  const startedAtMs = Date.now();
+  let importMode    = 'static_ga4_only';
+  let auditWebId    = null;
+  let auditServerId = null;
+  let auditTags     = null;
+
+  // Permanent, best-effort audit write (collection `provision_audit`, NO TTL).
+  // Never throws — a failed audit must not fail the provision. Carries NO secrets.
+  async function _writeManagedAudit(success, errorCode) {
+    if (dryRun) return;
+    try {
+      await firestoreService.saveAudit({
+        jobId,
+        clientId:      clientId || null,
+        mode,
+        importMode:    mode === 'client_server' ? importMode : null,
+        capiDelivered: mode === 'client_server' && importMode === 'versions_import',
+        schemaVersion: (input.serverConfigRef && input.serverConfigRef.schemaVersion) || null,
+        blobBytes:     (input.serverConfigRef && input.serverConfigRef.bytes) || null,
+        gtmPublicId:             auditWebId,
+        serverContainerPublicId: auditServerId,
+        importedTagCount:        auditTags,
+        durationMs:    Date.now() - startedAtMs,
+        success:       !!success,
+        errorCode:     errorCode || null,
+      });
+    } catch (e) {
+      console.warn('[managed/create][job ' + jobId + '] audit write failed (non-fatal):', e.message);
+    }
+  }
+
   try {
     // Dry-run: walk the state machine without touching GTM/Stape/saveContainer.
     if (dryRun) {
@@ -282,13 +328,22 @@ async function _runManagedProvisionJob(jobId) {
     // back in-flight jobs to the static path. Any load failure degrades to static.
     let serverConfigJson = null;
     if (mode === 'client_server' && input.serverConfigRef && _serverConfigImportEnabled()) {
+      // A staged ref means the operator INTENDED full CAPI for this container.
+      // If we can't load/verify it (missing, corrupt JSON, checksum mismatch,
+      // unsupported schema), FAIL the job — silently shipping a GA4-only
+      // container here would hide a real operational error. The throw lands in
+      // the worker's terminal-failure handler (and the finally cleans the blob).
       try {
         serverConfigJson = await configBlobStore.get(input.serverConfigRef);
-        await _setJob(jobId, { serverConfigSource: 'versions_import' });
       } catch (e) {
-        console.warn('[managed/create][job ' + jobId + '] serverConfig load failed (' + e.message + ') — static path');
-        await _setJob(jobId, { serverConfigLoadError: e.message });
+        const err = new Error('Server config import failed — the flag is ON and a config was staged, '
+          + 'but the blob is unusable (' + e.message + '). Refusing to ship a GA4-only container.');
+        err.code   = e.code || 'SERVER_CONFIG_UNUSABLE';
+        err.status = 422;
+        throw err;
       }
+      importMode = 'versions_import';
+      await _setJob(jobId, { serverConfigSource: 'versions_import' });
     }
 
     const provisionOpts = {
@@ -446,6 +501,14 @@ async function _runManagedProvisionJob(jobId) {
       if (stapeDeployed) delete serverResult.containerConfig;
     }
 
+    // Capture audit/observability context from the successful provision.
+    auditWebId    = webResult.gtmPublicId || null;
+    auditServerId = serverResult ? (serverResult.publicId || null) : null;
+    auditTags     = serverResult ? (serverResult.importedTagCount || 0) : (webResult.importedTagCount || 0);
+    if (mode === 'client_server') {
+      _lastManagedImport = { mode: importMode, capiDelivered: importMode === 'versions_import', at: Date.now() };
+    }
+
     await _setJob(jobId, {
       status:     'completed',
       stage:      'done',
@@ -454,9 +517,20 @@ async function _runManagedProvisionJob(jobId) {
         mode,
         ...webResult,
         server: serverResult,                  // null when mode=client
+        // Did this container actually ship with full CAPI, or GA4-only? Lets the
+        // caller/admin distinguish "import succeeded" from any fallback without
+        // inspecting GTM. (versions_import here means GTM accepted it — gtmRequest
+        // throws on any non-2xx, so reaching 'completed' implies acceptance.)
+        serverConfigImport: mode === 'client_server' ? {
+          mode:          importMode,                       // 'versions_import' | 'static_ga4_only'
+          capiDelivered: importMode === 'versions_import',
+          blobBytes:     (input.serverConfigRef && input.serverConfigRef.bytes)         || null,
+          schemaVersion: (input.serverConfigRef && input.serverConfigRef.schemaVersion) || null,
+        } : null,
       },
       finishedAt: Date.now(),
     });
+    await _writeManagedAudit(true, null);
   } catch (e) {
     console.error('[managed/create][job ' + jobId + ']', e);
     await _setJob(jobId, {
@@ -468,6 +542,7 @@ async function _runManagedProvisionJob(jobId) {
       httpStatus: (e.status && e.status >= 400 && e.status < 600) ? e.status : 502,
       finishedAt: Date.now(),
     });
+    await _writeManagedAudit(false, e.code || null);
   } finally {
     // C-P1: the staged server config is secret-bearing (embeds CAPI tokens) —
     // delete it as soon as provisioning reaches a terminal state. The bucket
@@ -594,9 +669,23 @@ async function _dispatchProvisionJob(jobType, jobId) {
     await cloudTasks.enqueueProvisionJob({ jobType, jobId });
     return;
   }
+  // Bounded backpressure: refuse new work when the in-process queue is saturated
+  // instead of growing it (and memory) without limit. Throwing here routes to the
+  // request handler's catch, which marks the job failed, cleans any staged blob,
+  // and returns 503.
+  if (provisionQueue.isFull()) {
+    const e = new Error('Provisioning queue is full (' + provisionQueue.stats().queued + ' waiting) — retry shortly');
+    e.status = 503;
+    e.code   = 'QUEUE_FULL';
+    throw e;
+  }
   const runner = jobType === 'ss' ? _runSsProvisionJob : _runManagedProvisionJob;
-  Promise.resolve()
-    .then(() => runner(jobId))
+  // In-process fallback (local / Railway): cap global concurrency + FIFO-queue the
+  // overflow so a burst can't fan out into hundreds of parallel GTM import
+  // sequences. Fire-and-forget (the HTTP layer already returned 202 and the client
+  // polls the job doc); the runner reads the feature flag at EXECUTION time, so a
+  // still-queued job honors a mid-flight rollback. No job is dropped.
+  provisionQueue.run(() => runner(jobId))
     .catch(err => console.error('[jobs] inline run failed for ' + jobId + ':', err));
 }
 
@@ -1510,6 +1599,18 @@ const server = http.createServer((req, res) => {
         error: err,
         gtmConfigured:       gtmService.isConfigured(),
         firestoreConfigured: firestoreService.isConfigured(),
+        // Server-side CAPI import readiness — lets operators confirm whether
+        // managed server containers will ship with CAPI tags (Meta/TikTok/Snap)
+        // or silently fall back to the GA4-only static config. deliversCapi is
+        // true ONLY when the flag AND the staging bucket are both in place.
+        serverConfigImport: {
+          enabled:          _serverConfigImportEnabled(),
+          bucketConfigured: configBlobStore.isConfigured(),
+          deliversCapi:     _serverConfigImportEnabled() && configBlobStore.isConfigured(),
+          schemaVersion:    configBlobStore.SCHEMA_VERSION,
+          lastImportMode:   _lastManagedImport ? _lastManagedImport.mode : null,
+        },
+        provisionQueue: provisionQueue.stats(),
       });
     })().catch(e => sendJSON(res, 500, { error: e.message }));
     return;
@@ -1601,12 +1702,19 @@ const server = http.createServer((req, res) => {
       try {
         await _dispatchProvisionJob('managed', jobId);
       } catch (e) {
+        // The worker never started, so its finally{} blob cleanup won't run.
+        // Delete the secret-bearing staged config now (the bucket lifecycle TTL
+        // is the backstop only for hard process crashes, not for this path).
+        if (input.serverConfigRef) {
+          try { await configBlobStore.del(input.serverConfigRef); }
+          catch (e2) { console.warn('[managed/create] blob cleanup after enqueue failure failed:', e2.message); }
+        }
         await _setJob(jobId, {
           status: 'failed', stage: 'enqueue_error',
           error:  'Failed to enqueue provisioning job: ' + e.message,
           finishedAt: Date.now(),
         });
-        return sendJSON(res, 502, { error: 'Failed to enqueue provisioning job: ' + e.message });
+        return sendJSON(res, (e.status && e.status >= 400 && e.status < 600) ? e.status : 502, { error: 'Failed to enqueue provisioning job: ' + e.message });
       }
 
       // 202 Accepted — job doc already exists, so the client's first poll is safe.
@@ -2275,7 +2383,7 @@ const server = http.createServer((req, res) => {
               error:  'Failed to enqueue provisioning job: ' + e.message,
               finishedAt: Date.now(),
             });
-            return sendJSON(res, 502, { error: 'Failed to enqueue provisioning job: ' + e.message });
+            return sendJSON(res, (e.status && e.status >= 400 && e.status < 600) ? e.status : 502, { error: 'Failed to enqueue provisioning job: ' + e.message });
           }
 
           sendJSON(res, 202, { ok: true, jobId });
@@ -2435,6 +2543,19 @@ server.listen(PORT, () => {
   const mode = puppeteer ? '🟢 Puppeteer (headless Chrome)' : '🟡 HTTP fallback (install puppeteer for full analysis)';
   console.log(`Easy Track server running at http://localhost:${PORT}`);
   console.log(`Scanner mode: ${mode}`);
+
+  // Server-side CAPI import state — operators must be able to confirm at a glance
+  // whether managed server containers will ship with CAPI tags or silently fall
+  // back to the GA4-only static config. See docs/ENABLE-SERVER-SIDE-CAPI-AR.md.
+  const _capiOn  = _serverConfigImportEnabled();
+  const _capiBkt = configBlobStore.isConfigured();
+  if (_capiOn && _capiBkt) {
+    console.log('Server-side CAPI import: 🟢 ENABLED (MANAGED_IMPORT_SERVER_CONFIG=1 + PROVISIONING_BUCKET set)');
+  } else if (_capiOn && !_capiBkt) {
+    console.warn('Server-side CAPI import: 🔴 FLAG ON but staging bucket NOT configured — managed server containers will fall back to GA4-only. Set PROVISIONING_BUCKET (+ FIREBASE_SA_KEY_JSON).');
+  } else {
+    console.log('Server-side CAPI import: ⚪ disabled (default GA4-only). Set MANAGED_IMPORT_SERVER_CONFIG=1 + PROVISIONING_BUCKET to enable.');
+  }
 });
 
 // ── Global process guards ─────────────────────────────────────────────────────
