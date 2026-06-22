@@ -65,10 +65,10 @@ const cloudTasks              = require('./lib/cloud-tasks');
 // in a private GCS bucket and the job carries only a small { bucket, object } ref.
 const configBlobStore         = require('./lib/config-blob-store');
 
-// Inlined concurrency limiter (mirror of lib/provision-queue.js, kept in sync) —
-// defined here, NOT require()'d, because the deploy ships only existing tracked
-// files. Global FIFO + bounded queue for the in-process provisioning fallback so a
-// burst can't fan out into hundreds of parallel GTM import sequences.
+// Self-contained concurrency limiter — inlined here (NOT a separate module)
+// because the deploy ships only existing tracked files. Global FIFO + bounded
+// queue for the in-process provisioning fallback so a burst can't fan out into
+// hundreds of parallel GTM import sequences.
 const provisionQueue = (function createProvisionQueueSingleton() {
   function createLimiter(max, queueMax) {
     const cap  = Math.max(1, parseInt(max, 10) || 1);

@@ -18,11 +18,11 @@
 
 const https = require('https');
 const crypto = require('crypto');
-// Inlined timeout transport (https-only variant of the reference in
-// lib/http-timeout.js, kept in sync). Defined here — NOT require()'d — because the
-// deploy ships only existing tracked files, so runtime code must stay self-contained.
-// Three bounded layers (connect / response-inactivity / overall), all our own timers
-// → cleared on settle (no leak), single-settle guarded, request aborted on breach.
+// Self-contained timeout transport (https-only). Inlined here — NOT a separate
+// module — because the deploy ships only existing tracked files, so runtime code
+// must stay self-contained. Three bounded layers (connect / response-inactivity /
+// overall), all our own timers → cleared on settle (no leak), single-settle
+// guarded, request aborted on breach.
 function requestWithTimeouts(opts, body, timeouts) {
   const { connectMs = 0, responseMs = 0, overallMs = 0 } = timeouts || {};
   return new Promise((resolve, reject) => {
