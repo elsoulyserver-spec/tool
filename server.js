@@ -1,3 +1,4 @@
+console.log("[BOOT] entry | node " + process.version + " | PORT=" + JSON.stringify(process.env.PORT) + " | cwd=" + process.cwd());
 const http   = require('http');
 const https  = require('https');
 const fs     = require('fs');
@@ -2568,7 +2569,9 @@ server.on('clientError', (err, socket) => {
   }
 });
 
+server.on('error', function (e) { console.error('[BOOT] SERVER ERROR:', e && e.code, e && e.message); });
 server.listen(PORT, '0.0.0.0', () => {
+  console.log('[BOOT] LISTENING ->', JSON.stringify(server.address()), 'PORT_env=', process.env.PORT);
   const mode = puppeteer ? '🟢 Puppeteer (headless Chrome)' : '🟡 HTTP fallback (install puppeteer for full analysis)';
   console.log(`Easy Track server running at http://0.0.0.0:${PORT}`);
   console.log(`Scanner mode: ${mode}`);
