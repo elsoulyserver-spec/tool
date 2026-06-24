@@ -2568,9 +2568,9 @@ server.on('clientError', (err, socket) => {
   }
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   const mode = puppeteer ? '🟢 Puppeteer (headless Chrome)' : '🟡 HTTP fallback (install puppeteer for full analysis)';
-  console.log(`Easy Track server running at http://localhost:${PORT}`);
+  console.log(`Easy Track server running at http://0.0.0.0:${PORT}`);
   console.log(`Scanner mode: ${mode}`);
 
   // Server-side CAPI import state — operators must be able to confirm at a glance
