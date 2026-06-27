@@ -374,8 +374,345 @@ function getStorageBucket(name) {
   return admin.storage().bucket(b);
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// CLIENT PROFILE  —  collection: `clients`
+// Reads a single client document and the Firebase Auth user record.
+// updateClientProfile allows the mutable subset of fields (name, company,
+// timezone, status) — the rest are controlled by admin-only paths.
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function getClient(uid) {
+  if (!uid) throw new Error('getClient: uid is required');
+  const snap = await db().collection('clients').doc(uid).get();
+  return snap.exists ? { id: snap.id, ...snap.data() } : null;
+}
+
+async function getAuthUser(uid) {
+  init();
+  if (_initError) throw _initError;
+  if (!admin) throw new Error('firebase-admin is not installed');
+  try {
+    return await admin.auth().getUser(uid);
+  } catch (e) {
+    if (e.code === 'auth/user-not-found') return null;
+    throw e;
+  }
+}
+
+async function updateClientProfile(uid, fields) {
+  const allowed = ['name', 'company', 'timezone', 'status', 'notes'];
+  const update = {};
+  Object.keys(fields || {}).forEach(k => {
+    if (allowed.indexOf(k) !== -1 && fields[k] !== undefined) {
+      update[k] = fields[k];
+    }
+  });
+  if (!Object.keys(update).length) throw new Error('no updatable fields provided');
+  update.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+  await db().collection('clients').doc(uid).set(update, { merge: true });
+  return update;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// API KEYS  —  collection: `api_keys`
+// Document ID = keyId (12 hex chars, embedded in key: eas_{keyId}_{secret})
+// Enables O(1) lookup — parse keyId from raw key, fetch doc directly.
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function saveApiKey(keyId, data) {
+  if (!keyId) throw new Error('saveApiKey: keyId is required');
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  await db().collection('api_keys').doc(keyId).set({
+    ...data,
+    createdAt: now,
+    updatedAt: now,
+  });
+}
+
+async function getApiKey(keyId) {
+  if (!keyId) throw new Error('getApiKey: keyId is required');
+  const snap = await db().collection('api_keys').doc(keyId).get();
+  return snap.exists ? { id: snap.id, ...snap.data() } : null;
+}
+
+async function listApiKeysByClient(clientId) {
+  if (!clientId) throw new Error('listApiKeysByClient: clientId is required');
+  const qs = await db().collection('api_keys')
+    .where('clientId', '==', clientId)
+    .where('status',   '==', 'active')
+    .orderBy('createdAt', 'desc')
+    .get();
+  const out = [];
+  qs.forEach(d => out.push({ id: d.id, ...d.data() }));
+  return out;
+}
+
+async function revokeApiKey(keyId) {
+  if (!keyId) throw new Error('revokeApiKey: keyId is required');
+  await db().collection('api_keys').doc(keyId).update({
+    status:    'revoked',
+    revokedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+async function touchApiKeyLastUsed(keyId) {
+  if (!keyId) return;
+  // best-effort — non-fatal if it fails
+  try {
+    await db().collection('api_keys').doc(keyId).update({
+      lastUsedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (_) {}
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AUDIT LOGS  —  collection: `audit_logs`
+// Append-only. Diffs only (not full snapshots). Actor email as HMAC hash.
+// IP purged after 90 days (ipPurgeAfter field, enforced at read time by API).
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function saveAuditLog(record) {
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const ipPurgeAfter = admin.firestore.Timestamp.fromMillis(
+    Date.now() + 90 * 24 * 60 * 60 * 1000
+  );
+  const ref = await db().collection('audit_logs').add({
+    ...record,
+    occurredAt:    now,
+    ipPurgeAfter,
+  });
+  return ref.id;
+}
+
+async function queryAuditLogs(clientId, { limit = 50, before } = {}) {
+  if (!clientId) throw new Error('queryAuditLogs: clientId is required');
+  let q = db().collection('audit_logs')
+    .where('clientId', '==', clientId)
+    .orderBy('occurredAt', 'desc');
+  if (before) {
+    const beforeTs = admin.firestore.Timestamp.fromDate(new Date(before));
+    q = q.startAfter(beforeTs);
+  }
+  q = q.limit(Math.min(limit, 200));
+  const qs = await q.get();
+  const now = Date.now();
+  const out = [];
+  qs.forEach(d => {
+    const data = d.data();
+    // Purge IP from response if past retention window
+    const purgeAt = data.ipPurgeAfter && data.ipPurgeAfter.toMillis
+      ? data.ipPurgeAfter.toMillis() : 0;
+    if (purgeAt && now > purgeAt) data.ipAddress = null;
+    out.push({ id: d.id, ...data });
+  });
+  return out;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ACTIVITY TIMELINE  —  collection: `activity_timeline`
+// Append-only. dedupeKey prevents duplicate milestone entries within 1 hour.
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function saveTimelineEvent(record) {
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const ref = await db().collection('activity_timeline').add({
+    ...record,
+    occurredAt: now,
+  });
+  return ref.id;
+}
+
+async function findRecentTimelineEvent(clientId, eventType, dedupeKey, windowMs) {
+  const since = admin.firestore.Timestamp.fromMillis(Date.now() - windowMs);
+  const qs = await db().collection('activity_timeline')
+    .where('clientId',  '==', clientId)
+    .where('eventType', '==', eventType)
+    .where('dedupeKey', '==', dedupeKey)
+    .where('occurredAt', '>=', since)
+    .limit(1)
+    .get();
+  if (qs.empty) return null;
+  const d = qs.docs[0];
+  return { id: d.id, ...d.data() };
+}
+
+async function queryTimeline(clientId, { limit = 50, before, eventType } = {}) {
+  if (!clientId) throw new Error('queryTimeline: clientId is required');
+  let q = db().collection('activity_timeline')
+    .where('clientId', '==', clientId);
+  if (eventType) q = q.where('eventType', '==', eventType);
+  q = q.orderBy('occurredAt', 'desc');
+  if (before) {
+    const beforeTs = admin.firestore.Timestamp.fromDate(new Date(before));
+    q = q.startAfter(beforeTs);
+  }
+  q = q.limit(Math.min(limit, 200));
+  const qs = await q.get();
+  const out = [];
+  qs.forEach(d => out.push({ id: d.id, ...d.data() }));
+  return out;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HEALTH CACHE  —  collection: `client_health_cache`
+// Document ID = clientId. Computed by the health-eval job (Phase 2).
+// Phase 1 reads it (may be absent → unknown state).
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function getHealthCache(clientId) {
+  if (!clientId) throw new Error('getHealthCache: clientId is required');
+  const snap = await db().collection('client_health_cache').doc(clientId).get();
+  return snap.exists ? snap.data() : null;
+}
+
+async function saveHealthCache(clientId, data) {
+  if (!clientId) throw new Error('saveHealthCache: clientId is required');
+  await db().collection('client_health_cache').doc(clientId).set({
+    ...data,
+    computedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PLATFORM HEALTH  —  collection: `platform_health`
+// Document ID = platform name (e.g. 'meta', 'ga4', 'tiktok').
+// Status: 'operational' | 'degraded' | 'outage'.
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function getPlatformHealth() {
+  const qs = await db().collection('platform_health').get();
+  const out = {};
+  qs.forEach(d => { out[d.id] = d.data(); });
+  return out;
+}
+
+async function setPlatformHealth(platform, data) {
+  if (!platform) throw new Error('setPlatformHealth: platform is required');
+  await db().collection('platform_health').doc(platform).set({
+    ...data,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EVENT TYPE LAST SEEN  —  collection: `event_type_last_seen`
+// Document ID = `{clientId}_{eventName}`. Written by the sGTM beacon endpoint.
+// Used by Phase 2 diagnostic rules to detect missing events without a raw event store.
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function upsertEventTypeLastSeen(clientId, eventName) {
+  if (!clientId || !eventName) throw new Error('upsertEventTypeLastSeen: clientId and eventName are required');
+  const docId = `${clientId}_${eventName}`;
+  await db().collection('event_type_last_seen').doc(docId).set({
+    clientId,
+    eventName,
+    lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ACTIVE CLIENTS  —  collection: `clients`
+// Paginated list for the health-eval job. Returns QueryDocumentSnapshot[] so
+// the caller can pass the last doc to startAfter() for cursor-based pagination.
+// Requires composite index: clients (status ASC, createdAt ASC).
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function listActiveClients(startAfterDoc, limit) {
+  let q = db().collection('clients')
+    .where('status', 'in', ['active', 'trial'])
+    .orderBy('createdAt', 'asc')
+    .limit(Math.min(limit || 100, 200));
+  if (startAfterDoc) q = q.startAfter(startAfterDoc);
+  const snap = await q.get();
+  return snap.docs;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EVENT TYPE LAST SEEN — point-read all 8 known GA4 events for one client.
+// Uses deterministic doc IDs ({clientId}_{eventName}) — 8 parallel point reads
+// rather than a query, so no composite index is needed.
+// ══════════════════════════════════════════════════════════════════════════════
+
+const BEACON_EVENTS = [
+  'page_view', 'view_item', 'add_to_cart', 'begin_checkout',
+  'purchase', 'generate_lead', 'sign_up', 'search',
+];
+
+async function listEventTypeLastSeen(clientId) {
+  if (!clientId) throw new Error('listEventTypeLastSeen: clientId is required');
+  const snaps = await Promise.all(
+    BEACON_EVENTS.map(ev =>
+      db().collection('event_type_last_seen').doc(`${clientId}_${ev}`).get(),
+    ),
+  );
+  return snaps
+    .filter(s => s.exists)
+    .map(s => ({ eventName: s.data().eventName, lastSeenAt: s.data().lastSeenAt || null }));
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DIAGNOSTIC RESULTS  —  collection: `diagnostic_results`
+// Document ID = clientId. Written by health-eval job, read by /diagnostics API.
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function saveDiagnosticResult(clientId, data) {
+  if (!clientId) throw new Error('saveDiagnosticResult: clientId is required');
+  await db().collection('diagnostic_results').doc(clientId).set({
+    ...data,
+    clientId,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+async function getDiagnosticResult(clientId) {
+  if (!clientId) throw new Error('getDiagnosticResult: clientId is required');
+  const snap = await db().collection('diagnostic_results').doc(clientId).get();
+  return snap.exists ? { id: snap.id, ...snap.data() } : null;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HEALTH JOB LOCK  —  collection: `health_job_lock`
+// Single doc ('singleton') coordinates the health-eval job across instances.
+// Heartbeat-based: acquirer must call extendHealthJobLock() every 5 minutes.
+// Transaction on acquire makes the check-then-write atomic.
+// ══════════════════════════════════════════════════════════════════════════════
+
+const _LOCK_INITIAL_TTL_MS = 25 * 60 * 1000;
+
+async function acquireHealthJobLock(ownerId) {
+  const lockRef = db().collection('health_job_lock').doc('singleton');
+  return db().runTransaction(async tx => {
+    const snap = await tx.get(lockRef);
+    const now  = Date.now();
+    if (snap.exists) {
+      const until = snap.data().lockedUntil;
+      if (until && until.toMillis() > now) return false;
+    }
+    tx.set(lockRef, {
+      ownerId,
+      lockedUntil: admin.firestore.Timestamp.fromMillis(now + _LOCK_INITIAL_TTL_MS),
+      lockedAt:    admin.firestore.FieldValue.serverTimestamp(),
+      heartbeatAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return true;
+  });
+}
+
+async function extendHealthJobLock(extendMs) {
+  await db().collection('health_job_lock').doc('singleton').update({
+    lockedUntil: admin.firestore.Timestamp.fromMillis(Date.now() + extendMs),
+    heartbeatAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+async function releaseHealthJobLock() {
+  await db().collection('health_job_lock').doc('singleton').delete();
+}
+
 module.exports = {
   isConfigured,
+  BEACON_EVENTS,
   saveContainer,
   getContainer,
   listContainersByClient,
@@ -398,4 +735,37 @@ module.exports = {
   verifyIdToken,
   // Storage (provisioning config blobs)
   getStorageBucket,
+  // Client profile
+  getClient,
+  getAuthUser,
+  updateClientProfile,
+  // API keys
+  saveApiKey,
+  getApiKey,
+  listApiKeysByClient,
+  revokeApiKey,
+  touchApiKeyLastUsed,
+  // Audit logs
+  saveAuditLog,
+  queryAuditLogs,
+  // Activity timeline
+  saveTimelineEvent,
+  findRecentTimelineEvent,
+  queryTimeline,
+  // Health
+  getHealthCache,
+  saveHealthCache,
+  getPlatformHealth,
+  setPlatformHealth,
+  // Beacon / event tracking
+  upsertEventTypeLastSeen,
+  // Phase 2 — health job data access
+  listActiveClients,
+  listEventTypeLastSeen,
+  saveDiagnosticResult,
+  getDiagnosticResult,
+  // Phase 2 — health job lock (heartbeat-based)
+  acquireHealthJobLock,
+  extendHealthJobLock,
+  releaseHealthJobLock,
 };

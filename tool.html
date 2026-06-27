@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 
 <head>
@@ -321,6 +321,23 @@
     .finput[type=tel] {
       direction: ltr;
       text-align: right;
+    }
+
+    /* ── Accessibility: WCAG 2.1 AA focus-visible ── */
+    :focus { outline: none; }
+    :focus-visible {
+      outline: 2px solid var(--acc);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+    button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
+      outline: 2px solid var(--acc);
+      outline-offset: 3px;
+      border-radius: 6px;
+    }
+    input:focus-visible, select:focus-visible, textarea:focus-visible {
+      outline: 2px solid var(--acc);
+      outline-offset: 0;
     }
 
     .finput:focus {
@@ -3142,18 +3159,8 @@
       <span id="userName" style="display:none;"></span>
       <a href="admin.html" id="adminLink" style="display:none;"></a>
 
-      <button class="ar-en-btn">
-        <span class="material-symbols-outlined" style="font-size:16px;">language</span>
-        <span>AR / EN</span>
-      </button>
-      <div class="ub-icons">
-        <button><span class="material-symbols-outlined">notifications</span></button>
-        <button><span class="material-symbols-outlined">help</span></button>
-      </div>
-      <div class="ub-profile" onclick="toggleHistory()" title="سجل النشاط">
-        <img
-          src="https://lh3.googleusercontent.com/aida-public/AB6AXuDj6yl2AOM1v07OkjHxEhwA3D3NxxfJGf6J_t02PyuQca57V1XH6I00Rp6qjOnaKFbIXhDWlGDEn3WbaR-NBHQjKdkjXYOgKtJ9dMX8t9EfOOq-CT2ZVQr-B9teg0lekCP08lY6McYWuY6n4O88QojZYsS9hY-PbIflYNW-TprDPgyq8vdWK8NJOoDXXsasyqn4NSKIbyl5svwn92sthixu2gV-8wTqjML-RvosELRK0q1x-k4cg7W8KsqURlaaRw0l1IEhTt1EQQ"
-          alt="User profile" style="width:100%;height:100%;object-fit:cover;">
+      <div class="ub-profile" onclick="toggleHistory()" title="سجل النشاط" style="display:flex;align-items:center;justify-content:center;">
+        <span id="ubProfileInitial" style="font-family:var(--font-display);font-weight:800;font-size:16px;color:var(--acc);">?</span>
       </div>
     </div>
   </div>
@@ -3384,14 +3391,14 @@
             </h2>
             <p style="color:var(--mut);font-size:13.5px;line-height:1.95;margin:0 0 22px;">
               شكراً لتسجيلك في <strong style="color:var(--acc);">Easy Track</strong> 💚<br>
-              عشان نفعّل دخولك، ابعت رسالة لـ <strong style="color:var(--acc);">يوسف الصولي</strong> على واتساب
-              وقول له إنك سجّلت بالإيميل: <strong id="gate-pending-email" style="color:var(--wht);direction:ltr;display:inline-block;">—</strong><br>
-              هيتم تفعيل حسابك خلال ساعات قليلة.
+              تم إنشاء حسابك بنجاح. تأكد من إيميلك:
+              <strong id="gate-pending-email" style="color:var(--wht);direction:ltr;display:inline-block;">—</strong><br>
+              سجّل دخولك وستجد حسابك نشطاً تلقائياً.
             </p>
-            <a id="gate-pending-wa" href="#" target="_blank" rel="noopener" class="gcta"
-              style="display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;">
-              💬 تواصل مع يوسف الصولي على واتساب ←
-            </a>
+            <button type="button" onclick="(typeof showGateLogin==='function'?showGateLogin():void 0)" class="gcta"
+              style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:none;cursor:pointer;text-decoration:none;">
+              ← تسجيل الدخول
+            </button>
             <button type="button"
               onclick="(typeof showGateLogin==='function'?showGateLogin():void 0)"
               style="background:none;border:none;color:var(--mut);cursor:pointer;padding:12px;margin-top:8px;font-size:12.5px;text-decoration:underline;width:100%;">
@@ -3401,12 +3408,12 @@
         </div>
 
         <div class="gfoot">
-          <a class="gli" href="https://www.linkedin.com/in/youssef-elsouly" target="_blank">
+          <a class="gli" href="https://www.linkedin.com/company/easytrac" target="_blank">
             <svg viewBox="0 0 24 24">
               <path
                 d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
             </svg>
-            Easy Track — يوسف
+            Easy Track
           </a>
           <div class="gpriv">🔒 بياناتك آمنة ولن تُشارك</div>
         </div>
@@ -4053,101 +4060,7 @@
       font-size: 11.5px;
     }
 
-    /* ─── GA4 Client Configuration Block (Step 4) ─── */
-    .ga4-client-section {
-      margin-top: 20px;
-      border: 1px solid rgba(249, 171, 0, 0.2);
-      border-radius: 12px;
-      background: rgba(249, 171, 0, 0.03);
-      overflow: hidden;
-    }
-    .ga4-client-header {
-      padding: 14px 16px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .ga4-client-icon-wrap {
-      width: 34px;
-      height: 34px;
-      border-radius: 8px;
-      background: rgba(249, 171, 0, 0.12);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-      flex-shrink: 0;
-    }
-    .ga4-client-title-wrap { flex: 1; }
-    .ga4-client-title {
-      font-family: var(--font-display);
-      font-weight: 700;
-      font-size: 13px;
-      color: var(--wht);
-      margin-bottom: 2px;
-    }
-    .ga4-client-sub {
-      font-size: 11px;
-      color: var(--mut);
-      line-height: 1.4;
-    }
-    .ga4-client-toggle {
-      width: 44px;
-      height: 24px;
-      border-radius: 12px;
-      border: 1.5px solid rgba(255, 255, 255, 0.12);
-      background: rgba(255, 255, 255, 0.06);
-      cursor: pointer;
-      position: relative;
-      transition: all 0.2s;
-      flex-shrink: 0;
-    }
-    .ga4-client-toggle::after {
-      content: '';
-      position: absolute;
-      top: 3px;
-      left: 3px;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: var(--mut);
-      transition: all 0.2s;
-    }
-    .ga4-client-toggle.on {
-      background: rgba(249, 171, 0, 0.2);
-      border-color: rgba(249, 171, 0, 0.45);
-    }
-    .ga4-client-toggle.on::after {
-      left: calc(100% - 19px);
-      background: #F9AB00;
-    }
-    .ga4-client-toggle-lbl {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      font-weight: 700;
-      color: var(--mut);
-      letter-spacing: 1px;
-      min-width: 24px;
-      flex-shrink: 0;
-    }
-    .ga4-client-toggle-lbl.on { color: #F9AB00; }
-    .ga4-client-body {
-      display: none;
-      padding: 0 16px 16px;
-      animation: pin .2s ease;
-    }
-    .ga4-client-body.open { display: block; }
-    .ga4-client-url-row { margin-bottom: 14px; }
-    .ga4-client-label {
-      display: block;
-      font-size: 10.5px;
-      font-weight: 700;
-      color: var(--mut);
-      text-transform: uppercase;
-      letter-spacing: 0.9px;
-      margin-bottom: 7px;
-      font-family: var(--font-ui);
-    }
+    /* ─── GA4 Client-Side Events Block (Server Side card, under GA4 Measurement ID) ─── */
     .ga4-client-events-wrap {
       margin-top: 16px;
       padding-top: 14px;
@@ -4228,6 +4141,14 @@
             <div class="pc-ss-section">
               <div class="pc-ss-sec-label">GA4 Measurement ID (من الـ Client Side)</div>
               <div id="pc-ss-ga4-display"></div>
+              <!-- GA4 client-side events — routed to GA4 via the sGTM server container -->
+              <div class="ga4-client-events-wrap" id="pc-ss-ga4-events-wrap" style="display:none;">
+                <div class="ga4-client-events-header">
+                  <span style="font-size:14px;">📊</span>
+                  <span class="ga4-client-events-title">Tracking Events — أحداث GA4 اللي هتتبعت عبر الـ sGTM</span>
+                </div>
+                <div class="ga4-client-events-grid" id="pc-ss-ga4-events-grid"></div>
+              </div>
             </div>
 
             <!-- 3. Platform Selection -->
@@ -4527,7 +4448,7 @@
               <span class="pc-ss-out-icon">🖥️</span>
               <div style="flex:1;">
                 <div style="font-family:var(--font-display);font-weight:700;font-size:14px;color:var(--wht);margin-bottom:3px;">Server Container — sGTM</div>
-                <div style="font-size:11px;color:var(--mut);">استورد الـ JSON ده في GTM → Admin → Import Container — ثم انسخ الـ Container Config لـ Stape/Cloud Run</div>
+                <div style="font-size:11px;color:var(--mut);">استورد الـ JSON ده في GTM → Admin → Import Container — أو حمّله واستخدمه في Stape/Cloud Run</div>
               </div>
             </div>
             <div class="cwrap">
@@ -4544,20 +4465,6 @@
                 </div>
               </div>
               <div class="cbody" id="ssGtmBody"></div>
-            </div>
-            <!-- Container Config section -->
-            <div class="pc-ss-config-section" id="pc-ss-config-section">
-              <div class="pc-ss-config-header">
-                <span class="material-symbols-outlined" style="font-size:16px;color:var(--acc);">key</span>
-                <span style="font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--wht);flex:1;">Container Config — للـ Stape / Cloud Run</span>
-                <button class="cpybtn" id="cpySsConfig">نسخ</button>
-              </div>
-              <div class="pc-ss-config-box" id="pc-ss-config-box">
-                <span style="color:var(--mut);">سيظهر هنا بعد توليد الـ Container…</span>
-              </div>
-              <div style="padding:10px 16px;font-size:11px;color:var(--mut);border-top:1px solid var(--bdr2);">
-                💡 افتح <strong style="color:var(--wht2);">Stape.io</strong> → New Container → Server GTM → الصق الـ Config هنا
-              </div>
             </div>
           </div>
 
@@ -5728,7 +5635,9 @@
       tiktok: { label:'TikTok Events API',  icon:'🎵', idLabel:'Pixel ID',      tokLabel:'Events API Access Token', idPh:'CXXXXXXXXXXXXXXXX', tokPh:'xxxxxxxx...', hasToken:true }
     };
 
-    // SS event definitions
+    // Legacy SS event catalog — kept ONLY for backward-compat migration of older
+    // configs. Platform event chips are now derived from the enabled GA4 events
+    // (_GA4_CLIENT_EVENTS), so this list is no longer rendered directly.
     var _pcSS_EVENTS = [
       { key:'purchase',          label:'Purchase',          icon:'💰', forced:true  },
       { key:'add_to_cart',       label:'Add to Cart',       icon:'🛒', forced:false },
@@ -5739,6 +5648,87 @@
       { key:'sign_up',           label:'Sign Up',           icon:'✍️', forced:false },
       { key:'search',            label:'Search',            icon:'🔍', forced:false }
     ];
+
+    // Migration: map legacy SS event keys → equivalent GA4 event keys.
+    // Used when loading older configs whose platform events used the legacy catalog.
+    // Keys not present here (page_view/lead/sign_up) have no GA4 equivalent and are dropped.
+    var _PCSS_LEGACY_TO_GA4 = {
+      initiate_checkout: 'begin_checkout',
+      view_content:      'view_item'
+      // purchase / add_to_cart / search already match GA4 keys (identity)
+    };
+    function _pcSS_canonEv(k) { return _PCSS_LEGACY_TO_GA4[k] || k; }
+
+    // The enabled GA4 events that platforms may forward. Normally this is exactly
+    // _ga4Client.selectedEvents. The fallback (forced events only — i.e. purchase)
+    // covers paths that build the container without ever opening the GA4 grid
+    // (e.g. the managed "Create Container" flow), so we never emit an empty container.
+    function pcSS_effectiveGa4Events() {
+      var sel = _ga4Client.selectedEvents || [];
+      if (sel.length) return sel.slice();
+      return _GA4_CLIENT_EVENTS.filter(function(e) { return e.forced; }).map(function(e) { return e.key; });
+    }
+
+    // GA4 is the single source of truth. Every platform's event list must be a
+    // SUBSET of the enabled GA4 events. This prunes each platform (and gads labels)
+    // down to the currently-enabled GA4 events, migrating legacy keys on the way.
+    // Safe to call repeatedly; idempotent.
+    function pcSS_pruneEventsToGa4() {
+      var allowed = _ga4Client.selectedEvents || [];
+      Object.keys(_pcSS.events || {}).forEach(function(plat) {
+        var arr = _pcSS.events[plat] || [];
+        var out = [];
+        arr.forEach(function(k) {
+          var ck = _pcSS_canonEv(k);
+          if (allowed.indexOf(ck) !== -1 && out.indexOf(ck) === -1) out.push(ck);
+        });
+        _pcSS.events[plat] = out;
+      });
+      // gads conversion labels: keep only labels for events gads still forwards
+      var gadsEvs = _pcSS.events['gads'] || [];
+      Object.keys(_pcSS.gadsLabels || {}).forEach(function(k) {
+        if (gadsEvs.indexOf(_pcSS_canonEv(k)) === -1) delete _pcSS.gadsLabels[k];
+      });
+    }
+
+    // Rehydrate _pcSS + _ga4Client from a saved ss_config, migrating older shapes.
+    // Tolerant of missing/partial fields so legacy saves never crash or leave
+    // undefined UI state. GA4 stays the source of truth; platforms are re-pruned.
+    function _pcSS_restoreFromConfig(ssc) {
+      if (!ssc || ssc.enabled === false) return;
+      _pcSS.enabled    = !!ssc.enabled;
+      _pcSS.serverUrl  = ssc.server_url || '';
+      _pcSS.ga4Id      = ssc.ga4_id || '';
+      _pcSS.platforms  = Array.isArray(ssc.platforms) ? ssc.platforms.slice() : [];
+      _pcSS.events     = (ssc.events && typeof ssc.events === 'object') ? JSON.parse(JSON.stringify(ssc.events)) : {};
+      _pcSS.gadsConvId = ssc.gads_conv_id || '';
+      _pcSS.gadsLabels = (ssc.gads_labels && typeof ssc.gads_labels === 'object') ? JSON.parse(JSON.stringify(ssc.gads_labels)) : {};
+
+      // GA4 source of truth: prefer saved ga4_events; else derive from the union of
+      // every platform's events (configs saved before ga4_events existed).
+      var ga4 = Array.isArray(ssc.ga4_events) ? ssc.ga4_events.slice() : [];
+      if (!ga4.length) {
+        Object.keys(_pcSS.events).forEach(function(plat) {
+          (_pcSS.events[plat] || []).forEach(function(k) {
+            var ck = _pcSS_canonEv(k);
+            if (ga4.indexOf(ck) === -1) ga4.push(ck);
+          });
+        });
+      }
+      // Forced GA4 events (e.g. purchase) are always present.
+      _GA4_CLIENT_EVENTS.forEach(function(e) { if (e.forced && ga4.indexOf(e.key) === -1) ga4.push(e.key); });
+      // Keep only known GA4 catalog keys, in catalog order (drop anything invalid).
+      _ga4Client.selectedEvents = _GA4_CLIENT_EVENTS
+        .filter(function(e) { return ga4.indexOf(e.key) !== -1; })
+        .map(function(e) { return e.key; });
+
+      // Enforce subset invariant + migrate legacy platform keys.
+      pcSS_pruneEventsToGa4();
+
+      // Refresh the SS card UI if it is currently mounted (no-ops otherwise).
+      try { if (typeof pcSS_buildGa4Events === 'function') pcSS_buildGa4Events(); } catch (e) {}
+      try { if (typeof pcSS_renderAccordions === 'function') pcSS_renderAccordions(); } catch (e) {}
+    }
 
     // ===== APP VIEW SWITCHING =====
     var APP_VIEWS = { overview: 'view-overview', pixels: 'view-pixels', gtmview: 'view-gtmview', projects: 'view-projects' };
@@ -6537,54 +6527,17 @@
           });
 
         } else if (p === 'ga4') {
-          // GA4: Measurement ID + Client Configuration section
+          // GA4: Measurement ID only.
+          // GA4 client-side event routing (events → GA4 via sGTM) now lives in the
+          // Server Side card, directly under the GA4 Measurement ID field.
           var ga4Vp = { rx: /^G-[A-Z0-9]{8,12}$/, hint: 'يبدأ بـ G-' };
-          var ga4IsEnabled = _ga4Client.enabled;
-          var ga4UrlValid  = _ga4Client.serverUrl && /^https:\/\/[A-Za-z0-9.\-]+(:\d+)?(\/[A-Za-z0-9._~%\-\/]*)?$/.test(_ga4Client.serverUrl);
 
-          var ga4Html =
-            // ── Measurement ID ──
+          wrap.innerHTML =
             '<div class="pixfield-wrap">'
             + '<input class="pixfield" id="pf-ga4" type="text" placeholder="G-XXXXXXXXXX" dir="ltr">'
             + '<div class="pix-valid" id="pv-ga4"></div>'
             + '</div>'
-            + '<div class="pixhint">💡 ' + HINTS['ga4'] + ' — <span style="color:var(--gold)">Format: ' + ga4Vp.hint + '</span></div>'
-            // ── GA4 Client Configuration Card ──
-            + '<div class="ga4-client-section">'
-            +   '<div class="ga4-client-header">'
-            +     '<div class="ga4-client-icon-wrap">⚙️</div>'
-            +     '<div class="ga4-client-title-wrap">'
-            +       '<div class="ga4-client-title">Google Analytics 4 — Client Configuration</div>'
-            +       '<div class="ga4-client-sub">توجيه أحداث GA4 عبر Server Container + تحديد Events</div>'
-            +     '</div>'
-            +     '<button class="ga4-client-toggle' + (ga4IsEnabled ? ' on' : '') + '" id="ga4-client-toggle-btn" type="button" onclick="ga4Client_toggle()" aria-label="تفعيل GA4 Client Mode"></button>'
-            +     '<span class="ga4-client-toggle-lbl' + (ga4IsEnabled ? ' on' : '') + '" id="ga4-client-toggle-lbl">' + (ga4IsEnabled ? 'ON' : 'OFF') + '</span>'
-            +   '</div>'
-            +   '<div class="ga4-client-body' + (ga4IsEnabled ? ' open' : '') + '" id="ga4-client-body">'
-            // ── Server Container URL ──
-            +     '<div class="ga4-client-url-row">'
-            +       '<label class="ga4-client-label">Server Container URL</label>'
-            +       '<div class="pixfield-wrap">'
-            +         '<input class="pc-ss-input" id="ga4-client-url" type="text" placeholder="https://sgtm.yourdomain.com" dir="ltr" oninput="ga4Client_onUrlInput()" autocomplete="off" value="' + (ga4UrlValid ? _ga4Client.serverUrl : '') + '">'
-            +         '<div class="pix-valid" id="ga4-client-url-valid">' + (ga4UrlValid ? '✅ رابط صحيح' : '') + '</div>'
-            +       '</div>'
-            +       '<div class="pixhint">💡 Server Container URL من Stape.io أو Cloud Run — لتوجيه أحداث GA4 عبر الـ sGTM</div>'
-            +     '</div>'
-            // ── Events multi-select (visible only when URL is valid) ──
-            +     '<div class="ga4-client-events-wrap" id="ga4-client-events-section" style="display:' + (ga4UrlValid ? 'block' : 'none') + ';">'
-            +       '<div class="ga4-client-events-header">'
-            +         '<span style="font-size:14px;">📊</span>'
-            +         '<span class="ga4-client-events-title">Tracking Events — اختار الأحداث للـ Server Container</span>'
-            +       '</div>'
-            +       '<div class="ga4-client-events-grid" id="ga4-client-events-grid"></div>'
-            +     '</div>'
-            +   '</div>'
-            + '</div>';
-
-          wrap.innerHTML = ga4Html;
-
-          // Restore events chips if URL was already valid when entering step 4
-          if (ga4UrlValid) ga4Client_buildEvents();
+            + '<div class="pixhint">💡 ' + HINTS['ga4'] + ' — <span style="color:var(--gold)">Format: ' + ga4Vp.hint + '</span></div>';
 
           // Measurement ID live validation
           (function () {
@@ -6694,17 +6647,32 @@
         el.innerHTML = '<input class="pc-ss-input" id="pc-ss-ga4-manual" type="text" placeholder="G-XXXXXXXXXX" dir="ltr" oninput="pcSS_onGA4Input()" autocomplete="off">'
           + '<div class="pc-ss-hint">💡 GA4 Measurement ID — أضف GA4 في Step 2 أولاً أو اكتبه هنا يدوياً</div>';
       }
+      // Build the GA4 client-side events grid
+      pcSS_buildGa4Events();
+    }
+
+    // Build/refresh the GA4 client-side events grid under the Measurement ID.
+    // Always shown while the Server Side card is open (the wrap lives inside
+    // pc-ss-body, so it only appears once the card is toggled ON). Events
+    // selected here are routed to GA4 via the sGTM server container.
+    function pcSS_buildGa4Events() {
+      var wrap = document.getElementById('pc-ss-ga4-events-wrap');
+      var grid = document.getElementById('pc-ss-ga4-events-grid');
+      if (!wrap || !grid) return;
+      wrap.style.display = 'block';
+      _ga4ClientRenderGrid(grid);
     }
 
     window.pcSS_editGA4 = function() {
       var el = document.getElementById('pc-ss-ga4-display');
       if (!el) return;
-      el.innerHTML = '<input class="pc-ss-input" id="pc-ss-ga4-manual" type="text" placeholder="G-XXXXXXXXXX" dir="ltr" value="' + (_pcSS.ga4Id || '') + '" oninput="pcSS_onGA4Input()" autocomplete="off">';
+      el.innerHTML = '<input class="pc-ss-input" id="pc-ss-ga4-manual" type="text" placeholder="G-XXXXXXXXXX" dir="ltr" value="' + escapeHtml(_pcSS.ga4Id || '') + '" oninput="pcSS_onGA4Input()" autocomplete="off">';
     };
 
     window.pcSS_onGA4Input = function() {
       var inp = document.getElementById('pc-ss-ga4-manual');
       if (inp) _pcSS.ga4Id = inp.value.trim();
+      pcSS_buildGa4Events();
     };
 
     function pcSS_togglePlatform(key) {
@@ -6713,14 +6681,17 @@
       if (idx === -1) {
         _pcSS.platforms.push(key);
         if (btn) btn.classList.add('on');
+        // New platform mirrors the currently-enabled GA4 events by default.
+        // The user can then deselect any of them (subset of GA4 = source of truth).
         if (!_pcSS.events[key]) {
-          _pcSS.events[key] = ['purchase']; // purchase forced by default
+          _pcSS.events[key] = (_ga4Client.selectedEvents || []).slice();
         }
       } else {
         _pcSS.platforms.splice(idx, 1);
         if (btn) btn.classList.remove('on');
         delete _pcSS._pxOpen[key];
       }
+      pcSS_pruneEventsToGa4(); // keep every platform a subset of GA4
       pcSS_renderAccordions();
     }
 
@@ -6739,14 +6710,23 @@
         acc.className = 'pc-ss-acc' + (isOpen ? ' open' : '');
         acc.id = 'pc-ss-acc-' + key;
 
-        // Build events chips HTML
-        var evChips = _pcSS_EVENTS.map(function(ev) {
-          var sel = (_pcSS.events[key] || []).indexOf(ev.key) !== -1;
-          return '<span class="pc-ss-ev-chip' + (sel ? ' on' : '') + (ev.forced ? ' forced' : '') + '" '
-            + 'onclick="pcSS_toggleEvent(\'' + key + '\',\'' + ev.key + '\')" '
-            + 'title="' + ev.label + '">'
-            + ev.icon + ' ' + ev.key + '</span>';
-        }).join('');
+        // Build events chips — ONLY the events enabled in GA4 (source of truth).
+        // A platform can never introduce an event that GA4 doesn't generate.
+        var enabledGa4 = _GA4_CLIENT_EVENTS.filter(function(e) {
+          return (_ga4Client.selectedEvents || []).indexOf(e.key) !== -1;
+        });
+        var evChips;
+        if (!enabledGa4.length) {
+          evChips = '<div class="pc-ss-ev-empty" style="font-size:11px;color:var(--mut);padding:4px 2px;line-height:1.5;">⚠️ مفيش أحداث GA4 مفعّلة — فعّل الأحداث من «Tracking Events» تحت الـ GA4 Measurement ID الأول، وهتظهر هنا.</div>';
+        } else {
+          evChips = enabledGa4.map(function(ev) {
+            var sel = (_pcSS.events[key] || []).indexOf(ev.key) !== -1;
+            return '<span class="pc-ss-ev-chip' + (sel ? ' on' : '') + '" '
+              + 'onclick="pcSS_toggleEvent(\'' + key + '\',\'' + ev.key + '\')" '
+              + 'title="' + ev.label + '">'
+              + ev.icon + ' ' + ev.key + '</span>';
+          }).join('');
+        }
 
         // Build credentials HTML
         var credsHtml = '';
@@ -6758,7 +6738,7 @@
             + '</div>';
           credsHtml += '<div class="pc-ss-px-row" id="pc-ss-gads-labels-wrap">'
             + '<div class="pc-ss-px-lbl">Conversion Labels <span style="color:var(--mut);font-weight:400;">(لكل event)</span></div>'
-            + (_pcSS.events['gads'] || ['purchase']).map(function(ev) {
+            + (_pcSS.events['gads'] || []).map(function(ev) {
                 return '<div class="pc-ss-label-row">'
                   + '<span class="pc-ss-label-ev">' + ev + '</span>'
                   + '<input class="pc-ss-input" style="flex:1;" id="pc-ss-gads-lbl-' + ev + '" type="text" placeholder="AbCd_xxxxxxxx" dir="ltr" value="' + (_pcSS.gadsLabels[ev]||'') + '" oninput="_pcSS.gadsLabels[\'' + ev + '\']=this.value.trim()" autocomplete="off">'
@@ -6804,9 +6784,9 @@
     };
 
     window.pcSS_toggleEvent = function(plat, evKey) {
-      var pd = _pcSS_EVENTS.find(function(e){ return e.key === evKey; });
-      if (pd && pd.forced) return; // purchase always on
-      if (!_pcSS.events[plat]) _pcSS.events[plat] = ['purchase'];
+      // Only events that exist in GA4 can be toggled on a platform (subset rule).
+      if ((_ga4Client.selectedEvents || []).indexOf(evKey) === -1) return;
+      if (!_pcSS.events[plat]) _pcSS.events[plat] = [];
       var arr = _pcSS.events[plat];
       var idx = arr.indexOf(evKey);
       if (idx === -1) arr.push(evKey);
@@ -6848,49 +6828,19 @@
 
     // ═══════════════════════════════════════════════════════════
     // ===== GA4 CLIENT-SIDE MODE — UI Functions =====
+    // The GA4 client-side event selector lives in the Server Side card,
+    // under the GA4 Measurement ID. Selected events are routed to GA4
+    // through the sGTM server container (the SS server URL).
     // ═══════════════════════════════════════════════════════════
-
-    function ga4Client_toggle() {
-      _ga4Client.enabled = !_ga4Client.enabled;
-      var btn  = document.getElementById('ga4-client-toggle-btn');
-      var lbl  = document.getElementById('ga4-client-toggle-lbl');
-      var body = document.getElementById('ga4-client-body');
-      if (btn)  btn.classList.toggle('on', _ga4Client.enabled);
-      if (lbl)  { lbl.textContent = _ga4Client.enabled ? 'ON' : 'OFF'; lbl.classList.toggle('on', _ga4Client.enabled); }
-      if (body) body.classList.toggle('open', _ga4Client.enabled);
-    }
 
     var _GA4_CLIENT_URL_RX = /^https:\/\/[A-Za-z0-9.\-]+(:\d+)?(\/[A-Za-z0-9._~%\-\/]*)?$/;
 
-    function ga4Client_onUrlInput() {
-      var inp      = document.getElementById('ga4-client-url');
-      var validEl  = document.getElementById('ga4-client-url-valid');
-      var evSection = document.getElementById('ga4-client-events-section');
-      if (!inp) return;
-
-      var val = inp.value.trim();
-      _ga4Client.serverUrl = val;
-
-      if (!val) {
-        if (validEl)   validEl.textContent = '';
-        if (evSection) evSection.style.display = 'none';
-        return;
-      }
-
-      var ok = _GA4_CLIENT_URL_RX.test(val);
-      if (validEl) {
-        validEl.textContent = ok ? '✅ رابط صحيح' : '❌ لازم يبدأ بـ https:// ويحتوي على domain صحيح';
-        validEl.style.color = ok ? '#34d399' : '#f87171';
-      }
-      if (evSection) evSection.style.display = ok ? 'block' : 'none';
-      if (ok) ga4Client_buildEvents();
-    }
-
-    function ga4Client_buildEvents() {
-      var grid = document.getElementById('ga4-client-events-grid');
+    // Render the GA4 client-side event chips into the given grid element,
+    // keeping _ga4Client.selectedEvents in sync. Reused by pcSS_buildGa4Events().
+    function _ga4ClientRenderGrid(grid) {
       if (!grid) return;
 
-      // Rebuild chips (clear first to avoid duplicates when URL changes)
+      // Rebuild chips (clear first to avoid duplicates on re-render)
       grid.innerHTML = '';
 
       // Ensure forced events are always in selectedEvents
@@ -6926,20 +6876,63 @@
           var idx = _ga4Client.selectedEvents.indexOf(key);
           if (idx === -1) { _ga4Client.selectedEvents.push(key); chip.classList.add('on'); }
           else            { _ga4Client.selectedEvents.splice(idx, 1); chip.classList.remove('on'); }
+          // GA4 is the source of truth: disabling an event must drop it from every
+          // platform; enabling one makes it available in every platform card.
+          pcSS_pruneEventsToGa4();
+          pcSS_renderAccordions();
         });
       }
-    }
-
-    // Collect GA4 client state from DOM before generation
-    function ga4Client_collect() {
-      var urlInp = document.getElementById('ga4-client-url');
-      if (urlInp) _ga4Client.serverUrl = urlInp.value.trim();
-      // selectedEvents already kept in sync by click handler
     }
 
     // ═══════════════════════════════════════════════════════════
     // ===== GENERATE =====
     function generate() {
+      // ── Pre-generation validation ──
+      var _valErrors = [];
+      if (!S.cms) _valErrors.push('اختر المنصة (سلة أو زد) أولاً');
+      if (!S.platforms || !S.platforms.length) _valErrors.push('اختر منصة تتبع واحدة على الأقل');
+      if (S.platforms && S.platforms.length) {
+        // Collect current pixel IDs from DOM for validation
+        var _idMap = {};
+        S.platforms.forEach(function(p) {
+          if (p === 'google') {
+            var _gEl = document.getElementById('pf-google-id');
+            _idMap[p] = _gEl ? _gEl.value.trim() : '';
+          } else {
+            var _pEl = document.getElementById('pf-' + p);
+            _idMap[p] = _pEl ? _pEl.value.trim() : '';
+          }
+        });
+        var _noId = S.platforms.filter(function(p) {
+          if (p === 'ga4') return !_idMap[p] || !/^G-[A-Z0-9]+$/i.test(_idMap[p]);
+          if (p === 'google') return !_idMap[p] || !/^\d{6,12}$/.test(_idMap[p]);
+          return !_idMap[p];
+        });
+        if (_noId.length) {
+          _noId.forEach(function(p) {
+            var _pm = (typeof PM !== 'undefined' && PM[p]) ? PM[p].name : p;
+            _valErrors.push('أدخل الـ Pixel ID لـ ' + _pm);
+          });
+        }
+      }
+      if (!S.events || !S.events.length) _valErrors.push('اختر حدثاً واحداً على الأقل للتتبع');
+      if (_valErrors.length) {
+        var _vEl = document.getElementById('genValidationErr');
+        if (!_vEl) {
+          _vEl = document.createElement('div');
+          _vEl.id = 'genValidationErr';
+          _vEl.style.cssText = 'background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);border-radius:12px;padding:14px 18px;margin-bottom:14px;font-family:Cairo,sans-serif;direction:rtl;font-size:13px;color:#f87171;';
+          var _genBtn = document.querySelector('[onclick="generate()"]');
+          if (_genBtn && _genBtn.parentNode) _genBtn.parentNode.insertBefore(_vEl, _genBtn);
+        }
+        _vEl.innerHTML = '<div style="font-weight:700;margin-bottom:8px;">⚠️ يرجى إصلاح الأخطاء التالية:</div><ul style="margin:0;padding-right:18px;">' + _valErrors.map(function(e){ return '<li>' + escapeHtml(e) + '</li>'; }).join('') + '</ul>';
+        _vEl.style.display = 'block';
+        return;
+      }
+      // Clear previous validation error
+      var _vEl2 = document.getElementById('genValidationErr');
+      if (_vEl2) _vEl2.style.display = 'none';
+
       try {
         // ── Step 1: Collect pixel IDs ──
         for (var i = 0; i < S.platforms.length; i++) {
@@ -6973,9 +6966,11 @@
         window.ET.ssEvents  = _pcSS.events;
 
         // ── GA4 client-side mode state ──
-        try { ga4Client_collect(); } catch(e) { console.warn('ga4Client_collect error:', e); }
-        window.ET.ga4ClientEnabled = _ga4Client.enabled && !!_ga4Client.serverUrl && _GA4_CLIENT_URL_RX.test(_ga4Client.serverUrl);
-        window.ET.ga4ClientUrl     = _ga4Client.serverUrl;
+        // Events are picked under the GA4 Measurement ID in the Server Side card,
+        // and routed to GA4 through the SS server container (same URL as SS).
+        _ga4Client.serverUrl = _pcSS.serverUrl;
+        window.ET.ga4ClientEnabled = _pcSS.enabled && !!_pcSS.serverUrl && _GA4_CLIENT_URL_RX.test(_pcSS.serverUrl) && _ga4Client.selectedEvents.length > 0;
+        window.ET.ga4ClientUrl     = _pcSS.serverUrl;
         window.ET.ga4ClientEvents  = _ga4Client.selectedEvents.slice();
 
         // ── Step 2: Show output panel & wire buttons FIRST so UI never stays blank ──
@@ -7051,9 +7046,6 @@
           var ssContainerStr = JSON.stringify(ssContainerResult, null, 2);
           var ssBody = document.getElementById('ssGtmBody');
           if (ssBody) ssBody.textContent = ssContainerStr;
-          // Container Config: compact version for Stape
-          var ssConfigBox = document.getElementById('pc-ss-config-box');
-          if (ssConfigBox) ssConfigBox.textContent = JSON.stringify(ssContainerResult);
           // Build filename from server URL hostname
           var _ssFileName = 'sgtm-container.json';
           try {
@@ -7075,8 +7067,6 @@
           }
           var cpySsBtn = document.getElementById('cpySsGtm');
           if (cpySsBtn) cpySsBtn.onclick = function() { navigator.clipboard.writeText(ssContainerStr).catch(function(){}); };
-          var cpyCfgBtn = document.getElementById('cpySsConfig');
-          if (cpyCfgBtn) cpyCfgBtn.onclick = function() { navigator.clipboard.writeText(JSON.stringify(ssContainerResult)).catch(function(){}); };
         } catch(e) {
           console.error('buildSSContainer error:', e);
           var ssBody2 = document.getElementById('ssGtmBody');
@@ -7103,6 +7093,9 @@
 
         // Update Overview page with active pixels
         try { refreshOverview(); } catch (roe) { console.warn('refreshOverview error:', roe); }
+
+        // Autosave wizard state to sessionStorage so it survives a page refresh
+        try { _saveWizardState(); } catch(e) {}
 
         // ── Step 4: Lazy GTM build — defer heavy JSON serialization so UI stays responsive ──
         var gtmBodyEl = document.getElementById('gtmBody');
@@ -7191,8 +7184,9 @@
           enabled:    true,
           server_url: _pcSS.serverUrl,
           ga4_id:     _pcSS.ga4Id,
+          ga4_events: (_ga4Client.selectedEvents || []).slice(), // GA4 = source of truth
           platforms:  _pcSS.platforms,
-          events:     _pcSS.events,
+          events:     _pcSS.events,                              // per-platform subset of ga4_events
           gads_conv_id: _pcSS.gadsConvId,
           gads_labels:  _pcSS.gadsLabels
           // tokens ommitted intentionally — sensitive
@@ -7513,8 +7507,6 @@
       // fingerprint uses fp() like all other entities (13-digit timestamp).
       customTemplates.push({ accountId:'0', containerId:'0', templateId: TPL_HTTP, name:'Easy Track - Universal HTTP Forwarder', fingerprint: fp(50000), templateData: UNIVERSAL_HTTP_CODE });
 
-      var varId = 1, tagId = 1, triggerId = 1, clientId = 1;
-
       // ── 1. GA4 Client ────────────────────────────────────────────
       clients.push({
         accountId:'000000000', containerId:'00000000', clientId: sid(clientId),
@@ -7592,15 +7584,23 @@
       });
 
       // ── 3. Triggers ───────────────────────────────────────────────────────────
-      // Collect all unique events: SS CAPI platforms + GA4 client-side selected events
+      // GA4 is the single source of truth — ensure every platform is a subset of
+      // the enabled GA4 events before emitting triggers/tags (migrates stale keys).
+      pcSS_pruneEventsToGa4();
+      var _ssGa4Allowed = pcSS_effectiveGa4Events();
+      // Resolve the events a platform forwards: explicit subset of GA4, or — when a
+      // platform was never configured (undefined) — mirror all enabled GA4 events.
+      function _ssPlatEvents(plat) {
+        var raw = _pcSS.events[plat];
+        return (raw === undefined)
+          ? _ssGa4Allowed.slice()
+          : raw.filter(function(ev) { return _ssGa4Allowed.indexOf(ev) !== -1; });
+      }
+      // Unique events that any platform actually forwards (already a GA4 subset).
       var allSsEvents = {};
       _pcSS.platforms.forEach(function(plat) {
-        (_pcSS.events[plat] || []).forEach(function(ev) { allSsEvents[ev] = true; });
+        _ssPlatEvents(plat).forEach(function(ev) { allSsEvents[ev] = true; });
       });
-      // Merge events selected in the GA4 Client Configuration UI (window.ET.ga4ClientEvents)
-      var _ga4ClientEvs = (window.ET && window.ET.ga4ClientEnabled && Array.isArray(window.ET.ga4ClientEvents))
-        ? window.ET.ga4ClientEvents : [];
-      _ga4ClientEvs.forEach(function(ev) { allSsEvents[ev] = true; });
 
       // CMS-aware event name map: event key → GA4 event_name that the browser actually sends
       var ssEvNameMap = {
@@ -7705,12 +7705,9 @@
       ];
 
       _pcSS.platforms.forEach(function(plat) {
-        var platEvents = (_pcSS.events[plat] || []);
-        // Also include any GA4 client events not already in platEvents
-        _ga4ClientEvs.forEach(function(ev) {
-          if (platEvents.indexOf(ev) === -1) platEvents = platEvents.concat([ev]);
-        });
-        if (!platEvents.length) platEvents = ['purchase']; // safety fallback
+        // Forward ONLY the events this platform selected (subset of GA4). An explicit
+        // empty array means "forward nothing" and is respected; undefined mirrors GA4.
+        var platEvents = _ssPlatEvents(plat);
 
         if (plat === 'meta') {
           var pixId = credVal(_pcSS.pixelIds['meta'], 'YOUR_META_PIXEL_ID');
@@ -9426,17 +9423,27 @@
         };
         var ssEvNameForCms = ssRelayEvMap[S.cms] || ssRelayEvMap['zid'];
 
-        // Platform event name map (SS event key → platform-specific name)
+        // Platform event name map (SS event key → platform-specific name).
+        // Includes both GA4 event keys (current model) and legacy keys (back-compat).
         var ssPlEv = {
-          meta:   { purchase:'Purchase', add_to_cart:'AddToCart', initiate_checkout:'InitiateCheckout', view_content:'ViewContent', page_view:'PageView', lead:'Lead', sign_up:'CompleteRegistration', search:'Search' },
-          gads:   { purchase:'conversion', add_to_cart:'conversion', initiate_checkout:'conversion', view_content:'conversion', lead:'conversion', sign_up:'conversion' },
-          snap:   { purchase:'PURCHASE', add_to_cart:'ADD_CART', initiate_checkout:'START_CHECKOUT', view_content:'VIEW_CONTENT', page_view:'PAGE_VIEW', lead:'SIGN_UP', sign_up:'SIGN_UP', search:'SEARCH' },
-          tiktok: { purchase:'CompletePayment', add_to_cart:'AddToCart', initiate_checkout:'InitiateCheckout', view_content:'ViewContent', page_view:'Pageview', lead:'SubmitForm', sign_up:'CompleteRegistration', search:'Search' }
+          meta:   { purchase:'Purchase', add_to_cart:'AddToCart', view_item:'ViewContent', begin_checkout:'InitiateCheckout', view_item_list:'ViewContent', add_to_wishlist:'AddToWishlist', view_cart:'InitiateCheckout', search:'Search',
+                    initiate_checkout:'InitiateCheckout', view_content:'ViewContent', page_view:'PageView', lead:'Lead', sign_up:'CompleteRegistration' },
+          gads:   { purchase:'conversion', add_to_cart:'conversion', view_item:'conversion', begin_checkout:'conversion', view_item_list:'conversion', add_to_wishlist:'conversion', view_cart:'conversion', search:'conversion',
+                    initiate_checkout:'conversion', view_content:'conversion', lead:'conversion', sign_up:'conversion' },
+          snap:   { purchase:'PURCHASE', add_to_cart:'ADD_CART', view_item:'VIEW_CONTENT', begin_checkout:'START_CHECKOUT', view_item_list:'VIEW_CONTENT', add_to_wishlist:'SAVE', view_cart:'VIEW_CONTENT', search:'SEARCH',
+                    initiate_checkout:'START_CHECKOUT', view_content:'VIEW_CONTENT', page_view:'PAGE_VIEW', lead:'SIGN_UP', sign_up:'SIGN_UP' },
+          tiktok: { purchase:'CompletePayment', add_to_cart:'AddToCart', view_item:'ViewContent', begin_checkout:'InitiateCheckout', view_item_list:'ViewContent', add_to_wishlist:'AddToWishlist', view_cart:'ViewContent', search:'Search',
+                    initiate_checkout:'InitiateCheckout', view_content:'ViewContent', page_view:'Pageview', lead:'SubmitForm', sign_up:'CompleteRegistration' }
         };
 
         // Build relay tag for each SS platform × event
+        // (events are kept a subset of the enabled GA4 events — single source of truth).
+        var _relayGa4Allowed = pcSS_effectiveGa4Events();
         _pcSS.platforms.forEach(function(plat) {
-          var platEvs = _pcSS.events[plat] || [];
+          var raw = _pcSS.events[plat];
+          var platEvs = (raw === undefined)
+            ? _relayGa4Allowed.slice()
+            : raw.filter(function(ev) { return _relayGa4Allowed.indexOf(ev) !== -1; });
           platEvs.forEach(function(evKey) {
             var ga4Name  = ssEvNameForCms[evKey] || evKey;
             var platName = (ssPlEv[plat] && ssPlEv[plat][evKey]) || evKey;
@@ -9845,7 +9852,7 @@
           icon: '📘', name: 'Meta Pixel', color: '#1877F2',
           steps: [
             { icon: 'upload_file', title: 'ارفع الـ Container', body: 'نزّل ملف GTM Container من تاب "GTM Container"، ثم في GTM: <strong>Admin → Import Container → Merge</strong>' },
-            { icon: 'key', title: 'Pixel ID', body: 'Pixel ID: <code style="color:var(--acc);background:rgba(70,241,197,0.1);padding:2px 8px;border-radius:4px;">' + (S.pixelIds.meta || 'YOUR_PIXEL_ID') + '</code><br>هتلاقيه في: Business Manager → Events Manager' },
+            { icon: 'key', title: 'Pixel ID', body: 'Pixel ID: <code style="color:var(--acc);background:rgba(70,241,197,0.1);padding:2px 8px;border-radius:4px;">' + escapeHtml(S.pixelIds.meta || 'YOUR_PIXEL_ID') + '</code><br>هتلاقيه في: Business Manager → Events Manager' },
             { icon: 'check_circle', title: 'جاهز!', body: 'الـ Container فيه كل الـ Tags والأحداث جاهزة ومربوطة — بس ارفعه واختبره من GTM Preview' }
           ]
         },
@@ -9853,7 +9860,7 @@
           icon: '🎵', name: 'TikTok Pixel', color: '#46f1c5',
           steps: [
             { icon: 'upload_file', title: 'ارفع الـ Container', body: 'نزّل ملف GTM Container وارفعه: <strong>Admin → Import Container → Merge</strong>' },
-            { icon: 'key', title: 'Pixel ID', body: 'Pixel ID: <code style="color:var(--acc);background:rgba(70,241,197,0.1);padding:2px 8px;border-radius:4px;">' + (S.pixelIds.tiktok || 'YOUR_PIXEL_ID') + '</code><br>TikTok Ads Manager → Assets → Events' },
+            { icon: 'key', title: 'Pixel ID', body: 'Pixel ID: <code style="color:var(--acc);background:rgba(70,241,197,0.1);padding:2px 8px;border-radius:4px;">' + escapeHtml(S.pixelIds.tiktok || 'YOUR_PIXEL_ID') + '</code><br>TikTok Ads Manager → Assets → Events' },
             { icon: 'check_circle', title: 'جاهز!', body: 'الـ Container فيه كل أحداث TikTok جاهزة — اختبرها من GTM Preview قبل النشر' }
           ]
         },
@@ -9861,7 +9868,7 @@
           icon: '👻', name: 'Snap Pixel', color: '#FFFC00',
           steps: [
             { icon: 'upload_file', title: 'ارفع الـ Container', body: 'نزّل ملف GTM Container وارفعه: <strong>Admin → Import Container → Merge</strong>' },
-            { icon: 'key', title: 'Pixel ID', body: 'Pixel ID: <code style="color:var(--acc);background:rgba(70,241,197,0.1);padding:2px 8px;border-radius:4px;">' + (S.pixelIds.snapchat || 'YOUR_PIXEL_ID') + '</code><br>Snapchat Ads Manager → Assets → Snap Pixel' },
+            { icon: 'key', title: 'Pixel ID', body: 'Pixel ID: <code style="color:var(--acc);background:rgba(70,241,197,0.1);padding:2px 8px;border-radius:4px;">' + escapeHtml(S.pixelIds.snapchat || 'YOUR_PIXEL_ID') + '</code><br>Snapchat Ads Manager → Assets → Snap Pixel' },
             { icon: 'check_circle', title: 'جاهز!', body: 'الـ Container المولّد جاهز لـ Snapchat بالكامل — اختبره من GTM Preview' }
           ]
         },
@@ -9869,7 +9876,7 @@
           icon: '🔍', name: 'Google Ads', color: '#4285F4',
           steps: [
             { icon: 'upload_file', title: 'ارفع الـ Container', body: 'نزّل ملف GTM Container وارفعه: <strong>Admin → Import Container → Merge</strong>' },
-            { icon: 'key', title: 'Conversion ID', body: 'ID: <code style="color:var(--acc);background:rgba(70,241,197,0.1);padding:2px 8px;border-radius:4px;">' + (S.pixelIds.google || 'YOUR_CONVERSION_ID') + '</code><br>هتلاقيه في: Google Ads → Goals → Conversions' },
+            { icon: 'key', title: 'Conversion ID', body: 'ID: <code style="color:var(--acc);background:rgba(70,241,197,0.1);padding:2px 8px;border-radius:4px;">' + escapeHtml(S.pixelIds.google || 'YOUR_CONVERSION_ID') + '</code><br>هتلاقيه في: Google Ads → Goals → Conversions' },
             { icon: 'check_circle', title: 'جاهز!', body: 'الـ Container فيه Tags جاهزة لتتبع الـ Conversions — اختبرها من GTM Preview' }
           ]
         },
@@ -9877,7 +9884,7 @@
           icon: '📊', name: 'Google Analytics 4', color: '#F9AB00',
           steps: [
             { icon: 'upload_file', title: 'ارفع الـ Container', body: 'نزّل ملف GTM Container وارفعه: <strong>Admin → Import Container → Merge</strong>' },
-            { icon: 'key', title: 'Measurement ID', body: 'ID: <code style="color:var(--acc);background:rgba(70,241,197,0.1);padding:2px 8px;border-radius:4px;">' + (S.pixelIds.ga4 || 'G-XXXXXXXXXX') + '</code><br>هتلاقيه في: GA4 Admin → Data Streams' },
+            { icon: 'key', title: 'Measurement ID', body: 'ID: <code style="color:var(--acc);background:rgba(70,241,197,0.1);padding:2px 8px;border-radius:4px;">' + escapeHtml(S.pixelIds.ga4 || 'G-XXXXXXXXXX') + '</code><br>هتلاقيه في: GA4 Admin → Data Streams' },
             { icon: 'check_circle', title: 'جاهز!', body: 'الـ Container فيه كل أحداث التحليلات جاهزة — اختبرها من GTM Preview' }
           ]
         }
@@ -10337,11 +10344,11 @@
         // Use a CORS proxy to fetch the page HTML
 
 
-        // Multi-proxy fallback — try 3 proxies in order
+        // Multi-proxy fallback — try own backend first, then third-party fallbacks
         var proxies = [
+          { url: (window.ETD_API_URL || '') + '/api/ss/health-check?url=' + encodeURIComponent(url), type: 'json', extract: function (d) { return d.contents || ''; } },
           { url: 'https://api.allorigins.win/get?url=' + encodeURIComponent(url), type: 'json', extract: function (d) { return d.contents || ''; } },
-          { url: 'https://corsproxy.io/?' + encodeURIComponent(url), type: 'text', extract: function (d) { return d; } },
-          { url: 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url), type: 'text', extract: function (d) { return d; } }
+          { url: 'https://corsproxy.io/?' + encodeURIComponent(url), type: 'text', extract: function (d) { return d; } }
         ];
         var html = '';
         var lastErr = '';
@@ -10521,6 +10528,15 @@
       }
     }
 
+    function escapeHtml(str) {
+      return String(str == null ? '' : str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     function buildTrackingPlan() {
       var el = document.getElementById('planContent');
       if (!el) return;
@@ -10530,7 +10546,7 @@
       var html = '<div style="font-family:Cairo,sans-serif;direction:rtl;">';
       // Header
       html += '<div style="background:#0b1628;border:1px solid rgba(232,184,75,.2);border-radius:14px;padding:20px;margin-bottom:14px;">';
-      html += '<div style="font-weight:900;font-size:18px;margin-bottom:6px;">' + name + '</div>';
+      html += '<div style="font-weight:900;font-size:18px;margin-bottom:6px;">' + escapeHtml(name) + '</div>';
       html += '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:#5a7090;">';
       html += '<span>📅 ' + today + '</span><span>🛍 ' + cmsName + '</span>';
       html += '<span>📊 ' + S.events.length + ' events</span><span>📡 ' + S.platforms.length + ' platforms</span>';
@@ -10541,7 +10557,7 @@
         html += '<div style="background:#0f1e35;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:14px;margin-bottom:10px;">';
         html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
         html += '<span style="font-weight:700;">' + pm.icon + ' ' + pm.name + '</span>';
-        html += '<span style="font-family:monospace;font-size:11px;color:#e8b84b;background:rgba(232,184,75,.1);padding:2px 8px;border-radius:5px;">' + pid + '</span>';
+        html += '<span style="font-family:monospace;font-size:11px;color:#e8b84b;background:rgba(232,184,75,.1);padding:2px 8px;border-radius:5px;">' + escapeHtml(pid) + '</span>';
         html += '</div><table style="width:100%;border-collapse:collapse;font-size:12px;">';
         html += '<tr style="color:#5a7090;"><th style="text-align:right;padding:5px;">GA4 Event</th><th style="text-align:right;padding:5px;">Platform Event</th><th style="text-align:center;padding:5px;">Score</th></tr>';
         S.events.forEach(function (ev) {
@@ -10626,30 +10642,7 @@
       var w = window.open('', '_blank');
       w.document.write('<html><head><meta charset="UTF-8"><style>body{background:#05090f;color:#f0f4ff;font-family:Cairo,sans-serif;padding:24px;}table{width:100%;border-collapse:collapse;}td,th{padding:8px;border:1px solid rgba(255,255,255,.1);}</style></head><body>');
       w.document.write(content.innerHTML);
-      w.document.write(`
-  <!-- ══ WHATSAPP WIDGET ══ -->
-  <script>
-  (function () {
-    var whatsappNumber = "201552388174";
-    var options = {
-      whatsapp: whatsappNumber,
-      call_to_action: "\u062a\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627 \u0644\u062e\u062f\u0645\u062a\u0643",
-      position: "left",
-      preFilledMessage: "\u0645\u0631\u062d\u0628\u064b\u0627\u060c \u0623\u0631\u064a\u062f \u0627\u0644\u062a\u0631\u0642\u064a\u0629 \u0625\u0644\u0649 \u062e\u0637\u0629 \u0623\u0639\u0644\u0649 \u0641\u064a Easy Track."
-    };
-    var proto = document.location.protocol, host = "getbutton.io";
-    var s = document.createElement("script");
-    s.type = "text/javascript"; s.async = true;
-    s.src = proto + "//static." + host + "/widget-send-button/js/init.js";
-    s.onload = function () {
-      if (typeof WhWidgetSendButton !== "undefined") {
-        WhWidgetSendButton.init(host, proto, options);
-      }
-    };
-    document.head.appendChild(s);
-  })();
-  <\/script>
-</body></html>`);
+      w.document.write('</body></html>');
       w.document.close(); w.print();
     }
 
@@ -10962,8 +10955,8 @@
       h += '<div style="background:linear-gradient(135deg,rgba(14,165,233,.12),rgba(16,185,129,.06));border:1px solid rgba(14,165,233,.2);border-radius:16px;padding:24px 28px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">';
       h += '<div>';
       h += '<div style="font-size:10px;font-family:var(--font-mono);letter-spacing:2px;color:var(--mut);text-transform:uppercase;margin-bottom:4px;">Easy Track · Audit Report</div>';
-      h += '<div style="font-size:22px;font-weight:900;color:var(--wht);margin-bottom:2px;">' + name + '</div>';
-      h += '<div style="font-size:12px;color:var(--mut);">' + (loc ? loc + ' · ' : '') + today + '</div>';
+      h += '<div style="font-size:22px;font-weight:900;color:var(--wht);margin-bottom:2px;">' + escapeHtml(name) + '</div>';
+      h += '<div style="font-size:12px;color:var(--mut);">' + (loc ? escapeHtml(loc) + ' · ' : '') + today + '</div>';
       h += '</div>';
       h += '<div style="text-align:center;background:rgba(0,0,0,.3);border-radius:12px;padding:14px 20px;">';
       h += '<div style="font-size:10px;font-family:var(--font-mono);letter-spacing:1px;color:var(--mut);margin-bottom:4px;">COVERAGE SCORE</div>';
@@ -11004,7 +10997,7 @@
         var pCol = pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#f43f5e';
         h += '<tr style="border-bottom:1px solid rgba(255,255,255,.04);">';
         h += '<td style="padding:10px 12px;font-weight:700;">' + pm.icon + ' ' + pm.name + '</td>';
-        h += '<td style="padding:10px 12px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--acc);">' + pid + '</td>';
+        h += '<td style="padding:10px 12px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--acc);">' + escapeHtml(pid) + '</td>';
         h += '<td style="padding:10px 12px;text-align:center;">' + mappedCount + ' / ' + totalEvents + '</td>';
         h += '<td style="padding:10px 12px;text-align:center;font-weight:700;color:' + pCol + ';">' + pct + '%</td>';
         h += '</tr>';
@@ -11060,7 +11053,7 @@
       if (!content) return;
       var w = window.open('', '_blank');
       var name = (S.lead && S.lead.name) || 'Client';
-      w.document.write('<html><head><meta charset="UTF-8"><title>Audit Report — ' + name + '</title>');
+      w.document.write('<html><head><meta charset="UTF-8"><title>Audit Report — ' + escapeHtml(name) + '</title>');
       w.document.write('<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">');
       w.document.write('<style>*{margin:0;padding:0;box-sizing:border-box;}body{background:#080808;color:#d4d4d4;font-family:Cairo,sans-serif;padding:32px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}@media print{body{padding:16px;}}</style>');
       w.document.write('</head><body>');
@@ -11080,11 +11073,85 @@
     }
 
     // ===== MULTI-STORE =====
+    // ── Wizard state persistence (sessionStorage) ──────────────────────────
+    function _saveWizardState() {
+      try {
+        sessionStorage.setItem('et_wizard', JSON.stringify({
+          cms: S.cms,
+          platforms: S.platforms ? S.platforms.slice() : [],
+          events: S.events ? S.events.slice() : [],
+          pixelIds: S.pixelIds ? JSON.parse(JSON.stringify(S.pixelIds)) : {},
+          lead: S.lead ? JSON.parse(JSON.stringify(S.lead)) : {}
+        }));
+      } catch(e) {}
+    }
+    function _restoreWizardState() {
+      try {
+        var raw = sessionStorage.getItem('et_wizard');
+        if (!raw) return false;
+        var ws = JSON.parse(raw);
+        if (ws.cms) S.cms = ws.cms;
+        if (ws.platforms && ws.platforms.length) S.platforms = ws.platforms;
+        if (ws.events && ws.events.length) S.events = ws.events;
+        if (ws.pixelIds && Object.keys(ws.pixelIds).length) S.pixelIds = ws.pixelIds;
+        if (ws.lead && ws.lead.name) S.lead = ws.lead;
+        return !!(ws.cms || (ws.platforms && ws.platforms.length));
+      } catch(e) { return false; }
+    }
+
+    // ── Firestore project store (write-through with localStorage cache) ──────
+    var _fsProjectsCache = null;
+
     function _getStores() {
+      if (_fsProjectsCache !== null) return _fsProjectsCache;
       try { return JSON.parse(localStorage.getItem('et_stores') || '[]'); } catch (e) { return []; }
     }
     function _saveStores(arr) {
+      _fsProjectsCache = arr;
       localStorage.setItem('et_stores', JSON.stringify(arr));
+      _fsSyncStores(arr);
+    }
+    async function _fsSyncStores(arr) {
+      if (!currentUser || !currentUser.id || !db) return;
+      try {
+        var uid = currentUser.id;
+        var colRef = db.collection('users').doc(uid).collection('projects');
+        var batch = db.batch();
+        var existing = await colRef.get();
+        existing.forEach(function(doc) { batch.delete(doc.ref); });
+        arr.forEach(function(s, i) {
+          var docRef = colRef.doc('p' + i);
+          batch.set(docRef, Object.assign({}, s, { _order: i, uid: uid }));
+        });
+        await batch.commit();
+      } catch(e) { console.warn('Firestore projects sync:', e); }
+    }
+    async function _fsLoadStores() {
+      if (!currentUser || !currentUser.id || !db) return;
+      try {
+        var uid = currentUser.id;
+        var colRef = db.collection('users').doc(uid).collection('projects');
+        var snap = await colRef.orderBy('_order').get();
+        if (snap.empty) {
+          var local = [];
+          try { local = JSON.parse(localStorage.getItem('et_stores') || '[]'); } catch(e) {}
+          _fsProjectsCache = local;
+          if (local.length) await _fsSyncStores(local);
+        } else {
+          var projects = [];
+          snap.forEach(function(doc) {
+            var d = doc.data();
+            delete d._order; delete d.uid;
+            projects.push(d);
+          });
+          _fsProjectsCache = projects;
+          localStorage.setItem('et_stores', JSON.stringify(projects));
+        }
+        renderStoresList();
+      } catch(e) {
+        console.warn('Firestore load projects:', e);
+        _fsProjectsCache = null;
+      }
     }
 
     function saveStore() {
@@ -11154,7 +11221,7 @@
         var plats = (s.platforms || []).map(function (p) { return PM[p] ? PM[p].icon : p; }).join(' ');
         h += '<div style="background:var(--sur2);border:1px solid var(--bdr2);border-radius:12px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">';
         h += '<div style="flex:1;min-width:140px;">';
-        h += '<div style="font-weight:700;font-size:14px;color:var(--wht2);margin-bottom:4px;">' + s.name + '</div>';
+        h += '<div style="font-weight:700;font-size:14px;color:var(--wht2);margin-bottom:4px;">' + escapeHtml(s.name) + '</div>';
         h += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
         h += '<span style="background:rgba(16,185,129,.08);color:var(--grn);font-size:11px;padding:2px 8px;border-radius:5px;font-family:monospace;border:1px solid rgba(16,185,129,.15);">' + cms + '</span>';
         h += '<span style="background:var(--acc-dim);color:var(--acc);font-size:13px;padding:2px 8px;border-radius:5px;border:1px solid rgba(14,165,233,.15);">' + plats + '</span>';
@@ -12907,9 +12974,20 @@
 
       clearTimeout(_fbLoadTimer);
 
-      if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
-      db = firebase.firestore();
-      auth = firebase.auth();
+      try {
+        if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+        db = firebase.firestore();
+        auth = firebase.auth();
+      } catch (fbInitErr) {
+        console.error('Firebase init failed:', fbInitErr);
+        var _fbErrBanner = document.getElementById('gGlobalErr') || document.createElement('div');
+        _fbErrBanner.id = 'gGlobalErr';
+        _fbErrBanner.style.cssText = 'position:fixed;top:0;left:0;width:100%;padding:16px;background:#f43f5e;color:#fff;text-align:center;font-family:Cairo,sans-serif;font-size:14px;font-weight:700;z-index:99999;direction:rtl;';
+        if (!_fbErrBanner.parentNode && document.body) document.body.prepend(_fbErrBanner);
+        _fbErrBanner.innerHTML = '⚠️ فشل تحميل الخدمة — تأكد من الاتصال بالإنترنت ثم <button onclick="location.reload()" style="background:none;border:1px solid #fff;color:#fff;padding:4px 12px;border-radius:6px;cursor:pointer;font-family:Cairo,sans-serif;font-size:14px;font-weight:700;margin-right:8px;">أعد المحاولة</button>';
+        _fbErrBanner.style.display = 'block';
+        return;
+      }
 
       // Enable Firestore offline persistence for resilience
       try {
@@ -13284,15 +13362,15 @@
             + 'onmouseover="this.style.borderColor=\'rgba(14,165,233,.3)\'" '
             + 'onmouseout="this.style.borderColor=\'rgba(255,255,255,.07)\'">';
           html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;cursor:pointer;" onclick="loadProject(' + i + ')">';
-          html += '<div style="font-weight:700;font-size:15px;color:var(--wht2);">' + (p.client_name || p.name || 'مشروع #' + (i + 1)) + '</div>';
-          html += '<div style="font-family:monospace;font-size:10px;color:var(--mut2);">' + date + '</div>';
+          html += '<div style="font-weight:700;font-size:15px;color:var(--wht2);">' + escapeHtml(p.client_name || p.name || 'مشروع #' + (i + 1)) + '</div>';
+          html += '<div style="font-family:monospace;font-size:10px;color:var(--mut2);">' + escapeHtml(date) + '</div>';
           html += '</div>';
           html += '<div style="display:flex;gap:6px;flex-wrap:wrap;cursor:pointer;" onclick="loadProject(' + i + ')">';
-          html += '<span style="background:rgba(16,185,129,.08);color:var(--grn);font-size:11px;padding:2px 10px;border-radius:6px;font-family:monospace;border:1px solid rgba(16,185,129,.15);">' + cms + '</span>';
-          html += '<span style="background:var(--acc-dim);color:var(--acc);font-size:11px;padding:2px 10px;border-radius:6px;font-family:monospace;border:1px solid rgba(14,165,233,.15);">' + platforms + '</span>';
-          html += '<span style="background:var(--sur3);color:var(--mut);font-size:11px;padding:2px 10px;border-radius:6px;font-family:monospace;border:1px solid var(--bdr2);">' + events + '</span>';
+          html += '<span style="background:rgba(16,185,129,.08);color:var(--grn);font-size:11px;padding:2px 10px;border-radius:6px;font-family:monospace;border:1px solid rgba(16,185,129,.15);">' + escapeHtml(cms) + '</span>';
+          html += '<span style="background:var(--acc-dim);color:var(--acc);font-size:11px;padding:2px 10px;border-radius:6px;font-family:monospace;border:1px solid rgba(14,165,233,.15);">' + escapeHtml(platforms) + '</span>';
+          html += '<span style="background:var(--sur3);color:var(--mut);font-size:11px;padding:2px 10px;border-radius:6px;font-family:monospace;border:1px solid var(--bdr2);">' + escapeHtml(events) + '</span>';
           if (hasGtm) {
-            html += '<span style="background:rgba(70,241,197,.12);color:var(--acc);font-size:11px;padding:2px 10px;border-radius:6px;font-family:monospace;border:1px solid rgba(70,241,197,.2);" title="GTM Container ID">' + p.gtmPublicId + '</span>';
+            html += '<span style="background:rgba(70,241,197,.12);color:var(--acc);font-size:11px;padding:2px 10px;border-radius:6px;font-family:monospace;border:1px solid rgba(70,241,197,.2);" title="GTM Container ID">' + escapeHtml(p.gtmPublicId) + '</span>';
           } else {
             html += '<span style="background:rgba(245,158,11,.08);color:var(--amber);font-size:11px;padding:2px 10px;border-radius:6px;font-family:monospace;border:1px solid rgba(245,158,11,.2);">لم يتم رفعه على GTM</span>';
           }
@@ -13306,8 +13384,8 @@
             html += '<div id="mp-snip-' + i + '" style="display:none;margin-top:12px;">';
             html += '  <div style="background:var(--sur);border:1px solid var(--bdr2);border-radius:10px;padding:10px 12px;margin-bottom:10px;display:flex;align-items:center;gap:10px;">';
             html += '    <span style="font-size:10px;color:var(--mut);letter-spacing:1px;font-family:var(--font-mono);">GTM ID</span>';
-            html += '    <span id="mp-gtm-' + i + '" style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--acc);">' + p.gtmPublicId + '</span>';
-            html += '    <button onclick="_mgdCopy(\'' + p.gtmPublicId + '\', this)" style="margin-right:auto;background:var(--sur3);border:1px solid var(--bdr2);color:var(--wht2);font-size:11px;padding:5px 10px;border-radius:6px;cursor:pointer;">📋 نسخ</button>';
+            html += '    <span id="mp-gtm-' + i + '" style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--acc);">' + escapeHtml(p.gtmPublicId) + '</span>';
+            html += '    <button onclick="_mgdCopy(' + JSON.stringify(p.gtmPublicId || '') + ', this)" style="margin-right:auto;background:var(--sur3);border:1px solid var(--bdr2);color:var(--wht2);font-size:11px;padding:5px 10px;border-radius:6px;cursor:pointer;">📋 نسخ</button>';
             html += '  </div>';
             html += '  <div style="font-size:11px;color:var(--wht2);font-weight:700;margin-bottom:6px;">حط الكود ده داخل &lt;head&gt; بتاع الموقع:</div>';
             html += '  <pre id="mp-snip-head-' + i + '" style="background:var(--bg);border:1px solid var(--bdr2);border-radius:8px;padding:10px;font-family:var(--font-mono);font-size:10.5px;color:var(--wht2);max-height:140px;overflow:auto;direction:ltr;text-align:left;margin-bottom:6px;line-height:1.5;white-space:pre;">' + _esc(p.snippetHead || '') + '</pre>';
@@ -13344,6 +13422,10 @@
       if (cfg.platformEvents) S.platformEvents = cfg.platformEvents;
       if (cfg.pixelIds) S.pixelIds = cfg.pixelIds;
       if (cfg.lead) S.lead = cfg.lead;
+
+      // Restore Server-Side config (GA4 events + per-platform subset), migrating
+      // any stale/legacy event keys so old saves don't crash or leak invalid state.
+      try { _pcSS_restoreFromConfig(cfg.ss_config); } catch (e) { console.warn('ss_config restore error:', e); }
 
       // Re-generate output
       generate();
@@ -13575,16 +13657,16 @@
           var evs = (p.events_count || 0) + ' events';
           var hasGtm = !!(p.gtmPublicId && p.snippetHead);
           html += '<div class="dp-card">';
-          html += '<div class="dp-card-name">' + (p.client_name || 'مشروع #' + (i + 1)) + '</div>';
+          html += '<div class="dp-card-name">' + escapeHtml(p.client_name || 'مشروع #' + (i + 1)) + '</div>';
           html += '<div class="dp-card-tags">';
-          html += '<span class="dp-tag cms">' + cms + '</span>';
-          html += '<span class="dp-tag plat">' + plat + '</span>';
-          html += '<span class="dp-tag evs">' + evs + '</span>';
+          html += '<span class="dp-tag cms">' + escapeHtml(cms) + '</span>';
+          html += '<span class="dp-tag plat">' + escapeHtml(plat) + '</span>';
+          html += '<span class="dp-tag evs">' + escapeHtml(evs) + '</span>';
           // GTM ID badge — so the client can instantly identify which project this is
           if (hasGtm) {
-            html += '<span class="dp-tag" style="background:rgba(70,241,197,.14);color:var(--acc);border:1px solid rgba(70,241,197,.28);font-weight:700;" title="GTM Container ID">' + p.gtmPublicId + '</span>';
+            html += '<span class="dp-tag" style="background:rgba(70,241,197,.14);color:var(--acc);border:1px solid rgba(70,241,197,.28);font-weight:700;" title="GTM Container ID">' + escapeHtml(p.gtmPublicId) + '</span>';
           } else if (p.gtmPublicId) {
-            html += '<span class="dp-tag" style="background:rgba(70,241,197,.08);color:var(--acc);border:1px solid rgba(70,241,197,.2);" title="GTM Container ID">' + p.gtmPublicId + '</span>';
+            html += '<span class="dp-tag" style="background:rgba(70,241,197,.08);color:var(--acc);border:1px solid rgba(70,241,197,.2);" title="GTM Container ID">' + escapeHtml(p.gtmPublicId) + '</span>';
           } else {
             html += '<span class="dp-tag" style="background:rgba(245,158,11,.08);color:var(--amber);border:1px solid rgba(245,158,11,.2);">لم يُرفع</span>';
           }
@@ -13602,8 +13684,8 @@
             html += '<div id="dp-snip-' + i + '" style="display:none;margin-top:10px;padding-top:10px;border-top:1px dashed var(--bdr2);">';
             html += '  <div style="display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--bdr2);border-radius:8px;padding:7px 10px;margin-bottom:8px;">';
             html += '    <span style="font-size:9px;color:var(--mut);letter-spacing:1px;font-family:var(--font-mono);">GTM ID</span>';
-            html += '    <span style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--acc);">' + p.gtmPublicId + '</span>';
-            html += '    <button onclick="_mgdCopy(\'' + p.gtmPublicId + '\', this)" style="margin-right:auto;background:var(--sur3);border:1px solid var(--bdr2);color:var(--wht2);font-size:10px;padding:3px 8px;border-radius:5px;cursor:pointer;">نسخ</button>';
+            html += '    <span style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--acc);">' + escapeHtml(p.gtmPublicId) + '</span>';
+            html += '    <button onclick="_mgdCopy(' + JSON.stringify(p.gtmPublicId || '') + ', this)" style="margin-right:auto;background:var(--sur3);border:1px solid var(--bdr2);color:var(--wht2);font-size:10px;padding:3px 8px;border-radius:5px;cursor:pointer;">نسخ</button>';
             html += '  </div>';
             html += '  <div style="font-size:10px;color:var(--mut);font-family:var(--font-mono);letter-spacing:.5px;margin-bottom:3px;">HEAD — داخل &lt;head&gt;</div>';
             html += '  <pre id="dp-snip-head-' + i + '" style="background:var(--bg);border:1px solid var(--bdr2);border-radius:8px;padding:8px;font-family:var(--font-mono);font-size:9.5px;color:var(--wht2);max-height:100px;overflow:auto;direction:ltr;text-align:left;margin:0 0 4px;line-height:1.4;white-space:pre;">' + _esc(p.snippetHead || '') + '</pre>';
@@ -13678,8 +13760,6 @@
 
     // Show the "Approval Pending" panel inside the gate.
     // Replaces the old behaviour of auto-opening WhatsApp on signup / pending-status login.
-    // The user is asked to message Yousef Elsouly manually; we pre-fill the email so the
-    // admin can match the request to the Firestore client doc.
     function showApprovalPending(userEmail) {
       var loginForm   = document.getElementById('gform-login');
       var signupForm  = document.getElementById('gform-signup');
@@ -13692,15 +13772,8 @@
 
       // Show email + build pre-filled WhatsApp link
       var emailEl = document.getElementById('gate-pending-email');
-      var waEl    = document.getElementById('gate-pending-wa');
       var em = (userEmail || '').trim();
       if (emailEl) emailEl.textContent = em || '—';
-      if (waEl) {
-        var msg = 'مرحباً يوسف، أنا سجّلت حساب جديد في Easy Track'
-                + (em ? ' بإيميل: ' + em : '')
-                + ' وأريد تفعيل دخولي. شكراً.';
-        waEl.href = 'https://wa.me/201552388174?text=' + encodeURIComponent(msg);
-      }
 
       // Make sure the gate itself is visible (in case enterTool was about to hide it)
       var gate = document.getElementById('gate');
@@ -13738,16 +13811,7 @@
       // Make sure id is set
       if (!currentUser.id && user.id) currentUser.id = user.id;
 
-      // If new signup → show approval-pending panel (admin must approve manually
-      // via WhatsApp). NEVER auto-open WhatsApp — the user clicks the button if
-      // they want to message Yousef Elsouly.
-      if (isNewSignup) {
-        localStorage.setItem('et_pending_plan', 'basic');
-        localStorage.setItem('et_pending_token', token);
-        localStorage.setItem('et_pending_user', JSON.stringify(user));
-        showApprovalPending(user.email);
-        return;
-      }
+      // New signups now auto-activate (status: 'active') — no approval gate.
 
       // If existing user but not yet approved → show the same approval-pending panel
       if (!user.status || user.status === 'pending') {
@@ -13760,6 +13824,8 @@
       var limit = PLAN_LIMITS[plan.toLowerCase()] || 1;
       var used = user.projects_used || 0;
       document.getElementById('userName').textContent = user.name || user.email.split('@')[0];
+      var _ubInitial = document.getElementById('ubProfileInitial');
+      if (_ubInitial) _ubInitial.textContent = (user.name || user.email || '?').charAt(0).toUpperCase();
       document.getElementById('projUsed').textContent = used;
       document.getElementById('projMax').textContent = limit === 999 ? '∞' : limit;
       var badge = document.getElementById('userPlanBadge');
@@ -13782,7 +13848,7 @@
       // Show initials in avatar if no photo
       if (ovAvatar) {
         var initials = displayName ? displayName.charAt(0).toUpperCase() : '?';
-        ovAvatar.innerHTML = '<span style="font-family:var(--font-display);font-weight:800;font-size:18px;color:var(--acc);">' + initials + '</span>';
+        ovAvatar.innerHTML = '<span style="font-family:var(--font-display);font-weight:800;font-size:18px;color:var(--acc);">' + escapeHtml(initials) + '</span>';
       }
 
       // Hide gate, show tool
@@ -13791,9 +13857,19 @@
       g.style.opacity = '0';
       setTimeout(function () {
         g.style.display = 'none';
-        S.lead = { name: user.name || '', phone: '', location: '', ts: new Date().toISOString() };
+        // Restore wizard state from last session if available
+        var _hadState = _restoreWizardState();
+        if (!_hadState) {
+          S.lead = { name: user.name || '', phone: '', location: '', ts: new Date().toISOString() };
+        }
         document.getElementById('s1').classList.add('on');
         updateProg(1);
+        // Load projects from Firestore (async, updates list in background)
+        _fsLoadStores();
+        // If prior wizard state was restored, re-render the output
+        if (_hadState && S.cms && S.platforms && S.platforms.length) {
+          try { generate(); } catch(e) {}
+        }
       }, 400);
     }
 
@@ -13904,7 +13980,7 @@
           whatsapp: whatsappNormalized,
           job: job,
           plan: 'Basic',
-          status: 'pending',
+          status: 'active',
           projects_used: 0,
           created_at: firebase.firestore.FieldValue.serverTimestamp()
         });
@@ -13912,9 +13988,9 @@
         var user = {
           id: uid, name: name, email: email,
           country: country, whatsapp: whatsappNormalized, job: job,
-          plan: 'Basic', projects_used: 0, status: 'pending'
+          plan: 'Basic', projects_used: 0, status: 'active'
         };
-        enterTool(user, null, true);  // isNewSignup = true → go to payment
+        enterTool(user, null);
 
       } catch (e) {
         var msg = e.code === 'auth/email-already-in-use' ? 'البريد ده مسجّل بالفعل — سجّل دخول' : (e.message || 'خطأ في إنشاء الحساب');
@@ -14955,13 +15031,13 @@
           resultEl.style.display = 'block';
           resultEl.innerHTML = '<div style="color:var(--mut);font-size:12px;">⏳ Using CORS proxy...</div>';
           try {
-            var proxyResp = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(fullUrl));
+            var proxyResp = await fetch((window.ETD_API_URL || '') + '/api/ss/health-check?url=' + encodeURIComponent(fullUrl));
             var proxyData = await proxyResp.json();
             if (!proxyData.contents) throw new Error('Empty response');
             html = proxyData.contents;
           } catch (e1) {
             try {
-              var p2Resp = await fetch('https://corsproxy.io/?' + encodeURIComponent(fullUrl));
+              var p2Resp = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(fullUrl));
               if (!p2Resp.ok) throw new Error('Status ' + p2Resp.status);
               html = await p2Resp.text();
             } catch (e2) {
@@ -16778,4 +16854,23 @@
   >
     <!-- WhatsApp SVG icon -->
     <svg width="30" height="30" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
-      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.76                                                                                                                                                                                                                                             
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+    </svg>
+    <!-- Pulse ring -->
+    <span style="
+      position:absolute;inset:0;border-radius:50%;
+      background:rgba(37,211,102,0.4);
+      animation:wa-ping 2s infinite;
+      pointer-events:none;
+    "></span>
+  </a>
+  <style>
+    @keyframes wa-ping {
+      0%   { transform:scale(1);   opacity:.5; }
+      70%  { transform:scale(1.7); opacity:0;  }
+      100% { transform:scale(1.7); opacity:0;  }
+    }
+  </style>
+
+</body>
+</html>

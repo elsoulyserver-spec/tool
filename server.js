@@ -1,4 +1,3 @@
-console.log("[BOOT] entry | node " + process.version + " | PORT=" + JSON.stringify(process.env.PORT) + " | cwd=" + process.cwd());
 const http   = require('http');
 const https  = require('https');
 const fs     = require('fs');
@@ -55,9 +54,8 @@ const rateLimiter  = require('./lib/ss-rate-limiter');
 const { StapeProvider }      = require('./lib/providers/stape');
 const { GoogleCloudProvider } = require('./lib/providers/gcloud');
 const { SelfHostedProvider }  = require('./lib/providers/selfhosted');
-// SSRF guard — reused from the providers layer to validate the pixel-scanner
-// target (blocks private/loopback/link-local/cloud-metadata hosts + bad ports).
-const { assertSafeUrl }       = require('./lib/providers/base');
+// assertSafeUrl (providers/base) is no longer called directly from server.js —
+// all user-URL paths now go through safeFetch / resolveHostname from ssrf-guard.
 // Cloud Tasks client — offloads long provisioning jobs to a worker request so
 // Cloud Run keeps CPU allocated for their full duration (see C3 / lib/cloud-tasks.js).
 const cloudTasks              = require('./lib/cloud-tasks');
@@ -65,6 +63,32 @@ const cloudTasks              = require('./lib/cloud-tasks');
 // Firestore job doc (1 MB limit + embedded customTemplate JS), so it is staged
 // in a private GCS bucket and the job carries only a small { bucket, object } ref.
 const configBlobStore         = require('./lib/config-blob-store');
+// Client Profile API services (Phase 1)
+const apiKeyService   = require('./lib/api-key-service');
+const auditService    = require('./lib/audit-service');
+const { validateTargetUrl, safeFetch, resolveHostname, isBlockedIp } = require('./lib/ssrf-guard');
+const timelineService = require('./lib/timeline-service');
+const profileService  = require('./lib/profile-service');
+// Health evaluation job (Phase 2)
+const healthService   = require('./lib/health-service');
+
+// Beacon write deduplication — bucket-keyed per 5-minute window.
+// Value is the bucket number; replaces itself naturally each period.
+// Prune runs every 10 min and removes entries from the previous bucket.
+const _beaconCache      = new Map();   // key: `${clientId}_${event}`, value: bucketNum
+const _BEACON_BUCKET_MS = 5 * 60 * 1000;
+setInterval(() => {
+  const cur = Math.floor(Date.now() / _BEACON_BUCKET_MS);
+  for (const [k, b] of _beaconCache) if (b < cur - 1) _beaconCache.delete(k);
+}, 10 * 60 * 1000).unref();
+
+// 64-char hex placeholder for timing-attack hardening in API key beacon auth.
+// Must decode to 32 bytes — same length as a real keyHash — so timingSafeEqual
+// always runs regardless of whether the keyId exists in Firestore.
+const _BEACON_DUMMY_HASH = '0'.repeat(64);
+// Beacon event allowlist — single source of truth shared with the health job's
+// listEventTypeLastSeen. Prevents authenticated callers writing arbitrary doc IDs.
+const _BEACON_VALID_EVENTS = new Set(firestoreService.BEACON_EVENTS);
 
 // Self-contained concurrency limiter — inlined here (NOT a separate module)
 // because the deploy ships only existing tracked files. Global FIFO + bounded
@@ -125,6 +149,8 @@ const provisionQueue = (function createProvisionQueueSingleton() {
     { key: 'GTM_ACCOUNT_ID',       breaks: '/api/managed/* and /api/ss/create-containers (GTM provisioning)' },
     { key: 'FIREBASE_SA_KEY_JSON', breaks: '/api/ss/* auth + ALL job storage (jobs are Firestore-backed)' },
     { key: 'MASTER_ENCRYPTION_KEY',breaks: '/api/ss/save-config (token encryption)' },
+    { key: 'API_KEY_SECRET',       breaks: '/api/v1/clients/:id/api-keys (API key generation + HMAC verification)' },
+    { key: 'BEACON_SECRET',        breaks: '/api/v1/internal/beacon (sGTM event presence beacons — HMAC validation)' },
   ];
   const missing = REQUIRED.filter(r => !((process.env[r.key] || '').trim()));
   if (missing.length) {
@@ -1265,50 +1291,9 @@ async function scanWithPuppeteer(targetUrl) {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// HTTP FALLBACK (no Puppeteer)
-// ══════════════════════════════════════════════════════════════════════════════
-function fetchWithHttp(targetUrl, redirects) {
-  redirects = redirects || 0;
-  return new Promise((resolve, reject) => {
-    if (redirects > 5) { reject(new Error('Too many redirects')); return; }
-    const lib = targetUrl.startsWith('https') ? https : http;
-    const req = lib.get(targetUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; EasyTrackScanner/1.0)' },
-      timeout: 15000,
-    }, res => {
-      // ── Redirect: re-validate EVERY hop through the SSRF guard ──────────────
-      // The first-hop check in /api/scan-url is not enough: an allow-looking host
-      // can 302 into localhost / a private IP / the cloud-metadata endpoint.
-      if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
-        res.resume(); // drain the redirect body so the socket is released
-        let next;
-        try {
-          const loc = res.headers.location;
-          next = /^https?:\/\//i.test(loc) ? loc : new URL(loc, targetUrl).href;
-        } catch (_) { reject(new Error('Invalid redirect location')); return; }
-        assertSafeUrl(next)
-          .then(() => resolve(fetchWithHttp(next, redirects + 1)))
-          .catch(e => reject(new Error('Redirect blocked by SSRF guard: ' + e.message)));
-        return;
-      }
-
-      let html = '';
-      res.setEncoding('utf8');
-      res.on('data', c => {
-        html += c;
-        if (html.length >= 800000) {           // hard cap — stop reading oversize bodies
-          html = html.slice(0, 800000);
-          res.destroy();
-          resolve({ html, url: targetUrl, pixels: [], method: 'http' });
-        }
-      });
-      res.on('end', () => resolve({ html, url: targetUrl, pixels: [], method: 'http' }));
-    });
-    req.on('timeout', () => req.destroy(new Error('Scan request timed out')));
-    req.on('error', reject);
-  });
-}
+// fetchWithHttp removed — replaced by safeFetch in /api/scan-url.
+// safeFetch resolves DNS once, validates the IP, and connects to the IP
+// directly (no TOCTOU window). See lib/ssrf-guard.js.
 
 // ══════════════════════════════════════════════════════════════════════════════
 // HELPERS
@@ -1560,49 +1545,79 @@ const server = http.createServer((req, res) => {
 
   // ── Pixel Scanner ─────────────────────────────────────────────
   if (req.method === 'POST' && req.url === '/api/scan-url') {
-    parseJsonBody(req, res, async body => {
-
-      let targetUrl = (body && body.url) ? body.url.trim() : '';
-      if (!targetUrl) { sendJSON(res, 400, { error: 'Missing url' }); return; }
-      if (!/^https?:\/\//i.test(targetUrl)) targetUrl = 'https://' + targetUrl;
-
-      // ── SSRF guard ─────────────────────────────────────────────────────────
-      // This endpoint is unauthenticated, so an unguarded fetch is a server-side
-      // request forgery + cloud-metadata exfiltration vector. Reject private /
-      // loopback / link-local / metadata hosts and disallowed ports BEFORE we
-      // fetch. fetchWithHttp re-checks every redirect hop as well.
-      try {
-        await assertSafeUrl(targetUrl);
-      } catch (e) {
-        return sendJSON(res, 400, { error: 'URL rejected (SSRF guard): ' + e.message });
+    (async () => {
+      // ── P0: Firebase auth — endpoint was previously unauthenticated ─────────
+      if (!firestoreService.isConfigured()) {
+        return sendJSON(res, 503, { error: 'Firebase غير مُهيَّأ على هذا الخادم' });
+      }
+      const scanAuthz = (req.headers['authorization'] || '').trim();
+      const scanAuthMatch = /^Bearer\s+(.+)$/i.exec(scanAuthz);
+      if (!scanAuthMatch) {
+        return sendJSON(res, 401, { error: 'Authorization header مطلوب' });
+      }
+      const scanToken = scanAuthMatch[1].trim();
+      if (!scanToken || scanToken.length > 8192) {
+        return sendJSON(res, 401, { error: 'Token غير صالح' });
+      }
+      let scanDecoded;
+      try { scanDecoded = await firestoreService.verifyIdToken(scanToken); }
+      catch (e) {
+        return sendJSON(res, 401, { error: 'Firebase token غير صالح', code: String((e && e.code) || 'auth/invalid-id-token') });
+      }
+      if (!scanDecoded || !scanDecoded.uid) {
+        return sendJSON(res, 401, { error: 'Token بدون uid' });
+      }
+      const scanRl = rateLimiter.check(scanDecoded.uid);
+      if (!scanRl.allowed) {
+        res.writeHead(429, { ...corsHeaders(), ...securityHeaders(), 'Retry-After': Math.ceil((scanRl.resetAt - Date.now()) / 1000) });
+        res.end(JSON.stringify({ error: 'Rate limit exceeded', resetAt: scanRl.resetAt }));
+        return;
       }
 
-      // ── Concurrency cap ────────────────────────────────────────────────────
-      // Reject rather than launch an unbounded number of headless Chromes.
-      if (scanInFlight >= MAX_CONCURRENT_SCANS) {
-        return sendJSON(res, 429, {
-          error:        'Scanner is at capacity — please retry shortly',
-          retryAfterMs: 3000,
-        });
-      }
+      parseJsonBody(req, res, async body => {
+        let targetUrl = (body && body.url) ? body.url.trim() : '';
+        if (!targetUrl) { sendJSON(res, 400, { error: 'Missing url' }); return; }
+        if (!/^https?:\/\//i.test(targetUrl)) targetUrl = 'https://' + targetUrl;
 
-      scanInFlight++;
-      try {
-        let result;
-        if (puppeteer) {
-          result = await scanWithPuppeteer(targetUrl);
-        } else {
-          console.warn('[scanner] Puppeteer not available — falling back to HTTP fetch');
-          result = await fetchWithHttp(targetUrl);
+        // ── SSRF guard: sync pre-check (protocol / port / IP-literal) ──────────
+        try { validateTargetUrl(targetUrl); }
+        catch (e) { return sendJSON(res, 400, { error: 'URL rejected: ' + e.message }); }
+
+        // ── Concurrency cap ──────────────────────────────────────────────────
+        if (scanInFlight >= MAX_CONCURRENT_SCANS) {
+          return sendJSON(res, 429, {
+            error:        'Scanner is at capacity — please retry shortly',
+            retryAfterMs: 3000,
+          });
         }
-        sendJSON(res, 200, result);
-      } catch (e) {
-        console.error('[scanner] Error:', e.message);
-        sendJSON(res, 502, { error: e.message });
-      } finally {
-        scanInFlight--;     // always release the slot, even on error/timeout
-      }
-    });
+
+        scanInFlight++;
+        try {
+          let result;
+          if (puppeteer) {
+            // Puppeteer re-resolves DNS internally (unavoidable with a browser engine).
+            // validateTargetUrl above blocks IP-literals and bad ports synchronously.
+            result = await scanWithPuppeteer(targetUrl);
+          } else {
+            // safeFetch: DNS resolved once, IP validated, connection to IP — no TOCTOU.
+            console.warn('[scanner] Puppeteer not available — falling back to safeFetch');
+            const { body: html } = await safeFetch(targetUrl, {
+              maxRedirects : 3,
+              timeoutMs    : 15_000,
+              maxBodyBytes : 800 * 1024,
+            });
+            result = { html, url: targetUrl, pixels: [], method: 'http' };
+          }
+          sendJSON(res, 200, result);
+        } catch (e) {
+          console.error('[scanner] Error:', e.message);
+          const status = /blocked|not allowed|SSRF|Invalid URL|hostname/i.test(e.message) ? 400 : 502;
+          sendJSON(res, status, { error: e.message });
+        } finally {
+          scanInFlight--;
+        }
+      });
+    })();
     return;
   }
 
@@ -1993,7 +2008,7 @@ const server = http.createServer((req, res) => {
       if (/axios is not installed|firebase-admin is not installed/i.test(msg)) {
         return { status: 500, payload: { error: 'مكتبة مفقودة على الخادم', detail: msg, hint: 'شغّل npm install على الخادم ثم أعد التشغيل' } };
       }
-      if (/Private\/internal IP|Hostname is blocked|Port .* is not allowed|Only http\/https/i.test(msg)) {
+      if (/Private\/internal IP|Hostname is blocked|Port .* is not allowed|Only http\/https|blocked range|blocked by SSRF|hostname is blocked|zone identifier|Invalid URL/i.test(msg)) {
         return { status: 400, payload: { error: 'الرابط مرفوض (SSRF guard)', detail: msg } };
       }
       return { status: 502, payload: { error: fallbackArMsg + ': ' + msg } };
@@ -2015,6 +2030,50 @@ const server = http.createServer((req, res) => {
     }
 
     const ssPath = req.url.split('?')[0];
+
+    // ────────────────────────────────────────────────────────────────────────
+    // GET /api/ss/health-check?url=... — fetch a customer site through the server
+    // to detect installed pixels without exposing customer URLs to third-party proxies.
+    // Authenticated via Firebase token.
+    // ────────────────────────────────────────────────────────────────────────
+    if (req.method === 'GET' && ssPath === '/api/ss/health-check') {
+      (async () => {
+        const auth = await ssAuthAndRate();
+        if (!auth) return;
+
+        const targetUrl = (req.url.includes('?')
+          ? new URLSearchParams(req.url.split('?')[1]).get('url')
+          : null) || '';
+
+        // Basic presence check before calling validateTargetUrl for a cleaner
+        // Arabic error message when the caller omits the parameter entirely.
+        if (!targetUrl) {
+          sendJSON(res, 400, { error: 'url param مطلوب ويجب أن يبدأ بـ http(s)://' });
+          return;
+        }
+
+        try {
+          // validateTargetUrl() throws with a descriptive English message for
+          // any blocked protocol, private IP, internal hostname, or bad port.
+          // safeFetch() calls it again on every redirect Location header, so
+          // open-redirect SSRF chains are blocked at each hop, not just on
+          // the initial URL.
+          const { body } = await safeFetch(targetUrl, {
+            maxRedirects : 3,
+            timeoutMs    : 10_000,
+            maxBodyBytes : 500 * 1024,
+          });
+          sendJSON(res, 200, { contents: body });
+        } catch (e) {
+          const msg = (e && e.message) || 'فشل الاتصال بالموقع';
+          // SSRF guard errors → 400 (caller mistake, not upstream failure)
+          const status = /SSRF guard|blocked|not allowed|Only http|Invalid URL|hostname/i.test(msg)
+            ? 400 : 502;
+          sendJSON(res, status, { error: msg });
+        }
+      })();
+      return;
+    }
 
     // ────────────────────────────────────────────────────────────────────────
     // GET /api/ss/config — return user's SS config (tokens redacted)
@@ -2049,12 +2108,20 @@ const server = http.createServer((req, res) => {
           if (!url) return sendJSON(res, 400, { error: 'حقل url مطلوب' });
           if (!/^https?:\/\/.+\..+/.test(url)) return sendJSON(res, 400, { error: 'الرابط غير صالح — يجب أن يبدأ بـ https://' });
 
+          // safeFetch: DNS resolved once, IP validated, connect to IP — no TOCTOU.
+          // maxRedirects:0 — sGTM servers must not redirect; redirect here means misconfiguration.
+          const t0 = Date.now();
           try {
-            const provider = ssGetProvider({ provider: body.provider || 'selfhosted' });
-            const result   = await provider.validateUrl(url);
-            if (!result.valid) rateLimiter.recordError(clientId);
-            else               rateLimiter.recordSuccess(clientId);
-            sendJSON(res, 200, { ok: result.valid, ...result });
+            const { statusCode } = await safeFetch(url, {
+              maxRedirects : 0,
+              timeoutMs    : 5_000,
+              maxBodyBytes : 512,
+            });
+            const latencyMs = Date.now() - t0;
+            const valid = statusCode >= 200 && statusCode < 500;
+            if (!valid) rateLimiter.recordError(clientId);
+            else        rateLimiter.recordSuccess(clientId);
+            sendJSON(res, 200, { ok: valid, valid, latencyMs, status: statusCode });
           } catch (e) {
             rateLimiter.recordError(clientId);
             const c = ssClassifyError(e, 'فشل الاتصال بالخادم'); sendJSON(res, c.status, c.payload);
@@ -2155,17 +2222,70 @@ const server = http.createServer((req, res) => {
             up_external_id: 'test_user_et',
           };
 
+          // Hardened POST — mirrors safeFetch internals:
+          // DNS resolved once, IP validated, http.request connects to the IP
+          // (not the hostname), so there is no TOCTOU window.
           try {
-            const provider = ssGetProvider({ provider: body.provider || 'selfhosted' });
-            const result   = await provider.sendTestEvent(url, testPayload);
-            if (!result.ok) rateLimiter.recordError(clientId);
-            else            rateLimiter.recordSuccess(clientId);
+            const endpoint   = url.replace(/\/$/, '') + '/g/collect';
+            const endParsed  = new URL(endpoint);
+            validateTargetUrl(endpoint); // sync: protocol / port / IP-literal guard
+            const rawHost    = endParsed.hostname; // may include [] brackets for IPv6
+            const resolvedIp = await resolveHostname(rawHost, 5000);
+            if (isBlockedIp(resolvedIp)) {
+              throw new Error('Resolved IP is in a blocked range: ' + resolvedIp);
+            }
+            const port     = endParsed.port
+              ? parseInt(endParsed.port, 10)
+              : (endParsed.protocol === 'https:' ? 443 : 80);
+            const bareHost = (rawHost.startsWith('[') && rawHost.endsWith(']'))
+              ? rawHost.slice(1, -1) : rawHost;
+            const lib      = endParsed.protocol === 'https:' ? https : http;
+            const postData = JSON.stringify(testPayload);
+            const reqOpts  = {
+              hostname : resolvedIp,
+              port,
+              path     : (endParsed.pathname || '/') + endParsed.search,
+              method   : 'POST',
+              headers  : {
+                'Host'           : (port === 80 || port === 443) ? bareHost : (bareHost + ':' + port),
+                'Content-Type'   : 'application/json',
+                'Content-Length' : Buffer.byteLength(postData),
+                'User-Agent'     : 'EasyTrack-SST-Tester/1.0',
+                'Connection'     : 'close',
+              },
+              timeout : 5000,
+            };
+            if (endParsed.protocol === 'https:') reqOpts.servername = bareHost;
+
+            const t0 = Date.now();
+            const evtResult = await new Promise((resolve, reject) => {
+              const evtReq = lib.request(reqOpts, apiRes => {
+                let respBody = '';
+                apiRes.setEncoding('utf8');
+                apiRes.on('data', c => { if (respBody.length < 4096) respBody += c; });
+                apiRes.on('end', () => resolve({ statusCode: apiRes.statusCode, body: respBody }));
+              });
+              evtReq.on('timeout', () => { evtReq.destroy(); reject(new Error('Test event request timed out')); });
+              evtReq.on('error', reject);
+              evtReq.write(postData);
+              evtReq.end();
+            });
+
+            const latencyMs = Date.now() - t0;
+            const ok        = evtResult.statusCode >= 200 && evtResult.statusCode < 300;
+            if (!ok) rateLimiter.recordError(clientId);
+            else     rateLimiter.recordSuccess(clientId);
+
+            let respBody = null;
+            try { respBody = JSON.parse(evtResult.body); }
+            catch (_) { respBody = evtResult.body.slice(0, 200) || null; }
+
             sendJSON(res, 200, {
-              ok:        result.ok,
-              status:    result.status,
-              latencyMs: result.latencyMs,
-              body:      result.body   || null,
-              error:     result.error  || null,
+              ok,
+              status:    evtResult.statusCode,
+              latencyMs,
+              body:      respBody,
+              error:     ok ? null : ('HTTP ' + evtResult.statusCode),
               eventId:   testPayload.ep_event_id,
             });
           } catch (e) {
@@ -2334,10 +2454,16 @@ const server = http.createServer((req, res) => {
         const url = (req.url.includes('?') ? new URLSearchParams(req.url.split('?')[1]).get('url') : null) || '';
         if (!url) { sendJSON(res, 400, { error: 'query param url مطلوب' }); return; }
 
+        // safeFetch: DNS resolved once, IP validated, connect to IP — no TOCTOU.
+        const t0 = Date.now();
         try {
-          const provider = ssGetProvider({ provider: 'selfhosted' });
-          const result   = await provider.getContainerStatus(url);
-          sendJSON(res, 200, { ok: true, ...result });
+          const { statusCode } = await safeFetch(url, {
+            maxRedirects : 0,
+            timeoutMs    : 5_000,
+            maxBodyBytes : 512,
+          });
+          const latencyMs = Date.now() - t0;
+          sendJSON(res, 200, { ok: true, healthy: statusCode >= 200 && statusCode < 500, latencyMs, status: statusCode });
         } catch (e) {
           sendJSON(res, 502, { error: e.message });
         }
@@ -2471,6 +2597,447 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // CLIENT PROFILE API  /api/v1/*
+  // Auth: Firebase ID token — Authorization: Bearer <token>
+  // Admin role: Firebase custom claim  decoded.admin === true
+  // Self-access: decoded.uid === targetClientId
+  // ══════════════════════════════════════════════════════════════════════════
+
+  if (req.url.startsWith('/api/v1/')) {
+    const v1Path   = req.url.split('?')[0];
+    const v1Params = req.url.includes('?')
+      ? new URLSearchParams(req.url.split('?')[1])
+      : new URLSearchParams();
+
+    // ── GET /api/v1/healthz — unauthenticated liveness probe ───────────────
+    if (req.method === 'GET' && v1Path === '/api/v1/healthz') {
+      sendJSON(res, 200, { ok: true, ts: new Date().toISOString() });
+      return;
+    }
+
+    // ── GET /api/v1/internal/beacon — sGTM event presence ping ───────────────
+    // Auth path A (Phase 2, API key):  ?key=&clientId=&event=
+    // Auth path B (Phase 1, HMAC):     ?clientId=&event=&sig=&ts=
+    // Cache-Control: no-store prevents proxies from collapsing writes into a
+    // single cached 200, which would silently drop real pings.
+    if (req.method === 'GET' && v1Path === '/api/v1/internal/beacon') {
+      res.setHeader('Cache-Control', 'no-store');
+      (async () => {
+        const bClientId = v1Params.get('clientId') || '';
+        const bEvent    = v1Params.get('event')    || '';
+        const bApiKey   = v1Params.get('key')      || '';
+
+        if (!bClientId || !bEvent) {
+          sendJSON(res, 400, { error: 'clientId and event are required' });
+          return;
+        }
+
+        let authenticated = false;
+
+        if (bApiKey) {
+          // ── Path A: per-client API key (sGTM beacon tag) ─────────────────
+          const parsed = apiKeyService.parse(bApiKey);
+          if (!parsed) {
+            // Always call verify() to consume constant time regardless of format validity.
+            apiKeyService.verify(bApiKey, _BEACON_DUMMY_HASH);
+            sendJSON(res, 401, { error: 'invalid api key format' });
+            return;
+          }
+          let keyDoc;
+          try { keyDoc = await firestoreService.getApiKey(parsed.keyId); } catch (_) {}
+          // Always verify — prevents timing oracle on whether the keyId exists.
+          const hash  = (keyDoc && keyDoc.keyHash) || _BEACON_DUMMY_HASH;
+          const valid = apiKeyService.verify(bApiKey, hash);
+          if (!valid || !keyDoc || keyDoc.status !== 'active') {
+            sendJSON(res, 401, { error: 'invalid or revoked api key' });
+            return;
+          }
+          if (keyDoc.clientId !== bClientId) {
+            sendJSON(res, 403, { error: 'api key does not belong to this client' });
+            return;
+          }
+          authenticated = true;
+
+        } else {
+          // ── Path B: HMAC signature (Phase 1 — shared BEACON_SECRET) ──────
+          const beaconSecret = (process.env.BEACON_SECRET || '').trim();
+          if (!beaconSecret) {
+            sendJSON(res, 503, { error: 'BEACON_SECRET is not configured' });
+            return;
+          }
+          const bSig = v1Params.get('sig') || '';
+          const bTs  = v1Params.get('ts')  || '';
+          if (!bSig || !bTs) {
+            sendJSON(res, 400, { error: 'sig and ts are required for HMAC auth' });
+            return;
+          }
+          const tsNum  = parseInt(bTs, 10);
+          const nowMin = Math.floor(Date.now() / 60000);
+          if (isNaN(tsNum) || Math.abs(nowMin - tsNum) > 5) {
+            sendJSON(res, 400, { error: 'beacon ts outside ±5 minute window' });
+            return;
+          }
+          const expected = crypto.createHmac('sha256', beaconSecret)
+            .update(bClientId + bEvent + bTs).digest('hex');
+          let valid = false;
+          try {
+            const aBuf = Buffer.from(expected, 'hex');
+            const bBuf = Buffer.from(bSig, 'hex');
+            if (aBuf.length === bBuf.length) valid = crypto.timingSafeEqual(aBuf, bBuf);
+          } catch (_) {}
+          if (!valid) {
+            sendJSON(res, 401, { error: 'invalid beacon signature' });
+            return;
+          }
+          authenticated = true;
+        }
+
+        if (!authenticated) { sendJSON(res, 401, { error: 'authentication required' }); return; }
+
+        if (!_BEACON_VALID_EVENTS.has(bEvent)) {
+          sendJSON(res, 400, { error: 'unknown event type' });
+          return;
+        }
+
+        // ── Bucket-based dedup ────────────────────────────────────────────────
+        // One Firestore write per 5-minute bucket per (clientId, event).
+        // Prevents write storms on high-traffic sites without masking outages.
+        const bucket = Math.floor(Date.now() / _BEACON_BUCKET_MS);
+        const ck     = `${bClientId}_${bEvent}`;
+        if (_beaconCache.get(ck) === bucket) {
+          sendJSON(res, 200, { ok: true });
+          return;
+        }
+        _beaconCache.set(ck, bucket);
+
+        try {
+          await firestoreService.upsertEventTypeLastSeen(bClientId, bEvent);
+          sendJSON(res, 200, { ok: true });
+        } catch (e) { sendJSON(res, 500, { error: e.message }); }
+      })();
+      return;
+    }
+
+    // ── v1 auth helper — closure over req/res ──────────────────────────────
+    // Mirrors ssAuthAndRate: verifies Firebase JWT, rejects revoked tokens,
+    // applies per-uid rate limiting (100 req/min), returns {clientId, email, decoded}.
+    // All callers MUST `if (!auth) return;` — null means response already sent.
+    async function v1Auth() {
+      if (!firestoreService.isConfigured()) {
+        sendJSON(res, 503, { error: 'Firebase Auth is not configured', hint: 'Set FIREBASE_SA_KEY_JSON' });
+        return null;
+      }
+      const authz = (req.headers['authorization'] || req.headers['Authorization'] || '').trim();
+      if (!authz) {
+        sendJSON(res, 401, { error: 'Authorization header required', hint: 'Send Authorization: Bearer <Firebase ID token>' });
+        return null;
+      }
+      if (!authz.toLowerCase().startsWith('bearer ')) {
+        sendJSON(res, 401, { error: 'Authorization must be a Bearer token' });
+        return null;
+      }
+      const idToken = authz.slice(7).trim();
+      // Firebase JWTs are ~1-2 KB. Reject anything suspiciously large before
+      // paying the verifyIdToken network round-trip.
+      if (!idToken || idToken.length > 8192) {
+        sendJSON(res, 401, { error: 'Token is empty or too long' });
+        return null;
+      }
+      let decoded;
+      try {
+        decoded = await firestoreService.verifyIdToken(idToken);
+      } catch (e) {
+        const expired = (e.code === 'auth/id-token-expired');
+        sendJSON(res, 401, { error: expired ? 'Token expired — refresh and retry' : 'Invalid or expired token', code: e.code });
+        return null;
+      }
+      if (!decoded || !decoded.uid) {
+        sendJSON(res, 401, { error: 'Token missing uid' });
+        return null;
+      }
+      // Rate limit by uid — shared store with /api/ss/* (same bucket, same 100 req/min)
+      const rl = rateLimiter.check(decoded.uid);
+      if (!rl.allowed) {
+        const retryAfter = Math.ceil((rl.resetAt - Date.now()) / 1000);
+        res.writeHead(429, { ...corsHeaders(), ...securityHeaders(), 'Retry-After': retryAfter });
+        res.end(JSON.stringify({ error: rl.locked ? 'Account temporarily locked due to repeated errors' : 'Rate limit exceeded (100 req/min)', resetAt: rl.resetAt }));
+        return null;
+      }
+      return { clientId: decoded.uid, email: decoded.email || null, decoded };
+    }
+
+    function v1RequireAdmin(auth) {
+      if (!auth.decoded.admin) {
+        sendJSON(res, 403, { error: 'Admin access required' });
+        return false;
+      }
+      return true;
+    }
+
+    function v1RequireAccess(auth, targetId) {
+      if (auth.decoded.admin || auth.clientId === targetId) return true;
+      sendJSON(res, 403, { error: 'Access denied' });
+      return false;
+    }
+
+    // ── Route: /api/v1/clients/:id/* ──────────────────────────────────────
+    const v1ClientMatch = v1Path.match(/^\/api\/v1\/clients\/([^/]+)(\/.*)?$/);
+
+    if (v1ClientMatch) {
+      const targetId = v1ClientMatch[1];
+      const subPath  = v1ClientMatch[2] || '';
+
+      // GET /api/v1/clients/:id/profile
+      if (req.method === 'GET' && subPath === '/profile') {
+        (async () => {
+          const auth = await v1Auth();
+          if (!auth) return;
+          if (!v1RequireAccess(auth, targetId)) return;
+          try {
+            const bundle = await profileService.getBundle(targetId, !!auth.decoded.admin);
+            if (!bundle) { sendJSON(res, 404, { error: 'Client not found' }); return; }
+            sendJSON(res, 200, bundle);
+          } catch (e) { sendJSON(res, 500, { error: e.message }); }
+        })();
+        return;
+      }
+
+      // GET /api/v1/clients/:id/timeline
+      if (req.method === 'GET' && subPath === '/timeline') {
+        (async () => {
+          const auth = await v1Auth();
+          if (!auth) return;
+          if (!v1RequireAccess(auth, targetId)) return;
+          const limit  = Math.min(parseInt(v1Params.get('limit')  || '50', 10), 200);
+          const before = v1Params.get('before') || null;
+          try {
+            const events = await firestoreService.queryTimeline(targetId, { limit, before });
+            sendJSON(res, 200, { ok: true, events, total: events.length });
+          } catch (e) { sendJSON(res, 500, { error: e.message }); }
+        })();
+        return;
+      }
+
+      // GET /api/v1/clients/:id/audit-log  (admin only)
+      if (req.method === 'GET' && subPath === '/audit-log') {
+        (async () => {
+          const auth = await v1Auth();
+          if (!auth) return;
+          if (!v1RequireAdmin(auth)) return;
+          const limit  = Math.min(parseInt(v1Params.get('limit')  || '50', 10), 200);
+          const before = v1Params.get('before') || null;
+          try {
+            const logs = await firestoreService.queryAuditLogs(targetId, { limit, before });
+            sendJSON(res, 200, { ok: true, logs, total: logs.length });
+          } catch (e) { sendJSON(res, 500, { error: e.message }); }
+        })();
+        return;
+      }
+
+      // PATCH /api/v1/clients/:id  (admin only)
+      if (req.method === 'PATCH' && subPath === '') {
+        (async () => {
+          const auth = await v1Auth();
+          if (!auth) return;
+          if (!v1RequireAdmin(auth)) return;
+          parseJsonBody(req, res, async body => {
+            try {
+              const before = await firestoreService.getClient(targetId);
+              if (!before) { sendJSON(res, 404, { error: 'Client not found' }); return; }
+              const updated = await firestoreService.updateClientProfile(targetId, body);
+              const diff = auditService.computeDiff(before, { ...before, ...updated });
+              if (diff) {
+                const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+                await Promise.all([
+                  firestoreService.saveAuditLog({
+                    clientId:       targetId,
+                    actorType:      'admin',
+                    actorId:        auth.clientId,
+                    actorEmailHash: auditService.hashEmail(auth.email),
+                    action:         'client.profile.update',
+                    entityType:     'client',
+                    entityId:       targetId,
+                    diff,
+                    ipAddress:      ip,
+                  }),
+                  timelineService.record({
+                    clientId:    targetId,
+                    eventType:   'profile.updated',
+                    actorType:   'admin',
+                    actorId:     auth.clientId,
+                    summary:     'Profile updated by admin',
+                    meta:        { fields: Object.keys(diff) },
+                    isMilestone: false,
+                    dedupeKey:   null,
+                  }),
+                ]);
+              }
+              sendJSON(res, 200, { ok: true, updated });
+            } catch (e) { sendJSON(res, 500, { error: e.message }); }
+          });
+        })();
+        return;
+      }
+
+      // POST /api/v1/clients/:id/api-keys  (admin or self)
+      if (req.method === 'POST' && subPath === '/api-keys') {
+        (async () => {
+          const auth = await v1Auth();
+          if (!auth) return;
+          if (!v1RequireAccess(auth, targetId)) return;
+          try {
+            const client = await firestoreService.getClient(targetId);
+            if (!client) { sendJSON(res, 404, { error: 'Client not found' }); return; }
+
+            const { keyId, rawKey, keyHash, prefix } = apiKeyService.generate(targetId);
+            await firestoreService.saveApiKey(keyId, {
+              clientId:   targetId,
+              keyHash,
+              prefix,
+              status:     'active',
+              lastUsedAt: null,
+              revokedAt:  null,
+            });
+            const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+            await Promise.all([
+              firestoreService.saveAuditLog({
+                clientId:       targetId,
+                actorType:      auth.decoded.admin ? 'admin' : 'user',
+                actorId:        auth.clientId,
+                actorEmailHash: auditService.hashEmail(auth.email),
+                action:         'api_key.created',
+                entityType:     'api_key',
+                entityId:       keyId,
+                diff:           null,
+                ipAddress:      ip,
+              }),
+              timelineService.record({
+                clientId:    targetId,
+                eventType:   'api_key.created',
+                actorType:   auth.decoded.admin ? 'admin' : 'user',
+                actorId:     auth.clientId,
+                summary:     'New API key created',
+                meta:        { prefix },
+                isMilestone: false,
+                dedupeKey:   null,
+              }),
+            ]);
+            // rawKey returned exactly once — not stored, never retrievable again
+            sendJSON(res, 201, { ok: true, keyId, rawKey, prefix });
+          } catch (e) { sendJSON(res, 500, { error: e.message }); }
+        })();
+        return;
+      }
+
+      // GET /api/v1/clients/:id/diagnostics  (admin or self)
+      if (req.method === 'GET' && subPath === '/diagnostics') {
+        (async () => {
+          const auth = await v1Auth();
+          if (!auth) return;
+          if (!v1RequireAccess(auth, targetId)) return;
+          try {
+            const result = await firestoreService.getDiagnosticResult(targetId);
+            if (!result) {
+              sendJSON(res, 404, { error: 'no diagnostic data yet — health job has not evaluated this client' });
+              return;
+            }
+            const _tiso = ts => {
+              if (!ts) return null;
+              if (typeof ts.toDate === 'function') return ts.toDate().toISOString();
+              if (ts instanceof Date) return ts.toISOString();
+              return null;
+            };
+            sendJSON(res, 200, {
+              ok:            true,
+              overallStatus: result.overallStatus || null,
+              rules:         result.rules || {},
+              updatedAt:     _tiso(result.updatedAt),
+            });
+          } catch (e) { sendJSON(res, 500, { error: e.message }); }
+        })();
+        return;
+      }
+
+      // DELETE /api/v1/clients/:id/api-keys/:keyId  (admin or self)
+      const v1ApiKeyMatch = subPath.match(/^\/api-keys\/([^/]+)$/);
+      if (req.method === 'DELETE' && v1ApiKeyMatch) {
+        const keyId = v1ApiKeyMatch[1];
+        (async () => {
+          const auth = await v1Auth();
+          if (!auth) return;
+          if (!v1RequireAccess(auth, targetId)) return;
+          try {
+            const key = await firestoreService.getApiKey(keyId);
+            if (!key || key.clientId !== targetId) {
+              sendJSON(res, 404, { error: 'API key not found' });
+              return;
+            }
+            await firestoreService.revokeApiKey(keyId);
+            const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+            await Promise.all([
+              firestoreService.saveAuditLog({
+                clientId:       targetId,
+                actorType:      auth.decoded.admin ? 'admin' : 'user',
+                actorId:        auth.clientId,
+                actorEmailHash: auditService.hashEmail(auth.email),
+                action:         'api_key.revoked',
+                entityType:     'api_key',
+                entityId:       keyId,
+                diff:           null,
+                ipAddress:      ip,
+              }),
+              timelineService.record({
+                clientId:    targetId,
+                eventType:   'api_key.revoked',
+                actorType:   auth.decoded.admin ? 'admin' : 'user',
+                actorId:     auth.clientId,
+                summary:     'API key revoked',
+                meta:        { keyId },
+                isMilestone: false,
+                dedupeKey:   keyId,
+              }),
+            ]);
+            sendJSON(res, 200, { ok: true });
+          } catch (e) { sendJSON(res, 500, { error: e.message }); }
+        })();
+        return;
+      }
+    }
+
+    // POST /api/v1/admin/platform-health  (admin only)
+    if (req.method === 'POST' && v1Path === '/api/v1/admin/platform-health') {
+      (async () => {
+        const auth = await v1Auth();
+        if (!auth) return;
+        if (!v1RequireAdmin(auth)) return;
+        parseJsonBody(req, res, async body => {
+          try {
+            const platform = (body && body.platform) ? String(body.platform).trim() : '';
+            const status   = (body && body.status)   ? String(body.status).trim()   : '';
+            const message  = (body && body.message)  ? String(body.message).trim()  : null;
+            if (!platform || !status) {
+              sendJSON(res, 400, { error: 'platform and status are required' });
+              return;
+            }
+            const VALID_STATUSES = ['operational', 'degraded', 'outage'];
+            if (!VALID_STATUSES.includes(status)) {
+              sendJSON(res, 400, { error: 'status must be one of: ' + VALID_STATUSES.join(', ') });
+              return;
+            }
+            await firestoreService.setPlatformHealth(platform, { status, message });
+            sendJSON(res, 200, { ok: true });
+          } catch (e) { sendJSON(res, 500, { error: e.message }); }
+        });
+      })();
+      return;
+    }
+
+    // Unknown /api/v1/* path
+    sendJSON(res, 404, { error: 'v1 endpoint not found: ' + v1Path });
+    return;
+  }
+
   // ── Static File Server ────────────────────────────────────────
   let urlPath;
   try {
@@ -2569,11 +3136,9 @@ server.on('clientError', (err, socket) => {
   }
 });
 
-server.on('error', function (e) { console.error('[BOOT] SERVER ERROR:', e && e.code, e && e.message); });
-server.listen(PORT, '0.0.0.0', () => {
-  console.log('[BOOT] LISTENING ->', JSON.stringify(server.address()), 'PORT_env=', process.env.PORT);
+server.listen(PORT, () => {
   const mode = puppeteer ? '🟢 Puppeteer (headless Chrome)' : '🟡 HTTP fallback (install puppeteer for full analysis)';
-  console.log(`Easy Track server running at http://0.0.0.0:${PORT}`);
+  console.log(`Easy Track server running at http://localhost:${PORT}`);
   console.log(`Scanner mode: ${mode}`);
 
   // Server-side CAPI import state — operators must be able to confirm at a glance
@@ -2588,6 +3153,16 @@ server.listen(PORT, '0.0.0.0', () => {
   } else {
     console.log('Server-side CAPI import: ⚪ disabled (default GA4-only). Set MANAGED_IMPORT_SERVER_CONFIG=1 + PROVISIONING_BUCKET to enable.');
   }
+
+  // Health evaluation job — evaluates diagnostic rules for all active clients.
+  // Staggered 90s after startup so Firebase init and first-request spike settle
+  // before the job issues its first full client scan.
+  setTimeout(() => {
+    healthService.runHealthJob().catch(e => console.error('[health-job] startup run failed:', e.message));
+    setInterval(() => {
+      healthService.runHealthJob().catch(e => console.error('[health-job] tick failed:', e.message));
+    }, 15 * 60 * 1000).unref();
+  }, 90 * 1000);
 });
 
 // ── Global process guards ─────────────────────────────────────────────────────
