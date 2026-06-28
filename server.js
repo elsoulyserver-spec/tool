@@ -2350,17 +2350,27 @@ const server = http.createServer((req, res) => {
           const url = (body.url || '').trim();
           if (!url) return sendJSON(res, 400, { error: 'حقل url مطلوب' });
 
+          // safeFetch: DNS resolved once, IP validated, connect to IP — no TOCTOU.
+          // Replaces provider.validateUrl() which used assertSafeUrl+axios (TOCTOU).
+          const t0 = Date.now();
           try {
-            const provider = new GoogleCloudProvider();
-            const result   = await provider.validateUrl(url);
-            if (!result.valid) rateLimiter.recordError(clientId);
-            else               rateLimiter.recordSuccess(clientId);
+            const { statusCode } = await safeFetch(url, {
+              maxRedirects : 0,
+              timeoutMs    : 5_000,
+              maxBodyBytes : 512,
+            });
+            const latencyMs = Date.now() - t0;
+            const valid     = statusCode >= 200 && statusCode < 500;
+            if (!valid) rateLimiter.recordError(clientId);
+            else        rateLimiter.recordSuccess(clientId);
             sendJSON(res, 200, {
-              ok:      result.valid,
-              message: result.valid
-                ? 'تم التحقق — الخادم يستجيب بنجاح (' + result.latencyMs + 'ms)'
+              ok:      valid,
+              valid,
+              latencyMs,
+              status:  statusCode,
+              message: valid
+                ? 'تم التحقق — الخادم يستجيب بنجاح (' + latencyMs + 'ms)'
                 : 'الخادم لا يستجيب — تأكد من اكتمال الـ deploy على Cloud Run',
-              ...result,
             });
           } catch (e) {
             rateLimiter.recordError(clientId);

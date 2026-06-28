@@ -103,6 +103,8 @@ function getSA() {
   if (!_sa.client_email || !_sa.private_key) {
     throw new Error('GTM_SA_KEY_JSON is missing client_email or private_key');
   }
+  // Railway/env vars store literal \n; restore real newlines so Node crypto can parse the PEM.
+  _sa.private_key = _sa.private_key.replace(/\\n/g, '\n');
   return _sa;
 }
 
