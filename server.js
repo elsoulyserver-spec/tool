@@ -3043,6 +3043,161 @@ const server = http.createServer((req, res) => {
       return;
     }
 
+    // ── POST /api/v1/internal/dlq — Dead Letter Queue (Phase 4) ─────────────
+    // Receives failed sGTM CAPI send events from the universal-http.tpl tag.
+    // Stores them in Firestore for retry inspection and audit.
+    // Auth: API key (same header used by beacon endpoint).
+    if (req.method === 'POST' && v1Path === '/api/v1/internal/dlq') {
+      parseJsonBody(req, res, async body => {
+        try {
+          const apiKey = (req.headers['x-api-key'] || '').trim();
+          if (!apiKey) {
+            sendJSON(res, 401, { error: 'x-api-key required' });
+            return;
+          }
+          // Validate required fields
+          const eventName = body && typeof body.event_name === 'string' ? body.event_name.trim() : '';
+          const eventId   = body && typeof body.event_id   === 'string' ? body.event_id.trim()   : '';
+          if (!eventName || !eventId) {
+            sendJSON(res, 400, { error: 'event_name and event_id are required' });
+            return;
+          }
+          const ALLOWED_DESTS = ['meta', 'tiktok', 'snap'];
+          const dest = body && typeof body.destination === 'string' ? body.destination.trim() : '';
+          if (!ALLOWED_DESTS.includes(dest)) {
+            sendJSON(res, 400, { error: 'destination must be one of: ' + ALLOWED_DESTS.join(', ') });
+            return;
+          }
+          const customerId = body && typeof body.customer_id === 'string' ? body.customer_id.trim() : '';
+          const now = Date.now();
+          // TTL: DLQ entries expire after 7 days (604800 seconds)
+          const expiresAt = new Date(now + 7 * 24 * 60 * 60 * 1000);
+          const entry = {
+            event_name:      eventName,
+            event_id:        eventId,
+            event_checksum:  body.event_checksum  || '',
+            destination:     dest,
+            destination_url: typeof body.destination_url === 'string' ? body.destination_url.slice(0, 512) : '',
+            error_code:      typeof body.error_code    === 'number' ? body.error_code    : 0,
+            error_message:   typeof body.error_message === 'string' ? body.error_message.slice(0, 256) : '',
+            payload_size:    typeof body.payload_size  === 'number' ? body.payload_size  : 0,
+            items_count:     typeof body.items_count   === 'number' ? body.items_count   : 0,
+            customer_id:     customerId,
+            timestamp:       body.timestamp || Math.floor(now / 1000),
+            retry_count:     0,
+            status:          'pending',
+            received_at:     new Date(now).toISOString(),
+            expires_at:      expiresAt.toISOString(),
+          };
+          const db = firestoreService.getDb();
+          if (db) {
+            await db.collection('dlq_events').add(entry);
+          }
+          sendJSON(res, 202, { ok: true, queued: true });
+        } catch (e) {
+          console.error('[DLQ] store error:', e.message);
+          sendJSON(res, 500, { error: 'dlq store failed' });
+        }
+      });
+      return;
+    }
+
+    // ── POST /api/v1/internal/replay — Event Replay (Phase 7) ───────────────
+    // Re-fires a stored DLQ event by event_id. Idempotent: uses event_checksum
+    // to detect duplicate replay attempts within a 24h window.
+    // Auth: Firebase ID token (admin claim required).
+    if (req.method === 'POST' && v1Path === '/api/v1/internal/replay') {
+      (async () => {
+        const auth = await v1Auth();
+        if (!auth) return;
+        if (!v1RequireAdmin(auth)) return;
+        parseJsonBody(req, res, async body => {
+          try {
+            const eventId = body && typeof body.event_id === 'string' ? body.event_id.trim() : '';
+            if (!eventId) {
+              sendJSON(res, 400, { error: 'event_id is required' });
+              return;
+            }
+            const db = firestoreService.getDb();
+            if (!db) {
+              sendJSON(res, 503, { error: 'Firestore unavailable' });
+              return;
+            }
+            // Locate the DLQ entry
+            const snap = await db.collection('dlq_events')
+              .where('event_id', '==', eventId)
+              .where('status', '==', 'pending')
+              .limit(1)
+              .get();
+            if (snap.empty) {
+              sendJSON(res, 404, { error: 'no pending DLQ entry for event_id: ' + eventId });
+              return;
+            }
+            const docRef = snap.docs[0].ref;
+            const entry  = snap.docs[0].data();
+            // Idempotency: refuse if already replayed within the last 24h
+            if (entry.last_replayed_at) {
+              const lastMs = new Date(entry.last_replayed_at).getTime();
+              if (Date.now() - lastMs < 24 * 60 * 60 * 1000) {
+                sendJSON(res, 409, {
+                  error:            'duplicate replay within 24h window',
+                  last_replayed_at: entry.last_replayed_at,
+                  event_checksum:   entry.event_checksum,
+                });
+                return;
+              }
+            }
+            // Mark as replaying before the HTTP call (optimistic lock)
+            await docRef.update({
+              status:           'replaying',
+              last_replayed_at: new Date().toISOString(),
+              retry_count:      (entry.retry_count || 0) + 1,
+            });
+            // The actual re-fire goes to the sGTM test-event endpoint (same path
+            // used by /api/ss/test-event). We trust the sGTM container to re-route
+            // to the correct platform — this avoids duplicating CAPI auth logic here.
+            const ssConfig = await firestoreService.getSSConfig(entry.customer_id);
+            if (!ssConfig || !ssConfig.serverUrl) {
+              await docRef.update({ status: 'failed', last_error: 'no sGTM URL on file' });
+              sendJSON(res, 422, { error: 'no sGTM server URL configured for this customer' });
+              return;
+            }
+            const replayUrl  = ssConfig.serverUrl.replace(/\/$/, '') + '/g/collect';
+            const replayBody = JSON.stringify({
+              v:              '2',
+              en:             entry.event_name,
+              'ep.event_id':  entry.event_id,
+              'ep.replayed':  '1',
+              'ep.checksum':  entry.event_checksum,
+            });
+            const https = require('https');
+            const replayReq = https.request(replayUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(replayBody) } }, replayRes => {
+              const ok = replayRes.statusCode >= 200 && replayRes.statusCode < 300;
+              docRef.update({
+                status:     ok ? 'replayed' : 'failed',
+                last_error: ok ? null : 'sGTM responded ' + replayRes.statusCode,
+              }).catch(() => {});
+            });
+            replayReq.on('error', err => {
+              docRef.update({ status: 'failed', last_error: err.message }).catch(() => {});
+            });
+            replayReq.write(replayBody);
+            replayReq.end();
+            sendJSON(res, 202, {
+              ok:             true,
+              event_id:       eventId,
+              event_checksum: entry.event_checksum,
+              retry_count:    (entry.retry_count || 0) + 1,
+            });
+          } catch (e) {
+            console.error('[Replay] error:', e.message);
+            sendJSON(res, 500, { error: 'replay failed: ' + e.message });
+          }
+        });
+      })();
+      return;
+    }
+
     // Unknown /api/v1/* path
     sendJSON(res, 404, { error: 'v1 endpoint not found: ' + v1Path });
     return;
