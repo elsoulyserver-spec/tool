@@ -38,6 +38,7 @@ function init() {
   let sa;
   try { sa = JSON.parse(raw); }
   catch (e) { _initError = new Error('FIREBASE_SA_KEY_JSON is not valid JSON: ' + e.message); return; }
+  if (sa.private_key) sa.private_key = sa.private_key.replace(/\\n/g, '\n');
 
   try {
     if (!admin.apps.length) {
