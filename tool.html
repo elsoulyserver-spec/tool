@@ -3725,26 +3725,36 @@
           </div>
         </div>
 
-        <!-- URL Scanner (Moved to Overview) -->
-        <div
-          style="background:var(--sur2);border:1px solid var(--bdr2);border-radius:16px;padding:20px;margin-bottom:24px;">
-          <div
-            style="font-size:13px;font-weight:700;color:var(--wht);margin-bottom:4px;display:flex;align-items:center;gap:8px;">
-            <span class="material-symbols-outlined" style="font-size:17px;color:#adc6ff;">travel_explore</span>
-            Pixel Scanner
+
+        <!-- Pixel Scanner -->
+        <div style="background:var(--sur2);border:1px solid var(--bdr2);border-radius:16px;overflow:hidden;margin-bottom:24px;">
+          <!-- Header -->
+          <div style="display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--bdr2);">
+            <div style="width:34px;height:34px;border-radius:10px;background:rgba(173,198,255,.1);border:1px solid rgba(173,198,255,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <span class="material-symbols-outlined" style="font-size:18px;color:#adc6ff;">travel_explore</span>
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:700;color:var(--wht);line-height:1.2;">Pixel Scanner</div>
+              <div style="font-size:11px;color:var(--mut);margin-top:2px;">اكتشف كل الـ pixels المثبتة على أي موقع</div>
+            </div>
           </div>
-          <div style="font-size:12px;color:var(--mut);margin-bottom:14px;">Enter any website URL to detect all tracking
-            pixels installed on it</div>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <input id="hmScanUrl" type="url" placeholder="https://example.com"
-              onkeydown="if(event.key==='Enter'){event.preventDefault();hmScanSite();}"
-              style="flex:1;min-width:220px;background:var(--sur3);border:1px solid var(--bdr2);border-radius:10px;padding:10px 14px;color:var(--wht);font-family:var(--font-ui);font-size:13px;outline:none;" />
-            <button id="hmScanBtn" onclick="hmScanSite()"
-              style="padding:10px 22px;border-radius:10px;border:none;background:var(--acc);color:#0a0a0a;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;">
-              <span class="material-symbols-outlined" style="font-size:16px;">radar</span> Scan
-            </button>
+          <!-- Input row -->
+          <div style="padding:16px 20px;">
+            <div style="display:flex;gap:10px;">
+              <div style="flex:1;display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--bdr2);border-radius:10px;padding:0 14px;transition:border-color .15s;"
+                onfocusin="this.style.borderColor='var(--bdr)'" onfocusout="this.style.borderColor='var(--bdr2)'">
+                <span class="material-symbols-outlined" style="font-size:16px;color:var(--mut);flex-shrink:0;">link</span>
+                <input id="hmScanUrl" type="url" placeholder="https://example.com"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();hmScanSite();}"
+                  style="flex:1;background:transparent;border:none;padding:11px 0;color:var(--wht);font-family:var(--font-ui);font-size:13px;outline:none;min-width:0;" />
+              </div>
+              <button id="hmScanBtn" onclick="hmScanSite()"
+                style="padding:11px 20px;border-radius:10px;border:none;background:var(--acc);color:#0a0a0a;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0;">
+                <span class="material-symbols-outlined" style="font-size:16px;">radar</span> Scan
+              </button>
+            </div>
+            <div id="hmScanResult" style="margin-top:14px;"></div>
           </div>
-          <div id="hmScanResult" style="margin-top:16px;"></div>
         </div>
 
       </div>
@@ -3755,16 +3765,16 @@
   <style>
     /* ─── Card wrapper ─── */
     .pc-ss-card {
-      background: linear-gradient(135deg, rgba(30,33,40,.9) 0%, rgba(22,25,31,.95) 100%);
-      border: 1px solid rgba(255,255,255,.07);
-      border-radius: 18px;
+      background: var(--sur2);
+      border: 1px solid var(--bdr2);
+      border-radius: 16px;
       margin-bottom: 24px;
       overflow: hidden;
       transition: border-color .25s, box-shadow .25s;
     }
     .pc-ss-card.ss-on {
-      border-color: rgba(70,241,197,.3);
-      box-shadow: 0 0 0 1px rgba(70,241,197,.08), 0 8px 40px rgba(70,241,197,.05);
+      border-color: var(--bdr);
+      box-shadow: 0 0 0 1px rgba(70,241,197,.06), 0 6px 32px rgba(70,241,197,.04);
     }
 
     /* ─── Header ─── */
@@ -3843,7 +3853,7 @@
     .pc-ss-body {
       display: none;
       padding: 4px 20px 20px;
-      border-top: 1px solid rgba(255,255,255,.06);
+      border-top: 1px solid var(--bdr2);
     }
     .pc-ss-body.open {
       display: block;
@@ -3870,8 +3880,8 @@
     .pc-ss-input {
       width: 100%;
       box-sizing: border-box;
-      background: rgba(255,255,255,.04);
-      border: 1.5px solid rgba(255,255,255,.08);
+      background: var(--bg);
+      border: 1px solid var(--bdr2);
       border-radius: 10px;
       padding: 10px 14px;
       font-family: var(--font-mono);
@@ -3881,8 +3891,8 @@
       transition: border-color .15s, background .15s;
     }
     .pc-ss-input:focus {
-      border-color: rgba(70,241,197,.4);
-      background: rgba(70,241,197,.03);
+      border-color: var(--bdr);
+      background: rgba(70,241,197,.02);
     }
     .pc-ss-valid { margin-top: 5px; font-size: 11px; min-height: 14px; font-family: var(--font-ui); }
     .pc-ss-hint {
@@ -3898,8 +3908,8 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      background: rgba(255,255,255,.04);
-      border: 1px solid rgba(255,255,255,.07);
+      background: var(--sur3);
+      border: 1px solid var(--bdr2);
       border-radius: 10px;
       padding: 9px 13px;
     }
@@ -3937,14 +3947,14 @@
 
     /* ─── Accordion ─── */
     .pc-ss-acc {
-      background: rgba(255,255,255,.02);
-      border: 1px solid rgba(255,255,255,.07);
+      background: var(--sur);
+      border: 1px solid var(--bdr2);
       border-radius: 12px;
       margin-bottom: 8px;
       overflow: hidden;
       transition: border-color .2s;
     }
-    .pc-ss-acc.open { border-color: rgba(70,241,197,.2); }
+    .pc-ss-acc.open { border-color: var(--bdr); }
     .pc-ss-acc-hdr {
       display: flex;
       align-items: center;
@@ -4119,7 +4129,7 @@
         <!-- ── Server Side Config Card ── -->
         <div class="pc-ss-card" id="pc-ss-card">
           <div class="pc-ss-header">
-            <span class="pc-ss-icon">🖥️</span>
+            <span class="pc-ss-icon material-symbols-outlined" style="font-size:22px;color:var(--acc);">dns</span>
             <div class="pc-ss-title-wrap">
               <div class="pc-ss-title">Server Side</div>
               <div class="pc-ss-sub">يتفعّل لو الزبون عنده سيرفر — يدعم CAPI لكل المنصات بدون ad blockers</div>
@@ -4134,7 +4144,7 @@
               <div class="pc-ss-sec-label">رابط السيرفر (sGTM URL)</div>
               <input class="pc-ss-input" id="pc-ss-url" type="url" placeholder="https://gtm.yourstore.com" dir="ltr" oninput="pcSS_validateUrl()" autocomplete="off">
               <div class="pc-ss-valid" id="pc-ss-url-valid"></div>
-              <div class="pc-ss-hint">💡 مثال: https://gtm.yourstore.com — لازم يبدأ بـ https://</div>
+              <div class="pc-ss-hint">مثال: https://gtm.yourstore.com — لازم يبدأ بـ https://</div>
             </div>
 
             <!-- 2. GA4 ID -->
@@ -4144,7 +4154,7 @@
               <!-- GA4 client-side events — routed to GA4 via the sGTM server container -->
               <div class="ga4-client-events-wrap" id="pc-ss-ga4-events-wrap" style="display:none;">
                 <div class="ga4-client-events-header">
-                  <span style="font-size:14px;">📊</span>
+                  <span class="material-symbols-outlined" style="font-size:16px;color:var(--acc);">bar_chart</span>
                   <span class="ga4-client-events-title">Tracking Events — أحداث GA4 اللي هتتبعت عبر الـ sGTM</span>
                 </div>
                 <div class="ga4-client-events-grid" id="pc-ss-ga4-events-grid"></div>
@@ -4231,7 +4241,6 @@
                 </svg>
               </div>
               <h3 class="cms-title">سلة</h3>
-              <p class="cms-sub">GTM Native · Data Layer تلقائي</p>
               <div style="display:flex;gap:4px;justify-content:center;margin-top:6px;flex-wrap:wrap;">
                 <span
                   style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(70,241,197,0.1);color:var(--acc);font-family:var(--font-mono);">GTM
@@ -4251,7 +4260,6 @@
                 <img src="https://www.f6s.com/content-resource/profiles/3554028_th1.jpg" style="width:48px;height:48px;border-radius:10px;object-fit:cover;" alt="زد" />
               </div>
               <h3 class="cms-title">زد</h3>
-              <p class="cms-sub">Events تلقائية · GTM Native</p>
               <div style="display:flex;gap:4px;justify-content:center;margin-top:6px;flex-wrap:wrap;">
                 <span
                   style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(70,241,197,0.1);color:var(--acc);font-family:var(--font-mono);">GTM
@@ -4391,7 +4399,6 @@
           <div class="phdr">
             <div class="pnum">Step 03</div>
             <div class="ptitle">إيه الـ Events اللي عايز تتتبعها؟</div>
-            <div class="psub">اختار الأحداث لكل منصة بشكل مستقل — GA4 منفصل عن Google Ads ومنفصل عن Meta</div>
           </div>
           <div class="cgrid" id="evGrid"></div>
           <div class="pacts">
@@ -4427,7 +4434,7 @@
             <button class="otab" id="tabSsGtm" onclick="oTab('ss-gtm',this)">
               <span class="material-symbols-outlined"
                 style="font-size:15px;font-variation-settings:'FILL' 1;">dns</span>
-              🖥️ Server Container
+              Server Container
             </button>
 
             <button class="otab" id="tabGuide" onclick="oTab('guide',this)">
@@ -4445,7 +4452,7 @@
           <!-- pane-ss-gtm: Server Container output — دايماً متاح زي الـ Web Container -->
           <div class="opane" id="pane-ss-gtm">
             <div class="pc-ss-out-banner">
-              <span class="pc-ss-out-icon">🖥️</span>
+              <span class="pc-ss-out-icon material-symbols-outlined" style="font-size:22px;color:var(--acc);">dns</span>
               <div style="flex:1;">
                 <div style="font-family:var(--font-display);font-weight:700;font-size:14px;color:var(--wht);margin-bottom:3px;">Server Container — sGTM</div>
                 <div style="font-size:11px;color:var(--mut);">استورد الـ JSON ده في GTM → Admin → Import Container — أو حمّله واستخدمه في Stape/Cloud Run</div>
@@ -4532,7 +4539,7 @@
               </div>
               <button onclick="oTab('ss-gtm',document.getElementById('tabSsGtm'))"
                 style="background:var(--acc);color:#00382b;border:none;border-radius:8px;padding:6px 12px;font-family:var(--font-ui);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">
-                🖥️ افتح الـ Server Container ←
+                افتح الـ Server Container ←
               </button>
             </div>
             <div class="cwrap">
@@ -4615,33 +4622,6 @@
               </div>
             </div>
 
-            <!-- Server-Side section — always visible, used only when clicking server button -->
-            <div id="mgdCapiTokensBlock" style="margin-bottom:8px;padding:12px 14px;
-              border-radius:12px;border:1px solid rgba(70,241,197,.25);background:rgba(70,241,197,.04);">
-              <!-- header -->
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-                <span class="material-symbols-outlined" style="font-size:16px;color:var(--acc);">dns</span>
-                <div style="font-size:12px;font-weight:700;color:var(--acc);">
-                  إعدادات Server-Side
-                  <span style="font-size:10px;font-weight:500;color:var(--mut);margin-right:6px;">(مطلوبة لو هتضغط Create Web + Server)</span>
-                </div>
-              </div>
-              <!-- sGTM URL -->
-              <div style="font-size:11px;color:var(--mut);margin-bottom:6px;line-height:1.5;">
-                🌐 رابط السيرفر بتاعك (sGTM URL)
-              </div>
-              <input id="mgdSgtmUrlInput" type="url" dir="ltr" placeholder="https://gtm.your-domain.com"
-                style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--bdr2);
-                border-radius:8px;padding:9px 12px;color:var(--wht);font-family:var(--font-mono);
-                font-size:12px;margin-bottom:12px;outline:none;"
-                oninput="this.style.borderColor=this.value.trim()?'var(--acc)':'var(--bdr2)'">
-              <!-- CAPI Tokens -->
-              <div style="font-size:11px;color:var(--mut);margin-bottom:8px;line-height:1.5;">
-                🔑 CAPI Access Tokens
-                <span style="color:rgba(255,255,255,.35)"> — اختياري، هتتضاف تلقائياً في السيرفر كونتينر</span>
-              </div>
-              <div id="mgdCapiTokenFields"></div>
-            </div>
 
             <!-- Progress area -->
             <div id="mgdProgress"
@@ -5617,22 +5597,22 @@
 
     // GA4 events available for client-side server routing
     var _GA4_CLIENT_EVENTS = [
-      { key: 'purchase',        label: 'Purchase',        icon: '💰', forced: true  },
-      { key: 'add_to_cart',     label: 'Add to Cart',     icon: '🛒', forced: false },
-      { key: 'view_item',       label: 'View Item',       icon: '👁️', forced: false },
-      { key: 'begin_checkout',  label: 'Begin Checkout',  icon: '💳', forced: false },
-      { key: 'view_item_list',  label: 'View Item List',  icon: '📋', forced: false },
-      { key: 'add_to_wishlist', label: 'Add to Wishlist', icon: '❤️', forced: false },
-      { key: 'view_cart',       label: 'View Cart',       icon: '🛍️', forced: false },
-      { key: 'search',          label: 'Search',          icon: '🔍', forced: false }
+      { key: 'purchase',        label: 'Purchase',        icon: 'payments',      forced: true  },
+      { key: 'add_to_cart',     label: 'Add to Cart',     icon: 'add_shopping_cart', forced: false },
+      { key: 'view_item',       label: 'View Item',       icon: 'visibility',    forced: false },
+      { key: 'begin_checkout',  label: 'Begin Checkout',  icon: 'shopping_cart_checkout', forced: false },
+      { key: 'view_item_list',  label: 'View Item List',  icon: 'list',          forced: false },
+      { key: 'add_to_wishlist', label: 'Add to Wishlist', icon: 'favorite',      forced: false },
+      { key: 'view_cart',       label: 'View Cart',       icon: 'shopping_bag',  forced: false },
+      { key: 'search',          label: 'Search',          icon: 'search',        forced: false }
     ];
 
     // SS platform definitions
     var _pcSS_PLATS = {
-      meta:   { label:'Meta CAPI',         icon:'💙', idLabel:'Pixel ID',      tokLabel:'CAPI Access Token',       idPh:'1234567890123456', tokPh:'EAAxxxxx...',    hasToken:true  },
-      gads:   { label:'Google Ads',         icon:'🎯', idLabel:'Conversion ID', tokLabel:'',                        idPh:'AW-1234567890',    tokPh:'',               hasToken:false },
-      snap:   { label:'Snapchat CAPI',      icon:'👻', idLabel:'Pixel ID',      tokLabel:'CAPI Token',              idPh:'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx', tokPh:'eyJhbGci...', hasToken:true },
-      tiktok: { label:'TikTok Events API',  icon:'🎵', idLabel:'Pixel ID',      tokLabel:'Events API Access Token', idPh:'CXXXXXXXXXXXXXXXX', tokPh:'xxxxxxxx...', hasToken:true }
+      meta:   { label:'Meta CAPI',         icon:'group', idLabel:'Pixel ID',      tokLabel:'CAPI Access Token',       idPh:'1234567890123456', tokPh:'EAAxxxxx...',    hasToken:true  },
+      gads:   { label:'Google Ads',         icon:'ads_click', idLabel:'Conversion ID', tokLabel:'',                        idPh:'AW-1234567890',    tokPh:'',               hasToken:false },
+      snap:   { label:'Snapchat CAPI',      icon:'photo_camera', idLabel:'Pixel ID',      tokLabel:'CAPI Token',              idPh:'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx', tokPh:'eyJhbGci...', hasToken:true },
+      tiktok: { label:'TikTok Events API',  icon:'music_note', idLabel:'Pixel ID',      tokLabel:'Events API Access Token', idPh:'CXXXXXXXXXXXXXXXX', tokPh:'xxxxxxxx...', hasToken:true }
     };
 
     // Legacy SS event catalog — kept ONLY for backward-compat migration of older
@@ -6724,7 +6704,7 @@
             return '<span class="pc-ss-ev-chip' + (sel ? ' on' : '') + '" '
               + 'onclick="pcSS_toggleEvent(\'' + key + '\',\'' + ev.key + '\')" '
               + 'title="' + ev.label + '">'
-              + ev.icon + ' ' + ev.key + '</span>';
+              + ev.label + '</span>';
           }).join('');
         }
 
@@ -6762,7 +6742,7 @@
         }
 
         acc.innerHTML = '<div class="pc-ss-acc-hdr" onclick="pcSS_toggleAccordion(\'' + key + '\')">'
-          + '<span style="font-size:18px;">' + pd.icon + '</span>'
+          + '<span class="material-symbols-outlined" style="font-size:18px;color:var(--acc);">' + pd.icon + '</span>'
           + '<span class="pc-ss-acc-name">' + pd.label + '</span>'
           + '<span class="pc-ss-acc-arr">▶</span>'
           + '</div>'
@@ -6858,7 +6838,7 @@
         chip.setAttribute('data-evkey', ev.key);
         if (ev.forced) chip.setAttribute('data-forced', '1');
         chip.innerHTML =
-          '<span class="ga4-client-ev-icon">' + ev.icon + '</span>'
+          '<span class="ga4-client-ev-icon material-symbols-outlined" style="font-size:14px;">' + ev.icon + '</span>'
           + '<span class="ga4-client-ev-name">' + ev.label + '</span>'
           + '<span class="ga4-client-ev-check">✓</span>';
         grid.appendChild(chip);
@@ -11592,17 +11572,13 @@
 
       // 2. Collect metadata from current session state (S) + currentUser
 
-      // Collect CAPI tokens + sGTM URL (only when server-side is on)
+      // Collect CAPI tokens + sGTM URL from Pixel Config Server-Side state (_pcSS)
       var _capiTokens = {};
       var _sgtmUrl    = '';
       if (_wantServer) {
-        var _capiPlatforms = ['meta', 'tiktok', 'snap', 'gads'];
-        _capiPlatforms.forEach(function(p) {
-          var el = document.getElementById('mgd-capi-tok-' + p);
-          if (el && el.value.trim()) _capiTokens[p] = el.value.trim();
-        });
-        var _urlEl = document.getElementById('mgdSgtmUrlInput');
-        if (_urlEl) _sgtmUrl = _urlEl.value.trim();
+        if (typeof pcSS_collect === 'function') { try { pcSS_collect(); } catch(_){} }
+        _sgtmUrl    = (_pcSS && _pcSS.serverUrl) ? _pcSS.serverUrl : '';
+        _capiTokens = (_pcSS && _pcSS.tokens)    ? Object.assign({}, _pcSS.tokens) : {};
       }
 
       // ── CRITICAL: build the FULL Server Container JSON from buildSSContainer()
