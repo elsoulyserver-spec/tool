@@ -867,6 +867,213 @@ async function deleteDlqEvent(docId) {
   await db().collection(DLQ_COLLECTION).doc(docId).delete();
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// DEPLOYMENT LOCKS  —  collection: `deployment_locks`
+// Prevents concurrent rollbacks for the same client.
+// Document ID = clientId. Transaction-based acquire (atomic check-and-set).
+// TTL: 10 minutes — auto-cleared on release; TTL is a safety net for crashes.
+// ══════════════════════════════════════════════════════════════════════════════
+const LOCKS_COLLECTION = 'deployment_locks';
+const LOCK_TTL_MS      = 10 * 60 * 1000; // 10 min — generous for slow GTM API
+
+async function acquireDeploymentLock(clientId, lockedBy) {
+  if (!clientId) throw new Error('acquireDeploymentLock: clientId required');
+  const lockRef = db().collection(LOCKS_COLLECTION).doc(clientId);
+  const now     = Date.now();
+
+  return db().runTransaction(async tx => {
+    const snap = await tx.get(lockRef);
+    if (snap.exists) {
+      const until = snap.data().lockedUntil;
+      const untilMs = until && until.toMillis ? until.toMillis() : 0;
+      if (untilMs > now) return false; // still held
+    }
+    tx.set(lockRef, {
+      locked:      true,
+      lockedBy:    lockedBy || 'unknown',
+      lockedAt:    admin.firestore.FieldValue.serverTimestamp(),
+      lockedUntil: admin.firestore.Timestamp.fromMillis(now + LOCK_TTL_MS),
+    });
+    return true;
+  });
+}
+
+async function releaseDeploymentLock(clientId) {
+  if (!clientId) return;
+  try { await db().collection(LOCKS_COLLECTION).doc(clientId).delete(); } catch (_) {}
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DEPLOYMENT LOGS  —  collection: `deployment_logs`
+// Append-only audit trail for every deployment event (publish / rollback /
+// failure). Never update or delete — these are immutable audit records.
+// Requires index: clientId ASC, timestamp DESC
+// ══════════════════════════════════════════════════════════════════════════════
+const DEPLOY_LOGS_COLLECTION = 'deployment_logs';
+
+async function saveDeploymentLog(record) {
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const ref = await db().collection(DEPLOY_LOGS_COLLECTION).add({
+    ...record,
+    timestamp: now,
+  });
+  return ref.id;
+}
+
+async function listDeploymentLogs(clientId, { limit = 100 } = {}) {
+  if (!clientId) throw new Error('listDeploymentLogs: clientId required');
+  const snap = await db().collection(DEPLOY_LOGS_COLLECTION)
+    .where('clientId', '==', clientId)
+    .orderBy('timestamp', 'desc')
+    .limit(Math.min(limit, 200))
+    .get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ATOMIC VERSION COUNTER  —  collection: `version_counters`
+// Document ID = clientId. Uses a Firestore transaction so concurrent callers
+// always get strictly increasing, unique version numbers.
+// Replace getNextVersionNumber() — do NOT use both for the same client.
+// ══════════════════════════════════════════════════════════════════════════════
+const VERSION_COUNTERS_COLLECTION = 'version_counters';
+
+async function allocateVersionNumber(clientId) {
+  if (!clientId) throw new Error('allocateVersionNumber: clientId required');
+  const counterRef = db().collection(VERSION_COUNTERS_COLLECTION).doc(clientId);
+  return db().runTransaction(async tx => {
+    const snap    = await tx.get(counterRef);
+    const current = snap.exists ? (snap.data().current || 0) : 0;
+    const next    = current + 1;
+    tx.set(counterRef, {
+      current:   next,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return next;
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CONTAINER VERSIONS  —  collection: `container_versions`
+// Append-only deployment history. One document per publish or rollback event.
+//
+// The configSnapshot stores the Firestore client config (platforms, events,
+// pixelIds…) — NOT the generated GTM JSON. The GTM container is a compiled
+// artifact; the client config is the source of truth. Rollback re-derives
+// the GTM JSON from the snapshot via gtm-config-builder on the server.
+//
+// Requires composite index:  container_versions (clientId ASC, version DESC)
+// ══════════════════════════════════════════════════════════════════════════════
+const VERSIONS_COLLECTION = 'container_versions';
+
+async function getNextVersionNumber(clientId) {
+  const snap = await db().collection(VERSIONS_COLLECTION)
+    .where('clientId', '==', clientId)
+    .orderBy('version', 'desc')
+    .limit(1)
+    .get();
+  if (snap.empty) return 1;
+  return (snap.docs[0].data().version || 0) + 1;
+}
+
+async function saveVersion(record) {
+  if (!record.clientId) throw new Error('saveVersion: clientId is required');
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const ref = await db().collection(VERSIONS_COLLECTION).add({
+    ...record,
+    publishedAt: record.publishedAt || now,
+    createdAt:   now,
+  });
+  return ref.id;
+}
+
+async function listVersions(clientId, { limit = 50 } = {}) {
+  if (!clientId) throw new Error('listVersions: clientId is required');
+  const snap = await db().collection(VERSIONS_COLLECTION)
+    .where('clientId', '==', clientId)
+    .orderBy('version', 'desc')
+    .limit(Math.min(limit, 100))
+    .get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function getVersionByNumber(clientId, versionNumber) {
+  if (!clientId) throw new Error('getVersionByNumber: clientId is required');
+  const snap = await db().collection(VERSIONS_COLLECTION)
+    .where('clientId', '==', clientId)
+    .where('version', '==', versionNumber)
+    .limit(1)
+    .get();
+  if (snap.empty) return null;
+  const d = snap.docs[0];
+  return { id: d.id, ...d.data() };
+}
+
+async function markVersionRolledBack(versionDocId) {
+  if (!versionDocId) throw new Error('markVersionRolledBack: versionDocId is required');
+  await db().collection(VERSIONS_COLLECTION).doc(versionDocId).update({
+    status:          'rolled_back',
+    deploymentState: 'rolled_back',
+    updatedAt:       admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+// ── Deployment Recovery ───────────────────────────────────────────────────────
+// Scans container_versions for records stuck in transient states longer than
+// thresholdMs. Returns the stuck docs so the caller can mark them failed and
+// release their locks. In-memory time filter avoids composite index requirement.
+const STUCK_STATES = ['building', 'importing', 'publishing'];
+
+async function detectStuckDeployments(thresholdMs) {
+  const cutoff = Date.now() - (thresholdMs || 15 * 60 * 1000);
+  const snap   = await db().collection(VERSIONS_COLLECTION)
+    .where('deploymentState', 'in', STUCK_STATES)
+    .limit(100)
+    .get();
+  const stuck = [];
+  snap.docs.forEach(d => {
+    const data      = d.data();
+    const createdAt = data.createdAt;
+    const createdMs = createdAt && createdAt.toMillis ? createdAt.toMillis() : 0;
+    if (createdMs && createdMs < cutoff) {
+      stuck.push({ id: d.id, ref: d.ref, ...data });
+    }
+  });
+  return stuck;
+}
+
+// Count deployments currently in active (transient) states — used by health endpoint.
+async function countActiveDeployments() {
+  const snap = await db().collection(VERSIONS_COLLECTION)
+    .where('deploymentState', 'in', STUCK_STATES)
+    .limit(1)   // we only need existence, not full list
+    .count()
+    .get();
+  return snap.data().count;
+}
+
+// Patch a version document mid-deployment (used by state machine updates).
+async function updateVersion(versionDocId, patch) {
+  if (!versionDocId) throw new Error('updateVersion: versionDocId is required');
+  await db().collection(VERSIONS_COLLECTION).doc(versionDocId).update({
+    ...patch,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+// Save version and return the Firestore document ID (needed for state machine).
+async function saveVersionGetId(record) {
+  if (!record.clientId) throw new Error('saveVersionGetId: clientId is required');
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const ref = await db().collection(VERSIONS_COLLECTION).add({
+    ...record,
+    publishedAt: record.publishedAt || now,
+    createdAt:   now,
+    updatedAt:   now,
+  });
+  return ref.id;
+}
+
 module.exports = {
   isConfigured,
   BEACON_EVENTS,
@@ -935,4 +1142,22 @@ module.exports = {
   updateDlqEvent,
   deleteDlqEvent,
   getDlqStats,
+  // Container version history
+  getNextVersionNumber,
+  allocateVersionNumber,
+  saveVersion,
+  saveVersionGetId,
+  updateVersion,
+  listVersions,
+  getVersionByNumber,
+  markVersionRolledBack,
+  // Deployment locks (concurrent rollback prevention)
+  acquireDeploymentLock,
+  releaseDeploymentLock,
+  // Deployment audit logs
+  saveDeploymentLog,
+  listDeploymentLogs,
+  // Deployment recovery
+  detectStuckDeployments,
+  countActiveDeployments,
 };

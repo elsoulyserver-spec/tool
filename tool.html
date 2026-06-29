@@ -3236,187 +3236,507 @@
 
   <div class="app">
 
-    <!-- GATE -->
+    <!-- GATE — redesigned v2 -->
+    <style>
+      /* ── Gate v2 overrides ── */
+      .gbox {
+        position: relative;
+        z-index: 10;
+        background: rgba(16, 19, 26, 0.96);
+        border: 1px solid rgba(70, 241, 197, 0.10);
+        border-radius: 20px;
+        padding: 36px 32px 28px;
+        max-width: 420px;
+        width: 100%;
+        box-shadow:
+          0 0 0 1px rgba(255,255,255,.025),
+          0 24px 64px rgba(0,0,0,.75),
+          0 0 80px rgba(70,241,197,.03);
+        animation: gin .35s cubic-bezier(.16,1,.3,1);
+      }
+
+      /* Brand block */
+      .g-brand {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 28px;
+      }
+      .g-logo-mark {
+        width: 52px;
+        height: 52px;
+        filter: drop-shadow(0 0 16px rgba(70,241,197,.28));
+      }
+      .g-wordmark {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-weight: 900;
+        font-size: 28px;
+        letter-spacing: -0.8px;
+        color: #e1e2eb;
+        line-height: 1;
+      }
+      .g-wordmark em { font-style: normal; color: #46f1c5; }
+      .g-badge {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 2px;
+      }
+      .g-badge-line {
+        width: 18px; height: 1px;
+        background: rgba(70,241,197,.3);
+      }
+      .g-badge-text {
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 9px;
+        letter-spacing: 3px;
+        color: rgba(70,241,197,.55);
+        text-transform: uppercase;
+      }
+
+      /* Heading */
+      .gtitle {
+        font-family: 'Cairo', sans-serif;
+        font-size: 20px;
+        font-weight: 700;
+        line-height: 1.4;
+        color: #e1e2eb;
+        letter-spacing: -0.3px;
+        margin-bottom: 20px;
+        text-align: center;
+      }
+      .gtitle em { font-style: normal; color: #46f1c5; }
+
+      /* Tabs */
+      .gate-tabs {
+        display: flex;
+        background: rgba(255,255,255,.04);
+        border: 1px solid rgba(255,255,255,.07);
+        border-radius: 10px;
+        padding: 3px;
+        margin-bottom: 20px;
+        gap: 3px;
+      }
+      .gate-tab {
+        flex: 1;
+        padding: 8px 12px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-family: 'Cairo', sans-serif;
+        font-size: 13px;
+        font-weight: 700;
+        background: transparent;
+        color: #85948d;
+        transition: all .15s;
+        letter-spacing: 0.1px;
+      }
+      .gate-tab.on {
+        background: #46f1c5;
+        color: #003d2e;
+        box-shadow: 0 1px 6px rgba(70,241,197,.2);
+      }
+
+      /* Field group */
+      .fgroup {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+
+      /* Field wrapper */
+      .fwrap { position: relative; }
+
+      /* Icon — SVG, not emoji */
+      .ficon {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 15px;
+        height: 15px;
+        color: #3b4a44;
+        pointer-events: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: color .15s;
+      }
+      .ficon svg { width: 15px; height: 15px; }
+
+      /* Input */
+      .finput {
+        width: 100%;
+        background: rgba(255,255,255,.04);
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 10px;
+        padding: 11px 38px 11px 14px;
+        color: #e1e2eb;
+        font-family: 'Cairo', sans-serif;
+        font-size: 13.5px;
+        outline: none;
+        transition: border-color .15s, background .15s, box-shadow .15s;
+        direction: rtl;
+      }
+      .finput[type=tel], .finput[type=email] {
+        direction: ltr;
+        text-align: right;
+        font-family: 'Inter', sans-serif;
+      }
+      .finput::placeholder { color: #3b4a44; font-size: 13px; }
+      .finput:hover { border-color: rgba(255,255,255,.14); }
+      .finput:focus {
+        border-color: rgba(70,241,197,.35);
+        background: rgba(70,241,197,.03);
+        box-shadow: 0 0 0 3px rgba(70,241,197,.07);
+      }
+      .finput:focus + .ficon { color: #46f1c5; }
+
+      /* Select arrow */
+      select.finput {
+        appearance: none;
+        cursor: pointer;
+        padding-left: 32px;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2346f1c5' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: left 12px center;
+      }
+      select.finput option { background: #10131a; color: #e1e2eb; }
+
+      /* Error */
+      .gerr {
+        display: none;
+        color: #ffb4ab;
+        font-size: 12px;
+        margin-bottom: 10px;
+        padding: 9px 13px;
+        background: rgba(255,180,171,.05);
+        border: 1px solid rgba(255,180,171,.18);
+        border-radius: 9px;
+        font-family: 'Cairo', sans-serif;
+        line-height: 1.6;
+        text-align: center;
+      }
+
+      /* Global error */
+      #gGlobalErr {
+        font-family: 'Cairo', sans-serif;
+        line-height: 1.65;
+      }
+
+      /* CTA */
+      .gcta {
+        width: 100%;
+        background: #46f1c5;
+        color: #003d2e;
+        border: none;
+        border-radius: 10px;
+        padding: 12px 20px;
+        font-family: 'Cairo', sans-serif;
+        font-size: 14px;
+        font-weight: 800;
+        cursor: pointer;
+        transition: background .18s, transform .18s, box-shadow .18s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        letter-spacing: -0.1px;
+        box-shadow: 0 2px 16px rgba(70,241,197,.22);
+      }
+      .gcta:hover {
+        background: #00d4aa;
+        transform: translateY(-1px);
+        box-shadow: 0 6px 24px rgba(70,241,197,.28);
+      }
+      .gcta:active { transform: translateY(0); }
+
+      /* Footer */
+      .gfoot {
+        margin-top: 18px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(255,255,255,.05);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .gli {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        text-decoration: none;
+        color: #85948d;
+        font-size: 11.5px;
+        font-family: 'Inter', sans-serif;
+        transition: color .15s;
+      }
+      .gli:hover { color: #bacac2; }
+      .gli svg { width: 13px; height: 13px; fill: currentColor; }
+      .gpriv {
+        font-size: 11px;
+        color: #3b4a44;
+        font-family: 'Cairo', sans-serif;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      /* Switch link */
+      .g-switch {
+        text-align: center;
+        margin-top: 12px;
+        font-size: 12px;
+        color: #85948d;
+        font-family: 'Cairo', sans-serif;
+      }
+      .g-switch a {
+        color: #46f1c5;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .g-switch a:hover { text-decoration: underline; }
+
+      /* Pending state */
+      .g-pending {
+        text-align: center;
+        padding: 8px 0 4px;
+      }
+      .g-pending-icon {
+        width: 48px;
+        height: 48px;
+        background: rgba(70,241,197,.08);
+        border: 1px solid rgba(70,241,197,.18);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 16px;
+      }
+      .g-pending-icon svg { width: 22px; height: 22px; color: #46f1c5; }
+      .g-pending h2 {
+        font-family: 'Cairo', sans-serif;
+        font-weight: 800;
+        font-size: 19px;
+        color: #e1e2eb;
+        margin: 0 0 10px;
+        letter-spacing: -0.3px;
+      }
+      .g-pending p {
+        color: #85948d;
+        font-size: 13px;
+        line-height: 1.8;
+        margin: 0 0 20px;
+        font-family: 'Cairo', sans-serif;
+      }
+      .g-pending strong { color: #bacac2; }
+      .g-pending em { color: #46f1c5; font-style: normal; }
+    </style>
+
     <div id="gate">
       <div class="gbox">
-        <!-- Easy Track Logo — Login Screen -->
-        <div style="text-align:center;margin-bottom:28px;">
-          <!-- SVG + Name stacked vertically like landing page -->
-          <div style="display:inline-flex;flex-direction:column;align-items:center;gap:16px;">
-            <svg viewBox="0 0 260 260" fill="none" xmlns="http://www.w3.org/2000/svg"
-              style="width:100px;height:100px;overflow:visible;filter:drop-shadow(0 0 24px rgba(70,241,197,0.3));">
-              <defs>
-                <linearGradient id="glGOuter" x1="0" y1="0" x2="260" y2="260" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stop-color="#46f1c5" stop-opacity="0.45"/>
-                  <stop offset="100%" stop-color="#00d4aa" stop-opacity="0.45"/>
-                </linearGradient>
-                <linearGradient id="glGMid" x1="0" y1="0" x2="260" y2="260" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stop-color="#46f1c5" stop-opacity="0.75"/>
-                  <stop offset="100%" stop-color="#00d4aa" stop-opacity="0.75"/>
-                </linearGradient>
-                <linearGradient id="glGArrow" x1="130" y1="148" x2="130" y2="200" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stop-color="#46f1c5"/>
-                  <stop offset="100%" stop-color="#00d4aa"/>
-                </linearGradient>
-                <radialGradient id="glGDot" cx="50%" cy="50%" r="50%">
-                  <stop offset="0%" stop-color="#46f1c5"/>
-                  <stop offset="100%" stop-color="#00d4aa"/>
-                </radialGradient>
-                <filter id="glGlowF" x="-60%" y="-60%" width="220%" height="220%">
-                  <feGaussianBlur stdDeviation="10" result="blur"/>
-                  <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-                </filter>
-              </defs>
-              <path d="M20 120 C20 57.726 70.726 7 133 7" stroke="url(#glGOuter)" stroke-width="5" stroke-linecap="round"/>
-              <path d="M240 120 C240 57.726 189.274 7 127 7" stroke="url(#glGOuter)" stroke-width="5" stroke-linecap="round"/>
-              <path d="M48 120 C48 79.131 81.131 46 122 46" stroke="url(#glGMid)" stroke-width="4.5" stroke-linecap="round"/>
-              <path d="M212 120 C212 79.131 178.869 46 138 46" stroke="url(#glGMid)" stroke-width="4.5" stroke-linecap="round"/>
-              <path d="M78 120 C78 100.118 94.118 84 114 84" stroke="#46f1c5" stroke-width="4" stroke-linecap="round"/>
-              <path d="M182 120 C182 100.118 165.882 84 146 84" stroke="#46f1c5" stroke-width="4" stroke-linecap="round"/>
-              <circle cx="130" cy="120" r="32" fill="rgba(70,241,197,0.12)" filter="url(#glGlowF)"/>
-              <circle cx="130" cy="120" r="18" fill="url(#glGDot)"/>
-              <path d="M112 148 L130 196 L148 148" stroke="url(#glGArrow)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <!-- Brand name below icon -->
-            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
-              <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:900;font-size:36px;letter-spacing:-1.2px;color:#e1e2eb;line-height:1;">
-                easy<span style="color:#46f1c5;text-shadow:0 0 20px rgba(70,241,197,0.45);">TRACK</span>
-              </div>
-              <div style="display:flex;align-items:center;gap:8px;">
-                <span style="display:inline-block;width:22px;height:1px;background:rgba(70,241,197,0.35);"></span>
-                <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:3.5px;color:rgba(70,241,197,0.65);text-transform:uppercase;">Pixel Config v3</span>
-                <span style="display:inline-block;width:22px;height:1px;background:rgba(70,241,197,0.35);"></span>
-              </div>
+
+        <!-- Brand block -->
+        <div class="g-brand">
+          <svg class="g-logo-mark" viewBox="0 0 260 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="glO" x1="0" y1="0" x2="260" y2="260" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#46f1c5" stop-opacity=".4"/>
+                <stop offset="100%" stop-color="#00d4aa" stop-opacity=".4"/>
+              </linearGradient>
+              <linearGradient id="glM" x1="0" y1="0" x2="260" y2="260" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#46f1c5" stop-opacity=".72"/>
+                <stop offset="100%" stop-color="#00d4aa" stop-opacity=".72"/>
+              </linearGradient>
+              <linearGradient id="glA" x1="130" y1="148" x2="130" y2="200" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#46f1c5"/>
+                <stop offset="100%" stop-color="#00d4aa"/>
+              </linearGradient>
+              <radialGradient id="glD" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#46f1c5"/>
+                <stop offset="100%" stop-color="#00d4aa"/>
+              </radialGradient>
+            </defs>
+            <path d="M20 120C20 57.7 70.7 7 133 7" stroke="url(#glO)" stroke-width="5" stroke-linecap="round"/>
+            <path d="M240 120C240 57.7 189.3 7 127 7" stroke="url(#glO)" stroke-width="5" stroke-linecap="round"/>
+            <path d="M48 120C48 79.1 81.1 46 122 46" stroke="url(#glM)" stroke-width="4.5" stroke-linecap="round"/>
+            <path d="M212 120C212 79.1 178.9 46 138 46" stroke="url(#glM)" stroke-width="4.5" stroke-linecap="round"/>
+            <path d="M78 120C78 100.1 94.1 84 114 84" stroke="#46f1c5" stroke-width="4" stroke-linecap="round"/>
+            <path d="M182 120C182 100.1 165.9 84 146 84" stroke="#46f1c5" stroke-width="4" stroke-linecap="round"/>
+            <circle cx="130" cy="120" r="24" fill="rgba(70,241,197,.10)"/>
+            <circle cx="130" cy="120" r="18" fill="url(#glD)"/>
+            <path d="M112 148L130 196L148 148" stroke="url(#glA)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+
+          <div>
+            <div class="g-wordmark">easy<em>TRACK</em></div>
+            <div class="g-badge">
+              <span class="g-badge-line"></span>
+              <span class="g-badge-text">Pixel Config v3</span>
+              <span class="g-badge-line"></span>
             </div>
           </div>
         </div>
-        <h1 class="gtitle">احصل على <em>Pixel Setup</em> كامل<br>في دقيقتين — مجاناً</h1>
-        <!-- Auth Tabs -->
-        <!-- Global connectivity error banner -->
-        <div id="gGlobalErr" style="display:none;background:rgba(255,100,80,.08);border:1px solid rgba(255,100,80,.25);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#ffb4ab;text-align:center;line-height:1.6;"></div>
 
+        <!-- Headline -->
+        <h1 class="gtitle">Pixel Setup كامل في دقيقتين — <em>مجاناً</em></h1>
+
+        <!-- Global error -->
+        <div id="gGlobalErr" style="display:none;background:rgba(255,100,80,.07);border:1px solid rgba(255,100,80,.2);border-radius:9px;padding:9px 13px;margin-bottom:12px;font-size:12px;color:#ffb4ab;text-align:center;"></div>
+
+        <!-- Tabs -->
         <div class="gate-tabs">
           <button class="gate-tab on" id="gtab-login" onclick="(typeof switchGateTab==='function'?switchGateTab('login'):void 0)">تسجيل دخول</button>
           <button class="gate-tab" id="gtab-signup" onclick="(typeof switchGateTab==='function'?switchGateTab('signup'):void 0)">حساب جديد</button>
         </div>
 
-        <!-- Login Form -->
+        <!-- ── Login ── -->
         <div id="gform-login">
           <div class="fgroup">
             <div class="fwrap">
-              <input class="finput" id="gEmail-l" type="email" placeholder="البريد الإلكتروني *"
-                style="direction:ltr;text-align:right;">
-              <span class="ficon">✉️</span>
+              <input class="finput" id="gEmail-l" type="email" placeholder="البريد الإلكتروني" autocomplete="email">
+              <span class="ficon">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="4" width="16" height="13" rx="2"/><path d="M2 7l8 5 8-5"/>
+                </svg>
+              </span>
             </div>
             <div class="fwrap">
-              <input class="finput" id="gPass-l" type="password" placeholder="كلمة المرور *"
-                style="direction:ltr;text-align:right;">
-              <span class="ficon">🔒</span>
+              <input class="finput" id="gPass-l" type="password" placeholder="كلمة المرور" autocomplete="current-password">
+              <span class="ficon">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="4" y="9" width="12" height="9" rx="2"/><path d="M7 9V6a3 3 0 016 0v3"/>
+                </svg>
+              </span>
             </div>
           </div>
           <div class="gerr" id="gErr-l"></div>
-          <button class="gcta" id="gBtn-l" onclick="(typeof doGateLogin==='function'?doGateLogin():void 0)">دخول ← </button>
-          <div style="text-align:center;margin-top:12px;font-size:12px;color:var(--mut);">مش عندك حساب؟ <a href="#"
-              onclick="(typeof switchGateTab==='function'?switchGateTab('signup'):void 0)" style="color:var(--gold);text-decoration:none;">سجّل دلوقتي</a></div>
+          <button class="gcta" id="gBtn-l" onclick="(typeof doGateLogin==='function'?doGateLogin():void 0)">
+            دخول
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h12M10 4l6 6-6 6"/></svg>
+          </button>
+          <div class="g-switch">مش عندك حساب؟ <a href="#" onclick="(typeof switchGateTab==='function'?switchGateTab('signup'):void 0)">سجّل دلوقتي</a></div>
         </div>
 
-        <!-- Signup Form -->
+        <!-- ── Signup ── -->
         <div id="gform-signup" style="display:none;">
           <div class="fgroup">
             <div class="fwrap">
-              <input class="finput" id="gName-s" type="text" placeholder="اسمك الكريم *">
-              <span class="ficon">👤</span>
+              <input class="finput" id="gName-s" type="text" placeholder="اسمك الكريم" autocomplete="name">
+              <span class="ficon">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="10" cy="7" r="3"/><path d="M3 18c0-3.3 3.1-6 7-6s7 2.7 7 6"/>
+                </svg>
+              </span>
             </div>
             <div class="fwrap">
-              <input class="finput" id="gEmail-s" type="email" placeholder="البريد الإلكتروني *"
-                style="direction:ltr;text-align:right;">
-              <span class="ficon">✉️</span>
+              <input class="finput" id="gEmail-s" type="email" placeholder="البريد الإلكتروني" autocomplete="email">
+              <span class="ficon">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="4" width="16" height="13" rx="2"/><path d="M2 7l8 5 8-5"/>
+                </svg>
+              </span>
             </div>
             <div class="fwrap">
-              <input class="finput" id="gPass-s" type="password" placeholder="كلمة المرور * (6 أحرف على الأقل)"
-                style="direction:ltr;text-align:right;">
-              <span class="ficon">🔒</span>
+              <input class="finput" id="gPass-s" type="password" placeholder="كلمة المرور (6 أحرف على الأقل)" autocomplete="new-password">
+              <span class="ficon">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="4" y="9" width="12" height="9" rx="2"/><path d="M7 9V6a3 3 0 016 0v3"/>
+                </svg>
+              </span>
             </div>
             <div class="fwrap">
-              <select class="finput" id="gCountry-s" style="appearance:none;cursor:pointer;">
-                <option value="" disabled selected>اختار البلد *</option>
-                <option value="SA">🇸🇦 السعودية</option>
-                <option value="EG">🇪🇬 مصر</option>
-                <option value="AE">🇦🇪 الإمارات</option>
-                <option value="KW">🇰🇼 الكويت</option>
-                <option value="QA">🇶🇦 قطر</option>
-                <option value="BH">🇧🇭 البحرين</option>
-                <option value="OM">🇴🇲 عُمان</option>
-                <option value="JO">🇯🇴 الأردن</option>
-                <option value="LB">🇱🇧 لبنان</option>
-                <option value="IQ">🇮🇶 العراق</option>
-                <option value="PS">🇵🇸 فلسطين</option>
-                <option value="SY">🇸🇾 سوريا</option>
-                <option value="YE">🇾🇪 اليمن</option>
-                <option value="LY">🇱🇾 ليبيا</option>
-                <option value="TN">🇹🇳 تونس</option>
-                <option value="DZ">🇩🇿 الجزائر</option>
-                <option value="MA">🇲🇦 المغرب</option>
-                <option value="SD">🇸🇩 السودان</option>
-                <option value="MR">🇲🇷 موريتانيا</option>
-                <option value="SO">🇸🇴 الصومال</option>
-                <option value="DJ">🇩🇯 جيبوتي</option>
-                <option value="KM">🇰🇲 جزر القمر</option>
-                <option value="OTHER">🌍 دولة أخرى</option>
+              <select class="finput" id="gCountry-s">
+                <option value="" disabled selected>اختر البلد</option>
+                <option value="SA">السعودية</option>
+                <option value="EG">مصر</option>
+                <option value="AE">الإمارات</option>
+                <option value="KW">الكويت</option>
+                <option value="QA">قطر</option>
+                <option value="BH">البحرين</option>
+                <option value="OM">عُمان</option>
+                <option value="JO">الأردن</option>
+                <option value="LB">لبنان</option>
+                <option value="IQ">العراق</option>
+                <option value="PS">فلسطين</option>
+                <option value="SY">سوريا</option>
+                <option value="YE">اليمن</option>
+                <option value="LY">ليبيا</option>
+                <option value="TN">تونس</option>
+                <option value="DZ">الجزائر</option>
+                <option value="MA">المغرب</option>
+                <option value="SD">السودان</option>
+                <option value="MR">موريتانيا</option>
+                <option value="SO">الصومال</option>
+                <option value="DJ">جيبوتي</option>
+                <option value="KM">جزر القمر</option>
+                <option value="OTHER">دولة أخرى</option>
               </select>
-              <span class="ficon">🌍</span>
             </div>
             <div class="fwrap">
-              <input class="finput" id="gWhatsapp-s" type="tel" placeholder="رقم الواتساب * (مع كود الدولة)"
-                style="direction:ltr;text-align:right;">
-              <span class="ficon">📱</span>
+              <input class="finput" id="gWhatsapp-s" type="tel" placeholder="واتساب (مع كود الدولة — مثال: +966…)" autocomplete="tel">
+              <span class="ficon">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="5" y="1" width="10" height="18" rx="2"/><circle cx="10" cy="15.5" r="1" fill="currentColor" stroke="none"/>
+                </svg>
+              </span>
             </div>
             <div class="fwrap">
-              <input class="finput" id="gJob-s" type="text" placeholder="وظيفتك * (مثال: Marketing Manager)">
-              <span class="ficon">💼</span>
+              <input class="finput" id="gJob-s" type="text" placeholder="وظيفتك (مثال: Marketing Manager)">
+              <span class="ficon">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="7" width="16" height="11" rx="2"/><path d="M7 7V5a3 3 0 016 0v2"/>
+                </svg>
+              </span>
             </div>
           </div>
           <div class="gerr" id="gErr-s"></div>
-          <button class="gcta" id="gBtn-s" onclick="(typeof doGateSignup==='function'?doGateSignup():void 0)">إنشاء حساب ← </button>
-          <div style="text-align:center;margin-top:12px;font-size:12px;color:var(--mut);">عندك حساب؟ <a href="#"
-              onclick="(typeof switchGateTab==='function'?switchGateTab('login'):void 0)" style="color:var(--gold);text-decoration:none;">سجّل دخول</a></div>
+          <button class="gcta" id="gBtn-s" onclick="(typeof doGateSignup==='function'?doGateSignup():void 0)">
+            إنشاء حساب
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h12M10 4l6 6-6 6"/></svg>
+          </button>
+          <div class="g-switch">عندك حساب؟ <a href="#" onclick="(typeof switchGateTab==='function'?switchGateTab('login'):void 0)">سجّل دخول</a></div>
         </div>
 
-        <!-- Approval Pending Panel — shown for new signups + existing pending accounts -->
+        <!-- ── Pending ── -->
         <div id="gform-pending" style="display:none;">
-          <div style="text-align:center;padding:8px 0 4px;">
-            <div style="font-size:54px;margin-bottom:14px;line-height:1;">⏳</div>
-            <h2 style="font-family:var(--font-display);font-weight:800;font-size:22px;color:var(--wht);margin:0 0 14px;letter-spacing:-0.4px;">
-              حسابك في انتظار الموافقة
-            </h2>
-            <p style="color:var(--mut);font-size:13.5px;line-height:1.95;margin:0 0 22px;">
-              شكراً لتسجيلك في <strong style="color:var(--acc);">Easy Track</strong> 💚<br>
-              تم إنشاء حسابك بنجاح. تأكد من إيميلك:
-              <strong id="gate-pending-email" style="color:var(--wht);direction:ltr;display:inline-block;">—</strong><br>
-              سجّل دخولك وستجد حسابك نشطاً تلقائياً.
+          <div class="g-pending">
+            <div class="g-pending-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+            </div>
+            <h2>حسابك قيد المراجعة</h2>
+            <p>
+              شكراً لتسجيلك في <em>Easy Track</em><br>
+              تم إنشاء حسابك. راجع بريدك الإلكتروني:<br>
+              <strong id="gate-pending-email" style="direction:ltr;display:inline-block;">—</strong>
             </p>
-            <button type="button" onclick="(typeof showGateLogin==='function'?showGateLogin():void 0)" class="gcta"
-              style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:none;cursor:pointer;text-decoration:none;">
-              ← تسجيل الدخول
-            </button>
-            <button type="button"
-              onclick="(typeof showGateLogin==='function'?showGateLogin():void 0)"
-              style="background:none;border:none;color:var(--mut);cursor:pointer;padding:12px;margin-top:8px;font-size:12.5px;text-decoration:underline;width:100%;">
-              ← ارجع لتسجيل الدخول
+            <button type="button" onclick="(typeof showGateLogin==='function'?showGateLogin():void 0)" class="gcta">
+              العودة لتسجيل الدخول
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h12M10 4l6 6-6 6"/></svg>
             </button>
           </div>
         </div>
 
+        <!-- Footer -->
         <div class="gfoot">
-          <a class="gli" href="https://www.linkedin.com/company/easytrac" target="_blank">
+          <a class="gli" href="https://www.linkedin.com/company/easytrac" target="_blank" rel="noopener">
             <svg viewBox="0 0 24 24">
-              <path
-                d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+              <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
             </svg>
             Easy Track
           </a>
-          <div class="gpriv">🔒 بياناتك آمنة ولن تُشارك</div>
+          <div class="gpriv">
+            <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="9" width="12" height="9" rx="2"/><path d="M7 9V6a3 3 0 016 0v3"/>
+            </svg>
+            بياناتك محمية
+          </div>
         </div>
+
       </div>
     </div>
 
@@ -3523,6 +3843,23 @@
         <button class="sb-link" id="sbProjects" type="button" onclick="switchAppView('projects',this)">
           <span class="material-symbols-outlined" style="font-size:18px;">folder_open</span>
           <span>My Projects</span>
+        </button>
+        <div class="sb-nav-section">Operations</div>
+        <button class="sb-link" id="sbVersions" type="button" onclick="switchAppView('versions',this)">
+          <span class="material-symbols-outlined" style="font-size:18px;">history</span>
+          <span>Versions</span>
+        </button>
+        <button class="sb-link" id="sbDeployments" type="button" onclick="switchAppView('deployments',this)">
+          <span class="material-symbols-outlined" style="font-size:18px;">rocket_launch</span>
+          <span>Deployments</span>
+        </button>
+        <button class="sb-link" id="sbHealth" type="button" onclick="switchAppView('health',this)">
+          <span class="material-symbols-outlined" style="font-size:18px;">monitor_heart</span>
+          <span>Health</span>
+        </button>
+        <button class="sb-link" id="sbAudit" type="button" onclick="switchAppView('audit',this)">
+          <span class="material-symbols-outlined" style="font-size:18px;">assignment</span>
+          <span>Audit</span>
         </button>
         <button class="sb-link" type="button" onclick="toggleSettings()">
           <span class="material-symbols-outlined" style="font-size:18px;">settings</span>
@@ -3682,6 +4019,56 @@
                   style="font-size:28px;font-weight:900;font-family:var(--font-display);color:var(--wht);">—</div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- ── Ops Overview Drift Banner ── -->
+        <div id="ovOpsDriftBanner" style="display:none;align-items:center;gap:8px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--amber);margin-bottom:16px;">
+          <span class="material-symbols-outlined" style="font-size:16px;">warning</span>
+          <span>Manual GTM changes detected. Rollback safety may be affected. <button onclick="switchAppView('versions',document.getElementById('sbVersions'))" style="background:none;border:none;color:var(--amber);text-decoration:underline;cursor:pointer;font-size:13px;padding:0;">View Versions →</button></span>
+        </div>
+
+        <!-- ── Ops Overview Cards ── -->
+        <div class="ops-overview-row" id="ovOpsCards" style="display:none;">
+          <div class="ops-overview-card" onclick="switchAppView('health',document.getElementById('sbHealth'))">
+            <div class="label">Health Score</div>
+            <div class="val" id="ovOpsScore">—</div>
+            <div class="sub">/ 100</div>
+          </div>
+          <div class="ops-overview-card" onclick="switchAppView('versions',document.getElementById('sbVersions'))">
+            <div class="label">Current Version</div>
+            <div class="val" id="ovOpsCurVer">—</div>
+            <div class="sub" id="ovOpsCurVerSub">—</div>
+          </div>
+          <div class="ops-overview-card" onclick="switchAppView('deployments',document.getElementById('sbDeployments'))">
+            <div class="label">Last Deployment</div>
+            <div class="val" id="ovOpsLastDeploy">—</div>
+            <div class="sub" id="ovOpsLastDeploySub">—</div>
+          </div>
+          <div class="ops-overview-card" onclick="switchAppView('health',document.getElementById('sbHealth'))">
+            <div class="label">Last Event</div>
+            <div class="val" id="ovOpsLastEvent">—</div>
+            <div class="sub" id="ovOpsLastEventSub">—</div>
+          </div>
+          <div class="ops-overview-card" onclick="switchAppView('health',document.getElementById('sbHealth'))">
+            <div class="label">Drift Status</div>
+            <div class="val" id="ovOpsDrift">—</div>
+            <div class="sub">container integrity</div>
+          </div>
+          <div class="ops-overview-card" onclick="switchAppView('health',document.getElementById('sbHealth'))">
+            <div class="label">Active Alerts</div>
+            <div class="val" id="ovOpsAlerts">—</div>
+            <div class="sub">view in health</div>
+          </div>
+          <div class="ops-overview-card" onclick="switchAppView('deployments',document.getElementById('sbDeployments'))">
+            <div class="label">Deploys Today</div>
+            <div class="val" id="ovOpsDeploys">—</div>
+            <div class="sub">this calendar day</div>
+          </div>
+          <div class="ops-overview-card" onclick="switchAppView('versions',document.getElementById('sbVersions'))">
+            <div class="label">Rollback Count</div>
+            <div class="val" id="ovOpsRollbacks">—</div>
+            <div class="sub">all time</div>
           </div>
         </div>
 
@@ -4711,11 +5098,692 @@
       </div>
       <!-- END MY PROJECTS VIEW -->
 
+      <!-- ══════ VERSIONS VIEW ══════ -->
+      <div class="app-view" id="view-versions">
+        <div class="ops-page-hdr">
+          <div>
+            <div class="ops-page-title">
+              <span class="material-symbols-outlined" style="font-size:22px;color:var(--acc);">history</span>
+              Versions
+            </div>
+            <div class="ops-page-sub">All published GTM container versions with rollback support</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="versionsSearch" class="ops-search" placeholder="Search versions..." oninput="filterVersionsTable()" />
+            <select id="versionsFilter" class="ops-select" onchange="filterVersionsTable()">
+              <option value="">All types</option>
+              <option value="publish">Publish</option>
+              <option value="rollback">Rollback</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="versionsDriftBanner" class="ops-drift-banner" style="display:none;">
+          <span class="material-symbols-outlined" style="font-size:16px;">warning</span>
+          <span>Manual GTM changes detected. Rollback safety may be affected.</span>
+        </div>
+
+        <div id="versionsTableWrap" class="ops-table-wrap">
+          <div id="versionsLoading" class="ops-empty">
+            <span class="material-symbols-outlined ops-spin">progress_activity</span>
+            <span>Loading versions...</span>
+          </div>
+          <table class="ops-table" id="versionsTable" style="display:none;">
+            <thead>
+              <tr>
+                <th style="width:80px;">Version</th>
+                <th style="width:160px;">Date</th>
+                <th style="width:90px;">Type</th>
+                <th style="width:100px;">State</th>
+                <th>GTM Version</th>
+                <th style="width:140px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="versionsTbody"></tbody>
+          </table>
+          <div id="versionsEmpty" class="ops-empty" style="display:none;">
+            <span class="material-symbols-outlined" style="font-size:36px;opacity:.3;">history</span>
+            <span>No versions found</span>
+          </div>
+        </div>
+
+        <!-- Config Diff Drawer -->
+        <div id="versionsDiffDrawer" class="ops-drawer" style="display:none;">
+          <div class="ops-drawer-inner">
+            <div class="ops-drawer-hdr">
+              <span id="versionsDiffTitle" style="font-weight:700;color:var(--wht);">Version Details</span>
+              <button class="ops-drawer-close" onclick="document.getElementById('versionsDiffDrawer').style.display='none'">
+                <span class="material-symbols-outlined" style="font-size:20px;">close</span>
+              </button>
+            </div>
+            <pre id="versionsDiffContent" class="ops-diff-pre"></pre>
+          </div>
+        </div>
+      </div>
+      <!-- END VERSIONS VIEW -->
+
+      <!-- ══════ DEPLOYMENTS VIEW ══════ -->
+      <div class="app-view" id="view-deployments">
+        <div class="ops-page-hdr">
+          <div>
+            <div class="ops-page-title">
+              <span class="material-symbols-outlined" style="font-size:22px;color:var(--acc);">rocket_launch</span>
+              Deployments
+            </div>
+            <div class="ops-page-sub">Deployment history, active runs, and recovery events</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select id="deploymentsFilter" class="ops-select" onchange="filterDeploymentsTable()">
+              <option value="">All states</option>
+              <option value="published">Published</option>
+              <option value="failed">Failed</option>
+              <option value="recovered">Recovered</option>
+              <option value="building">In Progress</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="ops-metric-row" id="deploymentsMetrics">
+          <div class="ops-metric-card">
+            <div class="ops-metric-label">Total Today</div>
+            <div class="ops-metric-val" id="dplMetricTotal">—</div>
+          </div>
+          <div class="ops-metric-card">
+            <div class="ops-metric-label">Successful</div>
+            <div class="ops-metric-val" id="dplMetricSuccess" style="color:var(--grn);">—</div>
+          </div>
+          <div class="ops-metric-card">
+            <div class="ops-metric-label">Failed</div>
+            <div class="ops-metric-val" id="dplMetricFailed" style="color:var(--red);">—</div>
+          </div>
+          <div class="ops-metric-card">
+            <div class="ops-metric-label">Recovered</div>
+            <div class="ops-metric-val" id="dplMetricRecovered" style="color:var(--amber);">—</div>
+          </div>
+        </div>
+
+        <div id="deploymentsTableWrap" class="ops-table-wrap">
+          <div id="deploymentsLoading" class="ops-empty">
+            <span class="material-symbols-outlined ops-spin">progress_activity</span>
+            <span>Loading deployments...</span>
+          </div>
+          <table class="ops-table" id="deploymentsTable" style="display:none;">
+            <thead>
+              <tr>
+                <th>Deployment ID</th>
+                <th style="width:140px;">Started</th>
+                <th style="width:100px;">State</th>
+                <th style="width:80px;">Duration</th>
+                <th style="width:80px;">Drift</th>
+                <th style="width:90px;">Result</th>
+                <th style="width:70px;">Details</th>
+              </tr>
+            </thead>
+            <tbody id="deploymentsTbody"></tbody>
+          </table>
+          <div id="deploymentsEmpty" class="ops-empty" style="display:none;">
+            <span class="material-symbols-outlined" style="font-size:36px;opacity:.3;">rocket_launch</span>
+            <span>No deployments found</span>
+          </div>
+        </div>
+
+        <!-- Deployment detail drawer -->
+        <div id="deploymentDetailDrawer" class="ops-drawer" style="display:none;">
+          <div class="ops-drawer-inner">
+            <div class="ops-drawer-hdr">
+              <span style="font-weight:700;color:var(--wht);">Deployment Details</span>
+              <button class="ops-drawer-close" onclick="document.getElementById('deploymentDetailDrawer').style.display='none'">
+                <span class="material-symbols-outlined" style="font-size:20px;">close</span>
+              </button>
+            </div>
+            <div id="deploymentDetailContent" style="padding:16px;"></div>
+          </div>
+        </div>
+      </div>
+      <!-- END DEPLOYMENTS VIEW -->
+
+      <!-- ══════ HEALTH VIEW ══════ -->
+      <div class="app-view" id="view-health">
+        <div class="ops-page-hdr">
+          <div>
+            <div class="ops-page-title">
+              <span class="material-symbols-outlined" style="font-size:22px;color:var(--acc);">monitor_heart</span>
+              Health Monitor
+            </div>
+            <div class="ops-page-sub">Tracking infrastructure health across all platforms</div>
+          </div>
+          <button class="ops-btn-sec" onclick="loadHealthView()">
+            <span class="material-symbols-outlined" style="font-size:16px;">refresh</span> Refresh
+          </button>
+        </div>
+
+        <div id="healthDriftBanner" class="ops-drift-banner" style="display:none;">
+          <span class="material-symbols-outlined" style="font-size:16px;">warning</span>
+          <span>Container drift detected. Manual GTM changes may affect rollback safety.</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:200px 1fr;gap:16px;margin-bottom:20px;">
+          <!-- Score ring -->
+          <div class="ops-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;">
+            <div style="font-size:11px;color:var(--mut);font-family:var(--font-mono);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Health Score</div>
+            <div id="healthScoreVal" style="font-size:56px;font-weight:900;font-family:var(--font-display);color:var(--acc);line-height:1;">—</div>
+            <div id="healthScoreLabel" style="font-size:12px;color:var(--mut);margin-top:6px;">/ 100</div>
+            <div id="healthScoreStatus" style="margin-top:10px;font-size:12px;font-weight:700;color:var(--grn);">—</div>
+          </div>
+          <!-- Platform health grid -->
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
+            <div class="ops-card" id="hcGA4">
+              <div class="ops-health-platform-label"><span class="material-symbols-outlined" style="font-size:15px;">analytics</span> GA4</div>
+              <div class="ops-health-platform-status" id="hcGA4Status">—</div>
+            </div>
+            <div class="ops-card" id="hcMeta">
+              <div class="ops-health-platform-label"><span class="material-symbols-outlined" style="font-size:15px;">campaign</span> Meta CAPI</div>
+              <div class="ops-health-platform-status" id="hcMetaStatus">—</div>
+            </div>
+            <div class="ops-card" id="hcGAds">
+              <div class="ops-health-platform-label"><span class="material-symbols-outlined" style="font-size:15px;">ads_click</span> Google Ads</div>
+              <div class="ops-health-platform-status" id="hcGAdsStatus">—</div>
+            </div>
+            <div class="ops-card" id="hcTikTok">
+              <div class="ops-health-platform-label"><span class="material-symbols-outlined" style="font-size:15px;">music_note</span> TikTok</div>
+              <div class="ops-health-platform-status" id="hcTikTokStatus">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+          <div class="ops-card">
+            <div class="ops-metric-label">Last Event Received</div>
+            <div class="ops-metric-val" id="hcLastEvent" style="font-size:20px;">—</div>
+            <div id="hcLastEventName" style="font-size:11px;color:var(--mut);margin-top:4px;">—</div>
+          </div>
+          <div class="ops-card">
+            <div class="ops-metric-label">Last Publish</div>
+            <div class="ops-metric-val" id="hcLastPublish" style="font-size:20px;">—</div>
+            <div id="hcLastPublishVer" style="font-size:11px;color:var(--mut);margin-top:4px;">—</div>
+          </div>
+          <div class="ops-card">
+            <div class="ops-metric-label">Container Drift</div>
+            <div class="ops-metric-val" id="hcDrift" style="font-size:20px;">—</div>
+            <div id="hcDriftDetail" style="font-size:11px;color:var(--mut);margin-top:4px;">—</div>
+          </div>
+          <div class="ops-card">
+            <div class="ops-metric-label">Event Freshness</div>
+            <div class="ops-metric-val" id="hcFreshness" style="font-size:20px;">—</div>
+            <div style="font-size:11px;color:var(--mut);margin-top:4px;">since last beacon</div>
+          </div>
+          <div class="ops-card">
+            <div class="ops-metric-label">Deployment Health</div>
+            <div class="ops-metric-val" id="hcDeployHealth" style="font-size:20px;">—</div>
+            <div id="hcDeployDetail" style="font-size:11px;color:var(--mut);margin-top:4px;">—</div>
+          </div>
+          <div class="ops-card">
+            <div class="ops-metric-label">Active Alerts</div>
+            <div class="ops-metric-val" id="hcAlerts" style="font-size:20px;color:var(--red);">—</div>
+            <div id="hcAlertsDetail" style="font-size:11px;color:var(--mut);margin-top:4px;">—</div>
+          </div>
+        </div>
+
+        <div id="healthLoading" class="ops-empty" style="margin-top:24px;display:none;">
+          <span class="material-symbols-outlined ops-spin">progress_activity</span>
+          <span>Loading health data...</span>
+        </div>
+      </div>
+      <!-- END HEALTH VIEW -->
+
+      <!-- ══════ AUDIT VIEW ══════ -->
+      <div class="app-view" id="view-audit">
+        <div class="ops-page-hdr">
+          <div>
+            <div class="ops-page-title">
+              <span class="material-symbols-outlined" style="font-size:22px;color:var(--acc);">assignment</span>
+              Audit Log
+            </div>
+            <div class="ops-page-sub">Complete audit trail of all deployment and system events</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="auditSearch" class="ops-search" placeholder="Search actions..." oninput="filterAuditTable()" />
+            <select id="auditFilter" class="ops-select" onchange="filterAuditTable()">
+              <option value="">All actions</option>
+              <option value="publish">Publish</option>
+              <option value="rollback">Rollback</option>
+              <option value="api_key">API Key</option>
+              <option value="config">Config</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="auditTableWrap" class="ops-table-wrap">
+          <div id="auditLoading" class="ops-empty">
+            <span class="material-symbols-outlined ops-spin">progress_activity</span>
+            <span>Loading audit log...</span>
+          </div>
+          <table class="ops-table" id="auditTable" style="display:none;">
+            <thead>
+              <tr>
+                <th style="width:160px;">Timestamp</th>
+                <th style="width:150px;">Action</th>
+                <th style="width:120px;">Actor</th>
+                <th>Deployment / Resource</th>
+                <th style="width:90px;">Result</th>
+                <th style="width:70px;">Details</th>
+              </tr>
+            </thead>
+            <tbody id="auditTbody"></tbody>
+          </table>
+          <div id="auditEmpty" class="ops-empty" style="display:none;">
+            <span class="material-symbols-outlined" style="font-size:36px;opacity:.3;">assignment</span>
+            <span>No audit events found</span>
+          </div>
+        </div>
+
+        <div id="auditPagination" style="display:flex;justify-content:center;gap:8px;margin-top:16px;display:none;">
+          <button class="ops-btn-sec" id="auditPrevBtn" onclick="loadAuditPage(-1)">← Previous</button>
+          <span id="auditPageInfo" style="font-size:12px;color:var(--mut);align-self:center;"></span>
+          <button class="ops-btn-sec" id="auditNextBtn" onclick="loadAuditPage(1)">Next →</button>
+        </div>
+
+        <!-- Audit detail drawer -->
+        <div id="auditDetailDrawer" class="ops-drawer" style="display:none;">
+          <div class="ops-drawer-inner">
+            <div class="ops-drawer-hdr">
+              <span style="font-weight:700;color:var(--wht);">Event Details</span>
+              <button class="ops-drawer-close" onclick="document.getElementById('auditDetailDrawer').style.display='none'">
+                <span class="material-symbols-outlined" style="font-size:20px;">close</span>
+              </button>
+            </div>
+            <pre id="auditDetailContent" class="ops-diff-pre"></pre>
+          </div>
+        </div>
+      </div>
+      <!-- END AUDIT VIEW -->
+
     </div>
   </div>
 
   <!-- New Component Styles -->
   <style>
+    /* ── Ops Console: Sidebar section label ── */
+    .sb-nav-section {
+      padding: 14px 16px 4px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--mut2);
+      text-transform: uppercase;
+    }
+
+    /* ── Ops Console: Page layout ── */
+    .ops-page-hdr {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .ops-page-title {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--wht);
+      letter-spacing: -.4px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ops-page-sub {
+      font-size: 13px;
+      color: var(--mut);
+      margin-top: 4px;
+    }
+
+    /* ── Ops Console: Drift banner ── */
+    .ops-drift-banner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(245,158,11,.08);
+      border: 1px solid rgba(245,158,11,.25);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: var(--amber);
+      margin-bottom: 16px;
+    }
+
+    /* ── Ops Console: Search + Select inputs ── */
+    .ops-search {
+      background: var(--sur2);
+      border: 1px solid var(--bdr2);
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-size: 13px;
+      color: var(--wht2);
+      font-family: var(--font-ui);
+      outline: none;
+      width: 180px;
+      transition: border-color .15s;
+    }
+
+    .ops-search:focus { border-color: var(--bdr); }
+
+    .ops-select {
+      background: var(--sur2);
+      border: 1px solid var(--bdr2);
+      border-radius: 8px;
+      padding: 7px 10px;
+      font-size: 13px;
+      color: var(--wht2);
+      font-family: var(--font-ui);
+      outline: none;
+      cursor: pointer;
+    }
+
+    /* ── Ops Console: Table ── */
+    .ops-table-wrap {
+      background: var(--sur2);
+      border: 1px solid var(--bdr2);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .ops-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .ops-table thead tr {
+      background: var(--sur3);
+    }
+
+    .ops-table th {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      color: var(--mut);
+      border-bottom: 1px solid var(--bdr2);
+      font-weight: 600;
+    }
+
+    .ops-table td {
+      padding: 11px 14px;
+      color: var(--wht2);
+      border-bottom: 1px solid rgba(255,255,255,.04);
+      vertical-align: middle;
+    }
+
+    .ops-table tbody tr:last-child td { border-bottom: none; }
+
+    .ops-table tbody tr:hover td { background: rgba(70,241,197,.03); }
+
+    /* ── Ops Console: Empty / loading state ── */
+    .ops-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 48px 20px;
+      color: var(--mut);
+      font-size: 13px;
+    }
+
+    @keyframes ops-spin { to { transform: rotate(360deg); } }
+    .ops-spin { display: inline-block; animation: ops-spin .8s linear infinite; }
+
+    /* ── Ops Console: Badges ── */
+    .ops-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 9px;
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      letter-spacing: .3px;
+    }
+
+    .ops-badge-green  { background: rgba(70,241,197,.12); color: var(--grn); }
+    .ops-badge-red    { background: rgba(255,180,171,.12); color: var(--red); }
+    .ops-badge-amber  { background: rgba(245,158,11,.12);  color: var(--amber); }
+    .ops-badge-blue   { background: rgba(173,198,255,.12); color: var(--blu); }
+    .ops-badge-dim    { background: var(--sur3); color: var(--mut); border: 1px solid var(--bdr2); }
+
+    /* ── Ops Console: Drawer ── */
+    .ops-drawer {
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      background: rgba(11,14,20,.7);
+      backdrop-filter: blur(8px);
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .ops-drawer-inner {
+      width: min(560px, 95vw);
+      height: 100%;
+      background: var(--sur);
+      border-left: 1px solid var(--bdr);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .ops-drawer-hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--bdr2);
+    }
+
+    .ops-drawer-close {
+      background: none;
+      border: none;
+      color: var(--mut);
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+    }
+
+    .ops-drawer-close:hover { color: var(--wht); }
+
+    .ops-diff-pre {
+      flex: 1;
+      overflow: auto;
+      margin: 0;
+      padding: 20px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      color: var(--wht2);
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* ── Ops Console: Metric cards row ── */
+    .ops-metric-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .ops-metric-card {
+      background: var(--sur2);
+      border: 1px solid var(--bdr2);
+      border-radius: 14px;
+      padding: 16px 18px;
+    }
+
+    .ops-metric-label {
+      font-size: 11px;
+      color: var(--mut);
+      font-family: var(--font-mono);
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .ops-metric-val {
+      font-size: 28px;
+      font-weight: 900;
+      font-family: var(--font-display);
+      color: var(--wht);
+      letter-spacing: -1px;
+    }
+
+    /* ── Ops Console: Generic card ── */
+    .ops-card {
+      background: var(--sur2);
+      border: 1px solid var(--bdr2);
+      border-radius: 14px;
+      padding: 16px 18px;
+    }
+
+    /* ── Ops Console: Health platform cells ── */
+    .ops-health-platform-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      color: var(--mut);
+      margin-bottom: 8px;
+    }
+
+    .ops-health-platform-status {
+      font-size: 16px;
+      font-weight: 700;
+      font-family: var(--font-display);
+      color: var(--wht);
+    }
+
+    /* ── Ops Console: Button secondary ── */
+    .ops-btn-sec {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--sur2);
+      border: 1px solid var(--bdr2);
+      border-radius: 8px;
+      padding: 7px 14px;
+      font-size: 13px;
+      color: var(--wht2);
+      font-family: var(--font-ui);
+      cursor: pointer;
+      transition: all .15s;
+    }
+
+    .ops-btn-sec:hover { border-color: var(--bdr); color: var(--wht); }
+
+    .ops-btn-rollback {
+      background: rgba(70,241,197,.08);
+      border: 1px solid rgba(70,241,197,.2);
+      border-radius: 6px;
+      padding: 3px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--acc);
+      cursor: pointer;
+      font-family: var(--font-mono);
+      transition: all .15s;
+    }
+
+    .ops-btn-rollback:hover { background: rgba(70,241,197,.15); }
+
+    .ops-btn-details {
+      background: var(--sur3);
+      border: 1px solid var(--bdr2);
+      border-radius: 6px;
+      padding: 3px 10px;
+      font-size: 11px;
+      color: var(--mut);
+      cursor: pointer;
+      font-family: var(--font-mono);
+      transition: all .15s;
+    }
+
+    .ops-btn-details:hover { color: var(--wht2); }
+
+    /* ── Ops Console: Timeline inline pill ── */
+    .ops-timeline-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+    }
+
+    /* ── Ops Console: Overview ops cards ── */
+    .ops-overview-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .ops-overview-card {
+      background: var(--sur2);
+      border: 1px solid var(--bdr2);
+      border-radius: 14px;
+      padding: 16px 18px;
+      cursor: pointer;
+      transition: border-color .15s;
+    }
+
+    .ops-overview-card:hover { border-color: var(--bdr); }
+
+    .ops-overview-card .label {
+      font-size: 10px;
+      color: var(--mut);
+      font-family: var(--font-mono);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .ops-overview-card .val {
+      font-size: 26px;
+      font-weight: 900;
+      font-family: var(--font-display);
+      color: var(--wht);
+      letter-spacing: -1px;
+      line-height: 1.1;
+    }
+
+    .ops-overview-card .sub {
+      font-size: 11px;
+      color: var(--mut);
+      margin-top: 4px;
+    }
+
+    /* ── Ops Console: Overview drift banner ── */
+    #ovOpsDriftBanner {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      background: rgba(245,158,11,.08);
+      border: 1px solid rgba(245,158,11,.25);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: var(--amber);
+      margin-bottom: 16px;
+    }
+
     /* ── Page headers ── */
     .page-hdr {
       display: flex;
@@ -5711,7 +6779,7 @@
     }
 
     // ===== APP VIEW SWITCHING =====
-    var APP_VIEWS = { overview: 'view-overview', pixels: 'view-pixels', gtmview: 'view-gtmview', projects: 'view-projects' };
+    var APP_VIEWS = { overview: 'view-overview', pixels: 'view-pixels', gtmview: 'view-gtmview', projects: 'view-projects', versions: 'view-versions', deployments: 'view-deployments', health: 'view-health', audit: 'view-audit' };
 
     // Cached GTM JSON string for sidebar view
     var _cachedGtmStr = null;
@@ -5731,8 +6799,10 @@
       document.querySelectorAll('#et-sidebar .sb-link').forEach(function (b) { b.classList.remove('active'); });
       if (btnEl) btnEl.classList.add('active');
 
-      // If going to Health Monitor — render dashboard
-      if (viewKey === 'health') { renderHealthDashboard(); }
+      // If going to Overview — refresh ops cards
+      if (viewKey === 'overview') {
+        if (typeof loadOpsOverviewCards === 'function' && _opsClientId()) loadOpsOverviewCards();
+      }
 
       // If going to GTM view — show cached JSON or empty state
       if (viewKey === 'gtmview') {
@@ -5753,6 +6823,473 @@
       if (viewKey === 'projects') {
         _loadProjectsIntoView();
       }
+
+      // ── Operations Console views ──
+      if (viewKey === 'versions')    { loadVersionsView(); }
+      if (viewKey === 'deployments') { loadDeploymentsView(); }
+      if (viewKey === 'health')      { loadHealthView(); }
+      if (viewKey === 'audit')       { loadAuditView(true); }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // OPERATIONS CONSOLE — shared helpers
+    // ═══════════════════════════════════════════════════════════
+
+    function _opsClientId() {
+      return (currentUser && currentUser.id) ? currentUser.id : null;
+    }
+
+    function _opsTimeAgo(ts) {
+      if (!ts) return '—';
+      var d = (ts && ts.toDate) ? ts.toDate() : new Date(ts);
+      var diff = Math.floor((Date.now() - d.getTime()) / 1000);
+      if (diff < 60)   return diff + 's ago';
+      if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+      return Math.floor(diff / 86400) + 'd ago';
+    }
+
+    function _opsFormatDate(ts) {
+      if (!ts) return '—';
+      var d = (ts && ts.toDate) ? ts.toDate() : new Date(ts);
+      return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+        + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function _opsBadge(text, color) {
+      return '<span class="ops-badge ops-badge-' + color + '">' + text + '</span>';
+    }
+
+    function _opsStateBadge(state) {
+      if (!state) return _opsBadge('unknown', 'dim');
+      var s = state.toLowerCase();
+      if (s === 'published' || s === 'live' || s === 'success') return _opsBadge(state, 'green');
+      if (s === 'failed' || s === 'error')  return _opsBadge(state, 'red');
+      if (s === 'rollback')                 return _opsBadge(state, 'amber');
+      if (s === 'building' || s === 'importing' || s === 'publishing') return _opsBadge(state, 'blue');
+      if (s === 'recovered')                return _opsBadge(state, 'amber');
+      return _opsBadge(state, 'dim');
+    }
+
+    async function _opsFetch(url) {
+      var tok = await firebase.auth().currentUser.getIdToken();
+      var r = await fetch(url, { headers: { Authorization: 'Bearer ' + tok } });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // VERSIONS PAGE
+    // ═══════════════════════════════════════════════════════════
+
+    var _versionsData = [];
+
+    async function loadVersionsView() {
+      var cid = _opsClientId();
+      if (!cid) return;
+      var loading = document.getElementById('versionsLoading');
+      var table   = document.getElementById('versionsTable');
+      var empty   = document.getElementById('versionsEmpty');
+      if (loading) loading.style.display = 'flex';
+      if (table)   table.style.display   = 'none';
+      if (empty)   empty.style.display   = 'none';
+      try {
+        var data = await _opsFetch('/api/versions/' + cid);
+        _versionsData = data.versions || [];
+        renderVersionsTable(_versionsData);
+        // Check drift from most recent version
+        var latest = _versionsData[0];
+        var driftBanner = document.getElementById('versionsDriftBanner');
+        if (driftBanner) driftBanner.style.display = (latest && latest.driftDetected) ? 'flex' : 'none';
+      } catch (e) {
+        if (loading) loading.style.display = 'none';
+        if (empty)   { empty.style.display = 'flex'; empty.querySelector('span:last-child').textContent = 'Failed to load: ' + e.message; }
+      }
+    }
+
+    function renderVersionsTable(rows) {
+      var loading = document.getElementById('versionsLoading');
+      var table   = document.getElementById('versionsTable');
+      var empty   = document.getElementById('versionsEmpty');
+      var tbody   = document.getElementById('versionsTbody');
+      if (!tbody) return;
+      if (loading) loading.style.display = 'none';
+      if (!rows || !rows.length) { if (empty) empty.style.display = 'flex'; return; }
+      if (table) table.style.display = 'table';
+      tbody.innerHTML = rows.map(function(v, i) {
+        var isLatest = i === 0;
+        var typeColor = v.deploymentType === 'rollback' ? 'amber' : 'green';
+        var stateColor = isLatest ? 'green' : 'dim';
+        var stateLabel = isLatest ? 'live' : 'superseded';
+        return '<tr>'
+          + '<td><span style="font-family:var(--font-mono);font-weight:700;color:var(--wht);">v' + (v.version || '?') + '</span>' + (isLatest ? ' <span style="font-size:9px;color:var(--acc);font-family:var(--font-mono);">LIVE</span>' : '') + '</td>'
+          + '<td style="font-size:12px;color:var(--mut);">' + _opsFormatDate(v.publishedAt) + '</td>'
+          + '<td>' + _opsBadge(v.deploymentType || 'publish', typeColor) + '</td>'
+          + '<td>' + _opsBadge(stateLabel, stateColor) + '</td>'
+          + '<td style="font-family:var(--font-mono);font-size:11px;color:var(--mut);">' + (v.gtmContainerId || '—') + (v.gtmVersionId ? ' / ver ' + v.gtmVersionId : '') + '</td>'
+          + '<td style="display:flex;gap:6px;flex-wrap:wrap;">'
+          + '<button class="ops-btn-details" onclick="showVersionDetails(' + JSON.stringify(v).replace(/"/g, '&quot;') + ')">details</button>'
+          + (!isLatest && v.deploymentType !== 'rollback' ? '<button class="ops-btn-rollback" onclick="opsRollback(' + (v.version) + ')">rollback</button>' : '')
+          + '</td>'
+          + '</tr>';
+      }).join('');
+    }
+
+    function filterVersionsTable() {
+      var search = (document.getElementById('versionsSearch') || {}).value || '';
+      var type   = (document.getElementById('versionsFilter') || {}).value || '';
+      var rows = _versionsData.filter(function(v) {
+        var matchSearch = !search || JSON.stringify(v).toLowerCase().includes(search.toLowerCase());
+        var matchType   = !type   || (v.deploymentType || 'publish').toLowerCase() === type;
+        return matchSearch && matchType;
+      });
+      renderVersionsTable(rows);
+    }
+
+    function showVersionDetails(v) {
+      var drawer  = document.getElementById('versionsDiffDrawer');
+      var title   = document.getElementById('versionsDiffTitle');
+      var content = document.getElementById('versionsDiffContent');
+      if (!drawer) return;
+      if (title)   title.textContent = 'Version v' + v.version + ' — ' + (v.deploymentType || 'publish');
+      if (content) content.textContent = JSON.stringify(v, null, 2);
+      drawer.style.display = 'flex';
+    }
+
+    async function opsRollback(targetVersion) {
+      var cid = _opsClientId();
+      if (!cid) return;
+      if (!confirm('Rollback to v' + targetVersion + '? This will push the stored config to GTM.')) return;
+      try {
+        var tok = await firebase.auth().currentUser.getIdToken();
+        var r = await fetch('/api/versions/rollback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+          body: JSON.stringify({ clientId: cid, targetVersion: targetVersion })
+        });
+        var data = await r.json();
+        if (!r.ok) { alert('Rollback failed: ' + (data.error || r.status)); return; }
+        alert('Rollback to v' + targetVersion + ' initiated. Deployment ID: ' + (data.deploymentId || '—'));
+        loadVersionsView();
+      } catch (e) {
+        alert('Rollback error: ' + e.message);
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // DEPLOYMENTS PAGE
+    // ═══════════════════════════════════════════════════════════
+
+    var _deploymentsData = [];
+
+    async function loadDeploymentsView() {
+      var cid = _opsClientId();
+      if (!cid) return;
+      var loading = document.getElementById('deploymentsLoading');
+      var table   = document.getElementById('deploymentsTable');
+      var empty   = document.getElementById('deploymentsEmpty');
+      if (loading) loading.style.display = 'flex';
+      if (table)   table.style.display   = 'none';
+      if (empty)   empty.style.display   = 'none';
+      try {
+        var data = await _opsFetch('/api/deployments/' + cid);
+        _deploymentsData = data.logs || [];
+        // Metrics
+        var today = new Date(); today.setHours(0,0,0,0);
+        var todayLogs = _deploymentsData.filter(function(l) {
+          var d = (l.startedAt && l.startedAt.toDate) ? l.startedAt.toDate() : new Date(l.startedAt || 0);
+          return d >= today;
+        });
+        var failed    = _deploymentsData.filter(function(l) { return l.state === 'failed'; }).length;
+        var recovered = _deploymentsData.filter(function(l) { return l.recovered || l.state === 'recovered'; }).length;
+        var success   = _deploymentsData.filter(function(l) { return l.state === 'published'; }).length;
+        _setEl('dplMetricTotal',     todayLogs.length || _deploymentsData.length);
+        _setEl('dplMetricSuccess',   success);
+        _setEl('dplMetricFailed',    failed);
+        _setEl('dplMetricRecovered', recovered);
+        renderDeploymentsTable(_deploymentsData);
+      } catch (e) {
+        if (loading) loading.style.display = 'none';
+        if (empty)   { empty.style.display = 'flex'; empty.querySelector('span:last-child').textContent = 'Failed to load: ' + e.message; }
+      }
+    }
+
+    function _setEl(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; }
+
+    function renderDeploymentsTable(rows) {
+      var loading = document.getElementById('deploymentsLoading');
+      var table   = document.getElementById('deploymentsTable');
+      var empty   = document.getElementById('deploymentsEmpty');
+      var tbody   = document.getElementById('deploymentsTbody');
+      if (!tbody) return;
+      if (loading) loading.style.display = 'none';
+      if (!rows || !rows.length) { if (empty) empty.style.display = 'flex'; return; }
+      if (table) table.style.display = 'table';
+      tbody.innerHTML = rows.map(function(l) {
+        var driftLabel = l.driftDetected ? '<span style="color:var(--amber);">⚠ Drift</span>' : '<span style="color:var(--mut);">Clean</span>';
+        var duration = '—';
+        if (l.startedAt && l.completedAt) {
+          var ms = new Date(l.completedAt) - new Date(l.startedAt);
+          duration = ms > 0 ? Math.round(ms / 1000) + 's' : '—';
+        }
+        return '<tr>'
+          + '<td style="font-family:var(--font-mono);font-size:11px;color:var(--mut);">' + (l.deploymentId || l.id || '—').slice(-12) + '</td>'
+          + '<td style="font-size:12px;color:var(--mut);">' + _opsFormatDate(l.startedAt) + '</td>'
+          + '<td>' + _opsStateBadge(l.state || 'unknown') + '</td>'
+          + '<td style="font-family:var(--font-mono);font-size:12px;">' + duration + '</td>'
+          + '<td>' + driftLabel + '</td>'
+          + '<td>' + _opsStateBadge(l.result || l.state || '—') + '</td>'
+          + '<td><button class="ops-btn-details" onclick="showDeploymentDetails(' + JSON.stringify(l).replace(/"/g, '&quot;') + ')">view</button></td>'
+          + '</tr>';
+      }).join('');
+    }
+
+    function filterDeploymentsTable() {
+      var state = (document.getElementById('deploymentsFilter') || {}).value || '';
+      var rows = _deploymentsData.filter(function(l) {
+        if (!state) return true;
+        if (state === 'building') return ['building','importing','publishing'].includes(l.state);
+        return (l.state || '').toLowerCase() === state;
+      });
+      renderDeploymentsTable(rows);
+    }
+
+    function showDeploymentDetails(l) {
+      var drawer  = document.getElementById('deploymentDetailDrawer');
+      var content = document.getElementById('deploymentDetailContent');
+      if (!drawer) return;
+      // Build deployment timeline
+      var stages = ['building','importing','publishing','published'];
+      var curIdx = stages.indexOf(l.state);
+      if (l.state === 'failed') curIdx = -1;
+      var timelineHtml = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">'
+        + stages.map(function(s, i) {
+          var done  = curIdx >= i;
+          var color = done ? 'var(--acc)' : (l.state === 'failed' && i === 0 ? 'var(--red)' : 'var(--mut2)');
+          return '<span class="ops-timeline-pill" style="color:' + color + ';">'
+            + (done ? '✓ ' : '○ ') + s
+            + (i < stages.length - 1 ? '</span><span style="color:var(--mut2);">→' : '</span>');
+        }).join('')
+        + '</div>';
+      if (l.state === 'failed') {
+        timelineHtml += '<div style="background:rgba(255,180,171,.08);border:1px solid rgba(255,180,171,.2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:14px;">'
+          + '✕ Deployment failed' + (l.errorMessage ? ': ' + l.errorMessage : '') + '</div>';
+      }
+      if (content) content.innerHTML = timelineHtml
+        + '<pre class="ops-diff-pre" style="background:var(--sur2);border:1px solid var(--bdr2);border-radius:8px;margin:0;">'
+        + JSON.stringify(l, null, 2) + '</pre>';
+      drawer.style.display = 'flex';
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // HEALTH PAGE
+    // ═══════════════════════════════════════════════════════════
+
+    async function loadHealthView() {
+      var cid = _opsClientId();
+      if (!cid) return;
+      var loading = document.getElementById('healthLoading');
+      if (loading) loading.style.display = 'flex';
+      try {
+        var data = await _opsFetch('/api/health/' + cid);
+        var h = data.health || data || {};
+
+        // Score
+        var score = h.healthScore || h.score || '—';
+        _setEl('healthScoreVal', score);
+        var statusLabel = score >= 80 ? 'Healthy' : score >= 50 ? 'Degraded' : 'Critical';
+        var statusColor = score >= 80 ? 'var(--grn)' : score >= 50 ? 'var(--amber)' : 'var(--red)';
+        _setEl('healthScoreStatus', statusLabel);
+        var ss = document.getElementById('healthScoreStatus');
+        if (ss) ss.style.color = statusColor;
+
+        // Platforms
+        var platforms = { GA4: 'hcGA4Status', Meta: 'hcMetaStatus', 'Google Ads': 'hcGAdsStatus', TikTok: 'hcTikTokStatus' };
+        var pData = h.platforms || {};
+        Object.keys(platforms).forEach(function(p) {
+          var ps = (pData[p] || pData[p.toLowerCase()] || {});
+          var el = document.getElementById(platforms[p]);
+          if (el) {
+            var ok = ps.ok || ps.active || ps.healthy;
+            el.textContent = ok ? '✓ Active' : (ps.status || 'Not configured');
+            el.style.color = ok ? 'var(--grn)' : 'var(--mut)';
+          }
+        });
+
+        // Freshness / event
+        _setEl('hcLastEvent',      h.lastEventAgo  || _opsTimeAgo(h.lastEventAt)  || '—');
+        _setEl('hcLastEventName',  h.lastEventName || '—');
+        _setEl('hcLastPublish',    h.lastPublishAgo || _opsTimeAgo(h.lastPublishAt) || '—');
+        _setEl('hcLastPublishVer', h.lastVersion ? 'v' + h.lastVersion : '—');
+        _setEl('hcFreshness',      h.freshness || h.eventFreshness || '—');
+        _setEl('hcDeployHealth',   h.deploymentHealth || (h.failedDeployments > 0 ? 'Degraded' : 'Healthy'));
+        _setEl('hcDeployDetail',   h.failedDeployments ? h.failedDeployments + ' failed' : 'All clear');
+        _setEl('hcAlerts',         h.alertCount || h.activeAlerts || 0);
+        _setEl('hcAlertsDetail',   h.alertCount ? 'action required' : 'No active alerts');
+
+        // Drift
+        var drift = h.driftDetected || h.drift;
+        _setEl('hcDrift',       drift ? '⚠ Detected' : '✓ Clean');
+        _setEl('hcDriftDetail', drift ? (h.driftWarning || 'Manual GTM changes found') : 'No changes outside Easy Track');
+        var driftEl = document.getElementById('hcDrift');
+        if (driftEl) driftEl.style.color = drift ? 'var(--amber)' : 'var(--grn)';
+        var driftBanner = document.getElementById('healthDriftBanner');
+        if (driftBanner) driftBanner.style.display = drift ? 'flex' : 'none';
+      } catch (e) {
+        if (loading) loading.style.display = 'none';
+      }
+      if (loading) loading.style.display = 'none';
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // AUDIT PAGE
+    // ═══════════════════════════════════════════════════════════
+
+    var _auditData   = [];
+    var _auditBefore = null;
+    var _auditPage   = 0;
+
+    async function loadAuditView(reset) {
+      var cid = _opsClientId();
+      if (!cid) return;
+      if (reset) { _auditBefore = null; _auditPage = 0; }
+      var loading = document.getElementById('auditLoading');
+      var table   = document.getElementById('auditTable');
+      var empty   = document.getElementById('auditEmpty');
+      if (loading) loading.style.display = 'flex';
+      if (table)   table.style.display   = 'none';
+      if (empty)   empty.style.display   = 'none';
+      try {
+        var url = '/api/v1/clients/' + cid + '/audit-log?limit=25' + (_auditBefore ? '&before=' + _auditBefore : '');
+        var data = await _opsFetch(url);
+        _auditData = data.logs || data.events || [];
+        renderAuditTable(_auditData);
+        // Pagination state
+        var pag = document.getElementById('auditPagination');
+        if (pag) pag.style.display = _auditData.length > 0 ? 'flex' : 'none';
+        _setEl('auditPageInfo', 'Page ' + (_auditPage + 1));
+        var nextBtn = document.getElementById('auditNextBtn');
+        if (nextBtn) nextBtn.disabled = _auditData.length < 25;
+        var prevBtn = document.getElementById('auditPrevBtn');
+        if (prevBtn) prevBtn.disabled = _auditPage === 0;
+      } catch (e) {
+        if (loading) loading.style.display = 'none';
+        if (empty)   { empty.style.display = 'flex'; empty.querySelector && (empty.querySelector('span:last-child').textContent = 'Failed to load: ' + e.message); }
+      }
+    }
+
+    function renderAuditTable(rows) {
+      var loading = document.getElementById('auditLoading');
+      var table   = document.getElementById('auditTable');
+      var empty   = document.getElementById('auditEmpty');
+      var tbody   = document.getElementById('auditTbody');
+      if (!tbody) return;
+      if (loading) loading.style.display = 'none';
+      if (!rows || !rows.length) { if (empty) empty.style.display = 'flex'; return; }
+      if (table) table.style.display = 'table';
+      tbody.innerHTML = rows.map(function(e) {
+        var result = e.result || e.status || 'ok';
+        var resColor = result === 'ok' || result === 'success' ? 'green' : result === 'failed' || result === 'error' ? 'red' : 'dim';
+        return '<tr>'
+          + '<td style="font-family:var(--font-mono);font-size:11px;color:var(--mut);white-space:nowrap;">' + _opsFormatDate(e.timestamp || e.createdAt) + '</td>'
+          + '<td><span style="font-family:var(--font-mono);font-size:12px;color:var(--wht2);">' + (e.action || '—') + '</span></td>'
+          + '<td style="font-size:12px;color:var(--mut);">' + (e.actor || e.performedBy || 'system') + '</td>'
+          + '<td style="font-family:var(--font-mono);font-size:11px;color:var(--mut);">' + (e.deploymentId || e.resourceId || '—') + '</td>'
+          + '<td>' + _opsBadge(result, resColor) + '</td>'
+          + '<td><button class="ops-btn-details" onclick="showAuditDetail(' + JSON.stringify(e).replace(/"/g, '&quot;') + ')">view</button></td>'
+          + '</tr>';
+      }).join('');
+    }
+
+    function filterAuditTable() {
+      var search = (document.getElementById('auditSearch') || {}).value || '';
+      var filter = (document.getElementById('auditFilter') || {}).value || '';
+      var rows = _auditData.filter(function(e) {
+        var matchSearch = !search || JSON.stringify(e).toLowerCase().includes(search.toLowerCase());
+        var matchFilter = !filter || (e.action || '').toLowerCase().includes(filter);
+        return matchSearch && matchFilter;
+      });
+      renderAuditTable(rows);
+    }
+
+    async function loadAuditPage(dir) {
+      if (dir < 0 && _auditPage === 0) return;
+      if (dir > 0 && _auditData.length < 25) return;
+      if (dir > 0) {
+        var last = _auditData[_auditData.length - 1];
+        _auditBefore = last && (last.timestamp || last.createdAt);
+        _auditPage++;
+      } else {
+        _auditBefore = null;
+        _auditPage = Math.max(0, _auditPage - 1);
+      }
+      await loadAuditView(false);
+    }
+
+    function showAuditDetail(e) {
+      var drawer  = document.getElementById('auditDetailDrawer');
+      var content = document.getElementById('auditDetailContent');
+      if (!drawer) return;
+      if (content) content.textContent = JSON.stringify(e, null, 2);
+      drawer.style.display = 'flex';
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // OVERVIEW — Operations cards (load on overview open)
+    // ═══════════════════════════════════════════════════════════
+
+    async function loadOpsOverviewCards() {
+      var cid = _opsClientId();
+      if (!cid) return;
+      try {
+        var health = await _opsFetch('/api/health/' + cid);
+        var h = health.health || health || {};
+
+        var score = h.healthScore || h.score || 0;
+        _setEl('ovOpsScore',      score || '—');
+        var scoreEl = document.getElementById('ovOpsScore');
+        if (scoreEl) scoreEl.style.color = score >= 80 ? 'var(--grn)' : score >= 50 ? 'var(--amber)' : 'var(--red)';
+
+        _setEl('ovOpsDrift',      h.driftDetected ? '⚠ Drift' : '✓ Clean');
+        var driftEl = document.getElementById('ovOpsDrift');
+        if (driftEl) driftEl.style.color = h.driftDetected ? 'var(--amber)' : 'var(--grn)';
+
+        _setEl('ovOpsAlerts',     h.alertCount || 0);
+        var alertsEl = document.getElementById('ovOpsAlerts');
+        if (alertsEl) alertsEl.style.color = (h.alertCount > 0) ? 'var(--red)' : 'var(--grn)';
+
+        _setEl('ovOpsLastEvent',  h.lastEventAgo || _opsTimeAgo(h.lastEventAt) || '—');
+        _setEl('ovOpsLastEventSub', h.lastEventName || '');
+
+        // Drift banner on overview
+        var banner = document.getElementById('ovOpsDriftBanner');
+        if (banner) banner.style.display = h.driftDetected ? 'flex' : 'none';
+      } catch (_) {}
+
+      try {
+        var vers = await _opsFetch('/api/versions/' + cid);
+        var vlist = vers.versions || [];
+        var latest = vlist[0];
+        _setEl('ovOpsCurVer',    latest ? 'v' + latest.version : '—');
+        _setEl('ovOpsCurVerSub', latest ? _opsTimeAgo(latest.publishedAt) : '');
+
+        var rollbacks = vlist.filter(function(v) { return v.deploymentType === 'rollback'; }).length;
+        _setEl('ovOpsRollbacks', rollbacks);
+      } catch (_) {}
+
+      try {
+        var deps = await _opsFetch('/api/deployments/' + cid);
+        var dlogs = deps.logs || [];
+        var today = new Date(); today.setHours(0,0,0,0);
+        var todayCount = dlogs.filter(function(l) {
+          var d = (l.startedAt && l.startedAt.toDate) ? l.startedAt.toDate() : new Date(l.startedAt || 0);
+          return d >= today;
+        }).length;
+        var last = dlogs[0];
+        _setEl('ovOpsDeploys',    todayCount);
+        _setEl('ovOpsLastDeploy', last ? _opsTimeAgo(last.startedAt) : '—');
+        _setEl('ovOpsLastDeploySub', last ? (last.state || '') : '');
+      } catch (_) {}
     }
 
     // Load projects into the My Projects sidebar view
@@ -5921,8 +7458,7 @@
         + '<div class="cwrap">'
         + '<div class="ctbar"><div class="ctdots"><div class="ctdot" style="background:#ff5f57"></div><div class="ctdot" style="background:#febc2e"></div><div class="ctdot" style="background:#28c840"></div></div>'
         + '<span class="clang">gtm-container.json</span>'
-        + '<div class="ctacts"><button class="cpybtn" onclick="(function(){try{navigator.clipboard.writeText(document.getElementById(\'gtmSbBody\').textContent);}catch(e){}})()">نسخ</button>'
-        + '<button class="dlbtn" onclick="(function(){var b=new Blob([document.getElementById(\'gtmSbBody\').textContent],{type:\'application/json\'});var a=document.createElement(\'a\');a.href=URL.createObjectURL(b);a.download=\'gtm-container.json\';a.click();})()">⬇️ تحميل</button></div></div>'
+        + '<div class="ctacts"><button class="cpybtn" onclick="(function(){try{navigator.clipboard.writeText(document.getElementById(\'gtmSbBody\').textContent);}catch(e){}})()">نسخ</button></div></div>'
         + '<div class="cbody" id="gtmSbBody" style="max-height:460px;overflow:auto;">' + _esc(jsonStr) + '</div>'
         + '</div>';
     }
@@ -13845,6 +15381,12 @@
         // If prior wizard state was restored, re-render the output
         if (_hadState && S.cms && S.platforms && S.platforms.length) {
           try { generate(); } catch(e) {}
+        }
+        // Load Operations Console cards on overview
+        var ovOpsCards = document.getElementById('ovOpsCards');
+        if (ovOpsCards) ovOpsCards.style.display = 'grid';
+        if (typeof loadOpsOverviewCards === 'function') {
+          setTimeout(loadOpsOverviewCards, 600);
         }
       }, 400);
     }

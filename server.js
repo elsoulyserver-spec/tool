@@ -53,8 +53,9 @@ const MAX_CONCURRENT_SCANS = parseInt(process.env.MAX_CONCURRENT_SCANS || '3', 1
 let scanInFlight = 0;
 
 // ── Managed GTM services (optional — endpoints return 503 if not set up) ──
-const gtmService       = require('./gtm-service');
-const firestoreService = require('./firestore-service');
+const gtmService        = require('./gtm-service');
+const firestoreService  = require('./firestore-service');
+const gtmConfigBuilder  = require('./lib/gtm-config-builder');
 
 // ── Server-Side Tracking services ─────────────────────────────────────────
 const cryptoVault  = require('./lib/crypto-vault');
@@ -525,6 +526,45 @@ async function _runManagedProvisionJob(jobId) {
       mode,
       serverContainerPublicId: serverResult ? serverResult.publicId : null,
     });
+
+    // 3b. Append a version record — source of truth is the Firestore client config;
+    //     the GTM container is a compiled artifact derived from it.
+    //     allocateVersionNumber uses a Firestore transaction → no race conditions.
+    try {
+      const vNum = await firestoreService.allocateVersionNumber(clientId);
+      await firestoreService.saveVersion({
+        clientId,
+        version:        vNum,
+        publishedBy:    clientEmail || clientId,
+        containerId:    webResult.gtmContainerId,
+        workspaceId:    webResult.gtmWorkspaceId,
+        gtmVersionId:   webResult.gtmVersionId   || null,
+        gtmPublicId:    webResult.gtmPublicId,
+        deploymentType:  'publish',
+        deploymentState: 'published',
+        status:          'published',
+        // configSnapshot: client config fields — NOT the generated GTM JSON.
+        // Rollback re-derives the GTM artifact from this snapshot server-side.
+        configSnapshot: {
+          ga4MeasurementId: (pixelIds || {}).ga4 || null,
+          sgtmUrl:          null,
+          pixelIds:         pixelIds  || {},
+          events:           events    || [],
+          customEvents:     [],
+          ecommPlatform:    cmsType   || '',
+          platforms:        platforms || [],
+          domain:           domain    || null,
+          mode,
+        },
+        diffSummary: {
+          added:    webResult.importedTagCount     || 0,
+          modified: 0,
+          removed:  0,
+        },
+      });
+    } catch (verErr) {
+      console.warn('[managed/create][job ' + jobId + '] version record write failed (non-fatal):', verErr.message);
+    }
 
     // 4. client_server flow — auto-deploy to Stape + auto-wire transport_url.
     //    The Stape API key is a PLATFORM credential (set via STAPE_API_KEY env
@@ -1974,27 +2014,20 @@ const server = http.createServer((req, res) => {
     return true;
   }
 
-  // GET /api/admin/export — dump all clients + containers as JSON
-  // Optional ?download=1 sets Content-Disposition so the browser saves a file
+  // GET /api/admin/export — internal admin data dump (JSON only, no file download)
   if (req.method === 'GET' && req.url.startsWith('/api/admin/export')) {
     if (!_requireAdmin()) return;
     if (!firestoreService.isConfigured()) {
       return sendJSON(res, 503, { error: 'Firestore is not configured' });
     }
-    const wantDownload = /[?&]download=1\b/.test(req.url);
     firestoreService.exportAll()
       .then(dump => {
         const json = JSON.stringify(dump, null, 2);
-        const headers = {
+        res.writeHead(200, {
           ...securityHeaders(),
           'Content-Type':   'application/json; charset=utf-8',
           'Content-Length': Buffer.byteLength(json),
-        };
-        if (wantDownload) {
-          const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-          headers['Content-Disposition'] = `attachment; filename="easytrack-export-${stamp}.json"`;
-        }
-        res.writeHead(200, headers);
+        });
         res.end(json);
       })
       .catch(e => sendJSON(res, 500, { error: e.message }));
@@ -2091,6 +2124,378 @@ const server = http.createServer((req, res) => {
         sendJSON(res, 500, { error: e.message });
       }
     });
+    return;
+  }
+
+  // ── VERSION HISTORY ENDPOINTS ──────────────────────────────────────────────
+
+  // GET /api/versions/:clientId — list deployment history (newest first).
+  // Auth: admin token.
+  const _verListMatch = req.url.split('?')[0].match(/^\/api\/versions\/([^/]+)$/);
+  if (req.method === 'GET' && _verListMatch) {
+    if (!_requireAdmin()) return;
+    if (!firestoreService.isConfigured()) return sendJSON(res, 503, { error: 'Firestore not configured' });
+    const clientId = decodeURIComponent(_verListMatch[1]);
+    try {
+      const versions = await firestoreService.listVersions(clientId);
+      // Serialize Firestore Timestamps to ISO strings for JSON transport
+      const out = versions.map(v => ({
+        id:             v.id,
+        version:        v.version,
+        publishedAt:    v.publishedAt && v.publishedAt.toDate ? v.publishedAt.toDate().toISOString() : (v.publishedAt || null),
+        publishedBy:    v.publishedBy || null,
+        deploymentType: v.deploymentType || 'publish',
+        status:         v.status         || 'published',
+        gtmVersionId:   v.gtmVersionId   || null,
+        gtmPublicId:    v.gtmPublicId    || null,
+        diffSummary:    v.diffSummary    || null,
+        configSnapshot: v.configSnapshot || null,
+      }));
+      sendJSON(res, 200, { ok: true, clientId, versions: out });
+    } catch (e) {
+      sendJSON(res, 500, { error: e.message });
+    }
+    return;
+  }
+
+  // POST /api/versions/rollback  (Phase 2.5 — Production Hardened)
+  // Body: { clientId, version }
+  // Full state machine: lock → pre-flight → drift check → build → import → publish → audit
+  if (req.method === 'POST' && req.url.split('?')[0] === '/api/versions/rollback') {
+    if (!_requireAdmin()) return;
+    if (!firestoreService.isConfigured()) return sendJSON(res, 503, { error: 'Firestore not configured' });
+    if (!gtmService.isConfigured())       return sendJSON(res, 503, { error: 'GTM not configured' });
+
+    parseJsonBody(req, res, async body => {
+      const { clientId, version } = body || {};
+      if (!clientId) return sendJSON(res, 400, { error: 'clientId is required' });
+      if (typeof version !== 'number' && !version)
+        return sendJSON(res, 400, { error: 'version (number) is required' });
+
+      const targetVersion = Number(version);
+      let lockAcquired    = false;
+      let versionDocId    = null;
+      const deploymentId  = 'rb_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+      try {
+        // ── STEP 1: Load target version record ─────────────────────────────────
+        const targetVer = await firestoreService.getVersionByNumber(clientId, targetVersion);
+        if (!targetVer) {
+          return sendJSON(res, 404, {
+            error: `Version ${targetVersion} not found for clientId ${clientId}`,
+          });
+        }
+
+        // ── STEP 2: Guard — prevent rollback-on-rollback ───────────────────────
+        if (targetVer.deploymentType === 'rollback') {
+          return sendJSON(res, 422, {
+            error: 'Cannot rollback a rollback deployment',
+            hint:  `v${targetVersion} is itself a rollback. Choose an original publish version.`,
+          });
+        }
+
+        // ── STEP 3: Pre-flight validation ──────────────────────────────────────
+        if (!targetVer.configSnapshot) {
+          return sendJSON(res, 422, {
+            error: 'Version has no configSnapshot — cannot rollback',
+            hint:  `v${targetVersion} was created before configSnapshot tracking was added.`,
+          });
+        }
+        const containerId = targetVer.containerId;
+        if (!containerId) {
+          return sendJSON(res, 422, { error: 'Version record missing containerId' });
+        }
+
+        // ── STEP 4: Acquire deployment lock — prevent concurrent rollbacks ─────
+        lockAcquired = await firestoreService.acquireDeploymentLock(clientId, deploymentId);
+        if (!lockAcquired) {
+          return sendJSON(res, 409, {
+            error: 'Another deployment is already in progress for this client',
+            hint:  'Wait for the current deployment to complete (max 10 minutes) then retry.',
+          });
+        }
+
+        // ── STEP 5: Drift detection — warn if GTM has manual changes ──────────
+        // Load the latest known version to compare against live GTM.
+        let driftInfo = { driftDetected: false, warning: null };
+        try {
+          const latestVersions = await firestoreService.listVersions(clientId, { limit: 1 });
+          const latestKnownGtmVersionId = latestVersions[0] && latestVersions[0].gtmVersionId;
+          if (latestKnownGtmVersionId) {
+            driftInfo = await gtmService.detectContainerDrift(containerId, latestKnownGtmVersionId);
+            if (driftInfo.driftDetected) {
+              console.warn('[versions/rollback][' + deploymentId + '] DRIFT DETECTED:', driftInfo.warning);
+            }
+          }
+        } catch (driftErr) {
+          console.warn('[versions/rollback][' + deploymentId + '] drift check failed (non-fatal):', driftErr.message);
+        }
+
+        // ── STEP 6: Allocate atomic version number ─────────────────────────────
+        const newVersionNum = await firestoreService.allocateVersionNumber(clientId);
+
+        // ── STEP 7: Create version record in 'building' state ──────────────────
+        // Creating before GTM ops means failure recovery can update this doc.
+        const snap = targetVer.configSnapshot;
+        versionDocId = await firestoreService.saveVersionGetId({
+          clientId,
+          version:        newVersionNum,
+          deploymentId,
+          publishedBy:    'admin/rollback',
+          containerId,
+          workspaceId:    null,
+          gtmVersionId:   null,
+          gtmPublicId:    targetVer.gtmPublicId || null,
+          deploymentType: 'rollback',
+          deploymentState: 'building',
+          status:         'building',
+          rolledBackFrom: targetVersion,
+          configSnapshot: snap,
+          diffSummary:    { added: 0, modified: 0, removed: 0 },
+          driftDetected:  driftInfo.driftDetected,
+          driftWarning:   driftInfo.warning || null,
+        });
+
+        // Log: rollback started
+        await firestoreService.saveDeploymentLog({
+          deploymentId,
+          clientId,
+          action:      'rollback_start',
+          actor:       'admin',
+          targetVersion,
+          newVersion:  newVersionNum,
+          versionDocId,
+          success:     null,
+          metadata:    { drift: driftInfo.driftDetected },
+        }).catch(() => {});
+
+        // ── STEP 8: Build GTM config from configSnapshot (source of truth) ─────
+        await firestoreService.updateVersion(versionDocId, { deploymentState: 'building' });
+
+        const rebuiltConfig = gtmConfigBuilder.buildWebConfig({
+          ga4MeasurementId: snap.ga4MeasurementId || (snap.pixelIds && snap.pixelIds.ga4) || '',
+          sgtmUrl:          snap.sgtmUrl          || '',
+          pixelIds:         snap.pixelIds         || {},
+          events:           snap.events           || [],
+          customEvents:     snap.customEvents     || [],
+          ecommPlatform:    snap.ecommPlatform    || snap.cmsType || '',
+        });
+
+        // ── STEP 9: Import + Publish via GTM API ───────────────────────────────
+        await firestoreService.updateVersion(versionDocId, { deploymentState: 'importing' });
+
+        const rollResult = await gtmService.rollbackContainer(
+          containerId,
+          rebuiltConfig,
+          `Easy Track Rollback to v${targetVersion}`,
+        );
+        // If rollbackContainer throws, catch below sets deploymentState = 'failed'.
+        // If we reach here, GTM is live.
+
+        // ── STEP 10: Finalize version record as published ──────────────────────
+        await firestoreService.updateVersion(versionDocId, {
+          deploymentState: 'published',
+          status:          'published',
+          gtmVersionId:    rollResult.versionId,
+          workspaceId:     rollResult.workspaceId,
+          publishedAt:     firestoreService.serverTimestamp ? firestoreService.serverTimestamp() : null,
+        });
+
+        // ── STEP 11: Mark previous live version as rolled_back (best-effort) ───
+        try {
+          const currentVersions = await firestoreService.listVersions(clientId, { limit: 5 });
+          const prevPublished = currentVersions.find(
+            v => v.id !== versionDocId && v.status === 'published',
+          );
+          if (prevPublished && prevPublished.id) {
+            await firestoreService.markVersionRolledBack(prevPublished.id);
+          }
+        } catch (markErr) {
+          console.warn('[versions/rollback][' + deploymentId + '] markVersionRolledBack failed (non-fatal):', markErr.message);
+        }
+
+        // ── STEP 12: Audit log — success ──────────────────────────────────────
+        await firestoreService.saveDeploymentLog({
+          deploymentId,
+          clientId,
+          action:      'rollback_success',
+          actor:       'admin',
+          targetVersion,
+          newVersion:  newVersionNum,
+          gtmVersionId: rollResult.versionId,
+          success:     true,
+          metadata:    { drift: driftInfo.driftDetected, driftWarning: driftInfo.warning },
+        }).catch(() => {});
+
+        sendJSON(res, 200, {
+          ok:             true,
+          clientId,
+          deploymentId,
+          rolledBackFrom: targetVersion,
+          newVersion:     newVersionNum,
+          gtmVersionId:   rollResult.versionId,
+          drift:          driftInfo.driftDetected ? { detected: true, warning: driftInfo.warning } : null,
+        });
+
+      } catch (e) {
+        console.error('[versions/rollback][' + deploymentId + '] FAILED:', e.message);
+
+        // ── FAILURE RECOVERY: mark version record as failed (do NOT leave as 'building') ──
+        if (versionDocId) {
+          firestoreService.updateVersion(versionDocId, {
+            deploymentState: 'failed',
+            status:          'failed',
+            failureReason:   e.message,
+          }).catch(() => {});
+        }
+
+        // Audit log — failure
+        firestoreService.saveDeploymentLog({
+          deploymentId,
+          clientId,
+          action:  'rollback_failed',
+          actor:   'admin',
+          targetVersion,
+          success: false,
+          error:   e.message,
+        }).catch(() => {});
+
+        sendJSON(res, 500, { error: e.message, deploymentId });
+
+      } finally {
+        // ── ALWAYS release the lock, even on crash ─────────────────────────────
+        if (lockAcquired) {
+          firestoreService.releaseDeploymentLock(clientId).catch(() => {});
+        }
+      }
+    });
+    return;
+  }
+
+  // GET /api/deployments/:clientId — list deployment audit logs for a client.
+  // Auth: admin token.
+  const _depLogsMatch = req.url.split('?')[0].match(/^\/api\/deployments\/([^/]+)$/);
+  if (req.method === 'GET' && _depLogsMatch) {
+    if (!_requireAdmin()) return;
+    if (!firestoreService.isConfigured()) return sendJSON(res, 503, { error: 'Firestore not configured' });
+    const clientId = decodeURIComponent(_depLogsMatch[1]);
+    try {
+      const [logs, versions] = await Promise.all([
+        firestoreService.listDeploymentLogs(clientId, { limit: 50 }),
+        firestoreService.listVersions(clientId, { limit: 20 }),
+      ]);
+      const _ts = v => v && v.toDate ? v.toDate().toISOString() : (v || null);
+      sendJSON(res, 200, {
+        ok: true,
+        clientId,
+        logs: logs.map(l => ({
+          id:            l.id,
+          deploymentId:  l.deploymentId  || null,
+          action:        l.action        || null,
+          actor:         l.actor         || null,
+          targetVersion: l.targetVersion || null,
+          newVersion:    l.newVersion    || null,
+          gtmVersionId:  l.gtmVersionId  || null,
+          success:       l.success,
+          error:         l.error         || null,
+          timestamp:     _ts(l.timestamp),
+          metadata:      l.metadata      || null,
+        })),
+        versions: versions.map(v => ({
+          id:              v.id,
+          version:         v.version,
+          deploymentId:    v.deploymentId    || null,
+          deploymentType:  v.deploymentType  || 'publish',
+          deploymentState: v.deploymentState || 'published',
+          status:          v.status          || 'published',
+          publishedAt:     _ts(v.publishedAt),
+          publishedBy:     v.publishedBy     || null,
+          gtmVersionId:    v.gtmVersionId    || null,
+          driftDetected:   v.driftDetected   || false,
+          failureReason:   v.failureReason   || null,
+          rolledBackFrom:  v.rolledBackFrom  || null,
+        })),
+      });
+    } catch (e) {
+      console.error('[deployments] error:', e.message);
+      sendJSON(res, 500, { error: e.message });
+    }
+    return;
+  }
+
+  // GET /api/health/:clientId — unified tracking health report.
+  // Composes: diagnostic_results + client_health_cache + latest version + platform health
+  // + active deployment count from recovery system.
+  // Auth: admin token.
+  const _healthMatch = req.url.split('?')[0].match(/^\/api\/health\/([^/]+)$/);
+  if (req.method === 'GET' && _healthMatch) {
+    if (!_requireAdmin()) return;
+    if (!firestoreService.isConfigured()) return sendJSON(res, 503, { error: 'Firestore not configured' });
+    const clientId = decodeURIComponent(_healthMatch[1]);
+    try {
+      const [diagResult, healthCache, versions, platformHealth, activeDeployments] = await Promise.all([
+        firestoreService.getDiagnosticResult(clientId).catch(() => null),
+        firestoreService.getHealthCache(clientId).catch(() => null),
+        firestoreService.listVersions(clientId, { limit: 1 }).catch(() => []),
+        firestoreService.getPlatformHealth().catch(() => ({})),
+        firestoreService.countActiveDeployments().catch(() => 0),
+      ]);
+
+      const lastVersion = versions[0] || null;
+
+      // Derive per-platform status from diagnostic result or health cache
+      const diag = diagResult || healthCache || {};
+      const platforms = {
+        ga4:       !!(diag.ga4Active        || diag.ga4),
+        meta:      !!(diag.metaActive       || diag.meta),
+        googleAds: !!(diag.googleAdsActive  || diag.googleAds),
+        tiktok:    !!(diag.tiktokActive     || diag.tiktok),
+      };
+
+      // Health score: 25 pts per active platform (max 4 platforms)
+      const activeCount   = Object.values(platforms).filter(Boolean).length;
+      const platformCount = Object.values(platforms).filter(v => v !== undefined).length || 4;
+      const score = diagResult && diagResult.healthScore != null
+        ? diagResult.healthScore
+        : healthCache && healthCache.healthScore != null
+          ? healthCache.healthScore
+          : Math.round((activeCount / platformCount) * 100);
+
+      const alerts = (diag.alerts || diag.issues || []).map(a =>
+        typeof a === 'string' ? { message: a, severity: 'warning' } : a,
+      );
+
+      // Add alert if there are active (potentially stuck) deployments
+      if (activeDeployments > 0) {
+        alerts.push({ message: `${activeDeployments} deployment(s) currently active`, severity: 'info' });
+      }
+
+      sendJSON(res, 200, {
+        ok:                   true,
+        clientId,
+        trackingHealthScore:  score,
+        ga4:                  platforms.ga4,
+        meta:                 platforms.meta,
+        googleAds:            platforms.googleAds,
+        tiktok:               platforms.tiktok,
+        lastEventReceived:    diag.lastEventAt
+          ? (diag.lastEventAt.toDate ? diag.lastEventAt.toDate().toISOString() : diag.lastEventAt)
+          : null,
+        lastPublish:          lastVersion && lastVersion.publishedAt
+          ? (lastVersion.publishedAt.toDate ? lastVersion.publishedAt.toDate().toISOString() : lastVersion.publishedAt)
+          : null,
+        lastVersion:          lastVersion ? lastVersion.version : null,
+        activeDeployment:     activeDeployments > 0,
+        stuckDeployments:     0,           // filled by recovery job on next sweep
+        lastRecovery:         null,        // filled when recovery runs
+        platformHealth,
+        alerts,
+        computedAt:           diag.computedAt || diag.updatedAt || null,
+      });
+    } catch (e) {
+      console.error('[health] error:', e.message);
+      sendJSON(res, 500, { error: e.message });
+    }
     return;
   }
 
@@ -3688,6 +4093,71 @@ server.listen(PORT, () => {
         }
       }).catch(e => console.error('[stall-detector] sweep failed:', e.message));
     }, 5 * 60 * 1000).unref();
+  }
+
+  // ── Deployment Recovery Job ───────────────────────────────────────────────
+  // Runs every 5 minutes. Finds container_version records stuck in transient
+  // states (building / importing / publishing) for > 15 minutes — these are
+  // orphaned by a server crash after the lock was acquired but before release.
+  // Recovery: mark failed + release lock + emit warning log entry.
+  // Threshold: 15 min (generous vs. the 10-min lock TTL — ensures the lock
+  // has also expired before we declare a deployment dead).
+  const DEPLOYMENT_STUCK_THRESHOLD_MS = 15 * 60 * 1000;
+  if (firestoreService.isConfigured()) {
+    const _runDeploymentRecovery = async () => {
+      let recovered = 0;
+      try {
+        const stuck = await firestoreService.detectStuckDeployments(DEPLOYMENT_STUCK_THRESHOLD_MS);
+        if (!stuck.length) return;
+
+        console.warn('[deployment-recovery] found ' + stuck.length + ' stuck deployment(s)');
+
+        for (const dep of stuck) {
+          try {
+            const deploymentId = dep.deploymentId || ('orphan_' + dep.id);
+            const clientId     = dep.clientId;
+
+            // 1. Log recovery event
+            await firestoreService.saveDeploymentLog({
+              deploymentId,
+              clientId,
+              action:   'deployment_recovered',
+              actor:    'recovery-job',
+              success:  false,
+              error:    'Deployment timed out (stuck in state: ' + dep.deploymentState + ')',
+              metadata: { stuckState: dep.deploymentState, recoveredAt: new Date().toISOString() },
+            }).catch(() => {});
+
+            // 2. Mark version record as failed
+            await firestoreService.updateVersion(dep.id, {
+              deploymentState: 'failed',
+              status:          'failed',
+              failureReason:   'Deployment timed out — recovered by recovery job',
+            });
+
+            // 3. Release deployment lock (may already be expired — delete is safe)
+            await firestoreService.releaseDeploymentLock(clientId);
+
+            console.warn('[deployment-recovery] recovered stuck deployment ' + deploymentId +
+              ' for client ' + clientId + ' (was: ' + dep.deploymentState + ')');
+            recovered++;
+          } catch (recErr) {
+            console.error('[deployment-recovery] failed to recover deployment ' + dep.id + ':', recErr.message);
+          }
+        }
+      } catch (e) {
+        console.error('[deployment-recovery] sweep failed:', e.message);
+      }
+      if (recovered > 0) {
+        console.log('[deployment-recovery] recovered ' + recovered + ' orphaned deployment(s)');
+      }
+    };
+
+    // Run 2 minutes after startup (let Firestore settle), then every 5 minutes.
+    setTimeout(() => {
+      _runDeploymentRecovery();
+      setInterval(_runDeploymentRecovery, 5 * 60 * 1000).unref();
+    }, 2 * 60 * 1000);
   }
 
   // DLQ retry worker — only started when Firestore is configured.

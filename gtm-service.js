@@ -832,6 +832,77 @@ async function rotateCapiTokenInContainer(containerId, workspaceId, platform, ne
   return { tagIds: results, versionId, published: !!versionId };
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// DRIFT DETECTION — compare the live GTM container version against what Easy
+// Track last published. If they differ, someone made manual changes in GTM.
+// Returns { driftDetected, liveVersionId, lastKnownVersionId, warning }.
+// Non-throwing — callers treat drift as a warning, never a blocker.
+// ══════════════════════════════════════════════════════════════════════════════
+async function getLiveContainerVersion(containerId) {
+  if (!containerId) throw new Error('getLiveContainerVersion: containerId required');
+  const acc  = getAccountId();
+  const resp = await gtmRequest(
+    'GET',
+    `/accounts/${acc}/containers/${containerId}/versions:live`,
+  );
+  return resp.containerVersion || resp;
+}
+
+async function detectContainerDrift(containerId, lastKnownGtmVersionId) {
+  try {
+    const live          = await getLiveContainerVersion(containerId);
+    const liveVersionId = live.containerVersionId || live.containerVersion?.containerVersionId;
+    const driftDetected = liveVersionId && lastKnownGtmVersionId &&
+                          String(liveVersionId) !== String(lastKnownGtmVersionId);
+    return {
+      driftDetected:    !!driftDetected,
+      liveVersionId:    liveVersionId   || null,
+      lastKnownVersionId: lastKnownGtmVersionId || null,
+      warning: driftDetected
+        ? `GTM container has manual changes (live: v${liveVersionId}, Easy Track last published: v${lastKnownGtmVersionId}). Rollback will overwrite them.`
+        : null,
+    };
+  } catch (e) {
+    // Non-fatal — drift check failure should never block a rollback.
+    return { driftDetected: false, liveVersionId: null, lastKnownVersionId: null,
+             warning: null, checkError: e.message };
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ROLLBACK — replace an existing container's state with a rebuilt config.
+// Called by POST /api/versions/rollback.
+//
+// WHY versions:import instead of importContainerJSON():
+//   importContainerJSON() does item-by-item POST into a workspace. GTM workspaces
+//   inherit all items from the live container, so adding items would DUPLICATE
+//   them (15 live + 15 rebuilt = 30 items). versions:import replaces the
+//   container state entirely — the correct semantic for rollback.
+//
+// The configJson is rebuilt server-side from the stored configSnapshot.
+// Firestore Client Config is the source of truth; the GTM container is a
+// compiled artifact derived from it.
+// ══════════════════════════════════════════════════════════════════════════════
+async function rollbackContainer(containerId, configJson, versionLabel) {
+  const acc = getAccountId();
+
+  // Wrap in the containerConfigJSON envelope that the GTM import API requires.
+  const apiBody = { containerConfigJSON: JSON.stringify(configJson) };
+  const importResp = await gtmRequest(
+    'POST',
+    `/accounts/${acc}/containers/${containerId}/versions:import`,
+    JSON.stringify(apiBody),
+  );
+
+  const versionId =
+    importResp.containerVersion && importResp.containerVersion.containerVersionId;
+  if (!versionId) throw new Error('rollbackContainer: versions:import returned no versionId');
+
+  await publishVersion(containerId, versionId);
+  // versions:import does not use a workspace — return null for workspaceId.
+  return { versionId, workspaceId: null };
+}
+
 module.exports = {
   isConfigured,
   getAccessToken,
@@ -842,6 +913,9 @@ module.exports = {
   publishVersion,
   inviteUserToContainer,
   provisionForClient,
+  rollbackContainer,
+  getLiveContainerVersion,
+  detectContainerDrift,
   // Server-side (client + server flow)
   createServerContainer,
   getContainerConfig,
