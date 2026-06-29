@@ -458,21 +458,14 @@ async function provisionForClient({ projectName, domain, configJson, publishLive
     throw err;
   }
 
-  // 1. Create container — always append a short timestamp suffix so names are
-  //    unique across retries. GTM returns HTTP 400 "duplicate name" otherwise.
-  const ts = new Date().toISOString().replace('T', ' ').slice(0, 16).replace(':', '-'); // "YYYY-MM-DD HH-MM"
+  // 1. Create container — append millisecond timestamp + random hex so the name
+  //    is unique even across rapid retries. GTM returns 400 "duplicate name" on
+  //    any name collision within the account.
+  const ts = Date.now().toString(36);  // base-36 ms — 6-7 chars, always unique
+  const rnd = crypto.randomBytes(3).toString('hex');  // 6 hex chars for extra safety
   const baseName = (projectName || 'Easy Track Project').toString().trim();
-  const uniqueName = baseName.slice(0, 60) + ' · ' + ts;
-  let container;
-  try {
-    container = await createContainer(uniqueName, domain);
-  } catch (e) {
-    // Fallback — if still a duplicate, append random hex too.
-    if (e.status === 400 && /duplicate/i.test(e.message || '')) {
-      const rnd = Math.random().toString(16).slice(2, 8);
-      container = await createContainer(uniqueName + ' ' + rnd, domain);
-    } else { throw e; }
-  }
+  const uniqueName = baseName.slice(0, 55) + ' · ' + ts + rnd;
+  const container = await createContainer(uniqueName, domain);
   const containerId = container.containerId;
   const publicId = container.publicId;     // e.g. GTM-XXXXXX
 
@@ -764,6 +757,81 @@ async function provisionForClientWithServer(opts) {
   };
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// TAG OPERATIONS — used by token rotation
+// ══════════════════════════════════════════════════════════════════════════════
+
+// List all tags in a workspace. Returns raw GTM tag objects.
+async function listContainerTags(containerId, workspaceId) {
+  const acc = getAccountId();
+  const res = await gtmRequest('GET',
+    `/accounts/${acc}/containers/${containerId}/workspaces/${workspaceId}/tags`);
+  return (res && res.tag) ? res.tag : [];
+}
+
+// Update a single tag's parameter by key. Merges the new param value into the
+// existing parameter list (preserves all other params). Returns updated tag.
+async function updateContainerTag(containerId, workspaceId, tagId, paramKey, paramValue) {
+  const acc = getAccountId();
+  // Fetch current tag state so we can do a surgical param update.
+  const current = await gtmRequest('GET',
+    `/accounts/${acc}/containers/${containerId}/workspaces/${workspaceId}/tags/${tagId}`);
+  const params = (current.parameter || []).map(p => {
+    if (p.key === paramKey) return { ...p, value: paramValue };
+    return p;
+  });
+  // If param didn't exist yet, append it.
+  if (!params.some(p => p.key === paramKey)) {
+    params.push({ type: 'template', key: paramKey, value: paramValue });
+  }
+  const body = JSON.stringify({ ...current, parameter: params });
+  return gtmRequest('PUT',
+    `/accounts/${acc}/containers/${containerId}/workspaces/${workspaceId}/tags/${tagId}`,
+    body);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TOKEN ROTATION — update authHeader on the CAPI tag in the sGTM container,
+// create a new version, and publish it. Used by POST /api/admin/rotate-token.
+// Returns { tagId, versionId, published }.
+// ══════════════════════════════════════════════════════════════════════════════
+async function rotateCapiTokenInContainer(containerId, workspaceId, platform, newToken) {
+  // Find the CAPI tag for the platform. The universal-http.tpl tag has a
+  // `platform` parameter set to 'meta'/'tiktok'/'snap'. If there are multiple
+  // containers (one per platform), match by `authHeader` parameter presence.
+  const tags = await listContainerTags(containerId, workspaceId);
+  const CAPI_TAG_TYPES = ['cvt_', 'custom_template'];  // sGTM custom template prefix
+
+  const capiTags = tags.filter(t => {
+    // Custom templates have type 'cvt_...' in sGTM
+    const isCustom = t.type && (t.type.startsWith('cvt_') || t.type === 'custom_template');
+    if (!isCustom) return false;
+    const params = t.parameter || [];
+    const platformParam = params.find(p => p.key === 'platform');
+    const hasAuthHeader = params.some(p => p.key === 'authHeader');
+    return hasAuthHeader && (!platform || (platformParam && platformParam.value === platform));
+  });
+
+  if (!capiTags.length) {
+    throw new Error('No CAPI tag found for platform=' + (platform || 'any') +
+      ' in container ' + containerId + ' workspace ' + workspaceId);
+  }
+
+  const results = [];
+  for (const tag of capiTags) {
+    await updateContainerTag(containerId, workspaceId, tag.tagId, 'authHeader', newToken);
+    results.push(tag.tagId);
+  }
+
+  // Create a new version and publish it.
+  const verResp = await createVersion(containerId, workspaceId,
+    'Token rotation — ' + (platform || 'CAPI') + ' — ' + new Date().toISOString().split('T')[0]);
+  const versionId = verResp.containerVersion && verResp.containerVersion.containerVersionId;
+  if (versionId) await publishVersion(containerId, versionId);
+
+  return { tagIds: results, versionId, published: !!versionId };
+}
+
 module.exports = {
   isConfigured,
   getAccessToken,
@@ -780,4 +848,8 @@ module.exports = {
   importServerContainerVersion,
   setGA4TransportUrl,
   provisionForClientWithServer,
+  // Tag operations / token rotation
+  listContainerTags,
+  updateContainerTag,
+  rotateCapiTokenInContainer,
 };

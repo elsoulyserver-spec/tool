@@ -120,11 +120,30 @@ async function listContainersByClient(clientId) {
   return out;
 }
 
-async function countActiveContainers() {
-  const qs = await db().collection(COLLECTION)
-    .where('status', '==', 'active')
-    .count().get();
+async function countActiveContainers(gtmAccountId) {
+  let q = db().collection(COLLECTION).where('status', '==', 'active');
+  if (gtmAccountId) q = q.where('gtmAccountId', '==', String(gtmAccountId));
+  const qs = await q.count().get();
   return qs.data().count;
+}
+
+// Return per-account container counts for all accounts listed in env.
+// GTM_ACCOUNT_IDS is a comma-separated list (includes GTM_ACCOUNT_ID as primary).
+async function getAccountCapacityReport() {
+  const primary = (process.env.GTM_ACCOUNT_ID || '').trim();
+  const extras  = (process.env.GTM_ACCOUNT_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+  const allIds  = Array.from(new Set([primary, ...extras].filter(Boolean)));
+  if (!allIds.length) return [];
+  const counts = await Promise.all(allIds.map(async id => {
+    const count = await countActiveContainers(id);
+    return {
+      accountId: id,
+      activeContainers: count,
+      capacityPct: Math.round((count / 490) * 100),
+      status: count >= 480 ? 'critical' : count >= 400 ? 'warning_high' : count >= 300 ? 'warning' : 'ok',
+    };
+  }));
+  return counts;
 }
 
 async function markGracePeriod(gtmPublicId) {
@@ -307,6 +326,57 @@ async function saveJob(jobId, patch) {
     { ...patch, updatedAt: now, expiresAt },
     { merge: true },
   );
+}
+
+// List jobs in status='pending' that have no heartbeatAt — these were created
+// but never dispatched (process crashed before/during _dispatchProvisionJob).
+// Only returns jobs created within the last `windowMs` to avoid re-dispatching
+// ancient orphans from previous deployments.
+async function listOrphanedPendingJobs(windowMs) {
+  const since = admin.firestore.Timestamp.fromMillis(Date.now() - (windowMs || 25 * 60 * 1000));
+  const snap = await db().collection(JOBS_COLLECTION)
+    .where('status', '==', 'pending')
+    .where('createdAt', '>=', since)
+    .limit(20)
+    .get();
+  const orphans = [];
+  snap.docs.forEach(d => {
+    const data = d.data();
+    // Only recover jobs that have NEVER received a heartbeat — these are the
+    // ones that were created but not dispatched.
+    if (!data.heartbeatAt) {
+      orphans.push({ jobId: d.id, ...data });
+    }
+  });
+  return orphans;
+}
+
+// Scan for provisioning_jobs stuck in status=running with no heartbeat update
+// in the last `thresholdMs` milliseconds. Marks them status=stalled and returns
+// an array of their jobIds so the caller can emit metrics / restart them.
+async function detectAndRecoverStalledJobs(thresholdMs) {
+  const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - (thresholdMs || 10 * 60 * 1000));
+  const snap = await db().collection(JOBS_COLLECTION)
+    .where('status', 'in', ['running', 'pending'])
+    .where('heartbeatAt', '<', cutoff)
+    .limit(50)
+    .get();
+  if (snap.empty) return [];
+  const stalledIds = [];
+  const batch = db().batch();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  snap.docs.forEach(d => {
+    stalledIds.push(d.id);
+    batch.update(d.ref, {
+      status:    'stalled',
+      stalledAt: now,
+      updatedAt: now,
+      stalledReason: 'no heartbeat for ' + Math.round((thresholdMs || 600000) / 60000) + ' min',
+      retryable: true,
+    });
+  });
+  await batch.commit();
+  return stalledIds;
 }
 
 // Read a job document. Returns null when missing OR past its TTL (defensive —
@@ -711,6 +781,92 @@ async function releaseHealthJobLock() {
   await db().collection('health_job_lock').doc('singleton').delete();
 }
 
+// ── Dead Letter Queue (Firestore-backed) ─────────────────────────────────────
+// Collection: dlq_events
+// Each document represents one failed CAPI send awaiting retry.
+// TTL field: expiresAt — set a Firestore TTL policy on this field.
+// Status values: 'pending' | 'retrying' | 'retried' | 'exhausted' | 'dropped'
+const DLQ_COLLECTION = 'dlq_events';
+const DLQ_TTL_MS     = 72 * 60 * 60 * 1000; // 72 hours — max retry window
+
+async function saveDlqEvent(doc) {
+  const ref = db().collection(DLQ_COLLECTION).doc();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  await ref.set({
+    ...doc,
+    status:      doc.status      || 'pending',
+    retryCount:  doc.retryCount  || 0,
+    nextRetryAt: doc.nextRetryAt || admin.firestore.Timestamp.fromMillis(Date.now() + 60 * 1000),
+    createdAt:   now,
+    updatedAt:   now,
+    expiresAt:   admin.firestore.Timestamp.fromMillis(Date.now() + DLQ_TTL_MS),
+  });
+  return ref.id;
+}
+
+// Fetch up to `limit` pending events whose nextRetryAt <= now.
+async function listPendingDlqEvents(limit) {
+  const now  = admin.firestore.Timestamp.fromMillis(Date.now());
+  const snap = await db().collection(DLQ_COLLECTION)
+    .where('status', '==', 'pending')
+    .where('nextRetryAt', '<=', now)
+    .orderBy('nextRetryAt', 'asc')
+    .limit(limit || 50)
+    .get();
+  return snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+}
+
+// Atomically claim a pending DLQ event for processing.
+// Uses a Firestore transaction to flip status pending→retrying only when
+// status is still 'pending'. Returns true if this worker won the claim,
+// false if another instance already claimed it (concurrent race).
+async function claimDlqEvent(docId) {
+  const ref = db().collection(DLQ_COLLECTION).doc(docId);
+  return db().runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return false;
+    if (snap.data().status !== 'pending') return false;
+    tx.update(ref, {
+      status:    'retrying',
+      claimedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return true;
+  });
+}
+
+// Patch a DLQ event document (used by retry worker to update status/retryCount).
+async function updateDlqEvent(docId, patch) {
+  await db().collection(DLQ_COLLECTION).doc(docId).update({
+    ...patch,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+// Return queue depth and oldest pending event age for observability.
+async function getDlqStats() {
+  const now      = admin.firestore.Timestamp.fromMillis(Date.now());
+  const [pending, oldest] = await Promise.all([
+    db().collection(DLQ_COLLECTION).where('status', '==', 'pending').count().get(),
+    db().collection(DLQ_COLLECTION)
+      .where('status', '==', 'pending')
+      .orderBy('createdAt', 'asc')
+      .limit(1)
+      .get(),
+  ]);
+  const depth = pending.data().count;
+  let oldestAgeMs = null;
+  if (!oldest.empty) {
+    const ts = oldest.docs[0].data().createdAt;
+    oldestAgeMs = ts && ts.toMillis ? Date.now() - ts.toMillis() : null;
+  }
+  return { depth, oldestAgeMs };
+}
+
+async function deleteDlqEvent(docId) {
+  await db().collection(DLQ_COLLECTION).doc(docId).delete();
+}
+
 module.exports = {
   isConfigured,
   BEACON_EVENTS,
@@ -718,6 +874,7 @@ module.exports = {
   getContainer,
   listContainersByClient,
   countActiveContainers,
+  getAccountCapacityReport,
   markGracePeriod,
   exportAll,
   updateClient,
@@ -730,6 +887,8 @@ module.exports = {
   // Provisioning jobs (durable, cross-instance)
   saveJob,
   getJob,
+  listOrphanedPendingJobs,
+  detectAndRecoverStalledJobs,
   // Permanent provision audit trail
   saveAudit,
   // Auth
@@ -769,4 +928,11 @@ module.exports = {
   acquireHealthJobLock,
   extendHealthJobLock,
   releaseHealthJobLock,
+  // Dead Letter Queue
+  saveDlqEvent,
+  listPendingDlqEvents,
+  claimDlqEvent,
+  updateDlqEvent,
+  deleteDlqEvent,
+  getDlqStats,
 };

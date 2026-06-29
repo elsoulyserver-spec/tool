@@ -33,8 +33,16 @@ const crypto = require('crypto');
 })();
 
 // ── Puppeteer (optional — graceful fallback if not installed) ──────────────
+const os = require('os');
 let puppeteer = null;
 try { puppeteer = require('puppeteer'); } catch (_) {}
+if (puppeteer) {
+  const _memMb = os.totalmem() / 1024 / 1024;
+  if (_memMb < 1024) {
+    console.warn('[startup] WARNING: ' + Math.round(_memMb) + ' MB RAM detected. ' +
+      'Puppeteer requires ≥1 GB. Deploy with --memory=1Gi on Cloud Run or expect OOM crashes.');
+  }
+}
 
 // ── Pixel-scanner concurrency guard ────────────────────────────────────────
 // Each Puppeteer scan launches a headless Chrome (~150-300 MB resident). Without
@@ -71,6 +79,14 @@ const timelineService = require('./lib/timeline-service');
 const profileService  = require('./lib/profile-service');
 // Health evaluation job (Phase 2)
 const healthService   = require('./lib/health-service');
+// DLQ retry worker — retries failed CAPI sends stored in Firestore dlq_events
+const dlqWorker       = require('./lib/dlq-worker');
+// In-process metrics counters — exposed via GET /api/v1/metrics
+const metrics           = require('./lib/metrics');
+// Cloud Monitoring push — flushes metrics to GCP every 60s (no-ops off-GCP)
+const cloudMonitoring   = require('./lib/cloud-monitoring');
+// Secret Manager wrapper — resolves MASTER_ENCRYPTION_KEY from GCP or ENV
+const secretManager     = require('./lib/secret-manager');
 
 // Beacon write deduplication — bucket-keyed per 5-minute window.
 // Value is the bucket number; replaces itself naturally each period.
@@ -165,6 +181,17 @@ const provisionQueue = (function createProvisionQueueSingleton() {
   }
 })();
 
+// ── Secret Manager startup validation ────────────────────────────────────────
+// Runs async but does NOT block the HTTP server from starting — a brief startup
+// window where the key is sourced from ENV is acceptable. Logs source + version.
+secretManager.validateAtStartup().catch(e => {
+  console.error('[startup] FATAL: encryption key unavailable —', e.message);
+  console.error('[startup] Set MASTER_ENCRYPTION_KEY or configure Secret Manager (SECRET_MANAGER_PROJECT + ENCRYPTION_KEY_SECRET)');
+  // Don't process.exit() — the server still starts, /api/ss/save-config will
+  // return 503 from ssRequireCrypto(). A hard exit would prevent healthz probes
+  // from responding during GCP Secret Manager outages.
+});
+
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
 
@@ -244,8 +271,16 @@ async function _setJob(id, patch, opts = {}) {
     if (Date.now() - last < PROGRESS_WRITE_MIN_INTERVAL_MS) return;
     _jobProgressWriteAt.set(id, Date.now());
   }
+  // heartbeatAt on every write — stall detector uses this field.
+  // lastProgressAt only on non-terminal status transitions.
+  const isTerminal = patch && (patch.status === 'completed' || patch.status === 'failed' || patch.status === 'stalled');
+  const augmented = {
+    ...patch,
+    heartbeatAt: new Date(),
+    ...(isTerminal ? {} : { lastProgressAt: new Date() }),
+  };
   try {
-    await firestoreService.saveJob(id, patch);
+    await firestoreService.saveJob(id, augmented);
   } catch (e) {
     console.warn('[jobs] saveJob failed for ' + id + ':', e.message);
   }
@@ -316,6 +351,7 @@ async function _runManagedProvisionJob(jobId) {
   // Permanent, best-effort audit write (collection `provision_audit`, NO TTL).
   // Never throws — a failed audit must not fail the provision. Carries NO secrets.
   async function _writeManagedAudit(success, errorCode) {
+    if (!success) metrics.incProvisioningFailed();
     if (dryRun) return;
     try {
       await firestoreService.saveAudit({
@@ -356,19 +392,54 @@ async function _runManagedProvisionJob(jobId) {
 
     await _setJob(jobId, { status: 'running', stage: 'capacity_check' });
 
-    // 1. Capacity guard — GTM caps at 500 containers per account
-    const activeCount = await firestoreService.countActiveContainers();
-    if (activeCount >= 490) {
+    // 1. Capacity guard — GTM caps at 500 containers per account.
+    // Multi-account: try primary first, fall back to extras if critical.
+    const capacityReport = await firestoreService.getAccountCapacityReport();
+    const primaryAccountId = (process.env.GTM_ACCOUNT_ID || '').trim();
+
+    // Emit capacity alerts at thresholds
+    capacityReport.forEach(acct => {
+      if (acct.status === 'critical') {
+        console.error('[capacity] CRITICAL: GTM account ' + acct.accountId +
+          ' at ' + acct.activeContainers + '/490 containers — add GTM_ACCOUNT_IDS');
+        metrics.incProvisioningFailed(); // count capacity failures
+      } else if (acct.status === 'warning_high') {
+        console.warn('[capacity] WARNING: GTM account ' + acct.accountId +
+          ' at ' + acct.activeContainers + '/490 containers (>400) — plan new account');
+      } else if (acct.status === 'warning') {
+        console.warn('[capacity] INFO: GTM account ' + acct.accountId +
+          ' at ' + acct.activeContainers + '/490 containers (>300)');
+      }
+    });
+
+    // Find an account with capacity. Prefer primary; fall back to lowest-utilization extra.
+    const available = capacityReport.filter(a => a.activeContainers < 480);
+    if (!available.length) {
       await _setJob(jobId, {
         status: 'failed',
         stage:  'capacity_exceeded',
-        error:  'Managed GTM account is near capacity',
-        hint:   'Provision a new GTM_ACCOUNT_ID and route new clients there',
+        error:  'All GTM accounts are at capacity (≥480 containers each)',
+        hint:   'Add a new GTM account ID to GTM_ACCOUNT_IDS env var',
         httpStatus: 507,
-        activeContainers: activeCount,
+        capacityReport,
       });
       return;
     }
+
+    // Use primary if available, else lowest utilization
+    const selectedAccount = available.find(a => a.accountId === primaryAccountId) ||
+      available.sort((a, b) => a.activeContainers - b.activeContainers)[0];
+
+    if (selectedAccount.accountId !== primaryAccountId) {
+      console.log('[capacity] routing to secondary account ' + selectedAccount.accountId +
+        ' (primary at capacity)');
+      // Temporarily override env var for this job's GTM calls.
+      // NOTE: This is process-level mutation — safe because provisioning jobs
+      // run sequentially within provisionQueue, but requires care with concurrency.
+      process.env.GTM_ACCOUNT_ID = selectedAccount.accountId;
+    }
+
+    const activeCount = selectedAccount.activeContainers;
 
     // 2. Provision via GTM API. Branch on mode:
     //    - 'client'        → existing single-container flow (publishes live).
@@ -743,6 +814,50 @@ async function _dispatchProvisionJob(jobType, jobId) {
   // still-queued job honors a mid-flight rollback. No job is dropped.
   provisionQueue.run(() => runner(jobId))
     .catch(err => console.error('[jobs] inline run failed for ' + jobId + ':', err));
+}
+
+// ── Startup queue recovery ───────────────────────────────────────────────────
+// On process restart, scan Firestore for provisioning_jobs in status='pending'
+// that have no heartbeatAt (i.e. they were created but never dispatched because
+// the process crashed before or during enqueueing). Re-dispatch them once.
+// Zombie guard: only recover jobs created in the last 25 minutes (the job TTL
+// is 30 min, and a fresh worker is unlikely to see older orphans from a different
+// deployment — those should be marked stalled by the stall detector instead).
+async function _recoverPendingJobsOnStartup() {
+  const admin = require('firebase-admin');
+  const db    = require('./firestore-service');
+  const cutoff = admin.firestore
+    ? new Date(Date.now() - 25 * 60 * 1000)
+    : null;
+
+  // We don't have direct db() access here — use firestoreService internals
+  // via a dedicated function added to firestore-service.
+  const orphans = await firestoreService.listOrphanedPendingJobs(25 * 60 * 1000);
+  if (!orphans.length) {
+    console.log('[startup-recovery] no orphaned pending jobs found');
+    return;
+  }
+
+  console.warn('[startup-recovery] found ' + orphans.length + ' orphaned pending job(s) — re-dispatching');
+  for (const job of orphans) {
+    try {
+      // Mark as recovery attempt before dispatching to prevent duplicate recovery
+      await firestoreService.saveJob(job.jobId, {
+        recoveredAt: new Date(),
+        recoveryAttempt: (job.recoveryAttempt || 0) + 1,
+      });
+      const jobType = job.jobType || 'managed';
+      await _dispatchProvisionJob(jobType, job.jobId);
+      console.log('[startup-recovery] re-dispatched job ' + job.jobId + ' type=' + jobType);
+    } catch (e) {
+      console.error('[startup-recovery] failed to re-dispatch job ' + job.jobId + ':', e.message);
+      await firestoreService.saveJob(job.jobId, {
+        status: 'failed',
+        error:  'startup recovery re-dispatch failed: ' + e.message,
+        finishedAt: Date.now(),
+      }).catch(() => {});
+    }
+  }
 }
 
 // Shared-secret auth for the internal Cloud Tasks worker route. The public
@@ -1771,18 +1886,38 @@ const server = http.createServer((req, res) => {
   // GET /api/managed/job/:jobId — poll status of a provisioning job.
   // Reads from Firestore so ANY Cloud Run instance can answer the poll, not just
   // the instance that created the job.
+  // Auth: Firebase ID token required; job.clientId must match token uid.
   if (req.method === 'GET' && req.url.startsWith('/api/managed/job/')) {
     const jobId = req.url.substring('/api/managed/job/'.length).split('?')[0];
     if (!jobId) return sendJSON(res, 400, { error: 'Missing jobId' });
     if (!firestoreService.isConfigured()) {
       return sendJSON(res, 503, { error: 'Firestore is not configured' });
     }
-    firestoreService.getJob(jobId)
-      .then(job => {
+    (async () => {
+      // Verify caller identity via Firebase ID token.
+      const authHeader = req.headers['authorization'] || '';
+      const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
+      if (!tokenMatch) return sendJSON(res, 401, { error: 'Authorization header required' });
+      const idToken = tokenMatch[1].trim();
+      let decoded;
+      try {
+        decoded = await firestoreService.verifyIdToken(idToken);
+      } catch (e) {
+        return sendJSON(res, 401, { error: 'Invalid token', code: String((e && e.code) || 'auth/invalid-id-token') });
+      }
+      const uid = decoded.uid;
+      try {
+        const job = await firestoreService.getJob(jobId);
         if (!job) return sendJSON(res, 404, { error: 'Job not found or expired' });
+        // Ownership check — prevent cross-tenant job reads.
+        if (job.clientId && job.clientId !== uid) {
+          return sendJSON(res, 403, { error: 'Forbidden: job does not belong to this account' });
+        }
         sendJSON(res, 200, { ok: true, jobId, ...job });
-      })
-      .catch(e => sendJSON(res, 500, { error: e.message }));
+      } catch (e) {
+        sendJSON(res, 500, { error: e.message });
+      }
+    })();
     return;
   }
 
@@ -1870,6 +2005,93 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url.startsWith('/api/admin/ping')) {
     if (!_requireAdmin()) return;
     return sendJSON(res, 200, { ok: true, firestore: firestoreService.isConfigured() });
+  }
+
+  // POST /api/admin/rotate-token
+  // Rotates a CAPI token for a client: re-encrypts in Firestore, then updates
+  // the authHeader parameter on the deployed sGTM tag, creates a new GTM version,
+  // and publishes it so the new token is live immediately.
+  //
+  // Body: { clientId, platform, newToken }
+  //   platform: 'meta' | 'tiktok' | 'snap'
+  //   newToken:  the new raw access token (will be encrypted before storage)
+  //
+  // Returns: { ok, platform, gtm: { tagIds, versionId, published } }
+  if (req.method === 'POST' && req.url.split('?')[0] === '/api/admin/rotate-token') {
+    if (!_requireAdmin()) return;
+    parseJsonBody(req, res, async body => {
+      const { clientId, platform, newToken } = body || {};
+      const ALLOWED_PLATFORMS = ['meta', 'tiktok', 'snap'];
+      if (!clientId) return sendJSON(res, 400, { error: 'clientId is required' });
+      if (!platform || !ALLOWED_PLATFORMS.includes(platform))
+        return sendJSON(res, 400, { error: 'platform must be one of: ' + ALLOWED_PLATFORMS.join(', ') });
+      if (!newToken || !String(newToken).trim())
+        return sendJSON(res, 400, { error: 'newToken is required' });
+      if (!firestoreService.isConfigured())
+        return sendJSON(res, 503, { error: 'Firestore not configured' });
+
+      try {
+        // 1. Load current ss_config to get container IDs
+        const cfg = await firestoreService.getSSConfig(clientId);
+        if (!cfg) return sendJSON(res, 404, { error: 'No ss_config found for clientId: ' + clientId });
+
+        // 2. Re-encrypt the new token and save to Firestore
+        const aad = clientId + ':' + platform;
+        const encryptedToken = cryptoVault.encryptToken(String(newToken).trim(), aad);
+        const updatedTokens = { ...(cfg.encryptedTokens || {}), [platform]: encryptedToken };
+        await firestoreService.saveSSConfig(clientId, { ...cfg, encryptedTokens: updatedTokens });
+
+        // 3. Update the sGTM container if we have container IDs
+        let gtmResult = null;
+        const serverContainerId = cfg.serverContainerId;
+        const serverWorkspaceId = cfg.serverWorkspaceId;
+
+        if (gtmService.isConfigured() && serverContainerId && serverWorkspaceId) {
+          try {
+            // Create a fresh workspace (current workspace may have uncommitted changes)
+            // We rotate directly in the stored workspaceId. If it has pending changes
+            // the version will include them — acceptable for a token rotation.
+            gtmResult = await gtmService.rotateCapiTokenInContainer(
+              serverContainerId,
+              serverWorkspaceId,
+              platform,
+              String(newToken).trim(),
+            );
+          } catch (gtmErr) {
+            // GTM update is best-effort: Firestore already has the new token. Log
+            // the error prominently so the operator knows to manually re-publish.
+            console.error('[rotate-token] GTM container update failed for clientId=' + clientId +
+              ' platform=' + platform + ':', gtmErr.message);
+            gtmResult = { error: gtmErr.message, manual: true };
+          }
+        } else {
+          gtmResult = { skipped: true, reason: !gtmService.isConfigured()
+            ? 'GTM not configured on server'
+            : 'no serverContainerId/serverWorkspaceId in ss_config' };
+        }
+
+        // 4. Audit log
+        await firestoreService.saveAuditLog({
+          clientId,
+          action:   'rotate_token',
+          platform,
+          actor:    'admin',
+          gtmUpdated: !!(gtmResult && gtmResult.versionId),
+        }).catch(() => {});
+
+        sendJSON(res, 200, {
+          ok:       true,
+          clientId,
+          platform,
+          firestore: { updated: true },
+          gtm:       gtmResult,
+        });
+      } catch (e) {
+        console.error('[rotate-token] error:', e.message);
+        sendJSON(res, 500, { error: e.message });
+      }
+    });
+    return;
   }
 
   // POST /api/admin/client/:uid — update client fields (status, plan, ...)
@@ -2626,6 +2848,135 @@ const server = http.createServer((req, res) => {
       return;
     }
 
+    // ── GET /api/v1/metrics — in-process operational metrics ──────────────
+    // Returns Prometheus-style counters + DLQ queue depth + alert status.
+    // Secured by ADMIN_TOKEN to prevent public exposure of operational data.
+    if (req.method === 'GET' && v1Path === '/api/v1/metrics') {
+      const adminToken = (process.env.ADMIN_TOKEN || '').trim();
+      if (adminToken) {
+        const provided = (req.headers['x-admin-token'] || '').trim();
+        if (!provided || provided.length !== adminToken.length ||
+            !require('crypto').timingSafeEqual(Buffer.from(provided), Buffer.from(adminToken))) {
+          sendJSON(res, 401, { error: 'X-Admin-Token required' });
+          return;
+        }
+      }
+      (async () => {
+        const snap = metrics.snapshot();
+        let dlqDepth = null;
+        let dlqOldestAgeMs = null;
+        if (firestoreService.isConfigured()) {
+          try {
+            const dlqStats = await firestoreService.getDlqStats();
+            dlqDepth      = dlqStats.depth;
+            dlqOldestAgeMs = dlqStats.oldestAgeMs;
+          } catch (_) {}
+        }
+        const alerts = metrics.checkAlerts(dlqDepth, dlqOldestAgeMs);
+        sendJSON(res, 200, {
+          ...snap,
+          dlq: { depth: dlqDepth, oldestAgeMs: dlqOldestAgeMs },
+          alerts,
+          healthy: alerts.length === 0,
+        });
+      })();
+      return;
+    }
+
+    // ── POST /api/v1/internal/dlq — sGTM failed-event ingest ─────────────
+    // Called by _fireDLQ() in the sGTM template when a CAPI send fails.
+    // Auth: BEACON_SECRET HMAC (same as beacon) or INTERNAL_WORKER_SECRET header
+    // so the sGTM template can authenticate using the shared secret it already has.
+    // The dlq-worker picks up these records and retries with exponential back-off.
+    if (req.method === 'POST' && v1Path === '/api/v1/internal/dlq') {
+      if (!firestoreService.isConfigured()) {
+        sendJSON(res, 503, { error: 'Firestore not configured' });
+        return;
+      }
+      // Auth: accept either BEACON_SECRET HMAC (X-DLQ-Sig header) or the
+      // internal worker secret (X-Internal-Token) so sGTM can call this without
+      // a Firebase token, using the same BEACON_SECRET it uses for the beacon ping.
+      const dlqSig      = (req.headers['x-dlq-sig']      || '').trim();
+      const internalTok = (req.headers['x-internal-token'] || '').trim();
+      const beaconSecret  = (process.env.BEACON_SECRET        || '').trim();
+      const workerSecret  = (process.env.INTERNAL_WORKER_SECRET || '').trim();
+
+      let authed = false;
+      if (internalTok && workerSecret) {
+        const a = Buffer.from(internalTok);
+        const b = Buffer.from(workerSecret);
+        authed  = a.length === b.length && crypto.timingSafeEqual(a, b);
+      }
+      if (!authed && dlqSig && beaconSecret) {
+        // sGTM signs: HMAC-SHA256(beaconSecret, event_id + '|' + timestamp)
+        // Timestamp must be within ±5 minutes to prevent replay.
+        const dlqTs  = parseInt(req.headers['x-dlq-ts'] || '0', 10);
+        const ageSec = Math.abs(Date.now() / 1000 - dlqTs);
+        if (ageSec <= 300) {
+          const expected = crypto.createHmac('sha256', beaconSecret)
+            .update((req.headers['x-dlq-event-id'] || '') + '|' + dlqTs)
+            .digest('hex');
+          const a = Buffer.from(dlqSig);
+          const b = Buffer.from(expected);
+          authed  = a.length === b.length && crypto.timingSafeEqual(a, b);
+        }
+      }
+      // If neither secret is configured, accept unauthenticated (DLQ is ingest-only,
+      // not a read endpoint — worst case an attacker fills the collection with junk).
+      // Log a warning so operators know to configure secrets.
+      if (!authed && (beaconSecret || workerSecret)) {
+        sendJSON(res, 401, { error: 'DLQ auth failed' });
+        return;
+      }
+      if (!beaconSecret && !workerSecret) {
+        console.warn('[dlq] BEACON_SECRET and INTERNAL_WORKER_SECRET both unset — DLQ endpoint is unauthenticated');
+      }
+
+      parseJsonBody(req, res, async body => {
+        if (!body || !body.event_name) {
+          sendJSON(res, 400, { error: 'Missing event_name' });
+          return;
+        }
+
+        // Classify: AUTH_ERROR events should NOT be queued for retry (they'll
+        // immediately exhaust on the next worker tick anyway — skip the round-trip).
+        const errCode = (body.error_code || 0);
+        if (errCode === 401 || errCode === 403) {
+          console.error('[dlq] AUTH_ERROR received — not queuing for retry.' +
+            ' platform=' + body.destination + ' event_id=' + body.event_id +
+            ' Rotate the CAPI token for customer_id=' + body.customer_id);
+          sendJSON(res, 200, { ok: true, queued: false, reason: 'auth_error_not_retryable' });
+          return;
+        }
+
+        try {
+          const docId = await firestoreService.saveDlqEvent({
+            eventId:          body.event_id          || '',
+            eventName:        body.event_name,
+            eventChecksum:    body.event_checksum     || '',
+            platform:         body.destination        || '',
+            // Field names must match what dlq-worker reads exactly.
+            destination_url:  body.destination_url    || '',
+            payload_snapshot: body.payload_snapshot   || '',
+            headers_snapshot: body.headers_snapshot   || JSON.stringify({ 'Content-Type': 'application/json' }),
+            customerId:       body.customer_id        || '',
+            sessionId:        body.session_id         || '',
+            anonymousId:      body.anonymous_id       || '',
+            errorCode:        errCode,
+            errorMessage:     body.error_message      || '',
+            payloadSize:      body.payload_size        || 0,
+            schemaVersion:    body.schema_version      || 1,
+          });
+          metrics.incDlqCreated();
+          sendJSON(res, 202, { ok: true, queued: true, docId });
+        } catch (e) {
+          console.error('[dlq] saveDlqEvent failed:', e.message);
+          sendJSON(res, 500, { error: e.message });
+        }
+      }, SS_BODY_LIMIT);
+      return;
+    }
+
     // ── GET /api/v1/internal/beacon — sGTM event presence ping ───────────────
     // Auth path A (Phase 2, API key):  ?key=&clientId=&event=
     // Auth path B (Phase 1, HMAC):     ?clientId=&event=&sig=&ts=
@@ -3043,11 +3394,9 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    // ── POST /api/v1/internal/dlq — Dead Letter Queue (Phase 4) ─────────────
-    // Receives failed sGTM CAPI send events from the universal-http.tpl tag.
-    // Stores them in Firestore for retry inspection and audit.
-    // Auth: API key (same header used by beacon endpoint).
-    if (req.method === 'POST' && v1Path === '/api/v1/internal/dlq') {
+    // Stale Phase-4 DLQ endpoint — unreachable (handler registered earlier wins).
+    // Disabled with `if (false)` to preserve git history without breaking routing.
+    if (false && req.method === 'POST' && v1Path === '/api/v1/internal/dlq') {
       parseJsonBody(req, res, async body => {
         try {
           const apiKey = (req.headers['x-api-key'] || '').trim();
@@ -3102,11 +3451,9 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    // ── POST /api/v1/internal/replay — Event Replay (Phase 7) ───────────────
-    // Re-fires a stored DLQ event by event_id. Idempotent: uses event_checksum
-    // to detect duplicate replay attempts within a 24h window.
-    // Auth: Firebase ID token (admin claim required).
-    if (req.method === 'POST' && v1Path === '/api/v1/internal/replay') {
+    // Stale Phase-7 replay endpoint — calls firestoreService.getDb() which is not
+    // exported. Disabled until a proper implementation replaces it.
+    if (false && req.method === 'POST' && v1Path === '/api/v1/internal/replay') {
       (async () => {
         const auth = await v1Auth();
         if (!auth) return;
@@ -3328,6 +3675,59 @@ server.listen(PORT, () => {
       healthService.runHealthJob().catch(e => console.error('[health-job] tick failed:', e.message));
     }, 15 * 60 * 1000).unref();
   }, 90 * 1000);
+
+  // Provisioning stall detector — runs every 5 minutes. Marks any job stuck
+  // in status=running/pending with heartbeatAt older than 10 minutes as stalled
+  // and increments the provisioning_stalled_total metric for alerting.
+  if (firestoreService.isConfigured()) {
+    setInterval(() => {
+      firestoreService.detectAndRecoverStalledJobs(10 * 60 * 1000).then(ids => {
+        if (ids.length) {
+          ids.forEach(() => metrics.incProvisioningStalled());
+          console.error('[stall-detector] ' + ids.length + ' stalled provisioning job(s) detected: ' + ids.join(', '));
+        }
+      }).catch(e => console.error('[stall-detector] sweep failed:', e.message));
+    }, 5 * 60 * 1000).unref();
+  }
+
+  // DLQ retry worker — only started when Firestore is configured.
+  // Picks up failed CAPI sends (written to `dlq_events` by POST /api/v1/internal/dlq)
+  // and retries with exponential back-off. Interval: 60s.
+  if (firestoreService.isConfigured()) {
+    dlqWorker.start(firestoreService, 60 * 1000).unref();
+  } else {
+    console.warn('[dlq-worker] Firestore not configured — DLQ retry worker disabled');
+  }
+
+  // ── Cloud Monitoring metrics flush — every 60s ───────────────────────────
+  setInterval(() => {
+    const snap = metrics.snapshot();
+    (async () => {
+      let dlqDepth = null, dlqOldestAgeMs = null, capacityReport = null;
+      if (firestoreService.isConfigured()) {
+        try {
+          const dlqStats = await firestoreService.getDlqStats();
+          dlqDepth = dlqStats.depth;
+          dlqOldestAgeMs = dlqStats.oldestAgeMs;
+          capacityReport = await firestoreService.getAccountCapacityReport();
+        } catch (_) {}
+      }
+      cloudMonitoring.pushSnapshot(snap, dlqDepth, dlqOldestAgeMs, capacityReport)
+        .catch(e => console.warn('[cloud-monitoring] flush error:', e.message));
+    })();
+  }, 60 * 1000).unref();
+
+  // ── Queue restart recovery ────────────────────────────────────────────────
+  // On restart, any job that was in status='pending' and never picked up (e.g.
+  // the process crashed between job creation and enqueueing) needs to be
+  // re-queued. We scan for jobs created in the last 30 minutes that are still
+  // in status='pending' and haven't been heartbeated yet.
+  if (firestoreService.isConfigured()) {
+    setTimeout(() => {
+      _recoverPendingJobsOnStartup().catch(e =>
+        console.error('[startup-recovery] failed:', e.message));
+    }, 15 * 1000);  // 15s delay so Firestore init settles
+  }
 });
 
 // ── Global process guards ─────────────────────────────────────────────────────
