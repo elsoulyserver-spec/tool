@@ -1,0 +1,467 @@
+/**
+ * Easy Track — Typography CSS Variables
+ *
+ * Layer order (lowest → highest specificity):
+ *   1. @layer base        — font-face fallback metrics, :root tokens
+ *   2. @layer direction   — [dir="ltr"] / [dir="rtl"] overrides
+ *   3. @layer utilities   — .text-* utility classes
+ *   4. @layer analytics   — table / chart / metric density overrides
+ *
+ * All values reference CSS custom properties — zero hardcoded strings in
+ * component styles. Changing a font means updating this file only.
+ */
+
+/* ============================================================
+   FONT-FACE: Fallback metric overrides for CLS prevention
+   Matches metrics of our primary fonts so system fallbacks
+   occupy the same bounding box while primary fonts load.
+   ============================================================ */
+
+@font-face {
+  font-family: 'IBMPlexArabicFallback';
+  src: local('Arial');
+  ascent-override: 90%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+  size-adjust: 103%;
+}
+
+@font-face {
+  font-family: 'InterFallback';
+  src: local('-apple-system'), local('BlinkMacSystemFont'), local('Segoe UI'), local('Arial');
+  ascent-override: 90%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+  size-adjust: 100%;
+}
+
+@font-face {
+  font-family: 'ThmanyahFallback';
+  src: local('Arial');
+  ascent-override: 90%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+  size-adjust: 105%;
+}
+
+/* ============================================================
+   ROOT TOKENS — direction-independent defaults
+   All consumers reference --font-* variables, never raw names.
+   ============================================================ */
+
+:root {
+  /* ── Font family tokens ─────────────────────────────────── */
+
+  /* Brand Arabic: ThmanyahSans — headings, marketing, brand moments */
+  --font-brand-ar: var(--font-brand-ar-next, 'ThmanyahSans'),
+                   'IBM Plex Sans Arabic',
+                   'ThmanyahFallback',
+                   'Noto Sans Arabic',
+                   sans-serif;
+
+  /* Analytics Arabic: IBM Plex Sans Arabic — table cells, labels, data */
+  --font-ui-ar: var(--font-ui-ar-next, 'IBM Plex Sans Arabic'),
+                'IBMPlexArabicFallback',
+                'Noto Sans Arabic',
+                sans-serif;
+
+  /* English UI: Inter — all LTR text, platform names */
+  --font-ui-en: var(--font-ui-en-next, 'Inter var'),
+                'Inter',
+                'InterFallback',
+                -apple-system,
+                BlinkMacSystemFont,
+                'Segoe UI',
+                sans-serif;
+
+  /* Numbers: Inter with tabular-nums enforced — direction always LTR */
+  --font-number: var(--font-ui-en-next, 'Inter var'),
+                 'Inter',
+                 'InterFallback',
+                 -apple-system,
+                 sans-serif;
+
+  /* Code / IDs / URLs: JetBrains Mono */
+  --font-code: var(--font-code-next, 'JetBrains Mono'),
+               'Fira Code',
+               'Cascadia Code',
+               'Consolas',
+               ui-monospace,
+               monospace;
+
+  /* Arabic Display (lazy — PDF only) */
+  --font-display-ar: var(--font-display-ar-next, 'ThmanyahSerifDisplay'),
+                     'ThmanyahSans',
+                     'IBM Plex Sans Arabic',
+                     serif;
+
+  /* Arabic Long-form Text (lazy — PDF only) */
+  --font-text-ar: var(--font-text-ar-next, 'ThmanyahSerifText'),
+                  'ThmanyahSans',
+                  'IBM Plex Sans Arabic',
+                  Georgia,
+                  serif;
+
+  /* ── Type scale tokens ──────────────────────────────────── */
+
+  --text-2xs:  10px;   /* badge labels, overlines             */
+  --text-xs:   11px;   /* column headers (min LTR)            */
+  --text-sm:   12px;   /* table cells (LTR), compact labels   */
+  --text-base: 13px;   /* primary body, table cells (AR min)  */
+  --text-md:   14px;   /* secondary headings, nav items       */
+  --text-lg:   15px;   /* card titles, sidebar headers        */
+  --text-xl:   16px;   /* section headings                    */
+  --text-2xl:  18px;   /* page headings (RTL default body)    */
+  --text-3xl:  20px;   /* KPI values, metric numbers          */
+  --text-4xl:  24px;   /* hero metrics                        */
+  --text-5xl:  30px;   /* dashboard display numbers           */
+  --text-6xl:  36px;   /* report cover, brand moments         */
+
+  /* ── Line height tokens ─────────────────────────────────── */
+
+  /* Latin line heights */
+  --lh-tight:  1.25;
+  --lh-snug:   1.375;
+  --lh-normal: 1.5;
+  --lh-relaxed:1.625;
+  --lh-loose:  1.75;
+
+  /* Arabic line heights — always higher than Latin equivalents */
+  --lh-ar-tight:  1.5;    /* minimum for Arabic — never below this */
+  --lh-ar-snug:   1.65;
+  --lh-ar-normal: 1.75;   /* default Arabic body */
+  --lh-ar-relaxed:1.85;
+  --lh-ar-loose:  2.0;
+
+  /* Table-specific: fixed height rows require exactly 1.0 line-height */
+  --lh-table: 1.0;
+
+  /* ── Letter spacing tokens ──────────────────────────────── */
+
+  --tracking-tighter: -0.05em;
+  --tracking-tight:   -0.025em;
+  --tracking-normal:   0em;
+  --tracking-wide:     0.025em;
+  --tracking-wider:    0.05em;
+  --tracking-widest:   0.1em;
+
+  /* ── Font weight tokens ─────────────────────────────────── */
+
+  --weight-light:    300;
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  /* ── Direction-neutral defaults ─────────────────────────── */
+
+  --font-sans: var(--font-ui-en);   /* overridden per direction below */
+  --lh-body:   var(--lh-normal);    /* overridden per direction below */
+  --lh-body-sm:var(--lh-snug);
+}
+
+/* ============================================================
+   DIRECTION OVERRIDES
+   These flip the default --font-sans and --lh-body so
+   every component using var(--font-sans) is correct by default.
+   ============================================================ */
+
+[dir='ltr'] {
+  --font-sans:  var(--font-ui-en);
+  --lh-body:    var(--lh-normal);
+  --lh-body-sm: var(--lh-snug);
+}
+
+[dir='rtl'] {
+  --font-sans:  var(--font-ui-ar);      /* IBM Plex Sans Arabic for analytics data */
+  --lh-body:    var(--lh-ar-normal);    /* 1.75 minimum */
+  --lh-body-sm: var(--lh-ar-snug);
+}
+
+/* ============================================================
+   BASE ELEMENT STYLES
+   ============================================================ */
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'kern' 1, 'liga' 1;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--weight-regular);
+  line-height: var(--lh-body);
+}
+
+/* Numbers embedded anywhere must always be Inter + tabular-nums */
+[data-numeric],
+.font-number {
+  font-family: var(--font-number);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* Code / technical identifiers */
+[data-code],
+.font-code,
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--font-code);
+  font-size: 0.9em;
+  font-feature-settings: 'liga' 1, 'calt' 1;
+}
+
+/* ============================================================
+   UTILITY CLASSES — Typography
+   Designed for use in analytics dashboards.
+   RTL-safe: no physical margin/padding assumptions.
+   ============================================================ */
+
+/* Arabic UI text — IBM Plex Sans Arabic, analytics-grade */
+.text-ui-ar {
+  font-family: var(--font-ui-ar);
+  direction: rtl;
+  unicode-bidi: isolate;
+  line-height: var(--lh-ar-normal);
+}
+
+/* Brand Arabic text — ThmanyahSans, headings / brand moments */
+.text-brand-ar {
+  font-family: var(--font-brand-ar);
+  direction: rtl;
+  unicode-bidi: isolate;
+  line-height: var(--lh-ar-normal);
+}
+
+/* English UI text — Inter */
+.text-ui-en {
+  font-family: var(--font-ui-en);
+  direction: ltr;
+  unicode-bidi: isolate;
+  line-height: var(--lh-normal);
+}
+
+/* Numeric values — always Inter tabular LTR, even inside RTL */
+.text-number {
+  font-family: var(--font-number);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  direction: ltr;
+  unicode-bidi: isolate;
+  white-space: nowrap;
+}
+
+/* Code / IDs / technical strings */
+.text-code {
+  font-family: var(--font-code);
+  font-size: var(--text-sm);
+  direction: ltr;
+  unicode-bidi: isolate;
+  white-space: nowrap;
+  font-feature-settings: 'liga' 1, 'calt' 1;
+}
+
+/* Platform event names (GA4 Purchase, Meta ViewContent, etc.)
+   Always Inter LTR — treated as technical identifiers */
+.text-event {
+  font-family: var(--font-ui-en);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  direction: ltr;
+  unicode-bidi: isolate;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* KPI / metric headline numbers */
+.text-metric {
+  font-family: var(--font-number);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  font-weight: var(--weight-bold);
+  direction: ltr;
+  unicode-bidi: isolate;
+  white-space: nowrap;
+  letter-spacing: var(--tracking-tight);
+}
+
+/* Currency values: SAR 12,500 */
+.text-currency {
+  font-family: var(--font-number);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  font-weight: var(--weight-medium);
+  direction: ltr;
+  unicode-bidi: isolate;
+  white-space: nowrap;
+}
+
+/* Percentage values: 98.43% */
+.text-percentage {
+  font-family: var(--font-number);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  font-weight: var(--weight-semibold);
+  direction: ltr;
+  unicode-bidi: isolate;
+  white-space: nowrap;
+}
+
+/* Technical IDs: GTM-XXXXXXX, container IDs, API keys */
+.text-id {
+  font-family: var(--font-code);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+  direction: ltr;
+  unicode-bidi: isolate;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ============================================================
+   ANALYTICS TABLE TYPOGRAPHY
+   Fixed row heights require no line wrapping — all cells
+   use lh-table: 1.0 and overflow: hidden + text-overflow: ellipsis
+   ============================================================ */
+
+.table-analytics {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);    /* 13px — minimum for Arabic */
+  font-weight: var(--weight-regular);
+  line-height: var(--lh-table);   /* 1.0 — required for virtual scroll */
+}
+
+/* Comfortable density: 44px rows */
+.table-density-comfortable .table-cell {
+  padding-block: 10px;
+  padding-inline: 14px;
+  font-size: var(--text-base);    /* 13px */
+}
+
+/* Standard density: 36px rows (default) */
+.table-density-standard .table-cell {
+  padding-block: 7px;
+  padding-inline: 12px;
+  font-size: var(--text-base);    /* 13px */
+}
+
+/* Compact density: 32px rows */
+.table-density-compact .table-cell {
+  padding-block: 6px;
+  padding-inline: 10px;
+  font-size: var(--text-sm);      /* 12px — LTR only; RTL must stay 13px */
+}
+
+/* Dense: 28px rows (audit / diagnostic logs only) */
+.table-density-dense .table-cell {
+  padding-block: 4px;
+  padding-inline: 8px;
+  font-size: var(--text-sm);      /* 12px — LTR only */
+}
+
+/* RTL table cells enforce 13px floor regardless of density */
+[dir='rtl'] .table-cell,
+[dir='rtl'] .table-density-compact .table-cell,
+[dir='rtl'] .table-density-dense   .table-cell {
+  font-size: var(--text-base);    /* 13px — Arabic minimum, non-negotiable */
+}
+
+/* Numeric columns: always right-aligned + LTR + Inter */
+.table-cell-numeric {
+  font-family: var(--font-number);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: end;
+  white-space: nowrap;
+}
+
+/* Table column headers */
+.table-header-cell {
+  font-size: var(--text-xs);      /* 11px */
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  line-height: var(--lh-table);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Arabic header cells: no uppercase, no tight tracking */
+[dir='rtl'] .table-header-cell {
+  text-transform: none;
+  letter-spacing: var(--tracking-normal);
+  font-size: var(--text-base);    /* 13px minimum */
+}
+
+/* ============================================================
+   DELTA / CHANGE INDICATORS
+   +18.4% / -3.2% — always Inter, always LTR, color-coded
+   ============================================================ */
+
+.text-delta {
+  font-family: var(--font-number);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-sm);
+  direction: ltr;
+  unicode-bidi: isolate;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   ACCESSIBILITY — forced-colors / high contrast
+   ============================================================ */
+
+@media (forced-colors: active) {
+  .text-ui-ar,
+  .text-brand-ar,
+  .text-ui-en {
+    forced-color-adjust: auto;
+  }
+}
+
+/* ============================================================
+   PERFORMANCE — unicode-range to avoid downloading Arabic fonts
+   on pages that have no Arabic content
+   Note: Next.js next/font/google handles this automatically for
+   IBM Plex Sans Arabic via the subset parameter.
+   For local Thmanyah fonts, declare here:
+   ============================================================ */
+
+/*
+  NOTE FOR BUILD PIPELINE:
+  After running pyftsubset on ThmanyahSans, add explicit unicode-range
+  declarations in the generated @font-face blocks to allow the browser
+  to skip download when the range is not used on the current page.
+
+  Example (add to generated output, not manually):
+
+  @font-face {
+    font-family: 'ThmanyahSans';
+    src: url('/fonts/thmanyahsans/thmanyahsans-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-display: swap;
+    unicode-range:
+      U+0600-06FF,   -- Arabic
+      U+0750-077F,   -- Arabic Supplement
+      U+08A0-08FF,   -- Arabic Extended-A
+      U+FB50-FDFF,   -- Arabic Presentation Forms-A
+      U+FE70-FEFF,   -- Arabic Presentation Forms-B
+      U+0020-007E;   -- Basic Latin (punctuation shared across scripts)
+  }
+*/

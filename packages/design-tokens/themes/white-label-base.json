@@ -1,0 +1,32 @@
+{
+  "_comment": "White-label base theme — tenant-overridable brand layer. Only Tier 2 brand tokens are overridable. Tier 1 primitives and Tier 3 component tokens are immutable and derived automatically.",
+
+  "brand": {
+    "color": {
+      "primary":         { "value": "{primitive.color.indigo.600}", "type": "color", "description": "Primary brand color — override per tenant" },
+      "primary-hover":   { "value": "{primitive.color.indigo.700}", "type": "color" },
+      "primary-light":   { "value": "{primitive.color.indigo.50}",  "type": "color" },
+      "primary-text":    { "value": "{primitive.color.white}",      "type": "color" },
+
+      "accent":          { "value": "{primitive.color.indigo.500}", "type": "color" },
+      "accent-hover":    { "value": "{primitive.color.indigo.600}", "type": "color" },
+
+      "logo-mark":       { "value": "{primitive.color.indigo.600}", "type": "color", "description": "Fallback if no logo image" }
+    },
+
+    "font": {
+      "ar":              { "value": "var(--font-brand-ar)",    "type": "fontFamilies", "description": "Arabic font — tenant can override with licensed Arabic font" },
+      "en":              { "value": "var(--font-ui-en)",       "type": "fontFamilies", "description": "English font — tenant can override with Google Font" }
+    },
+
+    "asset": {
+      "logo-url":        { "value": "/assets/easytrac-logo.svg", "type": "asset", "description": "Primary logo. Override with tenant CDN URL." },
+      "logo-dark-url":   { "value": "/assets/easytrac-logo-dark.svg", "type": "asset" },
+      "favicon-url":     { "value": "/favicon.svg",               "type": "asset" }
+    },
+
+    "radius": {
+      "base":            { "value": "{primitive.radius.md}",   "type": "borderRadius", "description": "Tenant can set to 0 for sharp corners or full for pill style" }
+    }
+  }
+}
