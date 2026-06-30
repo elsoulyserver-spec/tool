@@ -2165,25 +2165,27 @@ const server = http.createServer((req, res) => {
     if (!_requireAdmin()) return;
     if (!firestoreService.isConfigured()) return sendJSON(res, 503, { error: 'Firestore not configured' });
     const clientId = decodeURIComponent(_verListMatch[1]);
-    try {
-      const versions = await firestoreService.listVersions(clientId);
-      // Serialize Firestore Timestamps to ISO strings for JSON transport
-      const out = versions.map(v => ({
-        id:             v.id,
-        version:        v.version,
-        publishedAt:    v.publishedAt && v.publishedAt.toDate ? v.publishedAt.toDate().toISOString() : (v.publishedAt || null),
-        publishedBy:    v.publishedBy || null,
-        deploymentType: v.deploymentType || 'publish',
-        status:         v.status         || 'published',
-        gtmVersionId:   v.gtmVersionId   || null,
-        gtmPublicId:    v.gtmPublicId    || null,
-        diffSummary:    v.diffSummary    || null,
-        configSnapshot: v.configSnapshot || null,
-      }));
-      sendJSON(res, 200, { ok: true, clientId, versions: out });
-    } catch (e) {
-      sendJSON(res, 500, { error: e.message });
-    }
+    (async () => {
+      try {
+        const versions = await firestoreService.listVersions(clientId);
+        // Serialize Firestore Timestamps to ISO strings for JSON transport
+        const out = versions.map(v => ({
+          id:             v.id,
+          version:        v.version,
+          publishedAt:    v.publishedAt && v.publishedAt.toDate ? v.publishedAt.toDate().toISOString() : (v.publishedAt || null),
+          publishedBy:    v.publishedBy || null,
+          deploymentType: v.deploymentType || 'publish',
+          status:         v.status         || 'published',
+          gtmVersionId:   v.gtmVersionId   || null,
+          gtmPublicId:    v.gtmPublicId    || null,
+          diffSummary:    v.diffSummary    || null,
+          configSnapshot: v.configSnapshot || null,
+        }));
+        sendJSON(res, 200, { ok: true, clientId, versions: out });
+      } catch (e) {
+        sendJSON(res, 500, { error: e.message });
+      }
+    })();
     return;
   }
 
@@ -2489,47 +2491,49 @@ const server = http.createServer((req, res) => {
     if (!_requireAdmin()) return;
     if (!firestoreService.isConfigured()) return sendJSON(res, 503, { error: 'Firestore not configured' });
     const clientId = decodeURIComponent(_depLogsMatch[1]);
-    try {
-      const [logs, versions] = await Promise.all([
-        firestoreService.listDeploymentLogs(clientId, { limit: 50 }),
-        firestoreService.listVersions(clientId, { limit: 20 }),
-      ]);
-      const _ts = v => v && v.toDate ? v.toDate().toISOString() : (v || null);
-      sendJSON(res, 200, {
-        ok: true,
-        clientId,
-        logs: logs.map(l => ({
-          id:            l.id,
-          deploymentId:  l.deploymentId  || null,
-          action:        l.action        || null,
-          actor:         l.actor         || null,
-          targetVersion: l.targetVersion || null,
-          newVersion:    l.newVersion    || null,
-          gtmVersionId:  l.gtmVersionId  || null,
-          success:       l.success,
-          error:         l.error         || null,
-          timestamp:     _ts(l.timestamp),
-          metadata:      l.metadata      || null,
-        })),
-        versions: versions.map(v => ({
-          id:              v.id,
-          version:         v.version,
-          deploymentId:    v.deploymentId    || null,
-          deploymentType:  v.deploymentType  || 'publish',
-          deploymentState: v.deploymentState || 'published',
-          status:          v.status          || 'published',
-          publishedAt:     _ts(v.publishedAt),
-          publishedBy:     v.publishedBy     || null,
-          gtmVersionId:    v.gtmVersionId    || null,
-          driftDetected:   v.driftDetected   || false,
-          failureReason:   v.failureReason   || null,
-          rolledBackFrom:  v.rolledBackFrom  || null,
-        })),
-      });
-    } catch (e) {
-      console.error('[deployments] error:', e.message);
-      sendJSON(res, 500, { error: e.message });
-    }
+    (async () => {
+      try {
+        const [logs, versions] = await Promise.all([
+          firestoreService.listDeploymentLogs(clientId, { limit: 50 }),
+          firestoreService.listVersions(clientId, { limit: 20 }),
+        ]);
+        const _ts = v => v && v.toDate ? v.toDate().toISOString() : (v || null);
+        sendJSON(res, 200, {
+          ok: true,
+          clientId,
+          logs: logs.map(l => ({
+            id:            l.id,
+            deploymentId:  l.deploymentId  || null,
+            action:        l.action        || null,
+            actor:         l.actor         || null,
+            targetVersion: l.targetVersion || null,
+            newVersion:    l.newVersion    || null,
+            gtmVersionId:  l.gtmVersionId  || null,
+            success:       l.success,
+            error:         l.error         || null,
+            timestamp:     _ts(l.timestamp),
+            metadata:      l.metadata      || null,
+          })),
+          versions: versions.map(v => ({
+            id:              v.id,
+            version:         v.version,
+            deploymentId:    v.deploymentId    || null,
+            deploymentType:  v.deploymentType  || 'publish',
+            deploymentState: v.deploymentState || 'published',
+            status:          v.status          || 'published',
+            publishedAt:     _ts(v.publishedAt),
+            publishedBy:     v.publishedBy     || null,
+            gtmVersionId:    v.gtmVersionId    || null,
+            driftDetected:   v.driftDetected   || false,
+            failureReason:   v.failureReason   || null,
+            rolledBackFrom:  v.rolledBackFrom  || null,
+          })),
+        });
+      } catch (e) {
+        console.error('[deployments] error:', e.message);
+        sendJSON(res, 500, { error: e.message });
+      }
+    })();
     return;
   }
 
@@ -2573,26 +2577,28 @@ const server = http.createServer((req, res) => {
     const _qp  = new URLSearchParams(req.url.includes('?') ? req.url.split('?')[1] : '');
     const limit  = Math.min(parseInt(_qp.get('limit') || '50', 10), 200);
     const before = _qp.get('before') || null;
-    try {
-      const rawLogs = await firestoreService.queryAuditLogs(clientId, { limit, before });
-      // Serialize every Firestore Timestamp to ISO string before JSON transport.
-      const _ts = v => v && v.toDate ? v.toDate().toISOString() : (typeof v === 'string' ? v : null);
-      const logs = rawLogs.map(l => ({
-        id:         l.id,
-        occurredAt: _ts(l.occurredAt),
-        actorType:  l.actorType  || null,
-        actorId:    l.actorId    || null,
-        action:     l.action     || null,
-        entityType: l.entityType || null,
-        entityId:   l.entityId   || null,
-        diff:       l.diff       || null,
-        ipAddress:  l.ipAddress  || null,
-      }));
-      sendJSON(res, 200, { ok: true, clientId, logs, total: logs.length });
-    } catch (e) {
-      console.error('[audit] error:', e.message);
-      sendJSON(res, 500, { error: e.message });
-    }
+    (async () => {
+      try {
+        const rawLogs = await firestoreService.queryAuditLogs(clientId, { limit, before });
+        // Serialize every Firestore Timestamp to ISO string before JSON transport.
+        const _ts = v => v && v.toDate ? v.toDate().toISOString() : (typeof v === 'string' ? v : null);
+        const logs = rawLogs.map(l => ({
+          id:         l.id,
+          occurredAt: _ts(l.occurredAt),
+          actorType:  l.actorType  || null,
+          actorId:    l.actorId    || null,
+          action:     l.action     || null,
+          entityType: l.entityType || null,
+          entityId:   l.entityId   || null,
+          diff:       l.diff       || null,
+          ipAddress:  l.ipAddress  || null,
+        }));
+        sendJSON(res, 200, { ok: true, clientId, logs, total: logs.length });
+      } catch (e) {
+        console.error('[audit] error:', e.message);
+        sendJSON(res, 500, { error: e.message });
+      }
+    })();
     return;
   }
 
@@ -2640,73 +2646,75 @@ const server = http.createServer((req, res) => {
     if (!_requireAdmin()) return;
     if (!firestoreService.isConfigured()) return sendJSON(res, 503, { error: 'Firestore not configured' });
     const clientId = decodeURIComponent(_healthMatch[1]);
-    try {
-      const [diagResult, healthCache, versions, platformHealth, activeDeployments] = await Promise.all([
-        firestoreService.getDiagnosticResult(clientId).catch(() => null),
-        firestoreService.getHealthCache(clientId).catch(() => null),
-        firestoreService.listVersions(clientId, { limit: 1 }).catch(() => []),
-        firestoreService.getPlatformHealth().catch(() => ({})),
-        firestoreService.countActiveDeployments().catch(() => 0),
-      ]);
+    (async () => {
+      try {
+        const [diagResult, healthCache, versions, platformHealth, activeDeployments] = await Promise.all([
+          firestoreService.getDiagnosticResult(clientId).catch(() => null),
+          firestoreService.getHealthCache(clientId).catch(() => null),
+          firestoreService.listVersions(clientId, { limit: 1 }).catch(() => []),
+          firestoreService.getPlatformHealth().catch(() => ({})),
+          firestoreService.countActiveDeployments().catch(() => 0),
+        ]);
 
-      const lastVersion = versions[0] || null;
+        const lastVersion = versions[0] || null;
 
-      // Derive per-platform status from diagnostic result or health cache
-      const diag = diagResult || healthCache || {};
-      const platforms = {
-        ga4:       !!(diag.ga4Active        || diag.ga4),
-        meta:      !!(diag.metaActive       || diag.meta),
-        googleAds: !!(diag.googleAdsActive  || diag.googleAds),
-        tiktok:    !!(diag.tiktokActive     || diag.tiktok),
-      };
+        // Derive per-platform status from diagnostic result or health cache
+        const diag = diagResult || healthCache || {};
+        const platforms = {
+          ga4:       !!(diag.ga4Active        || diag.ga4),
+          meta:      !!(diag.metaActive       || diag.meta),
+          googleAds: !!(diag.googleAdsActive  || diag.googleAds),
+          tiktok:    !!(diag.tiktokActive     || diag.tiktok),
+        };
 
-      // Health score: 25 pts per active platform (max 4 platforms)
-      const activeCount   = Object.values(platforms).filter(Boolean).length;
-      const platformCount = Object.values(platforms).filter(v => v !== undefined).length || 4;
-      const score = diagResult && diagResult.healthScore != null
-        ? diagResult.healthScore
-        : healthCache && healthCache.healthScore != null
-          ? healthCache.healthScore
-          : Math.round((activeCount / platformCount) * 100);
+        // Health score: 25 pts per active platform (max 4 platforms)
+        const activeCount   = Object.values(platforms).filter(Boolean).length;
+        const platformCount = Object.values(platforms).filter(v => v !== undefined).length || 4;
+        const score = diagResult && diagResult.healthScore != null
+          ? diagResult.healthScore
+          : healthCache && healthCache.healthScore != null
+            ? healthCache.healthScore
+            : Math.round((activeCount / platformCount) * 100);
 
-      const alerts = (diag.alerts || diag.issues || []).map(a =>
-        typeof a === 'string' ? { message: a, severity: 'warning' } : a,
-      );
+        const alerts = (diag.alerts || diag.issues || []).map(a =>
+          typeof a === 'string' ? { message: a, severity: 'warning' } : a,
+        );
 
-      // Add alert if there are active (potentially stuck) deployments
-      if (activeDeployments > 0) {
-        alerts.push({ message: `${activeDeployments} deployment(s) currently active`, severity: 'info' });
+        // Add alert if there are active (potentially stuck) deployments
+        if (activeDeployments > 0) {
+          alerts.push({ message: `${activeDeployments} deployment(s) currently active`, severity: 'info' });
+        }
+
+        sendJSON(res, 200, {
+          ok:                   true,
+          clientId,
+          trackingHealthScore:  score,
+          ga4:                  platforms.ga4,
+          meta:                 platforms.meta,
+          googleAds:            platforms.googleAds,
+          tiktok:               platforms.tiktok,
+          lastEventReceived:    diag.lastEventAt
+            ? (diag.lastEventAt.toDate ? diag.lastEventAt.toDate().toISOString() : diag.lastEventAt)
+            : null,
+          lastPublish:          lastVersion && lastVersion.publishedAt
+            ? (lastVersion.publishedAt.toDate ? lastVersion.publishedAt.toDate().toISOString() : lastVersion.publishedAt)
+            : null,
+          lastVersion:          lastVersion ? lastVersion.version : null,
+          // driftDetected: sourced from the most recent container_versions doc.
+          // Only rollback deployments set this; regular publishes default to false.
+          driftDetected:        lastVersion ? (lastVersion.driftDetected || false) : false,
+          activeDeployment:     activeDeployments > 0,
+          stuckDeployments:     0,           // filled by recovery job on next sweep
+          lastRecovery:         null,        // filled when recovery runs
+          platformHealth,
+          alerts,
+          computedAt:           diag.computedAt || diag.updatedAt || null,
+        });
+      } catch (e) {
+        console.error('[health] error:', e.message);
+        sendJSON(res, 500, { error: e.message });
       }
-
-      sendJSON(res, 200, {
-        ok:                   true,
-        clientId,
-        trackingHealthScore:  score,
-        ga4:                  platforms.ga4,
-        meta:                 platforms.meta,
-        googleAds:            platforms.googleAds,
-        tiktok:               platforms.tiktok,
-        lastEventReceived:    diag.lastEventAt
-          ? (diag.lastEventAt.toDate ? diag.lastEventAt.toDate().toISOString() : diag.lastEventAt)
-          : null,
-        lastPublish:          lastVersion && lastVersion.publishedAt
-          ? (lastVersion.publishedAt.toDate ? lastVersion.publishedAt.toDate().toISOString() : lastVersion.publishedAt)
-          : null,
-        lastVersion:          lastVersion ? lastVersion.version : null,
-        // driftDetected: sourced from the most recent container_versions doc.
-        // Only rollback deployments set this; regular publishes default to false.
-        driftDetected:        lastVersion ? (lastVersion.driftDetected || false) : false,
-        activeDeployment:     activeDeployments > 0,
-        stuckDeployments:     0,           // filled by recovery job on next sweep
-        lastRecovery:         null,        // filled when recovery runs
-        platformHealth,
-        alerts,
-        computedAt:           diag.computedAt || diag.updatedAt || null,
-      });
-    } catch (e) {
-      console.error('[health] error:', e.message);
-      sendJSON(res, 500, { error: e.message });
-    }
+    })();
     return;
   }
 
