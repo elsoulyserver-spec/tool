@@ -6982,6 +6982,23 @@
 
     var _deploymentsData = [];
 
+    function joinDeployments(logs, versions) {
+      // Build a map of deploymentId → log entry for rollback logs
+      var logMap = {};
+      (logs || []).forEach(function(l) { if (l.deploymentId) logMap[l.deploymentId] = l; });
+      // Each version becomes a row; rollback versions get log data merged in
+      return (versions || []).map(function(v) {
+        var log = v.deploymentId ? (logMap[v.deploymentId] || {}) : {};
+        return Object.assign({}, log, v, {
+          _type: v.deploymentType || 'publish',
+          _state: v.deploymentState || log.state || (v.deploymentType === 'rollback' ? 'published' : 'published'),
+          _ts: v.publishedAt || log.timestamp || null,
+          _driftDetected: v.driftDetected || log.driftDetected || false,
+          _errorMessage: log.errorMessage || null,
+        });
+      });
+    }
+
     async function loadDeploymentsView() {
       var cid = _opsClientId();
       if (!cid) return;
@@ -6993,24 +7010,25 @@
       if (empty)   empty.style.display   = 'none';
       try {
         var data = await _opsFetch('/api/deployments/' + cid);
-        _deploymentsData = data.logs || [];
+        var joined = joinDeployments(data.logs || [], data.versions || []);
+        _deploymentsData = joined;
         // Metrics
         var today = new Date(); today.setHours(0,0,0,0);
-        var todayLogs = _deploymentsData.filter(function(l) {
-          var d = (l.startedAt && l.startedAt.toDate) ? l.startedAt.toDate() : new Date(l.startedAt || 0);
+        var todayRows = joined.filter(function(r) {
+          var d = r._ts ? new Date(r._ts) : new Date(0);
           return d >= today;
         });
-        var failed    = _deploymentsData.filter(function(l) { return l.state === 'failed'; }).length;
-        var recovered = _deploymentsData.filter(function(l) { return l.recovered || l.state === 'recovered'; }).length;
-        var success   = _deploymentsData.filter(function(l) { return l.state === 'published'; }).length;
-        _setEl('dplMetricTotal',     todayLogs.length || _deploymentsData.length);
+        var failed    = joined.filter(function(r) { return r._state === 'failed'; }).length;
+        var recovered = joined.filter(function(r) { return r._state === 'recovered'; }).length;
+        var success   = joined.filter(function(r) { return r._state === 'published'; }).length;
+        _setEl('dplMetricTotal',     todayRows.length || joined.length);
         _setEl('dplMetricSuccess',   success);
         _setEl('dplMetricFailed',    failed);
         _setEl('dplMetricRecovered', recovered);
-        renderDeploymentsTable(_deploymentsData);
+        renderDeploymentsTable(joined);
       } catch (e) {
         if (loading) loading.style.display = 'none';
-        if (empty)   { empty.style.display = 'flex'; empty.querySelector('span:last-child').textContent = 'Failed to load: ' + e.message; }
+        if (empty)   { empty.style.display = 'flex'; var em = empty.querySelector('span:last-child'); if (em) em.textContent = 'Failed to load: ' + e.message; }
       }
     }
 
@@ -7025,59 +7043,56 @@
       if (loading) loading.style.display = 'none';
       if (!rows || !rows.length) { if (empty) empty.style.display = 'flex'; return; }
       if (table) table.style.display = 'table';
-      tbody.innerHTML = rows.map(function(l) {
-        var driftLabel = l.driftDetected ? '<span style="color:var(--amber);">⚠ Drift</span>' : '<span style="color:var(--mut);">Clean</span>';
-        var duration = '—';
-        if (l.startedAt && l.completedAt) {
-          var ms = new Date(l.completedAt) - new Date(l.startedAt);
-          duration = ms > 0 ? Math.round(ms / 1000) + 's' : '—';
-        }
+      tbody.innerHTML = rows.map(function(r) {
+        var driftLabel = r._driftDetected ? '<span style="color:var(--amber);">⚠ Drift</span>' : '<span style="color:var(--mut);">Clean</span>';
+        var typeColor  = r._type === 'rollback' ? 'amber' : 'green';
         return '<tr>'
-          + '<td style="font-family:var(--font-mono);font-size:11px;color:var(--mut);">' + (l.deploymentId || l.id || '—').slice(-12) + '</td>'
-          + '<td style="font-size:12px;color:var(--mut);">' + _opsFormatDate(l.startedAt) + '</td>'
-          + '<td>' + _opsStateBadge(l.state || 'unknown') + '</td>'
-          + '<td style="font-family:var(--font-mono);font-size:12px;">' + duration + '</td>'
+          + '<td style="font-family:var(--font-mono);font-size:11px;color:var(--mut);">' + (r.deploymentId || r.id || '—').slice(-12) + '</td>'
+          + '<td style="font-size:12px;color:var(--mut);">' + _opsFormatDate(r._ts) + '</td>'
+          + '<td>' + _opsBadge(r._type || 'publish', typeColor) + '</td>'
+          + '<td>' + _opsStateBadge(r._state || 'unknown') + '</td>'
           + '<td>' + driftLabel + '</td>'
-          + '<td>' + _opsStateBadge(l.result || l.state || '—') + '</td>'
-          + '<td><button class="ops-btn-details" onclick="showDeploymentDetails(' + JSON.stringify(l).replace(/"/g, '&quot;') + ')">view</button></td>'
+          + '<td><button class="ops-btn-details" onclick="showDeploymentDetails(' + JSON.stringify(r).replace(/"/g, '&quot;') + ')">view</button></td>'
           + '</tr>';
       }).join('');
     }
 
     function filterDeploymentsTable() {
       var state = (document.getElementById('deploymentsFilter') || {}).value || '';
-      var rows = _deploymentsData.filter(function(l) {
+      var rows = _deploymentsData.filter(function(r) {
         if (!state) return true;
-        if (state === 'building') return ['building','importing','publishing'].includes(l.state);
-        return (l.state || '').toLowerCase() === state;
+        if (state === 'building') return ['building','importing','publishing'].includes(r._state);
+        return (r._state || '').toLowerCase() === state;
       });
       renderDeploymentsTable(rows);
     }
 
-    function showDeploymentDetails(l) {
+    function showDeploymentDetails(r) {
       var drawer  = document.getElementById('deploymentDetailDrawer');
       var content = document.getElementById('deploymentDetailContent');
       if (!drawer) return;
-      // Build deployment timeline
+      // Use deploymentState from the version record (building/importing/publishing/published/failed)
+      var depState = r.deploymentState || r._state || 'published';
       var stages = ['building','importing','publishing','published'];
-      var curIdx = stages.indexOf(l.state);
-      if (l.state === 'failed') curIdx = -1;
+      var curIdx = stages.indexOf(depState);
+      var failed = depState === 'failed';
+      if (failed) curIdx = -1;
       var timelineHtml = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">'
         + stages.map(function(s, i) {
-          var done  = curIdx >= i;
-          var color = done ? 'var(--acc)' : (l.state === 'failed' && i === 0 ? 'var(--red)' : 'var(--mut2)');
+          var done  = !failed && curIdx >= i;
+          var color = done ? 'var(--acc)' : (failed && i === 0 ? 'var(--red)' : 'var(--mut2)');
           return '<span class="ops-timeline-pill" style="color:' + color + ';">'
-            + (done ? '✓ ' : '○ ') + s
+            + (done ? '✓ ' : (failed && i === 0 ? '✕ ' : '○ ')) + s
             + (i < stages.length - 1 ? '</span><span style="color:var(--mut2);">→' : '</span>');
         }).join('')
         + '</div>';
-      if (l.state === 'failed') {
+      if (failed) {
         timelineHtml += '<div style="background:rgba(255,180,171,.08);border:1px solid rgba(255,180,171,.2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:14px;">'
-          + '✕ Deployment failed' + (l.errorMessage ? ': ' + l.errorMessage : '') + '</div>';
+          + '✕ Deployment failed' + (r._errorMessage ? ': ' + r._errorMessage : '') + '</div>';
       }
       if (content) content.innerHTML = timelineHtml
         + '<pre class="ops-diff-pre" style="background:var(--sur2);border:1px solid var(--bdr2);border-radius:8px;margin:0;">'
-        + JSON.stringify(l, null, 2) + '</pre>';
+        + JSON.stringify(r, null, 2) + '</pre>';
       drawer.style.display = 'flex';
     }
 
@@ -7094,41 +7109,46 @@
         var data = await _opsFetch('/api/health/' + cid);
         var h = data.health || data || {};
 
-        // Score
-        var score = h.healthScore || h.score || '—';
+        // Score — API field is trackingHealthScore
+        var numericScore = typeof h.trackingHealthScore === 'number' ? h.trackingHealthScore : null;
+        var score = numericScore != null ? numericScore : '—';
+        var statusLabel = numericScore == null ? '—' : numericScore >= 80 ? 'Healthy' : numericScore >= 50 ? 'Degraded' : 'Critical';
+        var statusColor = numericScore == null ? 'var(--mut)' : numericScore >= 80 ? 'var(--grn)' : numericScore >= 50 ? 'var(--amber)' : 'var(--red)';
         _setEl('healthScoreVal', score);
-        var statusLabel = score >= 80 ? 'Healthy' : score >= 50 ? 'Degraded' : 'Critical';
-        var statusColor = score >= 80 ? 'var(--grn)' : score >= 50 ? 'var(--amber)' : 'var(--red)';
         _setEl('healthScoreStatus', statusLabel);
         var ss = document.getElementById('healthScoreStatus');
         if (ss) ss.style.color = statusColor;
 
-        // Platforms
-        var platforms = { GA4: 'hcGA4Status', Meta: 'hcMetaStatus', 'Google Ads': 'hcGAdsStatus', TikTok: 'hcTikTokStatus' };
-        var pData = h.platforms || {};
-        Object.keys(platforms).forEach(function(p) {
-          var ps = (pData[p] || pData[p.toLowerCase()] || {});
-          var el = document.getElementById(platforms[p]);
-          if (el) {
-            var ok = ps.ok || ps.active || ps.healthy;
-            el.textContent = ok ? '✓ Active' : (ps.status || 'Not configured');
-            el.style.color = ok ? 'var(--grn)' : 'var(--mut)';
-          }
+        // Platforms — API returns flat booleans ga4/meta/googleAds/tiktok
+        var platMap = [
+          { key: 'ga4',       elId: 'hcGA4Status',   label: 'GA4' },
+          { key: 'meta',      elId: 'hcMetaStatus',  label: 'Meta' },
+          { key: 'googleAds', elId: 'hcGAdsStatus',  label: 'Google Ads' },
+          { key: 'tiktok',    elId: 'hcTikTokStatus',label: 'TikTok' },
+        ];
+        platMap.forEach(function(p) {
+          var el = document.getElementById(p.elId);
+          if (!el) return;
+          var ok = !!h[p.key];
+          el.textContent = ok ? '✓ Active' : 'Not configured';
+          el.style.color = ok ? 'var(--grn)' : 'var(--mut)';
         });
 
-        // Freshness / event
-        _setEl('hcLastEvent',      h.lastEventAgo  || _opsTimeAgo(h.lastEventAt)  || '—');
-        _setEl('hcLastEventName',  h.lastEventName || '—');
-        _setEl('hcLastPublish',    h.lastPublishAgo || _opsTimeAgo(h.lastPublishAt) || '—');
+        // Freshness / event — API field is lastEventReceived
+        _setEl('hcLastEvent',      _opsTimeAgo(h.lastEventReceived) || '—');
+        _setEl('hcLastEventName',  '—');
+        _setEl('hcLastPublish',    _opsTimeAgo(h.lastPublish) || '—');
         _setEl('hcLastPublishVer', h.lastVersion ? 'v' + h.lastVersion : '—');
-        _setEl('hcFreshness',      h.freshness || h.eventFreshness || '—');
-        _setEl('hcDeployHealth',   h.deploymentHealth || (h.failedDeployments > 0 ? 'Degraded' : 'Healthy'));
-        _setEl('hcDeployDetail',   h.failedDeployments ? h.failedDeployments + ' failed' : 'All clear');
-        _setEl('hcAlerts',         h.alertCount || h.activeAlerts || 0);
-        _setEl('hcAlertsDetail',   h.alertCount ? 'action required' : 'No active alerts');
+        _setEl('hcFreshness',      '—');
+        var alertCount = Array.isArray(h.alerts) ? h.alerts.length : 0;
+        var stuckCount = Array.isArray(h.stuckDeployments) ? h.stuckDeployments.length : 0;
+        _setEl('hcDeployHealth',   stuckCount > 0 ? 'Degraded' : 'Healthy');
+        _setEl('hcDeployDetail',   stuckCount > 0 ? stuckCount + ' stuck' : 'All clear');
+        _setEl('hcAlerts',         alertCount);
+        _setEl('hcAlertsDetail',   alertCount > 0 ? 'action required' : 'No active alerts');
 
         // Drift
-        var drift = h.driftDetected || h.drift;
+        var drift = h.driftDetected;
         _setEl('hcDrift',       drift ? '⚠ Detected' : '✓ Clean');
         _setEl('hcDriftDetail', drift ? (h.driftWarning || 'Manual GTM changes found') : 'No changes outside Easy Track');
         var driftEl = document.getElementById('hcDrift');
@@ -7160,7 +7180,7 @@
       if (table)   table.style.display   = 'none';
       if (empty)   empty.style.display   = 'none';
       try {
-        var url = '/api/v1/clients/' + cid + '/audit-log?limit=25' + (_auditBefore ? '&before=' + _auditBefore : '');
+        var url = '/api/audit/' + cid + '?limit=25' + (_auditBefore ? '&before=' + _auditBefore : '');
         var data = await _opsFetch(url);
         _auditData = data.logs || data.events || [];
         renderAuditTable(_auditData);
@@ -7188,14 +7208,14 @@
       if (!rows || !rows.length) { if (empty) empty.style.display = 'flex'; return; }
       if (table) table.style.display = 'table';
       tbody.innerHTML = rows.map(function(e) {
-        var result = e.result || e.status || 'ok';
-        var resColor = result === 'ok' || result === 'success' ? 'green' : result === 'failed' || result === 'error' ? 'red' : 'dim';
+        // API response: { id, occurredAt, actorType, actorId, action, entityType, entityId, diff, ipAddress }
+        var actor = e.actorId || e.actorType || 'system';
+        var entity = e.entityId ? (e.entityType || '') + ' ' + e.entityId.slice(-8) : (e.entityType || '—');
         return '<tr>'
-          + '<td style="font-family:var(--font-mono);font-size:11px;color:var(--mut);white-space:nowrap;">' + _opsFormatDate(e.timestamp || e.createdAt) + '</td>'
+          + '<td style="font-family:var(--font-mono);font-size:11px;color:var(--mut);white-space:nowrap;">' + _opsFormatDate(e.occurredAt) + '</td>'
           + '<td><span style="font-family:var(--font-mono);font-size:12px;color:var(--wht2);">' + (e.action || '—') + '</span></td>'
-          + '<td style="font-size:12px;color:var(--mut);">' + (e.actor || e.performedBy || 'system') + '</td>'
-          + '<td style="font-family:var(--font-mono);font-size:11px;color:var(--mut);">' + (e.deploymentId || e.resourceId || '—') + '</td>'
-          + '<td>' + _opsBadge(result, resColor) + '</td>'
+          + '<td style="font-size:12px;color:var(--mut);">' + actor + '</td>'
+          + '<td style="font-family:var(--font-mono);font-size:11px;color:var(--mut);">' + entity + '</td>'
           + '<td><button class="ops-btn-details" onclick="showAuditDetail(' + JSON.stringify(e).replace(/"/g, '&quot;') + ')">view</button></td>'
           + '</tr>';
       }).join('');
@@ -7217,7 +7237,7 @@
       if (dir > 0 && _auditData.length < 25) return;
       if (dir > 0) {
         var last = _auditData[_auditData.length - 1];
-        _auditBefore = last && (last.timestamp || last.createdAt);
+        _auditBefore = last && last.occurredAt;
         _auditPage++;
       } else {
         _auditBefore = null;
@@ -7245,21 +7265,22 @@
         var health = await _opsFetch('/api/health/' + cid);
         var h = health.health || health || {};
 
-        var score = h.healthScore || h.score || 0;
-        _setEl('ovOpsScore',      score || '—');
+        var numScore = typeof h.trackingHealthScore === 'number' ? h.trackingHealthScore : null;
+        _setEl('ovOpsScore', numScore != null ? numScore : '—');
         var scoreEl = document.getElementById('ovOpsScore');
-        if (scoreEl) scoreEl.style.color = score >= 80 ? 'var(--grn)' : score >= 50 ? 'var(--amber)' : 'var(--red)';
+        if (scoreEl) scoreEl.style.color = numScore == null ? 'var(--mut)' : numScore >= 80 ? 'var(--grn)' : numScore >= 50 ? 'var(--amber)' : 'var(--red)';
 
         _setEl('ovOpsDrift',      h.driftDetected ? '⚠ Drift' : '✓ Clean');
         var driftEl = document.getElementById('ovOpsDrift');
         if (driftEl) driftEl.style.color = h.driftDetected ? 'var(--amber)' : 'var(--grn)';
 
-        _setEl('ovOpsAlerts',     h.alertCount || 0);
+        var alertCount = Array.isArray(h.alerts) ? h.alerts.length : 0;
+        _setEl('ovOpsAlerts',     alertCount);
         var alertsEl = document.getElementById('ovOpsAlerts');
-        if (alertsEl) alertsEl.style.color = (h.alertCount > 0) ? 'var(--red)' : 'var(--grn)';
+        if (alertsEl) alertsEl.style.color = alertCount > 0 ? 'var(--red)' : 'var(--grn)';
 
-        _setEl('ovOpsLastEvent',  h.lastEventAgo || _opsTimeAgo(h.lastEventAt) || '—');
-        _setEl('ovOpsLastEventSub', h.lastEventName || '');
+        _setEl('ovOpsLastEvent',  _opsTimeAgo(h.lastEventReceived) || '—');
+        _setEl('ovOpsLastEventSub', '');
 
         // Drift banner on overview
         var banner = document.getElementById('ovOpsDriftBanner');
@@ -7279,16 +7300,15 @@
 
       try {
         var deps = await _opsFetch('/api/deployments/' + cid);
-        var dlogs = deps.logs || [];
+        var joined = joinDeployments(deps.logs || [], deps.versions || []);
         var today = new Date(); today.setHours(0,0,0,0);
-        var todayCount = dlogs.filter(function(l) {
-          var d = (l.startedAt && l.startedAt.toDate) ? l.startedAt.toDate() : new Date(l.startedAt || 0);
-          return d >= today;
+        var todayCount = joined.filter(function(r) {
+          return r._ts && new Date(r._ts) >= today;
         }).length;
-        var last = dlogs[0];
+        var last = joined[0];
         _setEl('ovOpsDeploys',    todayCount);
-        _setEl('ovOpsLastDeploy', last ? _opsTimeAgo(last.startedAt) : '—');
-        _setEl('ovOpsLastDeploySub', last ? (last.state || '') : '');
+        _setEl('ovOpsLastDeploy', last ? _opsTimeAgo(last._ts) : '—');
+        _setEl('ovOpsLastDeploySub', last ? (last._state || '') : '');
       } catch (_) {}
     }
 

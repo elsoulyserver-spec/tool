@@ -2129,8 +2129,37 @@ const server = http.createServer((req, res) => {
 
   // ── VERSION HISTORY ENDPOINTS ──────────────────────────────────────────────
 
-  // GET /api/versions/:clientId — list deployment history (newest first).
+  // ── GET /api/versions/:clientId ──────────────────────────────────────────────
+  // List container_versions for a client, newest first (by version number desc).
+  // No pagination — returns up to 50 records (hardcoded in listVersions).
   // Auth: admin token.
+  /*
+  Response:
+  {
+    "ok": true,
+    "clientId": "uid_abc123",
+    "versions": [
+      {
+        "id": "firestore_doc_id",
+        "version": 12,
+        "publishedAt": "2026-06-30T10:00:00.000Z",
+        "publishedBy": "admin/rollback",
+        "deploymentType": "publish",
+        "status": "published",
+        "gtmVersionId": "45",
+        "gtmPublicId": "GTM-XXXXX",
+        "diffSummary": { "added": 0, "modified": 0, "removed": 0 },
+        "configSnapshot": { "..." : "..." }
+      }
+    ]
+  }
+  Note: driftDetected is NOT in this response. It is in GET /api/health and
+        GET /api/deployments (versions[].driftDetected).
+  Errors:
+    401 { "error": "Unauthorized" }
+    503 { "error": "Firestore not configured" }
+    500 { "error": "..." }
+  */
   const _verListMatch = req.url.split('?')[0].match(/^\/api\/versions\/([^/]+)$/);
   if (req.method === 'GET' && _verListMatch) {
     if (!_requireAdmin()) return;
@@ -2158,9 +2187,33 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // POST /api/versions/rollback  (Phase 2.5 — Production Hardened)
-  // Body: { clientId, version }
-  // Full state machine: lock → pre-flight → drift check → build → import → publish → audit
+  // ── POST /api/versions/rollback ──────────────────────────────────────────────
+  // Full state machine: lock → pre-flight → drift check → build → import → publish → audit.
+  // Auth: admin token.
+  /*
+  Request body: { "clientId": "uid_abc123", "version": 11 }
+  Success response:
+  {
+    "ok": true,
+    "clientId": "uid_abc123",
+    "deploymentId": "rb_lxyz9a",
+    "rolledBackFrom": 11,
+    "newVersion": 12,
+    "gtmVersionId": "46",
+    "drift": null
+  }
+  drift when detected: { "detected": true, "warning": "GTM ver changed outside Easy Track" }
+  Errors:
+    400 { "error": "clientId is required" | "version (number) is required" }
+    401 { "error": "Unauthorized" }
+    404 { "error": "Version N not found for clientId X" }
+    409 { "error": "Another deployment is already in progress..." }
+    422 { "error": "Cannot rollback a rollback deployment", "hint": "..." }
+        { "error": "Version has no configSnapshot — cannot rollback", "hint": "..." }
+        { "error": "Version record missing containerId" }
+    500 { "error": "...", "deploymentId": "rb_xxx" }
+    503 { "error": "Firestore not configured" | "GTM not configured" }
+  */
   if (req.method === 'POST' && req.url.split('?')[0] === '/api/versions/rollback') {
     if (!_requireAdmin()) return;
     if (!firestoreService.isConfigured()) return sendJSON(res, 503, { error: 'Firestore not configured' });
@@ -2372,8 +2425,65 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // GET /api/deployments/:clientId — list deployment audit logs for a client.
+  // ── GET /api/deployments/:clientId ───────────────────────────────────────────
+  // Returns two parallel arrays that the frontend JOIN by deploymentId.
+  //
+  // JOIN CONTRACT:
+  //   logs[].deploymentId  — always present for rollback and recovery events.
+  //   versions[].deploymentId — present for rollbacks; NULL for regular publishes.
+  //
+  // Regular publishes (from /api/internal/run-provision-job) only create a
+  // container_versions doc with no deployment log and deploymentId === null.
+  // Rollbacks always produce: one version doc + ≥2 log entries (start + success/fail).
+  //
+  // Frontend algorithm:
+  //   const byId = {};
+  //   versions.forEach(v => { byId[v.deploymentId || v.id] = { ...v, logs: [] }; });
+  //   logs.forEach(l => { if (byId[l.deploymentId]) byId[l.deploymentId].logs.push(l); });
+  //
   // Auth: admin token.
+  /*
+  Response:
+  {
+    "ok": true,
+    "clientId": "uid_abc123",
+    "logs": [
+      {
+        "id": "doc_id",
+        "deploymentId": "rb_lxyz9a",
+        "action": "rollback_success",
+        "actor": "admin",
+        "targetVersion": 11,
+        "newVersion": 12,
+        "gtmVersionId": "46",
+        "success": true,
+        "error": null,
+        "timestamp": "2026-06-30T10:00:00.000Z",
+        "metadata": { "drift": false, "driftWarning": null }
+      }
+    ],
+    "versions": [
+      {
+        "id": "doc_id",
+        "version": 12,
+        "deploymentId": "rb_lxyz9a",
+        "deploymentType": "rollback",
+        "deploymentState": "published",
+        "status": "published",
+        "publishedAt": "2026-06-30T10:00:00.000Z",
+        "publishedBy": "admin/rollback",
+        "gtmVersionId": "46",
+        "driftDetected": false,
+        "failureReason": null,
+        "rolledBackFrom": 11
+      }
+    ]
+  }
+  Errors:
+    401 { "error": "Unauthorized" }
+    503 { "error": "Firestore not configured" }
+    500 { "error": "..." }
+  */
   const _depLogsMatch = req.url.split('?')[0].match(/^\/api\/deployments\/([^/]+)$/);
   if (req.method === 'GET' && _depLogsMatch) {
     if (!_requireAdmin()) return;
@@ -2423,10 +2533,108 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // GET /api/health/:clientId — unified tracking health report.
-  // Composes: diagnostic_results + client_health_cache + latest version + platform health
-  // + active deployment count from recovery system.
+  // ── GET /api/audit/:clientId ─────────────────────────────────────────────────
+  // Admin audit log with serialized timestamps.
+  // Auth: ADMIN_TOKEN (same _requireAdmin as all /api/* admin routes).
+  // Distinct from /api/v1/clients/:id/audit-log which requires Firebase JWT.
+  // Query params:
+  //   limit  — integer 1-200, default 50
+  //   before — ISO timestamp string (cursor for next page)
+  /*
+  Response:
+  {
+    "ok": true,
+    "clientId": "uid_abc123",
+    "logs": [
+      {
+        "id": "firestore_doc_id",
+        "occurredAt": "2026-06-30T12:00:00.000Z",
+        "actorType": "admin",
+        "actorId": "uid_admin",
+        "action": "client.profile.update",
+        "entityType": "client",
+        "entityId": "uid_abc123",
+        "diff": { "name": { "from": "Old", "to": "New" } },
+        "ipAddress": "1.2.3.4"
+      }
+    ],
+    "total": 10
+  }
+  Errors:
+    401 { "error": "Unauthorized" }
+    503 { "error": "Firestore not configured" }
+    500 { "error": "..." }
+  */
+  const _auditMatch = req.url.split('?')[0].match(/^\/api\/audit\/([^/]+)$/);
+  if (req.method === 'GET' && _auditMatch) {
+    if (!_requireAdmin()) return;
+    if (!firestoreService.isConfigured()) return sendJSON(res, 503, { error: 'Firestore not configured' });
+    const clientId = decodeURIComponent(_auditMatch[1]);
+    const _qp  = new URLSearchParams(req.url.includes('?') ? req.url.split('?')[1] : '');
+    const limit  = Math.min(parseInt(_qp.get('limit') || '50', 10), 200);
+    const before = _qp.get('before') || null;
+    try {
+      const rawLogs = await firestoreService.queryAuditLogs(clientId, { limit, before });
+      // Serialize every Firestore Timestamp to ISO string before JSON transport.
+      const _ts = v => v && v.toDate ? v.toDate().toISOString() : (typeof v === 'string' ? v : null);
+      const logs = rawLogs.map(l => ({
+        id:         l.id,
+        occurredAt: _ts(l.occurredAt),
+        actorType:  l.actorType  || null,
+        actorId:    l.actorId    || null,
+        action:     l.action     || null,
+        entityType: l.entityType || null,
+        entityId:   l.entityId   || null,
+        diff:       l.diff       || null,
+        ipAddress:  l.ipAddress  || null,
+      }));
+      sendJSON(res, 200, { ok: true, clientId, logs, total: logs.length });
+    } catch (e) {
+      console.error('[audit] error:', e.message);
+      sendJSON(res, 500, { error: e.message });
+    }
+    return;
+  }
+
+  // ── GET /api/health/:clientId ─────────────────────────────────────────────────
+  // Unified tracking health report. Composes:
+  //   diagnostic_results + client_health_cache + latest version + platform health
+  //   + active deployment count from recovery system.
   // Auth: admin token.
+  /*
+  Response:
+  {
+    "ok": true,
+    "clientId": "uid_abc123",
+    "trackingHealthScore": 75,
+    "ga4": true,
+    "meta": false,
+    "googleAds": true,
+    "tiktok": false,
+    "lastEventReceived": "2026-06-30T10:00:00.000Z",
+    "lastPublish": "2026-06-30T10:00:00.000Z",
+    "lastVersion": 12,
+    "driftDetected": false,
+    "activeDeployment": false,
+    "stuckDeployments": 0,
+    "lastRecovery": null,
+    "platformHealth": {},
+    "alerts": [
+      { "message": "1 deployment(s) currently active", "severity": "info" }
+    ],
+    "computedAt": null
+  }
+  Notes:
+    - trackingHealthScore: 0-100. Sourced from diagnostic_results.healthScore,
+      then client_health_cache.healthScore, then computed as 25pts per active platform.
+    - driftDetected: sourced from container_versions (latest record).
+    - alerts: derived from diag.alerts, diag.issues, + active deployment count.
+    - ga4/meta/googleAds/tiktok: boolean — true means platform is active.
+  Errors:
+    401 { "error": "Unauthorized" }
+    503 { "error": "Firestore not configured" }
+    500 { "error": "..." }
+  */
   const _healthMatch = req.url.split('?')[0].match(/^\/api\/health\/([^/]+)$/);
   if (req.method === 'GET' && _healthMatch) {
     if (!_requireAdmin()) return;
@@ -2485,6 +2693,9 @@ const server = http.createServer((req, res) => {
           ? (lastVersion.publishedAt.toDate ? lastVersion.publishedAt.toDate().toISOString() : lastVersion.publishedAt)
           : null,
         lastVersion:          lastVersion ? lastVersion.version : null,
+        // driftDetected: sourced from the most recent container_versions doc.
+        // Only rollback deployments set this; regular publishes default to false.
+        driftDetected:        lastVersion ? (lastVersion.driftDetected || false) : false,
         activeDeployment:     activeDeployments > 0,
         stuckDeployments:     0,           // filled by recovery job on next sweep
         lastRecovery:         null,        // filled when recovery runs
