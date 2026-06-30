@@ -18,6 +18,22 @@
       ]
     },
     {
+      "collectionGroup": "container_versions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clientId", "order": "ASCENDING"  },
+        { "fieldPath": "version",  "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "deployment_logs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clientId",  "order": "ASCENDING"  },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "activity_timeline",
       "queryScope": "COLLECTION",
       "fields": [
