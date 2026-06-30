@@ -1593,7 +1593,7 @@ function sendJSON(res, code, obj) {
 // ══════════════════════════════════════════════════════════════════════════════
 // HTTP SERVER
 // ══════════════════════════════════════════════════════════════════════════════
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
 
   // ── CORS preflight ──────────────────────────────────────────
   if (req.method === 'OPTIONS') {
@@ -1992,31 +1992,58 @@ const server = http.createServer((req, res) => {
 
   // ══════════════════════════════════════════════════════════════════════════
   // ADMIN ENDPOINTS
-  // Protected by a bearer token: set ADMIN_TOKEN env var on the server, then
-  // call with header: Authorization: Bearer <ADMIN_TOKEN>
+  // Accepts EITHER:
+  //   1) Legacy:   Authorization: Bearer <ADMIN_TOKEN>  (ADMIN_TOKEN env var)
+  //   2) Firebase: Authorization: Bearer <firebase-id-token>, where the
+  //      decoded token has the `admin: true` custom claim (same convention
+  //      as /api/v1/* — see line ~3459) or an email in ADMIN_EMAILS.
   // ══════════════════════════════════════════════════════════════════════════
-  function _requireAdmin() {
-    const expected = process.env.ADMIN_TOKEN;
-    if (!expected) {
-      sendJSON(res, 503, { error: 'ADMIN_TOKEN is not configured on the server' });
-      return false;
-    }
+  async function _requireAdmin() {
     const auth = req.headers['authorization'] || req.headers['Authorization'] || '';
     const token = auth.replace(/^Bearer\s+/i, '').trim();
-    // Constant-time comparison to prevent timing attacks
-    const a = Buffer.from(token);
-    const b = Buffer.from(expected);
-    const ok = a.length === b.length && require('crypto').timingSafeEqual(a, b);
-    if (!ok) {
+
+    if (!token) {
       sendJSON(res, 401, { error: 'Unauthorized' });
       return false;
     }
-    return true;
+
+    // 1) Legacy ADMIN_TOKEN — constant-time comparison to prevent timing attacks
+    const expected = process.env.ADMIN_TOKEN;
+    if (expected) {
+      const a = Buffer.from(token);
+      const b = Buffer.from(expected);
+      if (a.length === b.length && require('crypto').timingSafeEqual(a, b)) {
+        return true;
+      }
+    }
+
+    // 2) Firebase ID token with admin claim or ADMIN_EMAILS allowlist
+    try {
+      const decoded = await firestoreService.verifyIdToken(token);
+      const admins = (process.env.ADMIN_EMAILS || '')
+        .split(',')
+        .map(v => v.trim())
+        .filter(Boolean);
+      // TEMP: remove once ADMIN_EMAILS auth is confirmed working in prod
+      console.log('[ADMIN AUTH]', {
+        email: decoded?.email,
+        admin: decoded?.admin,
+        role: decoded?.role,
+        allowed: admins.includes(decoded?.email),
+      });
+      if (decoded.admin === true || decoded.role === 'admin' || admins.includes(decoded.email)) {
+        req.adminUser = decoded;
+        return true;
+      }
+    } catch (_) {}
+
+    sendJSON(res, 401, { error: 'Unauthorized' });
+    return false;
   }
 
   // GET /api/admin/export — internal admin data dump (JSON only, no file download)
   if (req.method === 'GET' && req.url.startsWith('/api/admin/export')) {
-    if (!_requireAdmin()) return;
+    if (!(await _requireAdmin())) return;
     if (!firestoreService.isConfigured()) {
       return sendJSON(res, 503, { error: 'Firestore is not configured' });
     }
@@ -2036,7 +2063,7 @@ const server = http.createServer((req, res) => {
 
   // GET /api/admin/ping — quick token validity check (used by admin login)
   if (req.method === 'GET' && req.url.startsWith('/api/admin/ping')) {
-    if (!_requireAdmin()) return;
+    if (!(await _requireAdmin())) return;
     return sendJSON(res, 200, { ok: true, firestore: firestoreService.isConfigured() });
   }
 
@@ -2051,7 +2078,7 @@ const server = http.createServer((req, res) => {
   //
   // Returns: { ok, platform, gtm: { tagIds, versionId, published } }
   if (req.method === 'POST' && req.url.split('?')[0] === '/api/admin/rotate-token') {
-    if (!_requireAdmin()) return;
+    if (!(await _requireAdmin())) return;
     parseJsonBody(req, res, async body => {
       const { clientId, platform, newToken } = body || {};
       const ALLOWED_PLATFORMS = ['meta', 'tiktok', 'snap'];
@@ -2162,7 +2189,7 @@ const server = http.createServer((req, res) => {
   */
   const _verListMatch = req.url.split('?')[0].match(/^\/api\/versions\/([^/]+)$/);
   if (req.method === 'GET' && _verListMatch) {
-    if (!_requireAdmin()) return;
+    if (!(await _requireAdmin())) return;
     if (!firestoreService.isConfigured()) return sendJSON(res, 503, { error: 'Firestore not configured' });
     const clientId = decodeURIComponent(_verListMatch[1]);
     (async () => {
@@ -2217,7 +2244,7 @@ const server = http.createServer((req, res) => {
     503 { "error": "Firestore not configured" | "GTM not configured" }
   */
   if (req.method === 'POST' && req.url.split('?')[0] === '/api/versions/rollback') {
-    if (!_requireAdmin()) return;
+    if (!(await _requireAdmin())) return;
     if (!firestoreService.isConfigured()) return sendJSON(res, 503, { error: 'Firestore not configured' });
     if (!gtmService.isConfigured())       return sendJSON(res, 503, { error: 'GTM not configured' });
 
@@ -2488,7 +2515,7 @@ const server = http.createServer((req, res) => {
   */
   const _depLogsMatch = req.url.split('?')[0].match(/^\/api\/deployments\/([^/]+)$/);
   if (req.method === 'GET' && _depLogsMatch) {
-    if (!_requireAdmin()) return;
+    if (!(await _requireAdmin())) return;
     if (!firestoreService.isConfigured()) return sendJSON(res, 503, { error: 'Firestore not configured' });
     const clientId = decodeURIComponent(_depLogsMatch[1]);
     (async () => {
@@ -2571,7 +2598,7 @@ const server = http.createServer((req, res) => {
   */
   const _auditMatch = req.url.split('?')[0].match(/^\/api\/audit\/([^/]+)$/);
   if (req.method === 'GET' && _auditMatch) {
-    if (!_requireAdmin()) return;
+    if (!(await _requireAdmin())) return;
     if (!firestoreService.isConfigured()) return sendJSON(res, 503, { error: 'Firestore not configured' });
     const clientId = decodeURIComponent(_auditMatch[1]);
     const _qp  = new URLSearchParams(req.url.includes('?') ? req.url.split('?')[1] : '');
@@ -2643,7 +2670,7 @@ const server = http.createServer((req, res) => {
   */
   const _healthMatch = req.url.split('?')[0].match(/^\/api\/health\/([^/]+)$/);
   if (req.method === 'GET' && _healthMatch) {
-    if (!_requireAdmin()) return;
+    if (!(await _requireAdmin())) return;
     if (!firestoreService.isConfigured()) return sendJSON(res, 503, { error: 'Firestore not configured' });
     const clientId = decodeURIComponent(_healthMatch[1]);
     (async () => {
@@ -2721,7 +2748,7 @@ const server = http.createServer((req, res) => {
   // POST /api/admin/client/:uid — update client fields (status, plan, ...)
   const _cliUpdMatch = req.url.split('?')[0].match(/^\/api\/admin\/client\/([^/]+)$/);
   if (req.method === 'POST' && _cliUpdMatch) {
-    if (!_requireAdmin()) return;
+    if (!(await _requireAdmin())) return;
     if (!firestoreService.isConfigured()) {
       return sendJSON(res, 503, { error: 'Firestore is not configured' });
     }
@@ -2736,7 +2763,7 @@ const server = http.createServer((req, res) => {
 
   // DELETE /api/admin/client/:uid — delete a client document
   if (req.method === 'DELETE' && _cliUpdMatch) {
-    if (!_requireAdmin()) return;
+    if (!(await _requireAdmin())) return;
     if (!firestoreService.isConfigured()) {
       return sendJSON(res, 503, { error: 'Firestore is not configured' });
     }
