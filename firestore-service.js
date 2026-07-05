@@ -1074,6 +1074,329 @@ async function saveVersionGetId(record) {
   return ref.id;
 }
 
+// Managed sGTM hosting registry.
+// These collections are the source of truth for tenant -> shard/service routing.
+const MANAGED_SERVERS_COLLECTION     = 'managed_servers';
+const MANAGED_DEPLOYMENTS_COLLECTION = 'managed_deployments';
+const MANAGED_ROUTES_COLLECTION      = 'managed_routes';
+const MANAGED_ATTACH_WINDOW_MS       = 35 * 60 * 1000;
+
+const MANAGED_TRANSIENT_STATES = new Set(['queued', 'deploying_preview', 'deploying_tagging', 'verifying']);
+const MANAGED_TERMINAL_STATES  = new Set(['active', 'failed', 'deleted']);
+const MANAGED_ALLOWED_TRANSITIONS = {
+  queued:             ['deploying_preview', 'failed'],
+  deploying_preview:  ['deploying_tagging', 'failed'],
+  deploying_tagging:  ['verifying', 'failed'],
+  verifying:          ['active', 'failed'],
+  active:             ['deleted', 'deploying_preview'],
+  failed:             ['deploying_preview', 'deleted'],
+  deleted:            [],
+};
+
+function _managedServerId(clientId) {
+  if (!clientId) throw new Error('managed server clientId is required');
+  return String(clientId);
+}
+
+function _managedRouteId(hostname) {
+  if (!hostname) throw new Error('managed route hostname is required');
+  return String(hostname).trim().toLowerCase();
+}
+
+function _deploymentPatchForState(toState, patch) {
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const out = {
+    ...(patch || {}),
+    status:    toState,
+    updatedAt: now,
+  };
+  if (MANAGED_TRANSIENT_STATES.has(toState)) out.lastProgressAt = now;
+  if (MANAGED_TERMINAL_STATES.has(toState)) out.finishedAt = patch && patch.finishedAt || now;
+  return out;
+}
+
+function _toMillis(value) {
+  if (!value) return 0;
+  if (typeof value === 'number') return value;
+  if (value instanceof Date) return value.getTime();
+  if (value.toMillis) return value.toMillis();
+  return 0;
+}
+
+function _managedServerTransition(current, patch) {
+  const existing = current || {};
+  const next = { ...existing, ...(patch || {}) };
+  const from = existing.status || null;
+  const to   = next.status || from || 'provisioning';
+  const allowed = {
+    null:          ['provisioning', 'active', 'failed', 'suspended'],
+    provisioning:  ['provisioning', 'active', 'failed', 'suspended'],
+    active:        ['active', 'provisioning', 'suspended', 'failed'],
+    failed:        ['failed', 'provisioning', 'suspended'],
+    suspended:     ['suspended', 'active', 'provisioning', 'failed'],
+    deleted:       [],
+  };
+  const key = from === null ? 'null' : from;
+  if (!allowed[key] || !allowed[key].includes(to)) {
+    const err = new Error(`invalid managed server transition: ${from || 'new'} -> ${to}`);
+    err.code = 'INVALID_SERVER_TRANSITION';
+    err.from = from;
+    err.to   = to;
+    throw err;
+  }
+  next.status = to;
+  return next;
+}
+
+async function saveManagedServer(record) {
+  if (!record || !record.clientId) throw new Error('saveManagedServer: clientId is required');
+  if (!record.shardId) throw new Error('saveManagedServer: shardId is required');
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const doc = {
+    ...record,
+    id:        record.id || _managedServerId(record.clientId),
+    status:    record.status || 'provisioning',
+    createdAt: record.createdAt || now,
+    updatedAt: now,
+  };
+  await db().collection(MANAGED_SERVERS_COLLECTION).doc(doc.id).set(doc, { merge: true });
+  return doc;
+}
+
+async function getManagedServer(clientId) {
+  const snap = await db().collection(MANAGED_SERVERS_COLLECTION).doc(_managedServerId(clientId)).get();
+  return snap.exists ? { id: snap.id, ...snap.data() } : null;
+}
+
+async function listManagedServersByClient(clientId, { includeDeleted = false } = {}) {
+  if (!clientId) throw new Error('listManagedServersByClient: clientId is required');
+  let q = db().collection(MANAGED_SERVERS_COLLECTION).where('clientId', '==', clientId);
+  if (!includeDeleted) q = q.where('status', '!=', 'deleted');
+  const snap = await q.get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function listManagedServers({ status, limit = 100 } = {}) {
+  let q = db().collection(MANAGED_SERVERS_COLLECTION);
+  if (status) q = q.where('status', '==', status);
+  q = q.orderBy('createdAt', 'desc').limit(Math.min(limit, 200));
+  const snap = await q.get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function createManagedServerJobTx(input) {
+  if (!input || !input.clientId) throw new Error('createManagedServerJobTx: clientId is required');
+  if (!input.jobId) throw new Error('createManagedServerJobTx: jobId is required');
+  const clientId  = _managedServerId(input.clientId);
+  const serverRef = db().collection(MANAGED_SERVERS_COLLECTION).doc(clientId);
+  const jobRef    = db().collection(JOBS_COLLECTION).doc(input.jobId);
+  const nowMs     = Date.now();
+
+  return db().runTransaction(async tx => {
+    const snap = await tx.get(serverRef);
+    const now  = admin.firestore.FieldValue.serverTimestamp();
+    if (snap.exists) {
+      const existing = { id: snap.id, ...snap.data() };
+      if (existing.status === 'active') {
+        return {
+          outcome: 'reuse',
+          server: existing,
+          publicServerUrl: existing.publicServerUrl || null,
+        };
+      }
+      const inFlight = existing.status === 'provisioning' && existing.jobId;
+      const updatedMs = _toMillis(existing.updatedAt) || _toMillis(existing.createdAt);
+      if (inFlight && updatedMs && nowMs - updatedMs < MANAGED_ATTACH_WINDOW_MS) {
+        return { outcome: 'attach', jobId: existing.jobId, server: existing };
+      }
+    }
+
+    const serverDoc = _managedServerTransition(snap.exists ? snap.data() : null, {
+      ...(input.server || {}),
+      id:         clientId,
+      clientId,
+      userId:     input.userId || input.clientId,
+      email:      input.email || null,
+      shard:      input.shardId || input.shard || (input.server && (input.server.shardId || input.server.shard)) || null,
+      shardId:    input.shardId || input.shard || (input.server && (input.server.shardId || input.server.shard)) || null,
+      status:     'provisioning',
+      currentStep: 'queued',
+      jobId:      input.jobId,
+      createdAt:  snap.exists ? snap.data().createdAt : now,
+      updatedAt:  now,
+    });
+    tx.set(serverRef, serverDoc, { merge: true });
+    tx.set(jobRef, {
+      ...(input.job || {}),
+      jobId:     input.jobId,
+      jobType:   input.jobType || 'managed_server',
+      clientId,
+      status:    'pending',
+      stage:     'queued',
+      createdAt: now,
+      updatedAt: now,
+      expiresAt: input.expiresAt || admin.firestore.Timestamp.fromMillis(Date.now() + JOB_TTL_MS),
+    }, { merge: true });
+    return { outcome: snap.exists ? 'resume' : 'created', jobId: input.jobId, server: serverDoc };
+  });
+}
+
+async function saveManagedRoute(record) {
+  if (!record || !record.hostname) throw new Error('saveManagedRoute: hostname is required');
+  if (!record.clientId) throw new Error('saveManagedRoute: clientId is required');
+  const now      = admin.firestore.FieldValue.serverTimestamp();
+  const hostname = _managedRouteId(record.hostname);
+  const doc = {
+    ...record,
+    hostname,
+    status:    record.status || 'active',
+    createdAt: record.createdAt || now,
+    updatedAt: now,
+  };
+  await db().collection(MANAGED_ROUTES_COLLECTION).doc(hostname).set(doc, { merge: true });
+  return doc;
+}
+
+async function getManagedRoute(hostname) {
+  const snap = await db().collection(MANAGED_ROUTES_COLLECTION).doc(_managedRouteId(hostname)).get();
+  return snap.exists ? { id: snap.id, ...snap.data() } : null;
+}
+
+async function deleteManagedRoute(hostname) {
+  await db().collection(MANAGED_ROUTES_COLLECTION).doc(_managedRouteId(hostname)).delete();
+  return true;
+}
+
+async function saveManagedDeployment(record) {
+  if (!record || !record.clientId) throw new Error('saveManagedDeployment: clientId is required');
+  if (!record.serverId) throw new Error('saveManagedDeployment: serverId is required');
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const ref = db().collection(MANAGED_DEPLOYMENTS_COLLECTION).doc(record.id || undefined);
+  const doc = {
+    ...record,
+    id:             ref.id,
+    status:         record.status || 'queued',
+    createdAt:      record.createdAt || now,
+    updatedAt:      now,
+    lastProgressAt: record.lastProgressAt || now,
+  };
+  await ref.set(doc, { merge: true });
+  return doc;
+}
+
+async function createDeployment(record) {
+  if (!record || !record.clientId) throw new Error('createDeployment: clientId is required');
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const ref = db().collection(MANAGED_DEPLOYMENTS_COLLECTION).doc(record.deploymentId || record.id || undefined);
+  const doc = {
+    ...record,
+    deploymentId: record.deploymentId || ref.id,
+    id:           ref.id,
+    status:       record.status || 'running',
+    logs:         Array.isArray(record.logs) ? record.logs.slice(0, 50) : [],
+    startedAt:    record.startedAt || now,
+    updatedAt:    now,
+  };
+  await ref.set(doc, { merge: true });
+  return doc;
+}
+
+async function getManagedDeployment(deploymentId) {
+  if (!deploymentId) throw new Error('getManagedDeployment: deploymentId is required');
+  const snap = await db().collection(MANAGED_DEPLOYMENTS_COLLECTION).doc(deploymentId).get();
+  return snap.exists ? { id: snap.id, ...snap.data() } : null;
+}
+
+async function appendDeploymentLog(deploymentId, entry) {
+  if (!deploymentId) throw new Error('appendDeploymentLog: deploymentId is required');
+  if (!entry || !entry.message) throw new Error('appendDeploymentLog: entry.message is required');
+  const ref = db().collection(MANAGED_DEPLOYMENTS_COLLECTION).doc(deploymentId);
+  return db().runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) {
+      const err = new Error(`managed deployment not found: ${deploymentId}`);
+      err.code = 'NOT_FOUND';
+      throw err;
+    }
+    const current = snap.data();
+    const logs = Array.isArray(current.logs) ? current.logs.slice(-49) : [];
+    logs.push({
+      step:    entry.step || current.currentStep || null,
+      level:   entry.level || 'info',
+      message: String(entry.message).slice(0, 500),
+      at:      entry.at || admin.firestore.FieldValue.serverTimestamp(),
+    });
+    tx.update(ref, {
+      logs,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return logs;
+  });
+}
+
+async function finalizeDeployment(deploymentId, patch = {}) {
+  if (!deploymentId) throw new Error('finalizeDeployment: deploymentId is required');
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const startedMs = _toMillis(patch.startedAt);
+  const out = {
+    ...patch,
+    status:      patch.status || (patch.errorMessage ? 'failed' : 'succeeded'),
+    completedAt: patch.completedAt || now,
+    updatedAt:   now,
+  };
+  if (startedMs && !out.durationMs) out.durationMs = Date.now() - startedMs;
+  await db().collection(MANAGED_DEPLOYMENTS_COLLECTION).doc(deploymentId).set(out, { merge: true });
+  return out;
+}
+
+async function listManagedDeployments(clientId, { limit = 50 } = {}) {
+  if (!clientId) throw new Error('listManagedDeployments: clientId is required');
+  const snap = await db().collection(MANAGED_DEPLOYMENTS_COLLECTION)
+    .where('clientId', '==', clientId)
+    .orderBy('createdAt', 'desc')
+    .limit(Math.min(limit, 100))
+    .get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function listDeployments(clientId, opts) {
+  const { limit = 50 } = opts || {};
+  if (!clientId) throw new Error('listDeployments: clientId is required');
+  const snap = await db().collection(MANAGED_DEPLOYMENTS_COLLECTION)
+    .where('clientId', '==', clientId)
+    .orderBy('startedAt', 'desc')
+    .limit(Math.min(limit, 100))
+    .get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function transitionManagedDeployment(deploymentId, toState, patch = {}) {
+  if (!deploymentId) throw new Error('transitionManagedDeployment: deploymentId is required');
+  if (!toState) throw new Error('transitionManagedDeployment: toState is required');
+  const ref = db().collection(MANAGED_DEPLOYMENTS_COLLECTION).doc(deploymentId);
+  return db().runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) {
+      const err = new Error(`managed deployment not found: ${deploymentId}`);
+      err.code = 'NOT_FOUND';
+      throw err;
+    }
+    const current = snap.data();
+    const from    = current.status || 'queued';
+    const allowed = MANAGED_ALLOWED_TRANSITIONS[from] || [];
+    if (!allowed.includes(toState)) {
+      const err = new Error(`invalid managed deployment transition: ${from} -> ${toState}`);
+      err.code = 'INVALID_STATE_TRANSITION';
+      err.from = from;
+      err.to   = toState;
+      throw err;
+    }
+    const update = _deploymentPatchForState(toState, patch);
+    tx.update(ref, update);
+    return { id: deploymentId, ...current, ...update };
+  });
+}
+
 module.exports = {
   isConfigured,
   BEACON_EVENTS,
@@ -1160,4 +1483,22 @@ module.exports = {
   // Deployment recovery
   detectStuckDeployments,
   countActiveDeployments,
+  // Managed sGTM hosting registry
+  _managedServerTransition,
+  saveManagedServer,
+  getManagedServer,
+  listManagedServersByClient,
+  listManagedServers,
+  createManagedServerJobTx,
+  saveManagedRoute,
+  getManagedRoute,
+  deleteManagedRoute,
+  saveManagedDeployment,
+  createDeployment,
+  getManagedDeployment,
+  appendDeploymentLog,
+  finalizeDeployment,
+  listManagedDeployments,
+  listDeployments,
+  transitionManagedDeployment,
 };

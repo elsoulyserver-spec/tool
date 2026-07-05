@@ -1,0 +1,8 @@
+<svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>EasyTrack</title>
+  <desc>EasyTrack app icon, dark tile. Master vector — export to 1024/512/192/64 px as needed; do not rebuild at each size.</desc>
+  <rect width="512" height="512" rx="112" fill="#0A0A0A"/>
+  <path d="M272 144 L136 144 L136 368 L272 368" stroke="#FFFFFF" stroke-width="56" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M136 256 L312 256" stroke="#FFFFFF" stroke-width="56" stroke-linecap="round"/>
+  <circle cx="360" cy="256" r="48" fill="#2F6BFF"/>
+</svg>

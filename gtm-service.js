@@ -645,28 +645,20 @@ async function setGA4TransportUrl(webContainerId, webWorkspaceId, sgtmUrl) {
 //
 // The transport_url wiring happens AFTER the user pastes back the deployed
 // sGTM URL — that's the wire-transport route, not this function.
-async function provisionForClientWithServer(opts) {
+async function provisionServerOnly(opts) {
   if (!isConfigured()) {
     const err = new Error('Managed GTM is not configured on this server');
     err.code = 'NOT_CONFIGURED';
     throw err;
   }
 
+  opts = opts || {};
   const onProgress = opts.onProgress || function () {};
 
-  // 1. Web container — DO NOT publishLive yet.
-  onProgress({ stage: 'web_container', done: 0, total: 1 });
-  const web = await provisionForClient({
-    ...opts,
-    publishLive: false,                 // overridden — wire-transport publishes
-  });
-  onProgress({ stage: 'web_container', done: 1, total: 1 });
-
-  // 2. Server container shell.
   onProgress({ stage: 'server_container', done: 0, total: 1 });
   const ts = new Date().toISOString().replace('T', ' ').slice(0, 16).replace(':', '-');
   const baseName = (opts.projectName || 'Easy Track Project').toString().trim();
-  const serverName = baseName.slice(0, 50) + ' (Server) · ' + ts;
+  const serverName = baseName.slice(0, 50) + ' (Server) - ' + ts;
 
   let serverCt;
   try {
@@ -678,10 +670,9 @@ async function provisionForClientWithServer(opts) {
     } else { throw e; }
   }
   const serverContainerId = serverCt.containerId;
-  const serverPublicId    = serverCt.publicId;     // GTM-XXXXXX
+  const serverPublicId    = serverCt.publicId;
   onProgress({ stage: 'server_container', done: 1, total: 1 });
 
-  // 3. Default workspace + import sGTM default config.
   const serverWs = await getDefaultWorkspace(serverContainerId);
   const serverWorkspaceId = serverWs.workspaceId;
 
@@ -689,10 +680,6 @@ async function provisionForClientWithServer(opts) {
   let serverVersionId;
 
   if (opts.serverConfigJson) {
-    // PHASE 1 (feature-flagged upstream in server.js): import the full,
-    // client-built server config via the SAME versions:import path the BYO flow
-    // uses — preserves client + customTemplate (Meta/TikTok/Snap CAPI), which the
-    // per-entity importContainerJSON drops. The static path below is the fallback.
     onProgress({ stage: 'sgtm_import', done: 0, total: 1 });
     const imp = await importServerContainerVersion(serverContainerId, opts.serverConfigJson);
     const cv  = opts.serverConfigJson.containerVersion || {};
@@ -701,21 +688,19 @@ async function provisionForClientWithServer(opts) {
       importedTriggerCount:  (cv.trigger  || []).length,
       importedVariableCount: (cv.variable || []).length,
     };
-    // versions:import returns a ContainerVersion; tolerate either response shape.
     serverVersionId = (imp && (imp.containerVersionId ||
       (imp.containerVersion && imp.containerVersion.containerVersionId))) || null;
     if (!serverVersionId) {
-      console.warn('[gtm] versions:import returned no version id — server container may be unpublished');
+      console.warn('[gtm] versions:import returned no version id - server container may be unpublished');
     }
     onProgress({ stage: 'sgtm_import', done: 1, total: 1 });
   } else {
-    // Static fallback (UNCHANGED): per-entity import of the GA4-only default.
     let sgtmConfig;
     try {
       sgtmConfig = require('./lib/sgtm-default-config.json');
     } catch (e) {
       sgtmConfig = { containerVersion: { variable: [], trigger: [], tag: [] } };
-      console.warn('[gtm] lib/sgtm-default-config.json missing — server container will be empty');
+      console.warn('[gtm] lib/sgtm-default-config.json missing - server container will be empty');
     }
 
     onProgress({ stage: 'sgtm_import', done: 0, total: 1 });
@@ -725,36 +710,52 @@ async function provisionForClientWithServer(opts) {
     );
 
     const verResp  = await createVersion(serverContainerId, serverWorkspaceId,
-      'sGTM initial — ' + new Date().toISOString().split('T')[0]);
+      'sGTM initial - ' + new Date().toISOString().split('T')[0]);
     serverVersionId = verResp.containerVersion && verResp.containerVersion.containerVersionId;
   }
 
-  // 4. Publish the server container so containerConfig is generated.
   onProgress({ stage: 'sgtm_publish', done: 0, total: 1 });
   if (serverVersionId) {
     await publishVersion(serverContainerId, serverVersionId);
   }
   onProgress({ stage: 'sgtm_publish', done: 1, total: 1 });
 
-  // 5. Pull the live containerConfig blob — this is what the user pastes
-  //    into Stape / Cloud Run / Docker as the CONTAINER_CONFIG env var.
   const containerConfig = await getContainerConfig(serverContainerId);
 
   return {
-    web,                                            // existing shape from provisionForClient
-    server: {
-      gtmAccountId:    getAccountId(),
-      containerId:     serverContainerId,
-      publicId:        serverPublicId,
-      workspaceId:     serverWorkspaceId,
-      versionId:       serverVersionId,
-      containerName:   serverName,
-      containerConfig,                              // ← the deploy blob
-      importedTagCount:      importResult.importedTagCount      || 0,
-      importedTriggerCount:  importResult.importedTriggerCount  || 0,
-      importedVariableCount: importResult.importedVariableCount || 0,
-    },
+    gtmAccountId:    getAccountId(),
+    containerId:     serverContainerId,
+    publicId:        serverPublicId,
+    workspaceId:     serverWorkspaceId,
+    versionId:       serverVersionId,
+    containerName:   serverName,
+    containerConfig,
+    importedTagCount:      importResult.importedTagCount      || 0,
+    importedTriggerCount:  importResult.importedTriggerCount  || 0,
+    importedVariableCount: importResult.importedVariableCount || 0,
   };
+}
+
+async function provisionForClientWithServer(opts) {
+  if (!isConfigured()) {
+    const err = new Error('Managed GTM is not configured on this server');
+    err.code = 'NOT_CONFIGURED';
+    throw err;
+  }
+
+  opts = opts || {};
+  const onProgress = opts.onProgress || function () {};
+
+  // 1. Web container — DO NOT publishLive yet.
+  onProgress({ stage: 'web_container', done: 0, total: 1 });
+  const web = await provisionForClient({
+    ...opts,
+    publishLive: false,                 // overridden — wire-transport publishes
+  });
+  onProgress({ stage: 'web_container', done: 1, total: 1 });
+
+  const server = await provisionServerOnly(opts);
+  return { web, server };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -921,6 +922,7 @@ module.exports = {
   getContainerConfig,
   importServerContainerVersion,
   setGA4TransportUrl,
+  provisionServerOnly,
   provisionForClientWithServer,
   // Tag operations / token rotation
   listContainerTags,

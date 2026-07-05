@@ -52,10 +52,52 @@ if (puppeteer) {
 const MAX_CONCURRENT_SCANS = parseInt(process.env.MAX_CONCURRENT_SCANS || '3', 10);
 let scanInFlight = 0;
 
+// ── sGTM native template loader — served to tool.html via /api/sgtm-templates ──
+// Optional at startup: deployments built from an older bundle may not include
+// the native template files yet. The UI has inline fallbacks, so missing files
+// should disable /api/sgtm-templates rather than crash the whole server.
+let sgtmTemplateLoader = { loadTpl: () => null };
+try {
+  sgtmTemplateLoader = require('./lib/sgtm-template-loader');
+} catch (e) {
+  console.warn('[sgtm-templates] loader unavailable; /api/sgtm-templates will return null templates:', e.message);
+}
+const _SGTM_TPL_META     = sgtmTemplateLoader.loadTpl('meta-capi');
+const _SGTM_TPL_TIKTOK   = sgtmTemplateLoader.loadTpl('tiktok-events');
+const _SGTM_TPL_SNAP     = sgtmTemplateLoader.loadTpl('snapchat-capi');
+const _SGTM_TPL_GADS     = sgtmTemplateLoader.loadTpl('google-ads-ec');
+
+function optionalStartupRequire(modulePath, loader, fallback) {
+  try {
+    return loader();
+  } catch (e) {
+    console.warn('[startup] optional module unavailable: ' + modulePath + ' — ' + e.message);
+    return fallback;
+  }
+}
+
+function _unavailableModule(name) {
+  const err = new Error(name + ' module is not available in this deployment bundle');
+  err.status = 503;
+  err.code = 'MODULE_UNAVAILABLE';
+  throw err;
+}
+
 // ── Managed GTM services (optional — endpoints return 503 if not set up) ──
 const gtmService        = require('./gtm-service');
 const firestoreService  = require('./firestore-service');
-const gtmConfigBuilder  = require('./lib/gtm-config-builder');
+const gtmConfigBuilder  = optionalStartupRequire('./lib/gtm-config-builder', () => require('./lib/gtm-config-builder'), {
+  buildWebConfig: () => _unavailableModule('gtm-config-builder'),
+});
+const managedCreateServer = optionalStartupRequire('./lib/provision/create-server', () => require('./lib/provision/create-server'), {
+  createServer: () => _unavailableModule('managed create-server'),
+});
+const managedProvisionRunner = optionalStartupRequire('./lib/provision/runner', () => require('./lib/provision/runner'), {
+  run: () => _unavailableModule('managed provision runner'),
+});
+const shardRegistry = optionalStartupRequire('./lib/shard-registry', () => require('./lib/shard-registry'), {
+  isConfigured: () => false,
+});
 
 // ── Server-Side Tracking services ─────────────────────────────────────────
 const cryptoVault  = require('./lib/crypto-vault');
@@ -73,21 +115,61 @@ const cloudTasks              = require('./lib/cloud-tasks');
 // in a private GCS bucket and the job carries only a small { bucket, object } ref.
 const configBlobStore         = require('./lib/config-blob-store');
 // Client Profile API services (Phase 1)
-const apiKeyService   = require('./lib/api-key-service');
-const auditService    = require('./lib/audit-service');
-const { validateTargetUrl, safeFetch, resolveHostname, isBlockedIp } = require('./lib/ssrf-guard');
-const timelineService = require('./lib/timeline-service');
-const profileService  = require('./lib/profile-service');
+const apiKeyService   = optionalStartupRequire('./lib/api-key-service', () => require('./lib/api-key-service'), {
+  generate: () => _unavailableModule('api-key-service'),
+  parse: () => null,
+  verify: () => false,
+});
+const auditService    = optionalStartupRequire('./lib/audit-service', () => require('./lib/audit-service'), {
+  hashEmail: () => null,
+  computeDiff: () => null,
+});
+const {
+  validateTargetUrl,
+  safeFetch,
+  resolveHostname,
+  isBlockedIp,
+} = optionalStartupRequire('./lib/ssrf-guard', () => require('./lib/ssrf-guard'), {
+  validateTargetUrl: () => _unavailableModule('ssrf-guard'),
+  safeFetch: async () => _unavailableModule('ssrf-guard'),
+  resolveHostname: async () => _unavailableModule('ssrf-guard'),
+  isBlockedIp: () => true,
+});
+const timelineService = optionalStartupRequire('./lib/timeline-service', () => require('./lib/timeline-service'), {
+  record: async () => {},
+});
+const profileService  = optionalStartupRequire('./lib/profile-service', () => require('./lib/profile-service'), {
+  getBundle: async () => null,
+});
 // Health evaluation job (Phase 2)
-const healthService   = require('./lib/health-service');
+const healthService   = optionalStartupRequire('./lib/health-service', () => require('./lib/health-service'), {
+  runHealthJob: async () => {},
+});
 // DLQ retry worker — retries failed CAPI sends stored in Firestore dlq_events
-const dlqWorker       = require('./lib/dlq-worker');
+const dlqWorker       = optionalStartupRequire('./lib/dlq-worker', () => require('./lib/dlq-worker'), {
+  start: () => ({ unref: () => {} }),
+});
 // In-process metrics counters — exposed via GET /api/v1/metrics
-const metrics           = require('./lib/metrics');
+const metrics           = optionalStartupRequire('./lib/metrics', () => require('./lib/metrics'), {
+  incCapiSuccess: () => {},
+  incCapiFailure: () => {},
+  incDlqCreated: () => {},
+  incDlqReplayed: () => {},
+  incDlqExhausted: () => {},
+  incConsentDenied: () => {},
+  incProvisioningFailed: () => {},
+  incProvisioningStalled: () => {},
+  snapshot: () => ({ counters: {}, platformStats: {}, startedAt: Date.now(), uptimeMs: 0 }),
+  checkAlerts: () => [],
+});
 // Cloud Monitoring push — flushes metrics to GCP every 60s (no-ops off-GCP)
-const cloudMonitoring   = require('./lib/cloud-monitoring');
+const cloudMonitoring   = optionalStartupRequire('./lib/cloud-monitoring', () => require('./lib/cloud-monitoring'), {
+  pushSnapshot: async () => {},
+});
 // Secret Manager wrapper — resolves MASTER_ENCRYPTION_KEY from GCP or ENV
-const secretManager     = require('./lib/secret-manager');
+const secretManager     = optionalStartupRequire('./lib/secret-manager', () => require('./lib/secret-manager'), {
+  validateAtStartup: async () => {},
+});
 
 // Beacon write deduplication — bucket-keyed per 5-minute window.
 // Value is the bucket number; replaces itself naturally each period.
@@ -846,7 +928,9 @@ async function _dispatchProvisionJob(jobType, jobId) {
     e.code   = 'QUEUE_FULL';
     throw e;
   }
-  const runner = jobType === 'ss' ? _runSsProvisionJob : _runManagedProvisionJob;
+  const runner = jobType === 'ss'
+    ? _runSsProvisionJob
+    : (jobType === 'managed_server' ? managedProvisionRunner.run : _runManagedProvisionJob);
   // In-process fallback (local / Railway): cap global concurrency + FIFO-queue the
   // overflow so a burst can't fan out into hundreds of parallel GTM import
   // sequences. Fire-and-forget (the HTTP layer already returned 202 and the client
@@ -1590,6 +1674,103 @@ function sendJSON(res, code, obj) {
   res.end(body);
 }
 
+function _managedDeployProvider() {
+  return (process.env.MANAGED_DEPLOY_PROVIDER || '').trim().toLowerCase();
+}
+
+function _managedProviderIsCloudRun() {
+  return _managedDeployProvider() === 'cloudrun';
+}
+
+function _decodedIsAdmin(decoded) {
+  const admins = (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map(v => v.trim().toLowerCase())
+    .filter(Boolean);
+  const email = (decoded && decoded.email || '').trim().toLowerCase();
+  return !!(decoded && (decoded.admin === true || decoded.role === 'admin' || admins.includes(email)));
+}
+
+async function _managedFirebaseAuth(req, res) {
+  if (!firestoreService.isConfigured()) {
+    sendJSON(res, 503, { error: 'Firestore is not configured' });
+    return null;
+  }
+  const authz = (req.headers['authorization'] || req.headers['Authorization'] || '').trim();
+  const m = /^Bearer\s+(.+)$/i.exec(authz);
+  if (!m) {
+    sendJSON(res, 401, { error: 'Authorization header required' });
+    return null;
+  }
+  const idToken = m[1].trim();
+  if (!idToken || idToken.length > 8192) {
+    sendJSON(res, 401, { error: 'Invalid token' });
+    return null;
+  }
+  try {
+    const decoded = await firestoreService.verifyIdToken(idToken);
+    if (!decoded || !decoded.uid) {
+      sendJSON(res, 401, { error: 'Invalid token' });
+      return null;
+    }
+    return decoded;
+  } catch (e) {
+    sendJSON(res, 401, { error: 'Invalid token', code: String((e && e.code) || 'auth/invalid-id-token') });
+    return null;
+  }
+}
+
+async function _requireManagedEntitlement(decoded) {
+  if (_decodedIsAdmin(decoded)) return true;
+  const client = await firestoreService.getClient(decoded.uid);
+  const entitlement = client && (
+    client.managedServerEnabled === true ||
+    client.managedHostingEnabled === true ||
+    (client.entitlements && (client.entitlements.managedServer === true || client.entitlements.managed_server === true)) ||
+    !!client.plan
+  );
+  return !!(client && client.status === 'active' && entitlement);
+}
+
+function _publicManagedServer(server) {
+  if (!server) return null;
+  return {
+    status: server.status || null,
+    currentStep: server.currentStep || null,
+    publicServerUrl: server.publicServerUrl || null,
+    previewPublicUrl: server.previewPublicUrl || null,
+    gtmServerPublicId: server.gtmServerPublicId || null,
+    transportWired: !!server.transportWired,
+    errorMessage: server.errorMessage || null,
+    createdAt: server.createdAt || null,
+    activatedAt: server.activatedAt || null,
+  };
+}
+
+function _publicManagedServerJob(job) {
+  if (!job) return null;
+  return {
+    jobType: job.jobType || 'managed_server',
+    clientId: job.clientId || null,
+    status: job.status || null,
+    stage: job.stage || null,
+    outcome: job.outcome || null,
+    publicServerUrl: job.publicServerUrl || (job.result && job.result.publicServerUrl) || null,
+    previewPublicUrl: job.previewPublicUrl || (job.result && job.result.previewPublicUrl) || null,
+    result: job.result ? {
+      ok: job.result.ok === true,
+      publicServerUrl: job.result.publicServerUrl || null,
+      previewPublicUrl: job.result.previewPublicUrl || null,
+      gtmServerPublicId: job.result.gtmServerPublicId || null,
+      transportWired: !!job.result.transportWired,
+    } : null,
+    error: job.error || null,
+    createdAt: job.createdAt || null,
+    updatedAt: job.updatedAt || null,
+    heartbeatAt: job.heartbeatAt || null,
+  };
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // HTTP SERVER
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1609,7 +1790,7 @@ const server = http.createServer(async (req, res) => {
   // full 60-120s — the whole reason for the Cloud Tasks hop. Auth is the
   // X-Internal-Token shared secret (see _authorizeInternal).
   //
-  // Body (from the Cloud Tasks payload): { jobType: 'managed' | 'ss', jobId }
+  // Body (from the Cloud Tasks payload): { jobType: 'managed' | 'ss' | 'managed_server', jobId }
   // The heavy input lives in the Firestore job doc, loaded by the runner.
   //
   // Always ACKs 2xx once a terminal state is reached (success OR recorded
@@ -1623,7 +1804,8 @@ const server = http.createServer(async (req, res) => {
     }
     parseJsonBody(req, res, async body => {
       const jobId   = body && body.jobId;
-      const jobType = (body && body.jobType) === 'ss' ? 'ss' : 'managed';
+      const rawJobType = body && body.jobType;
+      const jobType = rawJobType === 'ss' || rawJobType === 'managed_server' ? rawJobType : 'managed';
       if (!jobId) return sendJSON(res, 400, { error: 'Missing jobId' });
 
       let job;
@@ -1639,6 +1821,7 @@ const server = http.createServer(async (req, res) => {
 
       try {
         if (jobType === 'ss') await _runSsProvisionJob(jobId);
+        else if (jobType === 'managed_server') await managedProvisionRunner.run(jobId);
         else                  await _runManagedProvisionJob(jobId);
         sendJSON(res, 200, { ok: true, jobId });
       } catch (e) {
@@ -1782,6 +1965,25 @@ const server = http.createServer(async (req, res) => {
   // have to OAuth into their own GTM. See gtm-service.js + firestore-service.js.
   // ══════════════════════════════════════════════════════════════════════════
 
+  // GET /api/sgtm-templates — serve native .tpl source files to tool.html so
+  // buildSSContainer() can embed real per-platform Sandboxed JS templates in
+  // the generated Server Container JSON (instead of the inline fallback).
+  // No auth required — same trust level as serving tool.html itself.
+  // Always 200; missing keys listed in _missing so the frontend can fail loudly
+  // per-platform rather than going entirely dark.
+  if (req.method === 'GET' && req.url === '/api/sgtm-templates') {
+    const tpls = {
+      meta:   _SGTM_TPL_META,
+      tiktok: _SGTM_TPL_TIKTOK,
+      snap:   _SGTM_TPL_SNAP,
+      gads:   _SGTM_TPL_GADS,
+    };
+    const missing = Object.keys(tpls).filter(k => !tpls[k]);
+    if (missing.length) console.error('[sgtm-templates] missing/invalid .tpl files:', missing.join(', '));
+    sendJSON(res, 200, { ...tpls, _missing: missing });
+    return;
+  }
+
   // GET /api/managed/health — capacity + config status (for ops dashboard)
   if (req.method === 'GET' && req.url === '/api/managed/health') {
     (async () => {
@@ -1812,6 +2014,81 @@ const server = http.createServer(async (req, res) => {
         },
         provisionQueue: provisionQueue.stats(),
       });
+    })().catch(e => sendJSON(res, 500, { error: e.message }));
+    return;
+  }
+
+  // POST /api/managed/create-server
+  // Thin Phase-9 entrypoint for managed Cloud Run sGTM hosting. Business logic
+  // lives in lib/provision; this route only authenticates, checks entitlement,
+  // dispatches, and returns public wildcard URLs.
+  if (req.method === 'POST' && req.url === '/api/managed/create-server') {
+    parseJsonBody(req, res, async body => {
+      if (!gtmService.isConfigured()) {
+        return sendJSON(res, 503, { error: 'Managed GTM is not configured on this server' });
+      }
+      if (!firestoreService.isConfigured()) {
+        return sendJSON(res, 503, { error: 'Firestore is not configured on this server' });
+      }
+      if (!shardRegistry.isConfigured()) {
+        return sendJSON(res, 503, { error: 'Managed Cloud Run shards are not configured on this server' });
+      }
+
+      const decoded = await _managedFirebaseAuth(req, res);
+      if (!decoded) return;
+      const allowed = await _requireManagedEntitlement(decoded).catch(e => {
+        console.warn('[managed/create-server] entitlement check failed:', e.message);
+        return false;
+      });
+      if (!allowed) return sendJSON(res, 402, { error: 'Managed hosting entitlement required', code: 'NOT_ENTITLED' });
+
+      const admin = _decodedIsAdmin(decoded);
+      const requestedClientId = body && body.clientId ? String(body.clientId) : decoded.uid;
+      if (!admin && requestedClientId !== decoded.uid) {
+        return sendJSON(res, 403, { error: 'Forbidden: clientId does not match authenticated user' });
+      }
+      const rl = rateLimiter.check('managed_server:' + requestedClientId);
+      if (!rl.allowed) {
+        return sendJSON(res, 429, { error: 'Rate limit exceeded', resetAt: rl.resetAt });
+      }
+
+      try {
+        const result = await managedCreateServer.createServer({
+          clientId: requestedClientId,
+          userId: decoded.uid,
+          email: decoded.email || (body && body.email) || null,
+          webContainerId: body && body.webContainerId,
+          webWorkspaceId: body && body.webWorkspaceId,
+          serverConfigJson: body && body.serverConfigJson,
+        }, {
+          dispatch: jobId => _dispatchProvisionJob('managed_server', jobId),
+        });
+        const code = result.outcome === 'reuse' ? 200 : 202;
+        sendJSON(res, code, {
+          ok: true,
+          outcome: result.outcome,
+          alreadyProvisioned: result.outcome === 'reuse',
+          jobId: result.outcome === 'reuse' ? null : result.jobId,
+          publicServerUrl: result.publicServerUrl || null,
+          previewPublicUrl: result.previewPublicUrl || null,
+        });
+      } catch (e) {
+        const status = (e.status && e.status >= 400 && e.status < 600) ? e.status : 500;
+        sendJSON(res, status, { error: e.message, code: e.code || null });
+      }
+    });
+    return;
+  }
+
+  // GET /api/managed/server
+  if (req.method === 'GET' && req.url === '/api/managed/server') {
+    (async () => {
+      const decoded = await _managedFirebaseAuth(req, res);
+      if (!decoded) return;
+      const clientId = decoded.uid;
+      const serverDoc = await firestoreService.getManagedServer(clientId);
+      if (!serverDoc) return sendJSON(res, 404, { error: 'Managed server not found' });
+      sendJSON(res, 200, { ok: true, server: _publicManagedServer(serverDoc) });
     })().catch(e => sendJSON(res, 500, { error: e.message }));
     return;
   }
@@ -1854,6 +2131,52 @@ const server = http.createServer(async (req, res) => {
       const mode = (body.mode === 'client_server') ? 'client_server' : 'client';
 
       if (!clientId)               return sendJSON(res, 400, { error: 'Missing clientId' });
+
+      if (mode === 'client_server' && _managedProviderIsCloudRun()) {
+        if (!shardRegistry.isConfigured()) {
+          return sendJSON(res, 503, { error: 'Managed Cloud Run shards are not configured on this server' });
+        }
+        const decoded = await _managedFirebaseAuth(req, res);
+        if (!decoded) return;
+        const admin = _decodedIsAdmin(decoded);
+        if (!admin && clientId !== decoded.uid) {
+          return sendJSON(res, 403, { error: 'Forbidden: clientId does not match authenticated user' });
+        }
+        const allowed = await _requireManagedEntitlement(decoded).catch(e => {
+          console.warn('[managed/create-container] entitlement check failed:', e.message);
+          return false;
+        });
+        if (!allowed) return sendJSON(res, 402, { error: 'Managed hosting entitlement required', code: 'NOT_ENTITLED' });
+        const rl = rateLimiter.check('managed_server:' + clientId);
+        if (!rl.allowed) {
+          return sendJSON(res, 429, { error: 'Rate limit exceeded', resetAt: rl.resetAt });
+        }
+        try {
+          const result = await managedCreateServer.createServer({
+            clientId,
+            userId: decoded.uid,
+            email: decoded.email || clientEmail || null,
+            serverConfigJson,
+          }, {
+            dispatch: jobId => _dispatchProvisionJob('managed_server', jobId),
+          });
+          const code = result.outcome === 'reuse' ? 200 : 202;
+          return sendJSON(res, code, {
+            ok: true,
+            rerouted: true,
+            provider: 'cloudrun',
+            outcome: result.outcome,
+            alreadyProvisioned: result.outcome === 'reuse',
+            jobId: result.outcome === 'reuse' ? null : result.jobId,
+            publicServerUrl: result.publicServerUrl || null,
+            previewPublicUrl: result.previewPublicUrl || null,
+          });
+        } catch (e) {
+          const status = (e.status && e.status >= 400 && e.status < 600) ? e.status : 500;
+          return sendJSON(res, status, { error: e.message, code: e.code || null });
+        }
+      }
+
       if (!configJson && !dryRun)  return sendJSON(res, 400, { error: 'Missing configJson' });
 
       // Bundle everything the worker needs into the job doc; the Cloud Tasks
@@ -1953,6 +2276,9 @@ const server = http.createServer(async (req, res) => {
         if (job.clientId && job.clientId !== uid) {
           return sendJSON(res, 403, { error: 'Forbidden: job does not belong to this account' });
         }
+        if (job.jobType === 'managed_server') {
+          return sendJSON(res, 200, { ok: true, jobId, ..._publicManagedServerJob(job) });
+        }
         sendJSON(res, 200, { ok: true, jobId, ...job });
       } catch (e) {
         sendJSON(res, 500, { error: e.message });
@@ -2022,16 +2348,17 @@ const server = http.createServer(async (req, res) => {
       const decoded = await firestoreService.verifyIdToken(token);
       const admins = (process.env.ADMIN_EMAILS || '')
         .split(',')
-        .map(v => v.trim())
+        .map(v => v.trim().toLowerCase())
         .filter(Boolean);
+      const decodedEmail = (decoded?.email || '').trim().toLowerCase();
       // TEMP: remove once ADMIN_EMAILS auth is confirmed working in prod
       console.log('[ADMIN AUTH]', {
         email: decoded?.email,
         admin: decoded?.admin,
         role: decoded?.role,
-        allowed: admins.includes(decoded?.email),
+        allowed: admins.includes(decodedEmail),
       });
-      if (decoded.admin === true || decoded.role === 'admin' || admins.includes(decoded.email)) {
+      if (decoded.admin === true || decoded.role === 'admin' || admins.includes(decodedEmail)) {
         req.adminUser = decoded;
         return true;
       }
