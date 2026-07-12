@@ -20,6 +20,39 @@ try { admin = require('firebase-admin'); } catch (_) { /* lazy-handled below */ 
 let _db           = null;
 let _initError    = null;
 
+// ── PEM repair ────────────────────────────────────────────────────────────────
+// Inlined (NOT a separate module) because the deploy ships only existing tracked
+// files — same rationale as the timeout transport in gtm-service.js. Repairs a
+// service-account private_key regardless of how the env var mangled its newlines:
+// literal "\n", CRLF, or (the case the old \n-replace couldn't fix) newlines
+// collapsed to spaces. node-forge inside admin.credential.cert() otherwise throws
+// "Invalid PEM formatted message". Reconstruction pulls the base64 body from
+// between the BEGIN/END markers, strips all whitespace, and re-wraps at 64 cols.
+const _PEM_RE = /-----BEGIN ((?:RSA |EC )?PRIVATE KEY)-----([\s\S]*?)-----END \1-----/;
+function normalizePrivateKey(key) {
+  if (typeof key !== 'string') return key;
+  let k = key.trim().replace(/^["']|["']$/g, '');
+  k = k.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\\r/g, '\n');
+  k = k.replace(/\r\n?/g, '\n');
+  const m = k.match(_PEM_RE);
+  if (!m) return k;
+  const label   = m[1];
+  const body    = m[2].replace(/\s+/g, '');
+  const wrapped = body.match(/.{1,64}/g) || [];
+  return '-----BEGIN ' + label + '-----\n' + wrapped.join('\n') + '\n-----END ' + label + '-----\n';
+}
+// Non-leaking shape summary for diagnostics — never returns key material.
+function describePrivateKey(key) {
+  if (typeof key !== 'string') return 'type=' + typeof key;
+  return [
+    'len=' + key.length,
+    'begin=' + /-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/.test(key),
+    'end='   + /-----END (?:RSA |EC )?PRIVATE KEY-----/.test(key),
+    'realNewlines='    + (key.match(/\n/g)  || []).length,
+    'literalNewlines=' + (key.match(/\\n/g) || []).length,
+  ].join(' ');
+}
+
 function isConfigured() {
   return !!process.env.FIREBASE_SA_KEY_JSON && !!admin;
 }
@@ -38,7 +71,10 @@ function init() {
   let sa;
   try { sa = JSON.parse(raw); }
   catch (e) { _initError = new Error('FIREBASE_SA_KEY_JSON is not valid JSON: ' + e.message); return; }
-  if (sa.private_key) sa.private_key = sa.private_key.replace(/\\n/g, '\n');
+  // Repair the private_key regardless of how the env var mangled its newlines
+  // (literal \n, CRLF, or newlines collapsed to spaces). node-forge inside
+  // admin.credential.cert() otherwise throws "Invalid PEM formatted message".
+  if (sa.private_key) sa.private_key = normalizePrivateKey(sa.private_key);
 
   try {
     if (!admin.apps.length) {
@@ -55,7 +91,16 @@ function init() {
     // must run before any read/write and only once; this is that point.
     try { _db.settings({ ignoreUndefinedProperties: true }); } catch (_) { /* already configured */ }
   } catch (e) {
-    _initError = e;
+    // Surface WHY the key was rejected without leaking key material — turns the
+    // opaque "Invalid PEM formatted message" into an actionable diagnostic.
+    if (/PEM|private key/i.test(e.message)) {
+      _initError = new Error(
+        e.message + ' [FIREBASE_SA_KEY_JSON private_key ' +
+        describePrivateKey(sa && sa.private_key) + ']'
+      );
+    } else {
+      _initError = e;
+    }
   }
 }
 
@@ -120,11 +165,30 @@ async function listContainersByClient(clientId) {
   return out;
 }
 
-async function countActiveContainers() {
-  const qs = await db().collection(COLLECTION)
-    .where('status', '==', 'active')
-    .count().get();
+async function countActiveContainers(gtmAccountId) {
+  let q = db().collection(COLLECTION).where('status', '==', 'active');
+  if (gtmAccountId) q = q.where('gtmAccountId', '==', String(gtmAccountId));
+  const qs = await q.count().get();
   return qs.data().count;
+}
+
+// Return per-account container counts for all accounts listed in env.
+// GTM_ACCOUNT_IDS is a comma-separated list (includes GTM_ACCOUNT_ID as primary).
+async function getAccountCapacityReport() {
+  const primary = (process.env.GTM_ACCOUNT_ID || '').trim();
+  const extras  = (process.env.GTM_ACCOUNT_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+  const allIds  = Array.from(new Set([primary, ...extras].filter(Boolean)));
+  if (!allIds.length) return [];
+  const counts = await Promise.all(allIds.map(async id => {
+    const count = await countActiveContainers(id);
+    return {
+      accountId: id,
+      activeContainers: count,
+      capacityPct: Math.round((count / 490) * 100),
+      status: count >= 480 ? 'critical' : count >= 400 ? 'warning_high' : count >= 300 ? 'warning' : 'ok',
+    };
+  }));
+  return counts;
 }
 
 async function markGracePeriod(gtmPublicId) {
@@ -307,6 +371,57 @@ async function saveJob(jobId, patch) {
     { ...patch, updatedAt: now, expiresAt },
     { merge: true },
   );
+}
+
+// List jobs in status='pending' that have no heartbeatAt — these were created
+// but never dispatched (process crashed before/during _dispatchProvisionJob).
+// Only returns jobs created within the last `windowMs` to avoid re-dispatching
+// ancient orphans from previous deployments.
+async function listOrphanedPendingJobs(windowMs) {
+  const since = admin.firestore.Timestamp.fromMillis(Date.now() - (windowMs || 25 * 60 * 1000));
+  const snap = await db().collection(JOBS_COLLECTION)
+    .where('status', '==', 'pending')
+    .where('createdAt', '>=', since)
+    .limit(20)
+    .get();
+  const orphans = [];
+  snap.docs.forEach(d => {
+    const data = d.data();
+    // Only recover jobs that have NEVER received a heartbeat — these are the
+    // ones that were created but not dispatched.
+    if (!data.heartbeatAt) {
+      orphans.push({ jobId: d.id, ...data });
+    }
+  });
+  return orphans;
+}
+
+// Scan for provisioning_jobs stuck in status=running with no heartbeat update
+// in the last `thresholdMs` milliseconds. Marks them status=stalled and returns
+// an array of their jobIds so the caller can emit metrics / restart them.
+async function detectAndRecoverStalledJobs(thresholdMs) {
+  const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - (thresholdMs || 10 * 60 * 1000));
+  const snap = await db().collection(JOBS_COLLECTION)
+    .where('status', 'in', ['running', 'pending'])
+    .where('heartbeatAt', '<', cutoff)
+    .limit(50)
+    .get();
+  if (snap.empty) return [];
+  const stalledIds = [];
+  const batch = db().batch();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  snap.docs.forEach(d => {
+    stalledIds.push(d.id);
+    batch.update(d.ref, {
+      status:    'stalled',
+      stalledAt: now,
+      updatedAt: now,
+      stalledReason: 'no heartbeat for ' + Math.round((thresholdMs || 600000) / 60000) + ' min',
+      retryable: true,
+    });
+  });
+  await batch.commit();
+  return stalledIds;
 }
 
 // Read a job document. Returns null when missing OR past its TTL (defensive —
@@ -711,6 +826,622 @@ async function releaseHealthJobLock() {
   await db().collection('health_job_lock').doc('singleton').delete();
 }
 
+// ── Dead Letter Queue (Firestore-backed) ─────────────────────────────────────
+// Collection: dlq_events
+// Each document represents one failed CAPI send awaiting retry.
+// TTL field: expiresAt — set a Firestore TTL policy on this field.
+// Status values: 'pending' | 'retrying' | 'retried' | 'exhausted' | 'dropped'
+const DLQ_COLLECTION = 'dlq_events';
+const DLQ_TTL_MS     = 72 * 60 * 60 * 1000; // 72 hours — max retry window
+
+async function saveDlqEvent(doc) {
+  const ref = db().collection(DLQ_COLLECTION).doc();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  await ref.set({
+    ...doc,
+    status:      doc.status      || 'pending',
+    retryCount:  doc.retryCount  || 0,
+    nextRetryAt: doc.nextRetryAt || admin.firestore.Timestamp.fromMillis(Date.now() + 60 * 1000),
+    createdAt:   now,
+    updatedAt:   now,
+    expiresAt:   admin.firestore.Timestamp.fromMillis(Date.now() + DLQ_TTL_MS),
+  });
+  return ref.id;
+}
+
+// Fetch up to `limit` pending events whose nextRetryAt <= now.
+async function listPendingDlqEvents(limit) {
+  const now  = admin.firestore.Timestamp.fromMillis(Date.now());
+  const snap = await db().collection(DLQ_COLLECTION)
+    .where('status', '==', 'pending')
+    .where('nextRetryAt', '<=', now)
+    .orderBy('nextRetryAt', 'asc')
+    .limit(limit || 50)
+    .get();
+  return snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+}
+
+// Atomically claim a pending DLQ event for processing.
+// Uses a Firestore transaction to flip status pending→retrying only when
+// status is still 'pending'. Returns true if this worker won the claim,
+// false if another instance already claimed it (concurrent race).
+async function claimDlqEvent(docId) {
+  const ref = db().collection(DLQ_COLLECTION).doc(docId);
+  return db().runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return false;
+    if (snap.data().status !== 'pending') return false;
+    tx.update(ref, {
+      status:    'retrying',
+      claimedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return true;
+  });
+}
+
+// Patch a DLQ event document (used by retry worker to update status/retryCount).
+async function updateDlqEvent(docId, patch) {
+  await db().collection(DLQ_COLLECTION).doc(docId).update({
+    ...patch,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+// Return queue depth and oldest pending event age for observability.
+async function getDlqStats() {
+  const now      = admin.firestore.Timestamp.fromMillis(Date.now());
+  const [pending, oldest] = await Promise.all([
+    db().collection(DLQ_COLLECTION).where('status', '==', 'pending').count().get(),
+    db().collection(DLQ_COLLECTION)
+      .where('status', '==', 'pending')
+      .orderBy('createdAt', 'asc')
+      .limit(1)
+      .get(),
+  ]);
+  const depth = pending.data().count;
+  let oldestAgeMs = null;
+  if (!oldest.empty) {
+    const ts = oldest.docs[0].data().createdAt;
+    oldestAgeMs = ts && ts.toMillis ? Date.now() - ts.toMillis() : null;
+  }
+  return { depth, oldestAgeMs };
+}
+
+async function deleteDlqEvent(docId) {
+  await db().collection(DLQ_COLLECTION).doc(docId).delete();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DEPLOYMENT LOCKS  —  collection: `deployment_locks`
+// Prevents concurrent rollbacks for the same client.
+// Document ID = clientId. Transaction-based acquire (atomic check-and-set).
+// TTL: 10 minutes — auto-cleared on release; TTL is a safety net for crashes.
+// ══════════════════════════════════════════════════════════════════════════════
+const LOCKS_COLLECTION = 'deployment_locks';
+const LOCK_TTL_MS      = 10 * 60 * 1000; // 10 min — generous for slow GTM API
+
+async function acquireDeploymentLock(clientId, lockedBy) {
+  if (!clientId) throw new Error('acquireDeploymentLock: clientId required');
+  const lockRef = db().collection(LOCKS_COLLECTION).doc(clientId);
+  const now     = Date.now();
+
+  return db().runTransaction(async tx => {
+    const snap = await tx.get(lockRef);
+    if (snap.exists) {
+      const until = snap.data().lockedUntil;
+      const untilMs = until && until.toMillis ? until.toMillis() : 0;
+      if (untilMs > now) return false; // still held
+    }
+    tx.set(lockRef, {
+      locked:      true,
+      lockedBy:    lockedBy || 'unknown',
+      lockedAt:    admin.firestore.FieldValue.serverTimestamp(),
+      lockedUntil: admin.firestore.Timestamp.fromMillis(now + LOCK_TTL_MS),
+    });
+    return true;
+  });
+}
+
+async function releaseDeploymentLock(clientId) {
+  if (!clientId) return;
+  try { await db().collection(LOCKS_COLLECTION).doc(clientId).delete(); } catch (_) {}
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DEPLOYMENT LOGS  —  collection: `deployment_logs`
+// Append-only audit trail for every deployment event (publish / rollback /
+// failure). Never update or delete — these are immutable audit records.
+// Requires index: clientId ASC, timestamp DESC
+// ══════════════════════════════════════════════════════════════════════════════
+const DEPLOY_LOGS_COLLECTION = 'deployment_logs';
+
+async function saveDeploymentLog(record) {
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const ref = await db().collection(DEPLOY_LOGS_COLLECTION).add({
+    ...record,
+    timestamp: now,
+  });
+  return ref.id;
+}
+
+async function listDeploymentLogs(clientId, { limit = 100 } = {}) {
+  if (!clientId) throw new Error('listDeploymentLogs: clientId required');
+  const snap = await db().collection(DEPLOY_LOGS_COLLECTION)
+    .where('clientId', '==', clientId)
+    .orderBy('timestamp', 'desc')
+    .limit(Math.min(limit, 200))
+    .get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ATOMIC VERSION COUNTER  —  collection: `version_counters`
+// Document ID = clientId. Uses a Firestore transaction so concurrent callers
+// always get strictly increasing, unique version numbers.
+// Replace getNextVersionNumber() — do NOT use both for the same client.
+// ══════════════════════════════════════════════════════════════════════════════
+const VERSION_COUNTERS_COLLECTION = 'version_counters';
+
+async function allocateVersionNumber(clientId) {
+  if (!clientId) throw new Error('allocateVersionNumber: clientId required');
+  const counterRef = db().collection(VERSION_COUNTERS_COLLECTION).doc(clientId);
+  return db().runTransaction(async tx => {
+    const snap    = await tx.get(counterRef);
+    const current = snap.exists ? (snap.data().current || 0) : 0;
+    const next    = current + 1;
+    tx.set(counterRef, {
+      current:   next,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return next;
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CONTAINER VERSIONS  —  collection: `container_versions`
+// Append-only deployment history. One document per publish or rollback event.
+//
+// The configSnapshot stores the Firestore client config (platforms, events,
+// pixelIds…) — NOT the generated GTM JSON. The GTM container is a compiled
+// artifact; the client config is the source of truth. Rollback re-derives
+// the GTM JSON from the snapshot via gtm-config-builder on the server.
+//
+// Requires composite index:  container_versions (clientId ASC, version DESC)
+// ══════════════════════════════════════════════════════════════════════════════
+const VERSIONS_COLLECTION = 'container_versions';
+
+async function getNextVersionNumber(clientId) {
+  const snap = await db().collection(VERSIONS_COLLECTION)
+    .where('clientId', '==', clientId)
+    .orderBy('version', 'desc')
+    .limit(1)
+    .get();
+  if (snap.empty) return 1;
+  return (snap.docs[0].data().version || 0) + 1;
+}
+
+async function saveVersion(record) {
+  if (!record.clientId) throw new Error('saveVersion: clientId is required');
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const ref = await db().collection(VERSIONS_COLLECTION).add({
+    ...record,
+    publishedAt: record.publishedAt || now,
+    createdAt:   now,
+  });
+  return ref.id;
+}
+
+async function listVersions(clientId, { limit = 50 } = {}) {
+  if (!clientId) throw new Error('listVersions: clientId is required');
+  const snap = await db().collection(VERSIONS_COLLECTION)
+    .where('clientId', '==', clientId)
+    .orderBy('version', 'desc')
+    .limit(Math.min(limit, 100))
+    .get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function getVersionByNumber(clientId, versionNumber) {
+  if (!clientId) throw new Error('getVersionByNumber: clientId is required');
+  const snap = await db().collection(VERSIONS_COLLECTION)
+    .where('clientId', '==', clientId)
+    .where('version', '==', versionNumber)
+    .limit(1)
+    .get();
+  if (snap.empty) return null;
+  const d = snap.docs[0];
+  return { id: d.id, ...d.data() };
+}
+
+async function markVersionRolledBack(versionDocId) {
+  if (!versionDocId) throw new Error('markVersionRolledBack: versionDocId is required');
+  await db().collection(VERSIONS_COLLECTION).doc(versionDocId).update({
+    status:          'rolled_back',
+    deploymentState: 'rolled_back',
+    updatedAt:       admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+// ── Deployment Recovery ───────────────────────────────────────────────────────
+// Scans container_versions for records stuck in transient states longer than
+// thresholdMs. Returns the stuck docs so the caller can mark them failed and
+// release their locks. In-memory time filter avoids composite index requirement.
+const STUCK_STATES = ['building', 'importing', 'publishing'];
+
+async function detectStuckDeployments(thresholdMs) {
+  const cutoff = Date.now() - (thresholdMs || 15 * 60 * 1000);
+  const snap   = await db().collection(VERSIONS_COLLECTION)
+    .where('deploymentState', 'in', STUCK_STATES)
+    .limit(100)
+    .get();
+  const stuck = [];
+  snap.docs.forEach(d => {
+    const data      = d.data();
+    const createdAt = data.createdAt;
+    const createdMs = createdAt && createdAt.toMillis ? createdAt.toMillis() : 0;
+    if (createdMs && createdMs < cutoff) {
+      stuck.push({ id: d.id, ref: d.ref, ...data });
+    }
+  });
+  return stuck;
+}
+
+// Count deployments currently in active (transient) states — used by health endpoint.
+async function countActiveDeployments() {
+  const snap = await db().collection(VERSIONS_COLLECTION)
+    .where('deploymentState', 'in', STUCK_STATES)
+    .limit(1)   // we only need existence, not full list
+    .count()
+    .get();
+  return snap.data().count;
+}
+
+// Patch a version document mid-deployment (used by state machine updates).
+async function updateVersion(versionDocId, patch) {
+  if (!versionDocId) throw new Error('updateVersion: versionDocId is required');
+  await db().collection(VERSIONS_COLLECTION).doc(versionDocId).update({
+    ...patch,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+// Save version and return the Firestore document ID (needed for state machine).
+async function saveVersionGetId(record) {
+  if (!record.clientId) throw new Error('saveVersionGetId: clientId is required');
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const ref = await db().collection(VERSIONS_COLLECTION).add({
+    ...record,
+    publishedAt: record.publishedAt || now,
+    createdAt:   now,
+    updatedAt:   now,
+  });
+  return ref.id;
+}
+
+// Managed sGTM hosting registry.
+// These collections are the source of truth for tenant -> shard/service routing.
+const MANAGED_SERVERS_COLLECTION     = 'managed_servers';
+const MANAGED_DEPLOYMENTS_COLLECTION = 'managed_deployments';
+const MANAGED_ROUTES_COLLECTION      = 'managed_routes';
+const MANAGED_ATTACH_WINDOW_MS       = 35 * 60 * 1000;
+
+const MANAGED_TRANSIENT_STATES = new Set(['queued', 'deploying_preview', 'deploying_tagging', 'verifying']);
+const MANAGED_TERMINAL_STATES  = new Set(['active', 'failed', 'deleted']);
+const MANAGED_ALLOWED_TRANSITIONS = {
+  queued:             ['deploying_preview', 'failed'],
+  deploying_preview:  ['deploying_tagging', 'failed'],
+  deploying_tagging:  ['verifying', 'failed'],
+  verifying:          ['active', 'failed'],
+  active:             ['deleted', 'deploying_preview'],
+  failed:             ['deploying_preview', 'deleted'],
+  deleted:            [],
+};
+
+function _managedServerId(clientId) {
+  if (!clientId) throw new Error('managed server clientId is required');
+  return String(clientId);
+}
+
+function _managedRouteId(hostname) {
+  if (!hostname) throw new Error('managed route hostname is required');
+  return String(hostname).trim().toLowerCase();
+}
+
+function _deploymentPatchForState(toState, patch) {
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const out = {
+    ...(patch || {}),
+    status:    toState,
+    updatedAt: now,
+  };
+  if (MANAGED_TRANSIENT_STATES.has(toState)) out.lastProgressAt = now;
+  if (MANAGED_TERMINAL_STATES.has(toState)) out.finishedAt = patch && patch.finishedAt || now;
+  return out;
+}
+
+function _toMillis(value) {
+  if (!value) return 0;
+  if (typeof value === 'number') return value;
+  if (value instanceof Date) return value.getTime();
+  if (value.toMillis) return value.toMillis();
+  return 0;
+}
+
+function _managedServerTransition(current, patch) {
+  const existing = current || {};
+  const next = { ...existing, ...(patch || {}) };
+  const from = existing.status || null;
+  const to   = next.status || from || 'provisioning';
+  const allowed = {
+    null:          ['provisioning', 'active', 'failed', 'suspended'],
+    provisioning:  ['provisioning', 'active', 'failed', 'suspended'],
+    active:        ['active', 'provisioning', 'suspended', 'failed'],
+    failed:        ['failed', 'provisioning', 'suspended'],
+    suspended:     ['suspended', 'active', 'provisioning', 'failed'],
+    deleted:       [],
+  };
+  const key = from === null ? 'null' : from;
+  if (!allowed[key] || !allowed[key].includes(to)) {
+    const err = new Error(`invalid managed server transition: ${from || 'new'} -> ${to}`);
+    err.code = 'INVALID_SERVER_TRANSITION';
+    err.from = from;
+    err.to   = to;
+    throw err;
+  }
+  next.status = to;
+  return next;
+}
+
+async function saveManagedServer(record) {
+  if (!record || !record.clientId) throw new Error('saveManagedServer: clientId is required');
+  if (!record.shardId) throw new Error('saveManagedServer: shardId is required');
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const doc = {
+    ...record,
+    id:        record.id || _managedServerId(record.clientId),
+    status:    record.status || 'provisioning',
+    createdAt: record.createdAt || now,
+    updatedAt: now,
+  };
+  await db().collection(MANAGED_SERVERS_COLLECTION).doc(doc.id).set(doc, { merge: true });
+  return doc;
+}
+
+async function getManagedServer(clientId) {
+  const snap = await db().collection(MANAGED_SERVERS_COLLECTION).doc(_managedServerId(clientId)).get();
+  return snap.exists ? { id: snap.id, ...snap.data() } : null;
+}
+
+async function listManagedServersByClient(clientId, { includeDeleted = false } = {}) {
+  if (!clientId) throw new Error('listManagedServersByClient: clientId is required');
+  let q = db().collection(MANAGED_SERVERS_COLLECTION).where('clientId', '==', clientId);
+  if (!includeDeleted) q = q.where('status', '!=', 'deleted');
+  const snap = await q.get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function listManagedServers({ status, limit = 100 } = {}) {
+  let q = db().collection(MANAGED_SERVERS_COLLECTION);
+  if (status) q = q.where('status', '==', status);
+  q = q.orderBy('createdAt', 'desc').limit(Math.min(limit, 200));
+  const snap = await q.get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function createManagedServerJobTx(input) {
+  if (!input || !input.clientId) throw new Error('createManagedServerJobTx: clientId is required');
+  if (!input.jobId) throw new Error('createManagedServerJobTx: jobId is required');
+  const clientId  = _managedServerId(input.clientId);
+  const serverRef = db().collection(MANAGED_SERVERS_COLLECTION).doc(clientId);
+  const jobRef    = db().collection(JOBS_COLLECTION).doc(input.jobId);
+  const nowMs     = Date.now();
+
+  return db().runTransaction(async tx => {
+    const snap = await tx.get(serverRef);
+    const now  = admin.firestore.FieldValue.serverTimestamp();
+    if (snap.exists) {
+      const existing = { id: snap.id, ...snap.data() };
+      if (existing.status === 'active') {
+        return {
+          outcome: 'reuse',
+          server: existing,
+          publicServerUrl: existing.publicServerUrl || null,
+        };
+      }
+      const inFlight = existing.status === 'provisioning' && existing.jobId;
+      const updatedMs = _toMillis(existing.updatedAt) || _toMillis(existing.createdAt);
+      if (inFlight && updatedMs && nowMs - updatedMs < MANAGED_ATTACH_WINDOW_MS) {
+        return { outcome: 'attach', jobId: existing.jobId, server: existing };
+      }
+    }
+
+    const serverDoc = _managedServerTransition(snap.exists ? snap.data() : null, {
+      ...(input.server || {}),
+      id:         clientId,
+      clientId,
+      userId:     input.userId || input.clientId,
+      email:      input.email || null,
+      shard:      input.shardId || input.shard || (input.server && (input.server.shardId || input.server.shard)) || null,
+      shardId:    input.shardId || input.shard || (input.server && (input.server.shardId || input.server.shard)) || null,
+      status:     'provisioning',
+      currentStep: 'queued',
+      jobId:      input.jobId,
+      createdAt:  snap.exists ? snap.data().createdAt : now,
+      updatedAt:  now,
+    });
+    tx.set(serverRef, serverDoc, { merge: true });
+    tx.set(jobRef, {
+      ...(input.job || {}),
+      jobId:     input.jobId,
+      jobType:   input.jobType || 'managed_server',
+      clientId,
+      status:    'pending',
+      stage:     'queued',
+      createdAt: now,
+      updatedAt: now,
+      expiresAt: input.expiresAt || admin.firestore.Timestamp.fromMillis(Date.now() + JOB_TTL_MS),
+    }, { merge: true });
+    return { outcome: snap.exists ? 'resume' : 'created', jobId: input.jobId, server: serverDoc };
+  });
+}
+
+async function saveManagedRoute(record) {
+  if (!record || !record.hostname) throw new Error('saveManagedRoute: hostname is required');
+  if (!record.clientId) throw new Error('saveManagedRoute: clientId is required');
+  const now      = admin.firestore.FieldValue.serverTimestamp();
+  const hostname = _managedRouteId(record.hostname);
+  const doc = {
+    ...record,
+    hostname,
+    status:    record.status || 'active',
+    createdAt: record.createdAt || now,
+    updatedAt: now,
+  };
+  await db().collection(MANAGED_ROUTES_COLLECTION).doc(hostname).set(doc, { merge: true });
+  return doc;
+}
+
+async function getManagedRoute(hostname) {
+  const snap = await db().collection(MANAGED_ROUTES_COLLECTION).doc(_managedRouteId(hostname)).get();
+  return snap.exists ? { id: snap.id, ...snap.data() } : null;
+}
+
+async function deleteManagedRoute(hostname) {
+  await db().collection(MANAGED_ROUTES_COLLECTION).doc(_managedRouteId(hostname)).delete();
+  return true;
+}
+
+async function saveManagedDeployment(record) {
+  if (!record || !record.clientId) throw new Error('saveManagedDeployment: clientId is required');
+  if (!record.serverId) throw new Error('saveManagedDeployment: serverId is required');
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const ref = db().collection(MANAGED_DEPLOYMENTS_COLLECTION).doc(record.id || undefined);
+  const doc = {
+    ...record,
+    id:             ref.id,
+    status:         record.status || 'queued',
+    createdAt:      record.createdAt || now,
+    updatedAt:      now,
+    lastProgressAt: record.lastProgressAt || now,
+  };
+  await ref.set(doc, { merge: true });
+  return doc;
+}
+
+async function createDeployment(record) {
+  if (!record || !record.clientId) throw new Error('createDeployment: clientId is required');
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const ref = db().collection(MANAGED_DEPLOYMENTS_COLLECTION).doc(record.deploymentId || record.id || undefined);
+  const doc = {
+    ...record,
+    deploymentId: record.deploymentId || ref.id,
+    id:           ref.id,
+    status:       record.status || 'running',
+    logs:         Array.isArray(record.logs) ? record.logs.slice(0, 50) : [],
+    startedAt:    record.startedAt || now,
+    updatedAt:    now,
+  };
+  await ref.set(doc, { merge: true });
+  return doc;
+}
+
+async function getManagedDeployment(deploymentId) {
+  if (!deploymentId) throw new Error('getManagedDeployment: deploymentId is required');
+  const snap = await db().collection(MANAGED_DEPLOYMENTS_COLLECTION).doc(deploymentId).get();
+  return snap.exists ? { id: snap.id, ...snap.data() } : null;
+}
+
+async function appendDeploymentLog(deploymentId, entry) {
+  if (!deploymentId) throw new Error('appendDeploymentLog: deploymentId is required');
+  if (!entry || !entry.message) throw new Error('appendDeploymentLog: entry.message is required');
+  const ref = db().collection(MANAGED_DEPLOYMENTS_COLLECTION).doc(deploymentId);
+  return db().runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) {
+      const err = new Error(`managed deployment not found: ${deploymentId}`);
+      err.code = 'NOT_FOUND';
+      throw err;
+    }
+    const current = snap.data();
+    const logs = Array.isArray(current.logs) ? current.logs.slice(-49) : [];
+    logs.push({
+      step:    entry.step || current.currentStep || null,
+      level:   entry.level || 'info',
+      message: String(entry.message).slice(0, 500),
+      at:      entry.at || admin.firestore.FieldValue.serverTimestamp(),
+    });
+    tx.update(ref, {
+      logs,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return logs;
+  });
+}
+
+async function finalizeDeployment(deploymentId, patch = {}) {
+  if (!deploymentId) throw new Error('finalizeDeployment: deploymentId is required');
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const startedMs = _toMillis(patch.startedAt);
+  const out = {
+    ...patch,
+    status:      patch.status || (patch.errorMessage ? 'failed' : 'succeeded'),
+    completedAt: patch.completedAt || now,
+    updatedAt:   now,
+  };
+  if (startedMs && !out.durationMs) out.durationMs = Date.now() - startedMs;
+  await db().collection(MANAGED_DEPLOYMENTS_COLLECTION).doc(deploymentId).set(out, { merge: true });
+  return out;
+}
+
+async function listManagedDeployments(clientId, { limit = 50 } = {}) {
+  if (!clientId) throw new Error('listManagedDeployments: clientId is required');
+  const snap = await db().collection(MANAGED_DEPLOYMENTS_COLLECTION)
+    .where('clientId', '==', clientId)
+    .orderBy('createdAt', 'desc')
+    .limit(Math.min(limit, 100))
+    .get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function listDeployments(clientId, opts) {
+  const { limit = 50 } = opts || {};
+  if (!clientId) throw new Error('listDeployments: clientId is required');
+  const snap = await db().collection(MANAGED_DEPLOYMENTS_COLLECTION)
+    .where('clientId', '==', clientId)
+    .orderBy('startedAt', 'desc')
+    .limit(Math.min(limit, 100))
+    .get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function transitionManagedDeployment(deploymentId, toState, patch = {}) {
+  if (!deploymentId) throw new Error('transitionManagedDeployment: deploymentId is required');
+  if (!toState) throw new Error('transitionManagedDeployment: toState is required');
+  const ref = db().collection(MANAGED_DEPLOYMENTS_COLLECTION).doc(deploymentId);
+  return db().runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) {
+      const err = new Error(`managed deployment not found: ${deploymentId}`);
+      err.code = 'NOT_FOUND';
+      throw err;
+    }
+    const current = snap.data();
+    const from    = current.status || 'queued';
+    const allowed = MANAGED_ALLOWED_TRANSITIONS[from] || [];
+    if (!allowed.includes(toState)) {
+      const err = new Error(`invalid managed deployment transition: ${from} -> ${toState}`);
+      err.code = 'INVALID_STATE_TRANSITION';
+      err.from = from;
+      err.to   = toState;
+      throw err;
+    }
+    const update = _deploymentPatchForState(toState, patch);
+    tx.update(ref, update);
+    return { id: deploymentId, ...current, ...update };
+  });
+}
+
 module.exports = {
   isConfigured,
   BEACON_EVENTS,
@@ -718,6 +1449,7 @@ module.exports = {
   getContainer,
   listContainersByClient,
   countActiveContainers,
+  getAccountCapacityReport,
   markGracePeriod,
   exportAll,
   updateClient,
@@ -730,6 +1462,8 @@ module.exports = {
   // Provisioning jobs (durable, cross-instance)
   saveJob,
   getJob,
+  listOrphanedPendingJobs,
+  detectAndRecoverStalledJobs,
   // Permanent provision audit trail
   saveAudit,
   // Auth
@@ -769,4 +1503,47 @@ module.exports = {
   acquireHealthJobLock,
   extendHealthJobLock,
   releaseHealthJobLock,
+  // Dead Letter Queue
+  saveDlqEvent,
+  listPendingDlqEvents,
+  claimDlqEvent,
+  updateDlqEvent,
+  deleteDlqEvent,
+  getDlqStats,
+  // Container version history
+  getNextVersionNumber,
+  allocateVersionNumber,
+  saveVersion,
+  saveVersionGetId,
+  updateVersion,
+  listVersions,
+  getVersionByNumber,
+  markVersionRolledBack,
+  // Deployment locks (concurrent rollback prevention)
+  acquireDeploymentLock,
+  releaseDeploymentLock,
+  // Deployment audit logs
+  saveDeploymentLog,
+  listDeploymentLogs,
+  // Deployment recovery
+  detectStuckDeployments,
+  countActiveDeployments,
+  // Managed sGTM hosting registry
+  _managedServerTransition,
+  saveManagedServer,
+  getManagedServer,
+  listManagedServersByClient,
+  listManagedServers,
+  createManagedServerJobTx,
+  saveManagedRoute,
+  getManagedRoute,
+  deleteManagedRoute,
+  saveManagedDeployment,
+  createDeployment,
+  getManagedDeployment,
+  appendDeploymentLog,
+  finalizeDeployment,
+  listManagedDeployments,
+  listDeployments,
+  transitionManagedDeployment,
 };

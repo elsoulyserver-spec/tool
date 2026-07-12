@@ -92,6 +92,25 @@ const TOKEN_PATH = '/token';
 const GTM_HOST = 'tagmanager.googleapis.com';
 const API_BASE = '/tagmanager/v2';
 
+// ── PEM repair ──────────────────────────────────────────────────────────────
+// Inlined (deploy ships only existing tracked files) — repairs a private_key no
+// matter how the env var mangled its newlines: literal "\n", CRLF, or newlines
+// collapsed to spaces (which the old \n-replace couldn't fix). Reconstructs the
+// PEM body when the armor markers aren't on their own lines.
+const _PEM_RE = /-----BEGIN ((?:RSA |EC )?PRIVATE KEY)-----([\s\S]*?)-----END \1-----/;
+function normalizePrivateKey(key) {
+  if (typeof key !== 'string') return key;
+  let k = key.trim().replace(/^["']|["']$/g, '');
+  k = k.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\\r/g, '\n');
+  k = k.replace(/\r\n?/g, '\n');
+  const m = k.match(_PEM_RE);
+  if (!m) return k;
+  const label   = m[1];
+  const body    = m[2].replace(/\s+/g, '');
+  const wrapped = body.match(/.{1,64}/g) || [];
+  return '-----BEGIN ' + label + '-----\n' + wrapped.join('\n') + '\n-----END ' + label + '-----\n';
+}
+
 // ── Load & validate the service-account credentials ─────────────────────────
 let _sa = null;
 function getSA() {
@@ -103,8 +122,8 @@ function getSA() {
   if (!_sa.client_email || !_sa.private_key) {
     throw new Error('GTM_SA_KEY_JSON is missing client_email or private_key');
   }
-  // Railway/env vars store literal \n; restore real newlines so Node crypto can parse the PEM.
-  _sa.private_key = _sa.private_key.replace(/\\n/g, '\n');
+  // Railway/env vars mangle the PEM newlines; restore them so Node crypto can parse it.
+  _sa.private_key = normalizePrivateKey(_sa.private_key);
   return _sa;
 }
 
@@ -458,21 +477,14 @@ async function provisionForClient({ projectName, domain, configJson, publishLive
     throw err;
   }
 
-  // 1. Create container — always append a short timestamp suffix so names are
-  //    unique across retries. GTM returns HTTP 400 "duplicate name" otherwise.
-  const ts = new Date().toISOString().replace('T', ' ').slice(0, 16).replace(':', '-'); // "YYYY-MM-DD HH-MM"
+  // 1. Create container — append millisecond timestamp + random hex so the name
+  //    is unique even across rapid retries. GTM returns 400 "duplicate name" on
+  //    any name collision within the account.
+  const ts = Date.now().toString(36);  // base-36 ms — 6-7 chars, always unique
+  const rnd = crypto.randomBytes(3).toString('hex');  // 6 hex chars for extra safety
   const baseName = (projectName || 'Easy Track Project').toString().trim();
-  const uniqueName = baseName.slice(0, 60) + ' · ' + ts;
-  let container;
-  try {
-    container = await createContainer(uniqueName, domain);
-  } catch (e) {
-    // Fallback — if still a duplicate, append random hex too.
-    if (e.status === 400 && /duplicate/i.test(e.message || '')) {
-      const rnd = Math.random().toString(16).slice(2, 8);
-      container = await createContainer(uniqueName + ' ' + rnd, domain);
-    } else { throw e; }
-  }
+  const uniqueName = baseName.slice(0, 55) + ' · ' + ts + rnd;
+  const container = await createContainer(uniqueName, domain);
   const containerId = container.containerId;
   const publicId = container.publicId;     // e.g. GTM-XXXXXX
 
@@ -652,28 +664,20 @@ async function setGA4TransportUrl(webContainerId, webWorkspaceId, sgtmUrl) {
 //
 // The transport_url wiring happens AFTER the user pastes back the deployed
 // sGTM URL — that's the wire-transport route, not this function.
-async function provisionForClientWithServer(opts) {
+async function provisionServerOnly(opts) {
   if (!isConfigured()) {
     const err = new Error('Managed GTM is not configured on this server');
     err.code = 'NOT_CONFIGURED';
     throw err;
   }
 
+  opts = opts || {};
   const onProgress = opts.onProgress || function () {};
 
-  // 1. Web container — DO NOT publishLive yet.
-  onProgress({ stage: 'web_container', done: 0, total: 1 });
-  const web = await provisionForClient({
-    ...opts,
-    publishLive: false,                 // overridden — wire-transport publishes
-  });
-  onProgress({ stage: 'web_container', done: 1, total: 1 });
-
-  // 2. Server container shell.
   onProgress({ stage: 'server_container', done: 0, total: 1 });
   const ts = new Date().toISOString().replace('T', ' ').slice(0, 16).replace(':', '-');
   const baseName = (opts.projectName || 'Easy Track Project').toString().trim();
-  const serverName = baseName.slice(0, 50) + ' (Server) · ' + ts;
+  const serverName = baseName.slice(0, 50) + ' (Server) - ' + ts;
 
   let serverCt;
   try {
@@ -685,10 +689,9 @@ async function provisionForClientWithServer(opts) {
     } else { throw e; }
   }
   const serverContainerId = serverCt.containerId;
-  const serverPublicId    = serverCt.publicId;     // GTM-XXXXXX
+  const serverPublicId    = serverCt.publicId;
   onProgress({ stage: 'server_container', done: 1, total: 1 });
 
-  // 3. Default workspace + import sGTM default config.
   const serverWs = await getDefaultWorkspace(serverContainerId);
   const serverWorkspaceId = serverWs.workspaceId;
 
@@ -696,10 +699,6 @@ async function provisionForClientWithServer(opts) {
   let serverVersionId;
 
   if (opts.serverConfigJson) {
-    // PHASE 1 (feature-flagged upstream in server.js): import the full,
-    // client-built server config via the SAME versions:import path the BYO flow
-    // uses — preserves client + customTemplate (Meta/TikTok/Snap CAPI), which the
-    // per-entity importContainerJSON drops. The static path below is the fallback.
     onProgress({ stage: 'sgtm_import', done: 0, total: 1 });
     const imp = await importServerContainerVersion(serverContainerId, opts.serverConfigJson);
     const cv  = opts.serverConfigJson.containerVersion || {};
@@ -708,21 +707,19 @@ async function provisionForClientWithServer(opts) {
       importedTriggerCount:  (cv.trigger  || []).length,
       importedVariableCount: (cv.variable || []).length,
     };
-    // versions:import returns a ContainerVersion; tolerate either response shape.
     serverVersionId = (imp && (imp.containerVersionId ||
       (imp.containerVersion && imp.containerVersion.containerVersionId))) || null;
     if (!serverVersionId) {
-      console.warn('[gtm] versions:import returned no version id — server container may be unpublished');
+      console.warn('[gtm] versions:import returned no version id - server container may be unpublished');
     }
     onProgress({ stage: 'sgtm_import', done: 1, total: 1 });
   } else {
-    // Static fallback (UNCHANGED): per-entity import of the GA4-only default.
     let sgtmConfig;
     try {
       sgtmConfig = require('./lib/sgtm-default-config.json');
     } catch (e) {
       sgtmConfig = { containerVersion: { variable: [], trigger: [], tag: [] } };
-      console.warn('[gtm] lib/sgtm-default-config.json missing — server container will be empty');
+      console.warn('[gtm] lib/sgtm-default-config.json missing - server container will be empty');
     }
 
     onProgress({ stage: 'sgtm_import', done: 0, total: 1 });
@@ -732,36 +729,198 @@ async function provisionForClientWithServer(opts) {
     );
 
     const verResp  = await createVersion(serverContainerId, serverWorkspaceId,
-      'sGTM initial — ' + new Date().toISOString().split('T')[0]);
+      'sGTM initial - ' + new Date().toISOString().split('T')[0]);
     serverVersionId = verResp.containerVersion && verResp.containerVersion.containerVersionId;
   }
 
-  // 4. Publish the server container so containerConfig is generated.
   onProgress({ stage: 'sgtm_publish', done: 0, total: 1 });
   if (serverVersionId) {
     await publishVersion(serverContainerId, serverVersionId);
   }
   onProgress({ stage: 'sgtm_publish', done: 1, total: 1 });
 
-  // 5. Pull the live containerConfig blob — this is what the user pastes
-  //    into Stape / Cloud Run / Docker as the CONTAINER_CONFIG env var.
   const containerConfig = await getContainerConfig(serverContainerId);
 
   return {
-    web,                                            // existing shape from provisionForClient
-    server: {
-      gtmAccountId:    getAccountId(),
-      containerId:     serverContainerId,
-      publicId:        serverPublicId,
-      workspaceId:     serverWorkspaceId,
-      versionId:       serverVersionId,
-      containerName:   serverName,
-      containerConfig,                              // ← the deploy blob
-      importedTagCount:      importResult.importedTagCount      || 0,
-      importedTriggerCount:  importResult.importedTriggerCount  || 0,
-      importedVariableCount: importResult.importedVariableCount || 0,
-    },
+    gtmAccountId:    getAccountId(),
+    containerId:     serverContainerId,
+    publicId:        serverPublicId,
+    workspaceId:     serverWorkspaceId,
+    versionId:       serverVersionId,
+    containerName:   serverName,
+    containerConfig,
+    importedTagCount:      importResult.importedTagCount      || 0,
+    importedTriggerCount:  importResult.importedTriggerCount  || 0,
+    importedVariableCount: importResult.importedVariableCount || 0,
   };
+}
+
+async function provisionForClientWithServer(opts) {
+  if (!isConfigured()) {
+    const err = new Error('Managed GTM is not configured on this server');
+    err.code = 'NOT_CONFIGURED';
+    throw err;
+  }
+
+  opts = opts || {};
+  const onProgress = opts.onProgress || function () {};
+
+  // 1. Web container — DO NOT publishLive yet.
+  onProgress({ stage: 'web_container', done: 0, total: 1 });
+  const web = await provisionForClient({
+    ...opts,
+    publishLive: false,                 // overridden — wire-transport publishes
+  });
+  onProgress({ stage: 'web_container', done: 1, total: 1 });
+
+  const server = await provisionServerOnly(opts);
+  return { web, server };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAG OPERATIONS — used by token rotation
+// ══════════════════════════════════════════════════════════════════════════════
+
+// List all tags in a workspace. Returns raw GTM tag objects.
+async function listContainerTags(containerId, workspaceId) {
+  const acc = getAccountId();
+  const res = await gtmRequest('GET',
+    `/accounts/${acc}/containers/${containerId}/workspaces/${workspaceId}/tags`);
+  return (res && res.tag) ? res.tag : [];
+}
+
+// Update a single tag's parameter by key. Merges the new param value into the
+// existing parameter list (preserves all other params). Returns updated tag.
+async function updateContainerTag(containerId, workspaceId, tagId, paramKey, paramValue) {
+  const acc = getAccountId();
+  // Fetch current tag state so we can do a surgical param update.
+  const current = await gtmRequest('GET',
+    `/accounts/${acc}/containers/${containerId}/workspaces/${workspaceId}/tags/${tagId}`);
+  const params = (current.parameter || []).map(p => {
+    if (p.key === paramKey) return { ...p, value: paramValue };
+    return p;
+  });
+  // If param didn't exist yet, append it.
+  if (!params.some(p => p.key === paramKey)) {
+    params.push({ type: 'template', key: paramKey, value: paramValue });
+  }
+  const body = JSON.stringify({ ...current, parameter: params });
+  return gtmRequest('PUT',
+    `/accounts/${acc}/containers/${containerId}/workspaces/${workspaceId}/tags/${tagId}`,
+    body);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TOKEN ROTATION — update authHeader on the CAPI tag in the sGTM container,
+// create a new version, and publish it. Used by POST /api/admin/rotate-token.
+// Returns { tagId, versionId, published }.
+// ══════════════════════════════════════════════════════════════════════════════
+async function rotateCapiTokenInContainer(containerId, workspaceId, platform, newToken) {
+  // Find the CAPI tag for the platform. The universal-http.tpl tag has a
+  // `platform` parameter set to 'meta'/'tiktok'/'snap'. If there are multiple
+  // containers (one per platform), match by `authHeader` parameter presence.
+  const tags = await listContainerTags(containerId, workspaceId);
+  const CAPI_TAG_TYPES = ['cvt_', 'custom_template'];  // sGTM custom template prefix
+
+  const capiTags = tags.filter(t => {
+    // Custom templates have type 'cvt_...' in sGTM
+    const isCustom = t.type && (t.type.startsWith('cvt_') || t.type === 'custom_template');
+    if (!isCustom) return false;
+    const params = t.parameter || [];
+    const platformParam = params.find(p => p.key === 'platform');
+    const hasAuthHeader = params.some(p => p.key === 'authHeader');
+    return hasAuthHeader && (!platform || (platformParam && platformParam.value === platform));
+  });
+
+  if (!capiTags.length) {
+    throw new Error('No CAPI tag found for platform=' + (platform || 'any') +
+      ' in container ' + containerId + ' workspace ' + workspaceId);
+  }
+
+  const results = [];
+  for (const tag of capiTags) {
+    await updateContainerTag(containerId, workspaceId, tag.tagId, 'authHeader', newToken);
+    results.push(tag.tagId);
+  }
+
+  // Create a new version and publish it.
+  const verResp = await createVersion(containerId, workspaceId,
+    'Token rotation — ' + (platform || 'CAPI') + ' — ' + new Date().toISOString().split('T')[0]);
+  const versionId = verResp.containerVersion && verResp.containerVersion.containerVersionId;
+  if (versionId) await publishVersion(containerId, versionId);
+
+  return { tagIds: results, versionId, published: !!versionId };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DRIFT DETECTION — compare the live GTM container version against what Easy
+// Track last published. If they differ, someone made manual changes in GTM.
+// Returns { driftDetected, liveVersionId, lastKnownVersionId, warning }.
+// Non-throwing — callers treat drift as a warning, never a blocker.
+// ══════════════════════════════════════════════════════════════════════════════
+async function getLiveContainerVersion(containerId) {
+  if (!containerId) throw new Error('getLiveContainerVersion: containerId required');
+  const acc  = getAccountId();
+  const resp = await gtmRequest(
+    'GET',
+    `/accounts/${acc}/containers/${containerId}/versions:live`,
+  );
+  return resp.containerVersion || resp;
+}
+
+async function detectContainerDrift(containerId, lastKnownGtmVersionId) {
+  try {
+    const live          = await getLiveContainerVersion(containerId);
+    const liveVersionId = live.containerVersionId || live.containerVersion?.containerVersionId;
+    const driftDetected = liveVersionId && lastKnownGtmVersionId &&
+                          String(liveVersionId) !== String(lastKnownGtmVersionId);
+    return {
+      driftDetected:    !!driftDetected,
+      liveVersionId:    liveVersionId   || null,
+      lastKnownVersionId: lastKnownGtmVersionId || null,
+      warning: driftDetected
+        ? `GTM container has manual changes (live: v${liveVersionId}, Easy Track last published: v${lastKnownGtmVersionId}). Rollback will overwrite them.`
+        : null,
+    };
+  } catch (e) {
+    // Non-fatal — drift check failure should never block a rollback.
+    return { driftDetected: false, liveVersionId: null, lastKnownVersionId: null,
+             warning: null, checkError: e.message };
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ROLLBACK — replace an existing container's state with a rebuilt config.
+// Called by POST /api/versions/rollback.
+//
+// WHY versions:import instead of importContainerJSON():
+//   importContainerJSON() does item-by-item POST into a workspace. GTM workspaces
+//   inherit all items from the live container, so adding items would DUPLICATE
+//   them (15 live + 15 rebuilt = 30 items). versions:import replaces the
+//   container state entirely — the correct semantic for rollback.
+//
+// The configJson is rebuilt server-side from the stored configSnapshot.
+// Firestore Client Config is the source of truth; the GTM container is a
+// compiled artifact derived from it.
+// ══════════════════════════════════════════════════════════════════════════════
+async function rollbackContainer(containerId, configJson, versionLabel) {
+  const acc = getAccountId();
+
+  // Wrap in the containerConfigJSON envelope that the GTM import API requires.
+  const apiBody = { containerConfigJSON: JSON.stringify(configJson) };
+  const importResp = await gtmRequest(
+    'POST',
+    `/accounts/${acc}/containers/${containerId}/versions:import`,
+    JSON.stringify(apiBody),
+  );
+
+  const versionId =
+    importResp.containerVersion && importResp.containerVersion.containerVersionId;
+  if (!versionId) throw new Error('rollbackContainer: versions:import returned no versionId');
+
+  await publishVersion(containerId, versionId);
+  // versions:import does not use a workspace — return null for workspaceId.
+  return { versionId, workspaceId: null };
 }
 
 module.exports = {
@@ -774,10 +933,18 @@ module.exports = {
   publishVersion,
   inviteUserToContainer,
   provisionForClient,
+  rollbackContainer,
+  getLiveContainerVersion,
+  detectContainerDrift,
   // Server-side (client + server flow)
   createServerContainer,
   getContainerConfig,
   importServerContainerVersion,
   setGA4TransportUrl,
+  provisionServerOnly,
   provisionForClientWithServer,
+  // Tag operations / token rotation
+  listContainerTags,
+  updateContainerTag,
+  rotateCapiTokenInContainer,
 };
