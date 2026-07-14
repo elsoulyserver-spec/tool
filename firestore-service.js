@@ -203,13 +203,23 @@ async function markGracePeriod(gtmPublicId) {
 // Used by /api/admin/client/:uid endpoints, protected by ADMIN_TOKEN env var.
 // ══════════════════════════════════════════════════════════════════════════════
 async function updateClient(uid, fields) {
-  const allowed = ['status', 'plan', 'name', 'country', 'whatsapp', 'job', 'projects_used', 'notes'];
+  const allowed = ['status', 'plan', 'name', 'country', 'whatsapp', 'job', 'projects_used', 'notes', 'paymentStatus'];
   const update = {};
   Object.keys(fields || {}).forEach(k => {
     if (allowed.indexOf(k) !== -1 && fields[k] !== undefined && fields[k] !== null) {
       update[k] = fields[k];
     }
   });
+  // Manual paid marker (admin-only). paidAt is the SERVER-owned source of truth —
+  // a client-supplied paidAt is never trusted. Reverting sets an explicit null,
+  // which intentionally bypasses the no-null filter above.
+  if (fields && fields.paymentStatus === 'paid') {
+    update.paymentStatus = 'paid';
+    update.paidAt = admin.firestore.FieldValue.serverTimestamp();
+  } else if (fields && fields.paymentStatus === 'unpaid') {
+    update.paymentStatus = 'unpaid';
+    update.paidAt = null;
+  }
   if (!Object.keys(update).length) throw new Error('no updatable fields provided');
   update.updatedAt = admin.firestore.FieldValue.serverTimestamp();
   await db().collection('clients').doc(uid).set(update, { merge: true });
@@ -238,6 +248,7 @@ async function exportAll() {
     exportedAt:     new Date().toISOString(),
     clientsCount:   clients.length,
     containersCount: containers.length,
+    trialLaunchAt:  process.env.TRIAL_LAUNCH_AT || null,
     clients,
     containers,
   };
