@@ -10,6 +10,7 @@
 
 import { useAuth } from '@/lib/auth';
 import { isPreviewAllowed } from '@/lib/preview';
+import { TrialBanner } from '@/components/TrialBanner';
 
 const card: React.CSSProperties = {
   maxWidth: 520,
@@ -87,6 +88,7 @@ export default function HomeProof() {
 
   return (
     <main style={card}>
+      <TrialBanner />
       <div style={eyebrow}>EasyTrac · new UI</div>
       <h1 style={{ fontSize: 22 }}>Shared session verified <Pill tone="good">✓ live</Pill></h1>
       <p style={{ color: 'var(--muted)' }}>
