@@ -5,6 +5,10 @@ const path   = require('path');
 const zlib   = require('zlib');
 const crypto = require('crypto');
 
+// UI migration seam (strangler-fig). Inert unless NEXT_UI_ENABLED=true — see
+// lib/next-proxy.js and docs/EASYTRAC-P0-IMPLEMENTATION-PLAN.html.
+const nextProxy = require('./lib/next-proxy');
+
 // ══════════════════════════════════════════════════════════════════════════════
 // Zero-dependency .env loader — runs BEFORE any service modules that read
 // process.env. Handles `KEY=value` lines, ignores comments/blank lines, does
@@ -1459,6 +1463,16 @@ const server = http.createServer((req, res) => {
     res.writeHead(204, { ...corsHeaders(), ...securityHeaders() });
     res.end();
     return;
+  }
+
+  // ── Migration seam ──────────────────────────────────────────
+  // Proxy ONLY explicitly-migrated UI routes (+ Next runtime assets) to the
+  // separate Next.js service. Inert unless NEXT_UI_ENABLED=true; never matches
+  // /api/*; on upstream failure/timeout it falls back to the legacy app, so a
+  // dead Next service cannot take EasyTrac down. This is the whole strangler
+  // harness — migrating a route later = add it to MIGRATED_ROUTES (env).
+  if (nextProxy.shouldProxyToNext(req.url)) {
+    return nextProxy.proxyToNext(req, res);
   }
 
   // ══════════════════════════════════════════════════════════════════════════
