@@ -17,6 +17,11 @@
 let admin = null;
 try { admin = require('firebase-admin'); } catch (_) { /* lazy-handled below */ }
 
+// Pure trial derivation (dependency-free) — single source of truth for the
+// server-owned 7-day trial. Used to backfill trial fields and to enrich the
+// admin export with an always-fresh computed status.
+const { computeTrial } = require('./lib/trial-service');
+
 let _db           = null;
 let _initError    = null;
 
@@ -213,12 +218,22 @@ async function updateClient(uid, fields) {
   // Manual paid marker (admin-only). paidAt is the SERVER-owned source of truth —
   // a client-supplied paidAt is never trusted. Reverting sets an explicit null,
   // which intentionally bypasses the no-null filter above.
+  //
+  // trialStatus is kept consistent with the payment marker:
+  //   • paid   → 'converted' (the trial no longer applies)
+  //   • unpaid → recomputed from the ORIGINAL, untouched trial dates. We NEVER
+  //     write new trialStartedAt/trialEndsAt here, so reverting a paid client to
+  //     unpaid never grants a fresh 7-day trial.
   if (fields && fields.paymentStatus === 'paid') {
     update.paymentStatus = 'paid';
     update.paidAt = admin.firestore.FieldValue.serverTimestamp();
+    update.trialStatus = 'converted';
   } else if (fields && fields.paymentStatus === 'unpaid') {
     update.paymentStatus = 'unpaid';
     update.paidAt = null;
+    const existing = await getClient(uid);
+    const recomputed = computeTrial({ ...(existing || {}), paymentStatus: 'unpaid', paidAt: null });
+    update.trialStatus = recomputed.trialStatus;
   }
   if (!Object.keys(update).length) throw new Error('no updatable fields provided');
   update.updatedAt = admin.firestore.FieldValue.serverTimestamp();
@@ -228,6 +243,84 @@ async function updateClient(uid, fields) {
 
 async function deleteClient(uid) {
   await db().collection('clients').doc(uid).delete();
+  return true;
+}
+
+// ── Trial fields (server-owned) ───────────────────────────────────────────────
+// Lazily backfill the 7-day trial fields on a client doc. IDEMPOTENT: each field
+// is written only when currently absent, so re-login, profile updates, plan
+// changes, or app restarts never reset or extend the trial. The derivation is
+// anchored to the server-set created_at (see trial-service.computeTrial) and
+// never trusts any frontend-supplied date.
+async function ensureTrialFields(uid, client) {
+  if (!uid) throw new Error('ensureTrialFields: uid is required');
+  const c = client || await getClient(uid);
+  if (!c) return null;
+  const t = computeTrial(c);
+  const update = {};
+
+  const hasTrustedAnchor = c.createdAt != null || c.created_at != null || c.trialAnchoredAt != null;
+  if (!hasTrustedAnchor) {
+    // No trusted anchor (legacy/malformed doc). Stamp a TRUSTED server timestamp
+    // ONCE (trialAnchoredAt) so the trial becomes bounded from now — never an
+    // unbounded active trial and never derived from a client-supplied date.
+    update.trialAnchoredAt = admin.firestore.FieldValue.serverTimestamp();
+  }
+  // Display cache only (never used as an anchor by computeTrial).
+  if (c.trialStartedAt == null && t.trialStartedAt) {
+    update.trialStartedAt = admin.firestore.Timestamp.fromDate(t.trialStartedAt);
+  }
+
+  if (c.trialEndsAt == null && t.trialEndsAt) {
+    update.trialEndsAt = admin.firestore.Timestamp.fromDate(t.trialEndsAt);
+  }
+  if (c.paymentStatus == null) update.paymentStatus = t.paymentStatus;
+  // Only persist a concrete status (not the transient 'unknown').
+  if (c.trialStatus == null && t.trialStatus !== 'unknown') update.trialStatus = t.trialStatus;
+  if (c.containerStatus == null) update.containerStatus = t.containerStatus;
+  if (!Object.keys(update).length) return null;
+  update.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+  await db().collection('clients').doc(uid).set(update, { merge: true });
+  return update;
+}
+
+// Persist the final container teardown status on the client doc. Used by the
+// container-deletion service after a fully-successful teardown.
+async function updateClientContainerStatus(uid, patch) {
+  if (!uid) throw new Error('updateClientContainerStatus: uid is required');
+  const p = patch || {};
+  const update = { updatedAt: admin.firestore.FieldValue.serverTimestamp() };
+  if (p.containerStatus) update.containerStatus = p.containerStatus;
+  if (p.containerStatus === 'deleted') {
+    update.containerDeletedAt = admin.firestore.FieldValue.serverTimestamp();
+  }
+  if (p.containerDeletedBy !== undefined) update.containerDeletedBy = p.containerDeletedBy;
+  if (p.deletedResources !== undefined)   update.deletedResources   = p.deletedResources;
+  await db().collection('clients').doc(uid).set(update, { merge: true });
+  return update;
+}
+
+// Mark a managed_containers doc deleted (admin teardown). Direct set (bypasses
+// the provisioning transition guard) — this is an explicit administrative action.
+async function markContainerDeleted(gtmPublicId) {
+  if (!gtmPublicId) throw new Error('markContainerDeleted: gtmPublicId is required');
+  await db().collection(COLLECTION).doc(gtmPublicId).set({
+    status:    'deleted',
+    deletedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+  return true;
+}
+
+// Mark a managed_servers doc deleted (admin teardown). Direct set for the same
+// reason as markContainerDeleted.
+async function markManagedServerDeleted(id) {
+  if (!id) throw new Error('markManagedServerDeleted: id is required');
+  await db().collection(MANAGED_SERVERS_COLLECTION).doc(id).set({
+    status:    'deleted',
+    deletedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
   return true;
 }
 
@@ -242,7 +335,24 @@ async function exportAll() {
   ]);
   const clients    = [];
   const containers = [];
-  clientsSnap.forEach(d => clients.push({ id: d.id, ...d.data() }));
+  clientsSnap.forEach(d => {
+    const data = d.data();
+    const t = computeTrial(data);
+    clients.push({
+      id: d.id,
+      ...data,
+      // Always-fresh, server-computed trial view (source of truth is computeTrial,
+      // not any persisted field which may be stale between reads).
+      trial: {
+        paymentStatus:     t.paymentStatus,
+        trialStatus:       t.trialStatus,
+        trialStartedAt:    t.trialStartedAt ? t.trialStartedAt.toISOString() : null,
+        trialEndsAt:       t.trialEndsAt    ? t.trialEndsAt.toISOString()    : null,
+        trialDaysRemaining: t.trialDaysRemaining,
+        containerStatus:   t.containerStatus,
+      },
+    });
+  });
   containersSnap.forEach(d => containers.push({ id: d.id, ...d.data() }));
   return {
     exportedAt:     new Date().toISOString(),
@@ -1465,6 +1575,11 @@ module.exports = {
   exportAll,
   updateClient,
   deleteClient,
+  // Trial (server-owned) + container teardown status
+  ensureTrialFields,
+  updateClientContainerStatus,
+  markContainerDeleted,
+  markManagedServerDeleted,
   // Server-Side Tracking config
   saveSSConfig,
   getSSConfig,
