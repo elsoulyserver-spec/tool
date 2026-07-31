@@ -15,8 +15,8 @@
 //         opts.serverConfigJson  -> importServerContainerVersion() (versions:import)
 //         else                   -> static path (sgtm-default-config.json + per-entity)
 //   • importServerContainerVersion() is the SOLE caller of GTM `versions:import`.
-//     Because gtm-service invokes it as a local (closure) binding, a jest.spyOn on
-//     the export cannot intercept the internal call in CommonJS; the authoritative,
+//     Because gtm-service invokes it as a local (closure) binding, replacing the
+//     export (mock.method) cannot intercept the internal call in CommonJS; the authoritative,
 //     deterministic signal for "the import path ran" is therefore whether a
 //     `versions:import` POST was issued. We assert on BOTH the spy and that signal
 //     (OR-ed) so the test is correct regardless of the call-site binding.
@@ -27,17 +27,18 @@
 
 'use strict';
 
+// Runner: Node's built-in test runner (node --test). No Jest.
+const { test, describe, before, after, beforeEach, afterEach, mock } = require('node:test');
+const assert = require('node:assert/strict');
 const { EventEmitter } = require('events');
 const { generateKeyPairSync } = require('crypto');
 
-// Mock the GTM HTTP boundary. gtm-service constructs `new https.Agent(...)` at
-// module load, so the Agent constructor must exist in the mock.
-jest.mock('https', () => ({
-  Agent: function Agent() {},
-  request: jest.fn(),
-}));
-
+// GTM HTTP boundary: gtm-service does `const https = require('https')` and calls
+// `https.request(...)` at call time against the shared singleton, so we intercept
+// by swapping `https.request` per test (restored in afterEach). `new https.Agent`
+// at module load uses the real (harmless) constructor — no network at construction.
 const https = require('https');
+let _origHttpsRequest;
 
 // ── Request recorder + deterministic id counters (reset per test) ────────────
 let recorded;
@@ -74,7 +75,8 @@ function routeResponse(path, method) {
 }
 
 function installHttpsMock() {
-  https.request.mockImplementation((options, cb) => {
+  _origHttpsRequest = https.request;
+  https.request = (options, cb) => {
     const path   = options.path || '';
     const method = (options.method || 'GET').toUpperCase();
     recorded.push({ path, method });
@@ -94,7 +96,12 @@ function installHttpsMock() {
     req.end = () => {};
     req.destroy = () => {};
     return req;
-  });
+  };
+}
+
+function restoreHttpsMock() {
+  if (_origHttpsRequest) https.request = _origHttpsRequest;
+  _origHttpsRequest = undefined;
 }
 
 // ── Worker-stage gate (stages 1+2): EXACT predicate from server.js
@@ -132,7 +139,7 @@ let gtmService;
 let importSpy;
 let savedEnv;
 
-beforeAll(() => {
+before(() => {
   // Real RSA key so the SA JWT signing in gtm-service runs with real crypto
   // (no network, no crypto mock) — keeps the test fully deterministic.
   const { privateKey } = generateKeyPairSync('rsa', {
@@ -156,7 +163,7 @@ beforeAll(() => {
   gtmService = require('../gtm-service');
 });
 
-afterAll(() => {
+after(() => {
   process.env.GTM_SA_KEY_JSON = savedEnv.GTM_SA_KEY_JSON;
   process.env.GTM_ACCOUNT_ID = savedEnv.GTM_ACCOUNT_ID;
   process.env.MANAGED_IMPORT_SERVER_CONFIG = savedEnv.MANAGED_IMPORT_SERVER_CONFIG;
@@ -169,14 +176,16 @@ beforeEach(() => {
   entityCount = 0;
   createVersionCount = 0;
   installHttpsMock();
-  // Required by the task: mock importServerContainerVersion. (Intercepts only if
-  // the call goes through the export; assertions below also use the network seam.)
-  importSpy = jest.spyOn(gtmService, 'importServerContainerVersion')
-    .mockResolvedValue({ containerVersionId: IMPORT_VERSION_ID });
+  // Node-native dependency injection: replace the exported
+  // importServerContainerVersion. (Intercepts only if the call goes through the
+  // export; assertions below also use the network seam as an authoritative signal.)
+  importSpy = mock.method(gtmService, 'importServerContainerVersion',
+    async () => ({ containerVersionId: IMPORT_VERSION_ID }));
 });
 
 afterEach(() => {
-  jest.restoreAllMocks();
+  mock.restoreAll();
+  restoreHttpsMock();
 });
 
 // ── Observable signals (authoritative, binding-independent) ──────────────────
@@ -206,9 +215,9 @@ describe('provisionForClientWithServer — managed server-config import decision
 
     const result = await runPipeline({ serverConfigRef: STAGED_REF, blob: SERVER_CONFIG_JSON });
 
-    expect(importPathTaken()).toBe(true);                   // import branch ran
-    expect(staticServerImportTaken()).toBe(false);          // static GA4-only path did NOT run
-    expect(result.server.versionId).toBe(IMPORT_VERSION_ID); // serverVersionId === containerVersionId
+    assert.strictEqual(importPathTaken(), true);                   // import branch ran
+    assert.strictEqual(staticServerImportTaken(), false);          // static GA4-only path did NOT run
+    assert.strictEqual(result.server.versionId, IMPORT_VERSION_ID); // serverVersionId === containerVersionId
   });
 
   test('TEST CASE 2 (STATIC FALLBACK): flag="1" + serverConfigJson=null -> static path, no import', async () => {
@@ -216,10 +225,10 @@ describe('provisionForClientWithServer — managed server-config import decision
 
     const result = await runPipeline({ serverConfigRef: null, blob: null }); // nothing staged
 
-    expect(importPathTaken()).toBe(false);                  // importServerContainerVersion NOT used
-    expect(staticServerImportTaken()).toBe(true);           // static per-entity import ran
-    expect(result.server.versionId).toMatch(/^V_CREATE_/);  // version came from createVersion, not import
-    expect(result.server.versionId).not.toBe(IMPORT_VERSION_ID);
+    assert.strictEqual(importPathTaken(), false);                  // importServerContainerVersion NOT used
+    assert.strictEqual(staticServerImportTaken(), true);           // static per-entity import ran
+    assert.match(result.server.versionId, /^V_CREATE_/);           // version came from createVersion, not import
+    assert.notStrictEqual(result.server.versionId, IMPORT_VERSION_ID);
   });
 
   test('TEST CASE 3 (ROLLBACK): flag="0" + serverConfigJson exists -> static path always, no import', async () => {
@@ -227,9 +236,9 @@ describe('provisionForClientWithServer — managed server-config import decision
 
     const result = await runPipeline({ serverConfigRef: STAGED_REF, blob: SERVER_CONFIG_JSON });
 
-    expect(importPathTaken()).toBe(false);                  // flag off => worker gate yields null => static
-    expect(staticServerImportTaken()).toBe(true);
-    expect(result.server.versionId).toMatch(/^V_CREATE_/);
-    expect(result.server.versionId).not.toBe(IMPORT_VERSION_ID);
+    assert.strictEqual(importPathTaken(), false);                  // flag off => worker gate yields null => static
+    assert.strictEqual(staticServerImportTaken(), true);
+    assert.match(result.server.versionId, /^V_CREATE_/);
+    assert.notStrictEqual(result.server.versionId, IMPORT_VERSION_ID);
   });
 });
