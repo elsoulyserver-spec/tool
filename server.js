@@ -37,8 +37,16 @@ const nextProxy = require('./lib/next-proxy');
 })();
 
 // ── Puppeteer (optional — graceful fallback if not installed) ──────────────
+const os = require('os');
 let puppeteer = null;
 try { puppeteer = require('puppeteer'); } catch (_) {}
+if (puppeteer) {
+  const _memMb = os.totalmem() / 1024 / 1024;
+  if (_memMb < 1024) {
+    console.warn('[startup] WARNING: ' + Math.round(_memMb) + ' MB RAM detected. ' +
+      'Puppeteer requires ≥1 GB. Deploy with --memory=1Gi on Cloud Run or expect OOM crashes.');
+  }
+}
 
 // ── Pixel-scanner concurrency guard ────────────────────────────────────────
 // Each Puppeteer scan launches a headless Chrome (~150-300 MB resident). Without
@@ -48,9 +56,52 @@ try { puppeteer = require('puppeteer'); } catch (_) {}
 const MAX_CONCURRENT_SCANS = parseInt(process.env.MAX_CONCURRENT_SCANS || '3', 10);
 let scanInFlight = 0;
 
+// ── sGTM native template loader — served to tool.html via /api/sgtm-templates ──
+// Optional at startup: deployments built from an older bundle may not include
+// the native template files yet. The UI has inline fallbacks, so missing files
+// should disable /api/sgtm-templates rather than crash the whole server.
+let sgtmTemplateLoader = { loadTpl: () => null };
+try {
+  sgtmTemplateLoader = require('./lib/sgtm-template-loader');
+} catch (e) {
+  console.warn('[sgtm-templates] loader unavailable; /api/sgtm-templates will return null templates:', e.message);
+}
+const _SGTM_TPL_META     = sgtmTemplateLoader.loadTpl('meta-capi');
+const _SGTM_TPL_TIKTOK   = sgtmTemplateLoader.loadTpl('tiktok-events');
+const _SGTM_TPL_SNAP     = sgtmTemplateLoader.loadTpl('snapchat-capi');
+const _SGTM_TPL_GADS     = sgtmTemplateLoader.loadTpl('google-ads-ec');
+
+function optionalStartupRequire(modulePath, loader, fallback) {
+  try {
+    return loader();
+  } catch (e) {
+    console.warn('[startup] optional module unavailable: ' + modulePath + ' — ' + e.message);
+    return fallback;
+  }
+}
+
+function _unavailableModule(name) {
+  const err = new Error(name + ' module is not available in this deployment bundle');
+  err.status = 503;
+  err.code = 'MODULE_UNAVAILABLE';
+  throw err;
+}
+
 // ── Managed GTM services (optional — endpoints return 503 if not set up) ──
-const gtmService       = require('./gtm-service');
-const firestoreService = require('./firestore-service');
+const gtmService        = require('./gtm-service');
+const firestoreService  = require('./firestore-service');
+const gtmConfigBuilder  = optionalStartupRequire('./lib/gtm-config-builder', () => require('./lib/gtm-config-builder'), {
+  buildWebConfig: () => _unavailableModule('gtm-config-builder'),
+});
+const managedCreateServer = optionalStartupRequire('./lib/provision/create-server', () => require('./lib/provision/create-server'), {
+  createServer: () => _unavailableModule('managed create-server'),
+});
+const managedProvisionRunner = optionalStartupRequire('./lib/provision/runner', () => require('./lib/provision/runner'), {
+  run: () => _unavailableModule('managed provision runner'),
+});
+const shardRegistry = optionalStartupRequire('./lib/shard-registry', () => require('./lib/shard-registry'), {
+  isConfigured: () => false,
+});
 
 // ── Server-Side Tracking services ─────────────────────────────────────────
 const cryptoVault  = require('./lib/crypto-vault');
@@ -58,9 +109,8 @@ const rateLimiter  = require('./lib/ss-rate-limiter');
 const { StapeProvider }      = require('./lib/providers/stape');
 const { GoogleCloudProvider } = require('./lib/providers/gcloud');
 const { SelfHostedProvider }  = require('./lib/providers/selfhosted');
-// SSRF guard — reused from the providers layer to validate the pixel-scanner
-// target (blocks private/loopback/link-local/cloud-metadata hosts + bad ports).
-const { assertSafeUrl }       = require('./lib/providers/base');
+// assertSafeUrl (providers/base) is no longer called directly from server.js —
+// all user-URL paths now go through safeFetch / resolveHostname from ssrf-guard.
 // Cloud Tasks client — offloads long provisioning jobs to a worker request so
 // Cloud Run keeps CPU allocated for their full duration (see C3 / lib/cloud-tasks.js).
 const cloudTasks              = require('./lib/cloud-tasks');
@@ -68,6 +118,88 @@ const cloudTasks              = require('./lib/cloud-tasks');
 // Firestore job doc (1 MB limit + embedded customTemplate JS), so it is staged
 // in a private GCS bucket and the job carries only a small { bucket, object } ref.
 const configBlobStore         = require('./lib/config-blob-store');
+// Client Profile API services (Phase 1)
+const apiKeyService   = optionalStartupRequire('./lib/api-key-service', () => require('./lib/api-key-service'), {
+  generate: () => _unavailableModule('api-key-service'),
+  parse: () => null,
+  verify: () => false,
+});
+const auditService    = optionalStartupRequire('./lib/audit-service', () => require('./lib/audit-service'), {
+  hashEmail: () => null,
+  computeDiff: () => null,
+});
+const {
+  validateTargetUrl,
+  safeFetch,
+  resolveHostname,
+  isBlockedIp,
+} = optionalStartupRequire('./lib/ssrf-guard', () => require('./lib/ssrf-guard'), {
+  validateTargetUrl: () => _unavailableModule('ssrf-guard'),
+  safeFetch: async () => _unavailableModule('ssrf-guard'),
+  resolveHostname: async () => _unavailableModule('ssrf-guard'),
+  isBlockedIp: () => true,
+});
+const timelineService = optionalStartupRequire('./lib/timeline-service', () => require('./lib/timeline-service'), {
+  record: async () => {},
+});
+const profileService  = optionalStartupRequire('./lib/profile-service', () => require('./lib/profile-service'), {
+  getBundle: async () => null,
+});
+// Admin session/auth (secret-key → HttpOnly-cookie session, storage-agnostic).
+const adminSession    = require('./lib/admin-session');
+// Server-owned 7-day trial derivation (pure).
+const { computeTrial } = require('./lib/trial-service');
+// Managed-infra teardown for expired+unpaid clients (injected deps at call site).
+const containerDeletionService = require('./lib/container-deletion-service');
+// Task-owned adapter: isolates deletion from managed-hosting WIP (committed APIs only).
+const containerInfraAdapter = require('./lib/container-infrastructure-adapter');
+// Health evaluation job (Phase 2)
+const healthService   = optionalStartupRequire('./lib/health-service', () => require('./lib/health-service'), {
+  runHealthJob: async () => {},
+});
+// DLQ retry worker — retries failed CAPI sends stored in Firestore dlq_events
+const dlqWorker       = optionalStartupRequire('./lib/dlq-worker', () => require('./lib/dlq-worker'), {
+  start: () => ({ unref: () => {} }),
+});
+// In-process metrics counters — exposed via GET /api/v1/metrics
+const metrics           = optionalStartupRequire('./lib/metrics', () => require('./lib/metrics'), {
+  incCapiSuccess: () => {},
+  incCapiFailure: () => {},
+  incDlqCreated: () => {},
+  incDlqReplayed: () => {},
+  incDlqExhausted: () => {},
+  incConsentDenied: () => {},
+  incProvisioningFailed: () => {},
+  incProvisioningStalled: () => {},
+  snapshot: () => ({ counters: {}, platformStats: {}, startedAt: Date.now(), uptimeMs: 0 }),
+  checkAlerts: () => [],
+});
+// Cloud Monitoring push — flushes metrics to GCP every 60s (no-ops off-GCP)
+const cloudMonitoring   = optionalStartupRequire('./lib/cloud-monitoring', () => require('./lib/cloud-monitoring'), {
+  pushSnapshot: async () => {},
+});
+// Secret Manager wrapper — resolves MASTER_ENCRYPTION_KEY from GCP or ENV
+const secretManager     = optionalStartupRequire('./lib/secret-manager', () => require('./lib/secret-manager'), {
+  validateAtStartup: async () => {},
+});
+
+// Beacon write deduplication — bucket-keyed per 5-minute window.
+// Value is the bucket number; replaces itself naturally each period.
+// Prune runs every 10 min and removes entries from the previous bucket.
+const _beaconCache      = new Map();   // key: `${clientId}_${event}`, value: bucketNum
+const _BEACON_BUCKET_MS = 5 * 60 * 1000;
+setInterval(() => {
+  const cur = Math.floor(Date.now() / _BEACON_BUCKET_MS);
+  for (const [k, b] of _beaconCache) if (b < cur - 1) _beaconCache.delete(k);
+}, 10 * 60 * 1000).unref();
+
+// 64-char hex placeholder for timing-attack hardening in API key beacon auth.
+// Must decode to 32 bytes — same length as a real keyHash — so timingSafeEqual
+// always runs regardless of whether the keyId exists in Firestore.
+const _BEACON_DUMMY_HASH = '0'.repeat(64);
+// Beacon event allowlist — single source of truth shared with the health job's
+// listEventTypeLastSeen. Prevents authenticated callers writing arbitrary doc IDs.
+const _BEACON_VALID_EVENTS = new Set(firestoreService.BEACON_EVENTS);
 
 // Self-contained concurrency limiter — inlined here (NOT a separate module)
 // because the deploy ships only existing tracked files. Global FIFO + bounded
@@ -123,13 +255,22 @@ const provisionQueue = (function createProvisionQueueSingleton() {
 // We print exactly which vars are missing and which routes that breaks. Values
 // are never logged.
 (function envCheck() {
-  const REQUIRED = [
+  // CRITICAL vars abort a production boot when absent (deploy-time mistake, not
+  // a transient outage). RECOMMENDED vars only warn — they gate newer optional
+  // features and may legitimately be unset on older deployments.
+  const CRITICAL = [
     { key: 'GTM_SA_KEY_JSON',      breaks: '/api/managed/* and /api/ss/create-containers (GTM provisioning)' },
     { key: 'GTM_ACCOUNT_ID',       breaks: '/api/managed/* and /api/ss/create-containers (GTM provisioning)' },
     { key: 'FIREBASE_SA_KEY_JSON', breaks: '/api/ss/* auth + ALL job storage (jobs are Firestore-backed)' },
     { key: 'MASTER_ENCRYPTION_KEY',breaks: '/api/ss/save-config (token encryption)' },
   ];
-  const missing = REQUIRED.filter(r => !((process.env[r.key] || '').trim()));
+  const RECOMMENDED = [
+    { key: 'API_KEY_SECRET',       breaks: '/api/v1/clients/:id/api-keys (API key generation + HMAC verification)' },
+    { key: 'BEACON_SECRET',        breaks: '/api/v1/internal/beacon (sGTM event presence beacons — HMAC validation)' },
+  ];
+  const missingCritical    = CRITICAL.filter(r => !((process.env[r.key] || '').trim()));
+  const missingRecommended = RECOMMENDED.filter(r => !((process.env[r.key] || '').trim()));
+  const missing = missingCritical.concat(missingRecommended);
   if (missing.length) {
     console.warn('');
     console.warn('⚠️  STARTUP WARNING: missing required environment variables:');
@@ -140,10 +281,46 @@ const provisionQueue = (function createProvisionQueueSingleton() {
   } else {
     console.log('✓ All required environment variables are set.');
   }
+  // Fail-fast in production: a container missing its core secrets can only serve
+  // 503s, so exit with a clear message instead of limping. ALLOW_DEGRADED_START=1
+  // is the emergency escape hatch (e.g. bring the container up to debug).
+  const isProduction = process.env.NODE_ENV === 'production' ||
+                       !!process.env.K_SERVICE ||               // Cloud Run
+                       !!process.env.RAILWAY_ENVIRONMENT;       // Railway
+  if (missingCritical.length && isProduction && process.env.ALLOW_DEGRADED_START !== '1') {
+    console.error('✖ FATAL: refusing to start in production without: ' +
+      missingCritical.map(r => r.key).join(', '));
+    console.error('  Set the variables above, or set ALLOW_DEGRADED_START=1 to boot anyway.');
+    process.exit(1);
+  }
 })();
+
+// ── Secret Manager startup validation ────────────────────────────────────────
+// Runs async but does NOT block the HTTP server from starting — a brief startup
+// window where the key is sourced from ENV is acceptable. Logs source + version.
+secretManager.validateAtStartup().catch(e => {
+  console.error('[startup] FATAL: encryption key unavailable —', e.message);
+  console.error('[startup] Set MASTER_ENCRYPTION_KEY or configure Secret Manager (SECRET_MANAGER_PROJECT + ENCRYPTION_KEY_SECRET)');
+  // Don't process.exit() — the server still starts, /api/ss/save-config will
+  // return 503 from ssRequireCrypto(). A hard exit would prevent healthz probes
+  // from responding during GCP Secret Manager outages.
+});
 
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CLIENT-ROUTER APP ROUTES
+// The app (tool.html) is a single-page app with a lightweight History-API router.
+// These clean paths have no backing .html file — we serve the SPA entry (tool.html)
+// for each so a direct visit or a browser refresh returns 200 (never 404). The
+// in-app router then renders the correct view and enforces auth guards / redirects.
+// Cloudflare is DNS + SSL + proxy ONLY — no page rules / rewrites are needed
+// because the origin already returns the app for every app route.
+// ══════════════════════════════════════════════════════════════════════════════
+const APP_ROUTES = new Set([
+  '/register', '/sign-in', '/dashboard', '/tool', '/pricing', '/account', '/settings',
+]);
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PHASE-1 FEATURE FLAG — import managed server containers via versions:import
@@ -221,8 +398,16 @@ async function _setJob(id, patch, opts = {}) {
     if (Date.now() - last < PROGRESS_WRITE_MIN_INTERVAL_MS) return;
     _jobProgressWriteAt.set(id, Date.now());
   }
+  // heartbeatAt on every write — stall detector uses this field.
+  // lastProgressAt only on non-terminal status transitions.
+  const isTerminal = patch && (patch.status === 'completed' || patch.status === 'failed' || patch.status === 'stalled');
+  const augmented = {
+    ...patch,
+    heartbeatAt: new Date(),
+    ...(isTerminal ? {} : { lastProgressAt: new Date() }),
+  };
   try {
-    await firestoreService.saveJob(id, patch);
+    await firestoreService.saveJob(id, augmented);
   } catch (e) {
     console.warn('[jobs] saveJob failed for ' + id + ':', e.message);
   }
@@ -293,6 +478,7 @@ async function _runManagedProvisionJob(jobId) {
   // Permanent, best-effort audit write (collection `provision_audit`, NO TTL).
   // Never throws — a failed audit must not fail the provision. Carries NO secrets.
   async function _writeManagedAudit(success, errorCode) {
+    if (!success) metrics.incProvisioningFailed();
     if (dryRun) return;
     try {
       await firestoreService.saveAudit({
@@ -333,19 +519,54 @@ async function _runManagedProvisionJob(jobId) {
 
     await _setJob(jobId, { status: 'running', stage: 'capacity_check' });
 
-    // 1. Capacity guard — GTM caps at 500 containers per account
-    const activeCount = await firestoreService.countActiveContainers();
-    if (activeCount >= 490) {
+    // 1. Capacity guard — GTM caps at 500 containers per account.
+    // Multi-account: try primary first, fall back to extras if critical.
+    const capacityReport = await firestoreService.getAccountCapacityReport();
+    const primaryAccountId = (process.env.GTM_ACCOUNT_ID || '').trim();
+
+    // Emit capacity alerts at thresholds
+    capacityReport.forEach(acct => {
+      if (acct.status === 'critical') {
+        console.error('[capacity] CRITICAL: GTM account ' + acct.accountId +
+          ' at ' + acct.activeContainers + '/490 containers — add GTM_ACCOUNT_IDS');
+        metrics.incProvisioningFailed(); // count capacity failures
+      } else if (acct.status === 'warning_high') {
+        console.warn('[capacity] WARNING: GTM account ' + acct.accountId +
+          ' at ' + acct.activeContainers + '/490 containers (>400) — plan new account');
+      } else if (acct.status === 'warning') {
+        console.warn('[capacity] INFO: GTM account ' + acct.accountId +
+          ' at ' + acct.activeContainers + '/490 containers (>300)');
+      }
+    });
+
+    // Find an account with capacity. Prefer primary; fall back to lowest-utilization extra.
+    const available = capacityReport.filter(a => a.activeContainers < 480);
+    if (!available.length) {
       await _setJob(jobId, {
         status: 'failed',
         stage:  'capacity_exceeded',
-        error:  'Managed GTM account is near capacity',
-        hint:   'Provision a new GTM_ACCOUNT_ID and route new clients there',
+        error:  'All GTM accounts are at capacity (≥480 containers each)',
+        hint:   'Add a new GTM account ID to GTM_ACCOUNT_IDS env var',
         httpStatus: 507,
-        activeContainers: activeCount,
+        capacityReport,
       });
       return;
     }
+
+    // Use primary if available, else lowest utilization
+    const selectedAccount = available.find(a => a.accountId === primaryAccountId) ||
+      available.sort((a, b) => a.activeContainers - b.activeContainers)[0];
+
+    if (selectedAccount.accountId !== primaryAccountId) {
+      console.log('[capacity] routing to secondary account ' + selectedAccount.accountId +
+        ' (primary at capacity)');
+      // Temporarily override env var for this job's GTM calls.
+      // NOTE: This is process-level mutation — safe because provisioning jobs
+      // run sequentially within provisionQueue, but requires care with concurrency.
+      process.env.GTM_ACCOUNT_ID = selectedAccount.accountId;
+    }
+
+    const activeCount = selectedAccount.activeContainers;
 
     // 2. Provision via GTM API. Branch on mode:
     //    - 'client'        → existing single-container flow (publishes live).
@@ -385,7 +606,9 @@ async function _runManagedProvisionJob(jobId) {
       configJson,
       serverConfigJson,
       publishLive: mode === 'client_server' ? false : !!publishLive,
-      inviteEmail: clientEmail || null,
+      // GTM read-access invite intentionally disabled — we don't email the client
+      // container access; the response returns the GTM Container ID only.
+      inviteEmail: null,
       onProgress: (p) => { _setJob(jobId, { stage: 'gtm_provisioning', progress: p }, { progressOnly: true }); },
     };
 
@@ -431,6 +654,45 @@ async function _runManagedProvisionJob(jobId) {
       mode,
       serverContainerPublicId: serverResult ? serverResult.publicId : null,
     });
+
+    // 3b. Append a version record — source of truth is the Firestore client config;
+    //     the GTM container is a compiled artifact derived from it.
+    //     allocateVersionNumber uses a Firestore transaction → no race conditions.
+    try {
+      const vNum = await firestoreService.allocateVersionNumber(clientId);
+      await firestoreService.saveVersion({
+        clientId,
+        version:        vNum,
+        publishedBy:    clientEmail || clientId,
+        containerId:    webResult.gtmContainerId,
+        workspaceId:    webResult.gtmWorkspaceId,
+        gtmVersionId:   webResult.gtmVersionId   || null,
+        gtmPublicId:    webResult.gtmPublicId,
+        deploymentType:  'publish',
+        deploymentState: 'published',
+        status:          'published',
+        // configSnapshot: client config fields — NOT the generated GTM JSON.
+        // Rollback re-derives the GTM artifact from this snapshot server-side.
+        configSnapshot: {
+          ga4MeasurementId: (pixelIds || {}).ga4 || null,
+          sgtmUrl:          null,
+          pixelIds:         pixelIds  || {},
+          events:           events    || [],
+          customEvents:     [],
+          ecommPlatform:    cmsType   || '',
+          platforms:        platforms || [],
+          domain:           domain    || null,
+          mode,
+        },
+        diffSummary: {
+          added:    webResult.importedTagCount     || 0,
+          modified: 0,
+          removed:  0,
+        },
+      });
+    } catch (verErr) {
+      console.warn('[managed/create][job ' + jobId + '] version record write failed (non-fatal):', verErr.message);
+    }
 
     // 4. client_server flow — auto-deploy to Stape + auto-wire transport_url.
     //    The Stape API key is a PLATFORM credential (set via STAPE_API_KEY env
@@ -619,7 +881,8 @@ async function _runSsProvisionJob(jobId) {
       projectName: projectName || ((email || clientId.slice(0, 8)) + ' — SS Setup'),
       configJson:   finalConfigJson,
       publishLive:  false,
-      inviteEmail:  email || null,
+      // GTM read-access invite intentionally disabled — no email is sent.
+      inviteEmail:  null,
       onProgress:   (p) => { _setJob(jobId, { stage: 'gtm_provisioning', progress: p }, { progressOnly: true }); },
     });
 
@@ -712,7 +975,9 @@ async function _dispatchProvisionJob(jobType, jobId) {
     e.code   = 'QUEUE_FULL';
     throw e;
   }
-  const runner = jobType === 'ss' ? _runSsProvisionJob : _runManagedProvisionJob;
+  const runner = jobType === 'ss'
+    ? _runSsProvisionJob
+    : (jobType === 'managed_server' ? managedProvisionRunner.run : _runManagedProvisionJob);
   // In-process fallback (local / Railway): cap global concurrency + FIFO-queue the
   // overflow so a burst can't fan out into hundreds of parallel GTM import
   // sequences. Fire-and-forget (the HTTP layer already returned 202 and the client
@@ -720,6 +985,50 @@ async function _dispatchProvisionJob(jobType, jobId) {
   // still-queued job honors a mid-flight rollback. No job is dropped.
   provisionQueue.run(() => runner(jobId))
     .catch(err => console.error('[jobs] inline run failed for ' + jobId + ':', err));
+}
+
+// ── Startup queue recovery ───────────────────────────────────────────────────
+// On process restart, scan Firestore for provisioning_jobs in status='pending'
+// that have no heartbeatAt (i.e. they were created but never dispatched because
+// the process crashed before or during enqueueing). Re-dispatch them once.
+// Zombie guard: only recover jobs created in the last 25 minutes (the job TTL
+// is 30 min, and a fresh worker is unlikely to see older orphans from a different
+// deployment — those should be marked stalled by the stall detector instead).
+async function _recoverPendingJobsOnStartup() {
+  const admin = require('firebase-admin');
+  const db    = require('./firestore-service');
+  const cutoff = admin.firestore
+    ? new Date(Date.now() - 25 * 60 * 1000)
+    : null;
+
+  // We don't have direct db() access here — use firestoreService internals
+  // via a dedicated function added to firestore-service.
+  const orphans = await firestoreService.listOrphanedPendingJobs(25 * 60 * 1000);
+  if (!orphans.length) {
+    console.log('[startup-recovery] no orphaned pending jobs found');
+    return;
+  }
+
+  console.warn('[startup-recovery] found ' + orphans.length + ' orphaned pending job(s) — re-dispatching');
+  for (const job of orphans) {
+    try {
+      // Mark as recovery attempt before dispatching to prevent duplicate recovery
+      await firestoreService.saveJob(job.jobId, {
+        recoveredAt: new Date(),
+        recoveryAttempt: (job.recoveryAttempt || 0) + 1,
+      });
+      const jobType = job.jobType || 'managed';
+      await _dispatchProvisionJob(jobType, job.jobId);
+      console.log('[startup-recovery] re-dispatched job ' + job.jobId + ' type=' + jobType);
+    } catch (e) {
+      console.error('[startup-recovery] failed to re-dispatch job ' + job.jobId + ':', e.message);
+      await firestoreService.saveJob(job.jobId, {
+        status: 'failed',
+        error:  'startup recovery re-dispatch failed: ' + e.message,
+        finishedAt: Date.now(),
+      }).catch(() => {});
+    }
+  }
 }
 
 // Shared-secret auth for the internal Cloud Tasks worker route. The public
@@ -1268,50 +1577,9 @@ async function scanWithPuppeteer(targetUrl) {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// HTTP FALLBACK (no Puppeteer)
-// ══════════════════════════════════════════════════════════════════════════════
-function fetchWithHttp(targetUrl, redirects) {
-  redirects = redirects || 0;
-  return new Promise((resolve, reject) => {
-    if (redirects > 5) { reject(new Error('Too many redirects')); return; }
-    const lib = targetUrl.startsWith('https') ? https : http;
-    const req = lib.get(targetUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; EasyTrackScanner/1.0)' },
-      timeout: 15000,
-    }, res => {
-      // ── Redirect: re-validate EVERY hop through the SSRF guard ──────────────
-      // The first-hop check in /api/scan-url is not enough: an allow-looking host
-      // can 302 into localhost / a private IP / the cloud-metadata endpoint.
-      if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
-        res.resume(); // drain the redirect body so the socket is released
-        let next;
-        try {
-          const loc = res.headers.location;
-          next = /^https?:\/\//i.test(loc) ? loc : new URL(loc, targetUrl).href;
-        } catch (_) { reject(new Error('Invalid redirect location')); return; }
-        assertSafeUrl(next)
-          .then(() => resolve(fetchWithHttp(next, redirects + 1)))
-          .catch(e => reject(new Error('Redirect blocked by SSRF guard: ' + e.message)));
-        return;
-      }
-
-      let html = '';
-      res.setEncoding('utf8');
-      res.on('data', c => {
-        html += c;
-        if (html.length >= 800000) {           // hard cap — stop reading oversize bodies
-          html = html.slice(0, 800000);
-          res.destroy();
-          resolve({ html, url: targetUrl, pixels: [], method: 'http' });
-        }
-      });
-      res.on('end', () => resolve({ html, url: targetUrl, pixels: [], method: 'http' }));
-    });
-    req.on('timeout', () => req.destroy(new Error('Scan request timed out')));
-    req.on('error', reject);
-  });
-}
+// fetchWithHttp removed — replaced by safeFetch in /api/scan-url.
+// safeFetch resolves DNS once, validates the IP, and connects to the IP
+// directly (no TOCTOU window). See lib/ssrf-guard.js.
 
 // ══════════════════════════════════════════════════════════════════════════════
 // HELPERS
@@ -1453,10 +1721,188 @@ function sendJSON(res, code, obj) {
   res.end(body);
 }
 
+// JSON response that also sets one or more Set-Cookie headers.
+function sendJSONWithCookies(res, code, obj, cookies) {
+  const body = JSON.stringify(obj);
+  res.writeHead(code, {
+    'Content-Type': 'application/json; charset=utf-8',
+    ...corsHeaders(),
+    ...securityHeaders(),
+    'Set-Cookie': cookies,
+  });
+  res.end(body);
+}
+
+// ── Admin cookie / CSRF helpers ────────────────────────────────────────────────
+function _isProd() { return String(process.env.NODE_ENV) === 'production'; }
+
+function _parseCookies(req) {
+  const raw = req.headers['cookie'] || '';
+  const out = {};
+  raw.split(';').forEach(part => {
+    const i = part.indexOf('=');
+    if (i < 0) return;
+    const k = part.slice(0, i).trim();
+    if (!k) return;
+    out[k] = decodeURIComponent(part.slice(i + 1).trim());
+  });
+  return out;
+}
+
+// Cookie attributes shared by the session + csrf cookies. `httpOnly` is opt-in:
+// the csrf cookie is intentionally readable so the SPA can echo it as a header.
+function _adminCookie(name, value, { httpOnly, maxAgeSec }) {
+  const parts = [`${name}=${value}`, 'Path=/', 'SameSite=Strict'];
+  if (httpOnly) parts.push('HttpOnly');
+  if (_isProd()) parts.push('Secure');
+  if (maxAgeSec != null) parts.push('Max-Age=' + maxAgeSec);
+  return parts.join('; ');
+}
+
+// Same-origin guard for state-changing admin requests. If neither Origin nor
+// Referer is present (typical of a non-browser Bearer caller) we allow it — CSRF
+// only threatens the ambient-cookie path, which always carries an Origin.
+function _adminOriginOk(req) {
+  const host = req.headers['host'];
+  if (!host) return false;
+  const origin = req.headers['origin'];
+  if (origin) {
+    try { return new URL(origin).host === host; } catch (_) { return false; }
+  }
+  const referer = req.headers['referer'];
+  if (referer) {
+    try { return new URL(referer).host === host; } catch (_) { return false; }
+  }
+  return true;
+}
+
+// Global kill-switch for the destructive container-deletion action. Disabled by
+// default (fail-safe) — deletion is impossible for ALL clients unless an operator
+// explicitly sets CONTAINER_DELETION_ENABLED=true in the server environment. This
+// keeps the feature off during review even for an authenticated admin.
+function _containerDeletionEnabled() {
+  const v = (process.env.CONTAINER_DELETION_ENABLED || '').trim().toLowerCase();
+  return v === '1' || v === 'true';
+}
+
+// Wire the injected dependencies for the container-deletion service. Kept here
+// (not inside the service) so the service stays infra-free and unit-testable.
+function _buildContainerDeletionDeps(adminId) {
+  // Infrastructure access is delegated to the task-owned adapter, which depends
+  // only on committed firestore APIs and never require()s managed-hosting WIP.
+  // No Cloud Run provider is injected here, so teardown reports
+  // provider_unavailable (honest, non-destructive) until such a provider exists.
+  return {
+    getClient:                   (uid)    => firestoreService.getClient(uid),
+    updateClientContainerStatus: (uid, p) => firestoreService.updateClientContainerStatus(uid, p),
+    saveAuditLog:                (rec)    => firestoreService.saveAuditLog(rec),
+    now: () => new Date(),
+    adminId,
+    infra: containerInfraAdapter,
+  };
+}
+
+function _managedDeployProvider() {
+  return (process.env.MANAGED_DEPLOY_PROVIDER || '').trim().toLowerCase();
+}
+
+function _managedProviderIsCloudRun() {
+  return _managedDeployProvider() === 'cloudrun';
+}
+
+function _decodedIsAdmin(decoded) {
+  const admins = (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map(v => v.trim().toLowerCase())
+    .filter(Boolean);
+  const email = (decoded && decoded.email || '').trim().toLowerCase();
+  return !!(decoded && (decoded.admin === true || decoded.role === 'admin' || admins.includes(email)));
+}
+
+async function _managedFirebaseAuth(req, res) {
+  if (!firestoreService.isConfigured()) {
+    sendJSON(res, 503, { error: 'Firestore is not configured' });
+    return null;
+  }
+  const authz = (req.headers['authorization'] || req.headers['Authorization'] || '').trim();
+  const m = /^Bearer\s+(.+)$/i.exec(authz);
+  if (!m) {
+    sendJSON(res, 401, { error: 'Authorization header required' });
+    return null;
+  }
+  const idToken = m[1].trim();
+  if (!idToken || idToken.length > 8192) {
+    sendJSON(res, 401, { error: 'Invalid token' });
+    return null;
+  }
+  try {
+    const decoded = await firestoreService.verifyIdToken(idToken);
+    if (!decoded || !decoded.uid) {
+      sendJSON(res, 401, { error: 'Invalid token' });
+      return null;
+    }
+    return decoded;
+  } catch (e) {
+    sendJSON(res, 401, { error: 'Invalid token', code: String((e && e.code) || 'auth/invalid-id-token') });
+    return null;
+  }
+}
+
+async function _requireManagedEntitlement(decoded) {
+  if (_decodedIsAdmin(decoded)) return true;
+  const client = await firestoreService.getClient(decoded.uid);
+  const entitlement = client && (
+    client.managedServerEnabled === true ||
+    client.managedHostingEnabled === true ||
+    (client.entitlements && (client.entitlements.managedServer === true || client.entitlements.managed_server === true)) ||
+    !!client.plan
+  );
+  return !!(client && client.status === 'active' && entitlement);
+}
+
+function _publicManagedServer(server) {
+  if (!server) return null;
+  return {
+    status: server.status || null,
+    currentStep: server.currentStep || null,
+    publicServerUrl: server.publicServerUrl || null,
+    previewPublicUrl: server.previewPublicUrl || null,
+    gtmServerPublicId: server.gtmServerPublicId || null,
+    transportWired: !!server.transportWired,
+    errorMessage: server.errorMessage || null,
+    createdAt: server.createdAt || null,
+    activatedAt: server.activatedAt || null,
+  };
+}
+
+function _publicManagedServerJob(job) {
+  if (!job) return null;
+  return {
+    jobType: job.jobType || 'managed_server',
+    clientId: job.clientId || null,
+    status: job.status || null,
+    stage: job.stage || null,
+    outcome: job.outcome || null,
+    publicServerUrl: job.publicServerUrl || (job.result && job.result.publicServerUrl) || null,
+    previewPublicUrl: job.previewPublicUrl || (job.result && job.result.previewPublicUrl) || null,
+    result: job.result ? {
+      ok: job.result.ok === true,
+      publicServerUrl: job.result.publicServerUrl || null,
+      previewPublicUrl: job.result.previewPublicUrl || null,
+      gtmServerPublicId: job.result.gtmServerPublicId || null,
+      transportWired: !!job.result.transportWired,
+    } : null,
+    error: job.error || null,
+    createdAt: job.createdAt || null,
+    updatedAt: job.updatedAt || null,
+    heartbeatAt: job.heartbeatAt || null,
+  };
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // HTTP SERVER
 // ══════════════════════════════════════════════════════════════════════════════
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
 
   // ── CORS preflight ──────────────────────────────────────────
   if (req.method === 'OPTIONS') {
@@ -1482,7 +1928,7 @@ const server = http.createServer((req, res) => {
   // full 60-120s — the whole reason for the Cloud Tasks hop. Auth is the
   // X-Internal-Token shared secret (see _authorizeInternal).
   //
-  // Body (from the Cloud Tasks payload): { jobType: 'managed' | 'ss', jobId }
+  // Body (from the Cloud Tasks payload): { jobType: 'managed' | 'ss' | 'managed_server', jobId }
   // The heavy input lives in the Firestore job doc, loaded by the runner.
   //
   // Always ACKs 2xx once a terminal state is reached (success OR recorded
@@ -1496,7 +1942,8 @@ const server = http.createServer((req, res) => {
     }
     parseJsonBody(req, res, async body => {
       const jobId   = body && body.jobId;
-      const jobType = (body && body.jobType) === 'ss' ? 'ss' : 'managed';
+      const rawJobType = body && body.jobType;
+      const jobType = rawJobType === 'ss' || rawJobType === 'managed_server' ? rawJobType : 'managed';
       if (!jobId) return sendJSON(res, 400, { error: 'Missing jobId' });
 
       let job;
@@ -1512,6 +1959,7 @@ const server = http.createServer((req, res) => {
 
       try {
         if (jobType === 'ss') await _runSsProvisionJob(jobId);
+        else if (jobType === 'managed_server') await managedProvisionRunner.run(jobId);
         else                  await _runManagedProvisionJob(jobId);
         sendJSON(res, 200, { ok: true, jobId });
       } catch (e) {
@@ -1573,49 +2021,79 @@ const server = http.createServer((req, res) => {
 
   // ── Pixel Scanner ─────────────────────────────────────────────
   if (req.method === 'POST' && req.url === '/api/scan-url') {
-    parseJsonBody(req, res, async body => {
-
-      let targetUrl = (body && body.url) ? body.url.trim() : '';
-      if (!targetUrl) { sendJSON(res, 400, { error: 'Missing url' }); return; }
-      if (!/^https?:\/\//i.test(targetUrl)) targetUrl = 'https://' + targetUrl;
-
-      // ── SSRF guard ─────────────────────────────────────────────────────────
-      // This endpoint is unauthenticated, so an unguarded fetch is a server-side
-      // request forgery + cloud-metadata exfiltration vector. Reject private /
-      // loopback / link-local / metadata hosts and disallowed ports BEFORE we
-      // fetch. fetchWithHttp re-checks every redirect hop as well.
-      try {
-        await assertSafeUrl(targetUrl);
-      } catch (e) {
-        return sendJSON(res, 400, { error: 'URL rejected (SSRF guard): ' + e.message });
+    (async () => {
+      // ── P0: Firebase auth — endpoint was previously unauthenticated ─────────
+      if (!firestoreService.isConfigured()) {
+        return sendJSON(res, 503, { error: 'Firebase غير مُهيَّأ على هذا الخادم' });
+      }
+      const scanAuthz = (req.headers['authorization'] || '').trim();
+      const scanAuthMatch = /^Bearer\s+(.+)$/i.exec(scanAuthz);
+      if (!scanAuthMatch) {
+        return sendJSON(res, 401, { error: 'Authorization header مطلوب' });
+      }
+      const scanToken = scanAuthMatch[1].trim();
+      if (!scanToken || scanToken.length > 8192) {
+        return sendJSON(res, 401, { error: 'Token غير صالح' });
+      }
+      let scanDecoded;
+      try { scanDecoded = await firestoreService.verifyIdToken(scanToken); }
+      catch (e) {
+        return sendJSON(res, 401, { error: 'Firebase token غير صالح', code: String((e && e.code) || 'auth/invalid-id-token') });
+      }
+      if (!scanDecoded || !scanDecoded.uid) {
+        return sendJSON(res, 401, { error: 'Token بدون uid' });
+      }
+      const scanRl = rateLimiter.check(scanDecoded.uid);
+      if (!scanRl.allowed) {
+        res.writeHead(429, { ...corsHeaders(), ...securityHeaders(), 'Retry-After': Math.ceil((scanRl.resetAt - Date.now()) / 1000) });
+        res.end(JSON.stringify({ error: 'Rate limit exceeded', resetAt: scanRl.resetAt }));
+        return;
       }
 
-      // ── Concurrency cap ────────────────────────────────────────────────────
-      // Reject rather than launch an unbounded number of headless Chromes.
-      if (scanInFlight >= MAX_CONCURRENT_SCANS) {
-        return sendJSON(res, 429, {
-          error:        'Scanner is at capacity — please retry shortly',
-          retryAfterMs: 3000,
-        });
-      }
+      parseJsonBody(req, res, async body => {
+        let targetUrl = (body && body.url) ? body.url.trim() : '';
+        if (!targetUrl) { sendJSON(res, 400, { error: 'Missing url' }); return; }
+        if (!/^https?:\/\//i.test(targetUrl)) targetUrl = 'https://' + targetUrl;
 
-      scanInFlight++;
-      try {
-        let result;
-        if (puppeteer) {
-          result = await scanWithPuppeteer(targetUrl);
-        } else {
-          console.warn('[scanner] Puppeteer not available — falling back to HTTP fetch');
-          result = await fetchWithHttp(targetUrl);
+        // ── SSRF guard: sync pre-check (protocol / port / IP-literal) ──────────
+        try { validateTargetUrl(targetUrl); }
+        catch (e) { return sendJSON(res, 400, { error: 'URL rejected: ' + e.message }); }
+
+        // ── Concurrency cap ──────────────────────────────────────────────────
+        if (scanInFlight >= MAX_CONCURRENT_SCANS) {
+          return sendJSON(res, 429, {
+            error:        'Scanner is at capacity — please retry shortly',
+            retryAfterMs: 3000,
+          });
         }
-        sendJSON(res, 200, result);
-      } catch (e) {
-        console.error('[scanner] Error:', e.message);
-        sendJSON(res, 502, { error: e.message });
-      } finally {
-        scanInFlight--;     // always release the slot, even on error/timeout
-      }
-    });
+
+        scanInFlight++;
+        try {
+          let result;
+          if (puppeteer) {
+            // Puppeteer re-resolves DNS internally (unavoidable with a browser engine).
+            // validateTargetUrl above blocks IP-literals and bad ports synchronously.
+            result = await scanWithPuppeteer(targetUrl);
+          } else {
+            // safeFetch: DNS resolved once, IP validated, connection to IP — no TOCTOU.
+            console.warn('[scanner] Puppeteer not available — falling back to safeFetch');
+            const { body: html } = await safeFetch(targetUrl, {
+              maxRedirects : 3,
+              timeoutMs    : 15_000,
+              maxBodyBytes : 800 * 1024,
+            });
+            result = { html, url: targetUrl, pixels: [], method: 'http' };
+          }
+          sendJSON(res, 200, result);
+        } catch (e) {
+          console.error('[scanner] Error:', e.message);
+          const status = /blocked|not allowed|SSRF|Invalid URL|hostname/i.test(e.message) ? 400 : 502;
+          sendJSON(res, status, { error: e.message });
+        } finally {
+          scanInFlight--;
+        }
+      });
+    })();
     return;
   }
 
@@ -1624,6 +2102,25 @@ const server = http.createServer((req, res) => {
   // Creates containers in our own GTM account so non-technical clients don't
   // have to OAuth into their own GTM. See gtm-service.js + firestore-service.js.
   // ══════════════════════════════════════════════════════════════════════════
+
+  // GET /api/sgtm-templates — serve native .tpl source files to tool.html so
+  // buildSSContainer() can embed real per-platform Sandboxed JS templates in
+  // the generated Server Container JSON (instead of the inline fallback).
+  // No auth required — same trust level as serving tool.html itself.
+  // Always 200; missing keys listed in _missing so the frontend can fail loudly
+  // per-platform rather than going entirely dark.
+  if (req.method === 'GET' && req.url === '/api/sgtm-templates') {
+    const tpls = {
+      meta:   _SGTM_TPL_META,
+      tiktok: _SGTM_TPL_TIKTOK,
+      snap:   _SGTM_TPL_SNAP,
+      gads:   _SGTM_TPL_GADS,
+    };
+    const missing = Object.keys(tpls).filter(k => !tpls[k]);
+    if (missing.length) console.error('[sgtm-templates] missing/invalid .tpl files:', missing.join(', '));
+    sendJSON(res, 200, { ...tpls, _missing: missing });
+    return;
+  }
 
   // GET /api/managed/health — capacity + config status (for ops dashboard)
   if (req.method === 'GET' && req.url === '/api/managed/health') {
@@ -1655,6 +2152,81 @@ const server = http.createServer((req, res) => {
         },
         provisionQueue: provisionQueue.stats(),
       });
+    })().catch(e => sendJSON(res, 500, { error: e.message }));
+    return;
+  }
+
+  // POST /api/managed/create-server
+  // Thin Phase-9 entrypoint for managed Cloud Run sGTM hosting. Business logic
+  // lives in lib/provision; this route only authenticates, checks entitlement,
+  // dispatches, and returns public wildcard URLs.
+  if (req.method === 'POST' && req.url === '/api/managed/create-server') {
+    parseJsonBody(req, res, async body => {
+      if (!gtmService.isConfigured()) {
+        return sendJSON(res, 503, { error: 'Managed GTM is not configured on this server' });
+      }
+      if (!firestoreService.isConfigured()) {
+        return sendJSON(res, 503, { error: 'Firestore is not configured on this server' });
+      }
+      if (!shardRegistry.isConfigured()) {
+        return sendJSON(res, 503, { error: 'Managed Cloud Run shards are not configured on this server' });
+      }
+
+      const decoded = await _managedFirebaseAuth(req, res);
+      if (!decoded) return;
+      const allowed = await _requireManagedEntitlement(decoded).catch(e => {
+        console.warn('[managed/create-server] entitlement check failed:', e.message);
+        return false;
+      });
+      if (!allowed) return sendJSON(res, 402, { error: 'Managed hosting entitlement required', code: 'NOT_ENTITLED' });
+
+      const admin = _decodedIsAdmin(decoded);
+      const requestedClientId = body && body.clientId ? String(body.clientId) : decoded.uid;
+      if (!admin && requestedClientId !== decoded.uid) {
+        return sendJSON(res, 403, { error: 'Forbidden: clientId does not match authenticated user' });
+      }
+      const rl = rateLimiter.check('managed_server:' + requestedClientId);
+      if (!rl.allowed) {
+        return sendJSON(res, 429, { error: 'Rate limit exceeded', resetAt: rl.resetAt });
+      }
+
+      try {
+        const result = await managedCreateServer.createServer({
+          clientId: requestedClientId,
+          userId: decoded.uid,
+          email: decoded.email || (body && body.email) || null,
+          webContainerId: body && body.webContainerId,
+          webWorkspaceId: body && body.webWorkspaceId,
+          serverConfigJson: body && body.serverConfigJson,
+        }, {
+          dispatch: jobId => _dispatchProvisionJob('managed_server', jobId),
+        });
+        const code = result.outcome === 'reuse' ? 200 : 202;
+        sendJSON(res, code, {
+          ok: true,
+          outcome: result.outcome,
+          alreadyProvisioned: result.outcome === 'reuse',
+          jobId: result.outcome === 'reuse' ? null : result.jobId,
+          publicServerUrl: result.publicServerUrl || null,
+          previewPublicUrl: result.previewPublicUrl || null,
+        });
+      } catch (e) {
+        const status = (e.status && e.status >= 400 && e.status < 600) ? e.status : 500;
+        sendJSON(res, status, { error: e.message, code: e.code || null });
+      }
+    });
+    return;
+  }
+
+  // GET /api/managed/server
+  if (req.method === 'GET' && req.url === '/api/managed/server') {
+    (async () => {
+      const decoded = await _managedFirebaseAuth(req, res);
+      if (!decoded) return;
+      const clientId = decoded.uid;
+      const serverDoc = await firestoreService.getManagedServer(clientId);
+      if (!serverDoc) return sendJSON(res, 404, { error: 'Managed server not found' });
+      sendJSON(res, 200, { ok: true, server: _publicManagedServer(serverDoc) });
     })().catch(e => sendJSON(res, 500, { error: e.message }));
     return;
   }
@@ -1697,6 +2269,52 @@ const server = http.createServer((req, res) => {
       const mode = (body.mode === 'client_server') ? 'client_server' : 'client';
 
       if (!clientId)               return sendJSON(res, 400, { error: 'Missing clientId' });
+
+      if (mode === 'client_server' && _managedProviderIsCloudRun()) {
+        if (!shardRegistry.isConfigured()) {
+          return sendJSON(res, 503, { error: 'Managed Cloud Run shards are not configured on this server' });
+        }
+        const decoded = await _managedFirebaseAuth(req, res);
+        if (!decoded) return;
+        const admin = _decodedIsAdmin(decoded);
+        if (!admin && clientId !== decoded.uid) {
+          return sendJSON(res, 403, { error: 'Forbidden: clientId does not match authenticated user' });
+        }
+        const allowed = await _requireManagedEntitlement(decoded).catch(e => {
+          console.warn('[managed/create-container] entitlement check failed:', e.message);
+          return false;
+        });
+        if (!allowed) return sendJSON(res, 402, { error: 'Managed hosting entitlement required', code: 'NOT_ENTITLED' });
+        const rl = rateLimiter.check('managed_server:' + clientId);
+        if (!rl.allowed) {
+          return sendJSON(res, 429, { error: 'Rate limit exceeded', resetAt: rl.resetAt });
+        }
+        try {
+          const result = await managedCreateServer.createServer({
+            clientId,
+            userId: decoded.uid,
+            email: decoded.email || clientEmail || null,
+            serverConfigJson,
+          }, {
+            dispatch: jobId => _dispatchProvisionJob('managed_server', jobId),
+          });
+          const code = result.outcome === 'reuse' ? 200 : 202;
+          return sendJSON(res, code, {
+            ok: true,
+            rerouted: true,
+            provider: 'cloudrun',
+            outcome: result.outcome,
+            alreadyProvisioned: result.outcome === 'reuse',
+            jobId: result.outcome === 'reuse' ? null : result.jobId,
+            publicServerUrl: result.publicServerUrl || null,
+            previewPublicUrl: result.previewPublicUrl || null,
+          });
+        } catch (e) {
+          const status = (e.status && e.status >= 400 && e.status < 600) ? e.status : 500;
+          return sendJSON(res, status, { error: e.message, code: e.code || null });
+        }
+      }
+
       if (!configJson && !dryRun)  return sendJSON(res, 400, { error: 'Missing configJson' });
 
       // Bundle everything the worker needs into the job doc; the Cloud Tasks
@@ -1769,18 +2387,41 @@ const server = http.createServer((req, res) => {
   // GET /api/managed/job/:jobId — poll status of a provisioning job.
   // Reads from Firestore so ANY Cloud Run instance can answer the poll, not just
   // the instance that created the job.
+  // Auth: Firebase ID token required; job.clientId must match token uid.
   if (req.method === 'GET' && req.url.startsWith('/api/managed/job/')) {
     const jobId = req.url.substring('/api/managed/job/'.length).split('?')[0];
     if (!jobId) return sendJSON(res, 400, { error: 'Missing jobId' });
     if (!firestoreService.isConfigured()) {
       return sendJSON(res, 503, { error: 'Firestore is not configured' });
     }
-    firestoreService.getJob(jobId)
-      .then(job => {
+    (async () => {
+      // Verify caller identity via Firebase ID token.
+      const authHeader = req.headers['authorization'] || '';
+      const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
+      if (!tokenMatch) return sendJSON(res, 401, { error: 'Authorization header required' });
+      const idToken = tokenMatch[1].trim();
+      let decoded;
+      try {
+        decoded = await firestoreService.verifyIdToken(idToken);
+      } catch (e) {
+        return sendJSON(res, 401, { error: 'Invalid token', code: String((e && e.code) || 'auth/invalid-id-token') });
+      }
+      const uid = decoded.uid;
+      try {
+        const job = await firestoreService.getJob(jobId);
         if (!job) return sendJSON(res, 404, { error: 'Job not found or expired' });
+        // Ownership check — prevent cross-tenant job reads.
+        if (job.clientId && job.clientId !== uid) {
+          return sendJSON(res, 403, { error: 'Forbidden: job does not belong to this account' });
+        }
+        if (job.jobType === 'managed_server') {
+          return sendJSON(res, 200, { ok: true, jobId, ..._publicManagedServerJob(job) });
+        }
         sendJSON(res, 200, { ok: true, jobId, ...job });
-      })
-      .catch(e => sendJSON(res, 500, { error: e.message }));
+      } catch (e) {
+        sendJSON(res, 500, { error: e.message });
+      }
+    })();
     return;
   }
 
@@ -1815,49 +2456,152 @@ const server = http.createServer((req, res) => {
 
   // ══════════════════════════════════════════════════════════════════════════
   // ADMIN ENDPOINTS
-  // Protected by a bearer token: set ADMIN_TOKEN env var on the server, then
-  // call with header: Authorization: Bearer <ADMIN_TOKEN>
+  // Accepts EITHER:
+  //   1) Legacy:   Authorization: Bearer <ADMIN_TOKEN>  (ADMIN_TOKEN env var)
+  //   2) Firebase: Authorization: Bearer <firebase-id-token>, where the
+  //      decoded token has the `admin: true` custom claim (same convention
+  //      as /api/v1/* — see line ~3459) or an email in ADMIN_EMAILS.
   // ══════════════════════════════════════════════════════════════════════════
-  function _requireAdmin() {
-    const expected = process.env.ADMIN_TOKEN;
-    if (!expected) {
-      sendJSON(res, 503, { error: 'ADMIN_TOKEN is not configured on the server' });
-      return false;
-    }
-    const auth = req.headers['authorization'] || req.headers['Authorization'] || '';
-    const token = auth.replace(/^Bearer\s+/i, '').trim();
-    // Constant-time comparison to prevent timing attacks
-    const a = Buffer.from(token);
-    const b = Buffer.from(expected);
-    const ok = a.length === b.length && require('crypto').timingSafeEqual(a, b);
-    if (!ok) {
-      sendJSON(res, 401, { error: 'Unauthorized' });
-      return false;
-    }
-    return true;
+  // Identity of the authenticated admin for audit logging.
+  function _adminId() {
+    return (req.adminUser && req.adminUser.adminId) || 'admin';
   }
 
-  // GET /api/admin/export — dump all clients + containers as JSON
-  // Optional ?download=1 sets Content-Disposition so the browser saves a file
+  async function _requireAdmin() {
+    // 1) Session cookie — PRIMARY, browser path (secret-key login → HttpOnly cookie).
+    const cookies   = _parseCookies(req);
+    const sessToken = cookies['et_admin_session'];
+    if (sessToken) {
+      const session = await adminSession.verifySession(sessToken);
+      if (session) {
+        // CSRF + same-origin only for the ambient-cookie path on state-changing methods.
+        if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
+          if (!_adminOriginOk(req)) {
+            sendJSON(res, 403, { error: 'Cross-origin request rejected' });
+            return false;
+          }
+          const csrfHeader = req.headers['x-csrf-token'] || '';
+          if (!(await adminSession.verifyCsrf(sessToken, csrfHeader))) {
+            sendJSON(res, 403, { error: 'Invalid or missing CSRF token' });
+            return false;
+          }
+        }
+        req.adminUser = { via: 'session', adminId: session.adminId };
+        return true;
+      }
+    }
+
+    const auth  = req.headers['authorization'] || req.headers['Authorization'] || '';
+    const token = auth.replace(/^Bearer\s+/i, '').trim();
+
+    if (token) {
+      // 2) Legacy ADMIN_TOKEN Bearer — server-to-server / back-compat fallback.
+      // Constant-time comparison to prevent timing attacks.
+      const expected = process.env.ADMIN_TOKEN;
+      if (expected) {
+        const a = Buffer.from(token);
+        const b = Buffer.from(expected);
+        if (a.length === b.length && require('crypto').timingSafeEqual(a, b)) {
+          req.adminUser = { via: 'token', adminId: 'admin-token' };
+          return true;
+        }
+      }
+
+      // 3) Firebase ID token with admin claim or ADMIN_EMAILS allowlist.
+      try {
+        const decoded = await firestoreService.verifyIdToken(token);
+        const admins = (process.env.ADMIN_EMAILS || '')
+          .split(',')
+          .map(v => v.trim().toLowerCase())
+          .filter(Boolean);
+        const decodedEmail = (decoded?.email || '').trim().toLowerCase();
+        if (decoded.admin === true || decoded.role === 'admin' || admins.includes(decodedEmail)) {
+          req.adminUser = { via: 'firebase', adminId: decodedEmail || 'firebase-admin', decoded };
+          return true;
+        }
+      } catch (_) {}
+    }
+
+    sendJSON(res, 401, { error: 'Unauthorized' });
+    return false;
+  }
+
+  // ── Admin session lifecycle (secret-key → HttpOnly-cookie session) ──────────
+  // POST /api/admin/login — exchange ADMIN_SECRET_KEY for a session cookie.
+  if (req.method === 'POST' && req.url.split('?')[0] === '/api/admin/login') {
+    const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+    if (adminSession.isLoginDisabled()) {
+      return sendJSON(res, 503, { error: 'Admin login is not configured on this server' });
+    }
+    if (adminSession.isLockedOut(ip)) {
+      return sendJSON(res, 429, { error: 'Too many failed attempts. Try again later.' });
+    }
+    parseJsonBody(req, res, async body => {
+      // NOTE: never log body.secretKey.
+      const ok = adminSession.checkSecret(body && body.secretKey);
+      if (!ok) {
+        adminSession.recordFailure(ip);
+        try {
+          await firestoreService.saveAuditLog({
+            action: 'admin_login_failed', clientId: null, adminId: null,
+            occurredAt: new Date().toISOString(), success: false, metadata: { ip },
+          });
+        } catch (_) {}
+        return sendJSON(res, 401, { error: 'Invalid secret key' });
+      }
+      adminSession.recordSuccess(ip);
+      const { token, csrf } = await adminSession.createSession('super-admin');
+      const maxAgeSec = Math.floor(adminSession.SESSION_TTL_MS / 1000);
+      const cookies = [
+        _adminCookie('et_admin_session', token, { httpOnly: true,  maxAgeSec }),
+        _adminCookie('et_admin_csrf',    csrf,  { httpOnly: false, maxAgeSec }),
+      ];
+      try {
+        await firestoreService.saveAuditLog({
+          action: 'admin_login_success', clientId: null, adminId: 'super-admin',
+          occurredAt: new Date().toISOString(), success: true, metadata: { ip },
+        });
+      } catch (_) {}
+      return sendJSONWithCookies(res, 200, { ok: true, csrfToken: csrf }, cookies);
+    });
+    return;
+  }
+
+  // POST /api/admin/logout — destroy the session + clear cookies.
+  if (req.method === 'POST' && req.url.split('?')[0] === '/api/admin/logout') {
+    const cookies = _parseCookies(req);
+    const t = cookies['et_admin_session'];
+    if (t) { try { await adminSession.destroySession(t); } catch (_) {} }
+    const cleared = [
+      _adminCookie('et_admin_session', '', { httpOnly: true,  maxAgeSec: 0 }),
+      _adminCookie('et_admin_csrf',    '', { httpOnly: false, maxAgeSec: 0 }),
+    ];
+    return sendJSONWithCookies(res, 200, { ok: true }, cleared);
+  }
+
+  // GET /api/admin/session — is the caller an authenticated admin session?
+  if (req.method === 'GET' && req.url.split('?')[0] === '/api/admin/session') {
+    const cookies = _parseCookies(req);
+    const t = cookies['et_admin_session'];
+    const s = t ? await adminSession.verifySession(t) : null;
+    if (!s) return sendJSON(res, 401, { authenticated: false });
+    return sendJSON(res, 200, { authenticated: true, adminId: s.adminId, csrfToken: s.csrf });
+  }
+
+  // GET /api/admin/export — internal admin data dump (JSON only, no file download)
   if (req.method === 'GET' && req.url.startsWith('/api/admin/export')) {
-    if (!_requireAdmin()) return;
+    if (!(await _requireAdmin())) return;
     if (!firestoreService.isConfigured()) {
       return sendJSON(res, 503, { error: 'Firestore is not configured' });
     }
-    const wantDownload = /[?&]download=1\b/.test(req.url);
     firestoreService.exportAll()
       .then(dump => {
         const json = JSON.stringify(dump, null, 2);
-        const headers = {
+        res.writeHead(200, {
           ...securityHeaders(),
           'Content-Type':   'application/json; charset=utf-8',
           'Content-Length': Buffer.byteLength(json),
-        };
-        if (wantDownload) {
-          const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-          headers['Content-Disposition'] = `attachment; filename="easytrack-export-${stamp}.json"`;
-        }
-        res.writeHead(200, headers);
+        });
         res.end(json);
       })
       .catch(e => sendJSON(res, 500, { error: e.message }));
@@ -1866,29 +2610,791 @@ const server = http.createServer((req, res) => {
 
   // GET /api/admin/ping — quick token validity check (used by admin login)
   if (req.method === 'GET' && req.url.startsWith('/api/admin/ping')) {
-    if (!_requireAdmin()) return;
+    if (!(await _requireAdmin())) return;
     return sendJSON(res, 200, { ok: true, firestore: firestoreService.isConfigured() });
+  }
+
+  // POST /api/admin/rotate-token
+  // Rotates a CAPI token for a client: re-encrypts in Firestore, then updates
+  // the authHeader parameter on the deployed sGTM tag, creates a new GTM version,
+  // and publishes it so the new token is live immediately.
+  //
+  // Body: { clientId, platform, newToken }
+  //   platform: 'meta' | 'tiktok' | 'snap'
+  //   newToken:  the new raw access token (will be encrypted before storage)
+  //
+  // Returns: { ok, platform, gtm: { tagIds, versionId, published } }
+  if (req.method === 'POST' && req.url.split('?')[0] === '/api/admin/rotate-token') {
+    if (!(await _requireAdmin())) return;
+    parseJsonBody(req, res, async body => {
+      const { clientId, platform, newToken } = body || {};
+      const ALLOWED_PLATFORMS = ['meta', 'tiktok', 'snap'];
+      if (!clientId) return sendJSON(res, 400, { error: 'clientId is required' });
+      if (!platform || !ALLOWED_PLATFORMS.includes(platform))
+        return sendJSON(res, 400, { error: 'platform must be one of: ' + ALLOWED_PLATFORMS.join(', ') });
+      if (!newToken || !String(newToken).trim())
+        return sendJSON(res, 400, { error: 'newToken is required' });
+      if (!firestoreService.isConfigured())
+        return sendJSON(res, 503, { error: 'Firestore not configured' });
+
+      try {
+        // 1. Load current ss_config to get container IDs
+        const cfg = await firestoreService.getSSConfig(clientId);
+        if (!cfg) return sendJSON(res, 404, { error: 'No ss_config found for clientId: ' + clientId });
+
+        // 2. Re-encrypt the new token and save to Firestore
+        const aad = clientId + ':' + platform;
+        const encryptedToken = cryptoVault.encryptToken(String(newToken).trim(), aad);
+        const updatedTokens = { ...(cfg.encryptedTokens || {}), [platform]: encryptedToken };
+        await firestoreService.saveSSConfig(clientId, { ...cfg, encryptedTokens: updatedTokens });
+
+        // 3. Update the sGTM container if we have container IDs
+        let gtmResult = null;
+        const serverContainerId = cfg.serverContainerId;
+        const serverWorkspaceId = cfg.serverWorkspaceId;
+
+        if (gtmService.isConfigured() && serverContainerId && serverWorkspaceId) {
+          try {
+            // Create a fresh workspace (current workspace may have uncommitted changes)
+            // We rotate directly in the stored workspaceId. If it has pending changes
+            // the version will include them — acceptable for a token rotation.
+            gtmResult = await gtmService.rotateCapiTokenInContainer(
+              serverContainerId,
+              serverWorkspaceId,
+              platform,
+              String(newToken).trim(),
+            );
+          } catch (gtmErr) {
+            // GTM update is best-effort: Firestore already has the new token. Log
+            // the error prominently so the operator knows to manually re-publish.
+            console.error('[rotate-token] GTM container update failed for clientId=' + clientId +
+              ' platform=' + platform + ':', gtmErr.message);
+            gtmResult = { error: gtmErr.message, manual: true };
+          }
+        } else {
+          gtmResult = { skipped: true, reason: !gtmService.isConfigured()
+            ? 'GTM not configured on server'
+            : 'no serverContainerId/serverWorkspaceId in ss_config' };
+        }
+
+        // 4. Audit log
+        await firestoreService.saveAuditLog({
+          clientId,
+          action:   'rotate_token',
+          platform,
+          actor:    'admin',
+          gtmUpdated: !!(gtmResult && gtmResult.versionId),
+        }).catch(() => {});
+
+        sendJSON(res, 200, {
+          ok:       true,
+          clientId,
+          platform,
+          firestore: { updated: true },
+          gtm:       gtmResult,
+        });
+      } catch (e) {
+        console.error('[rotate-token] error:', e.message);
+        sendJSON(res, 500, { error: e.message });
+      }
+    });
+    return;
+  }
+
+  // ── VERSION HISTORY ENDPOINTS ──────────────────────────────────────────────
+
+  // ── GET /api/versions/:clientId ──────────────────────────────────────────────
+  // List container_versions for a client, newest first (by version number desc).
+  // No pagination — returns up to 50 records (hardcoded in listVersions).
+  // Auth: admin token.
+  /*
+  Response:
+  {
+    "ok": true,
+    "clientId": "uid_abc123",
+    "versions": [
+      {
+        "id": "firestore_doc_id",
+        "version": 12,
+        "publishedAt": "2026-06-30T10:00:00.000Z",
+        "publishedBy": "admin/rollback",
+        "deploymentType": "publish",
+        "status": "published",
+        "gtmVersionId": "45",
+        "gtmPublicId": "GTM-XXXXX",
+        "diffSummary": { "added": 0, "modified": 0, "removed": 0 },
+        "configSnapshot": { "..." : "..." }
+      }
+    ]
+  }
+  Note: driftDetected is NOT in this response. It is in GET /api/health and
+        GET /api/deployments (versions[].driftDetected).
+  Errors:
+    401 { "error": "Unauthorized" }
+    503 { "error": "Firestore not configured" }
+    500 { "error": "..." }
+  */
+  const _verListMatch = req.url.split('?')[0].match(/^\/api\/versions\/([^/]+)$/);
+  if (req.method === 'GET' && _verListMatch) {
+    if (!(await _requireAdmin())) return;
+    if (!firestoreService.isConfigured()) return sendJSON(res, 503, { error: 'Firestore not configured' });
+    const clientId = decodeURIComponent(_verListMatch[1]);
+    (async () => {
+      try {
+        const versions = await firestoreService.listVersions(clientId);
+        // Serialize Firestore Timestamps to ISO strings for JSON transport
+        const out = versions.map(v => ({
+          id:             v.id,
+          version:        v.version,
+          publishedAt:    v.publishedAt && v.publishedAt.toDate ? v.publishedAt.toDate().toISOString() : (v.publishedAt || null),
+          publishedBy:    v.publishedBy || null,
+          deploymentType: v.deploymentType || 'publish',
+          status:         v.status         || 'published',
+          gtmVersionId:   v.gtmVersionId   || null,
+          gtmPublicId:    v.gtmPublicId    || null,
+          diffSummary:    v.diffSummary    || null,
+          configSnapshot: v.configSnapshot || null,
+        }));
+        sendJSON(res, 200, { ok: true, clientId, versions: out });
+      } catch (e) {
+        sendJSON(res, 500, { error: e.message });
+      }
+    })();
+    return;
+  }
+
+  // ── POST /api/versions/rollback ──────────────────────────────────────────────
+  // Full state machine: lock → pre-flight → drift check → build → import → publish → audit.
+  // Auth: admin token.
+  /*
+  Request body: { "clientId": "uid_abc123", "version": 11 }
+  Success response:
+  {
+    "ok": true,
+    "clientId": "uid_abc123",
+    "deploymentId": "rb_lxyz9a",
+    "rolledBackFrom": 11,
+    "newVersion": 12,
+    "gtmVersionId": "46",
+    "drift": null
+  }
+  drift when detected: { "detected": true, "warning": "GTM ver changed outside Easy Track" }
+  Errors:
+    400 { "error": "clientId is required" | "version (number) is required" }
+    401 { "error": "Unauthorized" }
+    404 { "error": "Version N not found for clientId X" }
+    409 { "error": "Another deployment is already in progress..." }
+    422 { "error": "Cannot rollback a rollback deployment", "hint": "..." }
+        { "error": "Version has no configSnapshot — cannot rollback", "hint": "..." }
+        { "error": "Version record missing containerId" }
+    500 { "error": "...", "deploymentId": "rb_xxx" }
+    503 { "error": "Firestore not configured" | "GTM not configured" }
+  */
+  if (req.method === 'POST' && req.url.split('?')[0] === '/api/versions/rollback') {
+    if (!(await _requireAdmin())) return;
+    if (!firestoreService.isConfigured()) return sendJSON(res, 503, { error: 'Firestore not configured' });
+    if (!gtmService.isConfigured())       return sendJSON(res, 503, { error: 'GTM not configured' });
+
+    parseJsonBody(req, res, async body => {
+      const { clientId, version } = body || {};
+      if (!clientId) return sendJSON(res, 400, { error: 'clientId is required' });
+      if (typeof version !== 'number' && !version)
+        return sendJSON(res, 400, { error: 'version (number) is required' });
+
+      const targetVersion = Number(version);
+      let lockAcquired    = false;
+      let versionDocId    = null;
+      const deploymentId  = 'rb_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+      try {
+        // ── STEP 1: Load target version record ─────────────────────────────────
+        const targetVer = await firestoreService.getVersionByNumber(clientId, targetVersion);
+        if (!targetVer) {
+          return sendJSON(res, 404, {
+            error: `Version ${targetVersion} not found for clientId ${clientId}`,
+          });
+        }
+
+        // ── STEP 2: Guard — prevent rollback-on-rollback ───────────────────────
+        if (targetVer.deploymentType === 'rollback') {
+          return sendJSON(res, 422, {
+            error: 'Cannot rollback a rollback deployment',
+            hint:  `v${targetVersion} is itself a rollback. Choose an original publish version.`,
+          });
+        }
+
+        // ── STEP 3: Pre-flight validation ──────────────────────────────────────
+        if (!targetVer.configSnapshot) {
+          return sendJSON(res, 422, {
+            error: 'Version has no configSnapshot — cannot rollback',
+            hint:  `v${targetVersion} was created before configSnapshot tracking was added.`,
+          });
+        }
+        const containerId = targetVer.containerId;
+        if (!containerId) {
+          return sendJSON(res, 422, { error: 'Version record missing containerId' });
+        }
+
+        // ── STEP 4: Acquire deployment lock — prevent concurrent rollbacks ─────
+        lockAcquired = await firestoreService.acquireDeploymentLock(clientId, deploymentId);
+        if (!lockAcquired) {
+          return sendJSON(res, 409, {
+            error: 'Another deployment is already in progress for this client',
+            hint:  'Wait for the current deployment to complete (max 10 minutes) then retry.',
+          });
+        }
+
+        // ── STEP 5: Drift detection — warn if GTM has manual changes ──────────
+        // Load the latest known version to compare against live GTM.
+        let driftInfo = { driftDetected: false, warning: null };
+        try {
+          const latestVersions = await firestoreService.listVersions(clientId, { limit: 1 });
+          const latestKnownGtmVersionId = latestVersions[0] && latestVersions[0].gtmVersionId;
+          if (latestKnownGtmVersionId) {
+            driftInfo = await gtmService.detectContainerDrift(containerId, latestKnownGtmVersionId);
+            if (driftInfo.driftDetected) {
+              console.warn('[versions/rollback][' + deploymentId + '] DRIFT DETECTED:', driftInfo.warning);
+            }
+          }
+        } catch (driftErr) {
+          console.warn('[versions/rollback][' + deploymentId + '] drift check failed (non-fatal):', driftErr.message);
+        }
+
+        // ── STEP 6: Allocate atomic version number ─────────────────────────────
+        const newVersionNum = await firestoreService.allocateVersionNumber(clientId);
+
+        // ── STEP 7: Create version record in 'building' state ──────────────────
+        // Creating before GTM ops means failure recovery can update this doc.
+        const snap = targetVer.configSnapshot;
+        versionDocId = await firestoreService.saveVersionGetId({
+          clientId,
+          version:        newVersionNum,
+          deploymentId,
+          publishedBy:    'admin/rollback',
+          containerId,
+          workspaceId:    null,
+          gtmVersionId:   null,
+          gtmPublicId:    targetVer.gtmPublicId || null,
+          deploymentType: 'rollback',
+          deploymentState: 'building',
+          status:         'building',
+          rolledBackFrom: targetVersion,
+          configSnapshot: snap,
+          diffSummary:    { added: 0, modified: 0, removed: 0 },
+          driftDetected:  driftInfo.driftDetected,
+          driftWarning:   driftInfo.warning || null,
+        });
+
+        // Log: rollback started
+        await firestoreService.saveDeploymentLog({
+          deploymentId,
+          clientId,
+          action:      'rollback_start',
+          actor:       'admin',
+          targetVersion,
+          newVersion:  newVersionNum,
+          versionDocId,
+          success:     null,
+          metadata:    { drift: driftInfo.driftDetected },
+        }).catch(() => {});
+
+        // ── STEP 8: Build GTM config from configSnapshot (source of truth) ─────
+        await firestoreService.updateVersion(versionDocId, { deploymentState: 'building' });
+
+        const rebuiltConfig = gtmConfigBuilder.buildWebConfig({
+          ga4MeasurementId: snap.ga4MeasurementId || (snap.pixelIds && snap.pixelIds.ga4) || '',
+          sgtmUrl:          snap.sgtmUrl          || '',
+          pixelIds:         snap.pixelIds         || {},
+          events:           snap.events           || [],
+          customEvents:     snap.customEvents     || [],
+          ecommPlatform:    snap.ecommPlatform    || snap.cmsType || '',
+        });
+
+        // ── STEP 9: Import + Publish via GTM API ───────────────────────────────
+        await firestoreService.updateVersion(versionDocId, { deploymentState: 'importing' });
+
+        const rollResult = await gtmService.rollbackContainer(
+          containerId,
+          rebuiltConfig,
+          `Easy Track Rollback to v${targetVersion}`,
+        );
+        // If rollbackContainer throws, catch below sets deploymentState = 'failed'.
+        // If we reach here, GTM is live.
+
+        // ── STEP 10: Finalize version record as published ──────────────────────
+        await firestoreService.updateVersion(versionDocId, {
+          deploymentState: 'published',
+          status:          'published',
+          gtmVersionId:    rollResult.versionId,
+          workspaceId:     rollResult.workspaceId,
+          publishedAt:     firestoreService.serverTimestamp ? firestoreService.serverTimestamp() : null,
+        });
+
+        // ── STEP 11: Mark previous live version as rolled_back (best-effort) ───
+        try {
+          const currentVersions = await firestoreService.listVersions(clientId, { limit: 5 });
+          const prevPublished = currentVersions.find(
+            v => v.id !== versionDocId && v.status === 'published',
+          );
+          if (prevPublished && prevPublished.id) {
+            await firestoreService.markVersionRolledBack(prevPublished.id);
+          }
+        } catch (markErr) {
+          console.warn('[versions/rollback][' + deploymentId + '] markVersionRolledBack failed (non-fatal):', markErr.message);
+        }
+
+        // ── STEP 12: Audit log — success ──────────────────────────────────────
+        await firestoreService.saveDeploymentLog({
+          deploymentId,
+          clientId,
+          action:      'rollback_success',
+          actor:       'admin',
+          targetVersion,
+          newVersion:  newVersionNum,
+          gtmVersionId: rollResult.versionId,
+          success:     true,
+          metadata:    { drift: driftInfo.driftDetected, driftWarning: driftInfo.warning },
+        }).catch(() => {});
+
+        sendJSON(res, 200, {
+          ok:             true,
+          clientId,
+          deploymentId,
+          rolledBackFrom: targetVersion,
+          newVersion:     newVersionNum,
+          gtmVersionId:   rollResult.versionId,
+          drift:          driftInfo.driftDetected ? { detected: true, warning: driftInfo.warning } : null,
+        });
+
+      } catch (e) {
+        console.error('[versions/rollback][' + deploymentId + '] FAILED:', e.message);
+
+        // ── FAILURE RECOVERY: mark version record as failed (do NOT leave as 'building') ──
+        if (versionDocId) {
+          firestoreService.updateVersion(versionDocId, {
+            deploymentState: 'failed',
+            status:          'failed',
+            failureReason:   e.message,
+          }).catch(() => {});
+        }
+
+        // Audit log — failure
+        firestoreService.saveDeploymentLog({
+          deploymentId,
+          clientId,
+          action:  'rollback_failed',
+          actor:   'admin',
+          targetVersion,
+          success: false,
+          error:   e.message,
+        }).catch(() => {});
+
+        sendJSON(res, 500, { error: e.message, deploymentId });
+
+      } finally {
+        // ── ALWAYS release the lock, even on crash ─────────────────────────────
+        if (lockAcquired) {
+          firestoreService.releaseDeploymentLock(clientId).catch(() => {});
+        }
+      }
+    });
+    return;
+  }
+
+  // ── GET /api/deployments/:clientId ───────────────────────────────────────────
+  // Returns two parallel arrays that the frontend JOIN by deploymentId.
+  //
+  // JOIN CONTRACT:
+  //   logs[].deploymentId  — always present for rollback and recovery events.
+  //   versions[].deploymentId — present for rollbacks; NULL for regular publishes.
+  //
+  // Regular publishes (from /api/internal/run-provision-job) only create a
+  // container_versions doc with no deployment log and deploymentId === null.
+  // Rollbacks always produce: one version doc + ≥2 log entries (start + success/fail).
+  //
+  // Frontend algorithm:
+  //   const byId = {};
+  //   versions.forEach(v => { byId[v.deploymentId || v.id] = { ...v, logs: [] }; });
+  //   logs.forEach(l => { if (byId[l.deploymentId]) byId[l.deploymentId].logs.push(l); });
+  //
+  // Auth: admin token.
+  /*
+  Response:
+  {
+    "ok": true,
+    "clientId": "uid_abc123",
+    "logs": [
+      {
+        "id": "doc_id",
+        "deploymentId": "rb_lxyz9a",
+        "action": "rollback_success",
+        "actor": "admin",
+        "targetVersion": 11,
+        "newVersion": 12,
+        "gtmVersionId": "46",
+        "success": true,
+        "error": null,
+        "timestamp": "2026-06-30T10:00:00.000Z",
+        "metadata": { "drift": false, "driftWarning": null }
+      }
+    ],
+    "versions": [
+      {
+        "id": "doc_id",
+        "version": 12,
+        "deploymentId": "rb_lxyz9a",
+        "deploymentType": "rollback",
+        "deploymentState": "published",
+        "status": "published",
+        "publishedAt": "2026-06-30T10:00:00.000Z",
+        "publishedBy": "admin/rollback",
+        "gtmVersionId": "46",
+        "driftDetected": false,
+        "failureReason": null,
+        "rolledBackFrom": 11
+      }
+    ]
+  }
+  Errors:
+    401 { "error": "Unauthorized" }
+    503 { "error": "Firestore not configured" }
+    500 { "error": "..." }
+  */
+  const _depLogsMatch = req.url.split('?')[0].match(/^\/api\/deployments\/([^/]+)$/);
+  if (req.method === 'GET' && _depLogsMatch) {
+    if (!(await _requireAdmin())) return;
+    if (!firestoreService.isConfigured()) return sendJSON(res, 503, { error: 'Firestore not configured' });
+    const clientId = decodeURIComponent(_depLogsMatch[1]);
+    (async () => {
+      try {
+        const [logs, versions] = await Promise.all([
+          firestoreService.listDeploymentLogs(clientId, { limit: 50 }),
+          firestoreService.listVersions(clientId, { limit: 20 }),
+        ]);
+        const _ts = v => v && v.toDate ? v.toDate().toISOString() : (v || null);
+        sendJSON(res, 200, {
+          ok: true,
+          clientId,
+          logs: logs.map(l => ({
+            id:            l.id,
+            deploymentId:  l.deploymentId  || null,
+            action:        l.action        || null,
+            actor:         l.actor         || null,
+            targetVersion: l.targetVersion || null,
+            newVersion:    l.newVersion    || null,
+            gtmVersionId:  l.gtmVersionId  || null,
+            success:       l.success,
+            error:         l.error         || null,
+            timestamp:     _ts(l.timestamp),
+            metadata:      l.metadata      || null,
+          })),
+          versions: versions.map(v => ({
+            id:              v.id,
+            version:         v.version,
+            deploymentId:    v.deploymentId    || null,
+            deploymentType:  v.deploymentType  || 'publish',
+            deploymentState: v.deploymentState || 'published',
+            status:          v.status          || 'published',
+            publishedAt:     _ts(v.publishedAt),
+            publishedBy:     v.publishedBy     || null,
+            gtmVersionId:    v.gtmVersionId    || null,
+            driftDetected:   v.driftDetected   || false,
+            failureReason:   v.failureReason   || null,
+            rolledBackFrom:  v.rolledBackFrom  || null,
+          })),
+        });
+      } catch (e) {
+        console.error('[deployments] error:', e.message);
+        sendJSON(res, 500, { error: e.message });
+      }
+    })();
+    return;
+  }
+
+  // ── GET /api/audit/:clientId ─────────────────────────────────────────────────
+  // Admin audit log with serialized timestamps.
+  // Auth: ADMIN_TOKEN (same _requireAdmin as all /api/* admin routes).
+  // Distinct from /api/v1/clients/:id/audit-log which requires Firebase JWT.
+  // Query params:
+  //   limit  — integer 1-200, default 50
+  //   before — ISO timestamp string (cursor for next page)
+  /*
+  Response:
+  {
+    "ok": true,
+    "clientId": "uid_abc123",
+    "logs": [
+      {
+        "id": "firestore_doc_id",
+        "occurredAt": "2026-06-30T12:00:00.000Z",
+        "actorType": "admin",
+        "actorId": "uid_admin",
+        "action": "client.profile.update",
+        "entityType": "client",
+        "entityId": "uid_abc123",
+        "diff": { "name": { "from": "Old", "to": "New" } },
+        "ipAddress": "1.2.3.4"
+      }
+    ],
+    "total": 10
+  }
+  Errors:
+    401 { "error": "Unauthorized" }
+    503 { "error": "Firestore not configured" }
+    500 { "error": "..." }
+  */
+  const _auditMatch = req.url.split('?')[0].match(/^\/api\/audit\/([^/]+)$/);
+  if (req.method === 'GET' && _auditMatch) {
+    if (!(await _requireAdmin())) return;
+    if (!firestoreService.isConfigured()) return sendJSON(res, 503, { error: 'Firestore not configured' });
+    const clientId = decodeURIComponent(_auditMatch[1]);
+    const _qp  = new URLSearchParams(req.url.includes('?') ? req.url.split('?')[1] : '');
+    const limit  = Math.min(parseInt(_qp.get('limit') || '50', 10), 200);
+    const before = _qp.get('before') || null;
+    (async () => {
+      try {
+        const rawLogs = await firestoreService.queryAuditLogs(clientId, { limit, before });
+        // Serialize every Firestore Timestamp to ISO string before JSON transport.
+        const _ts = v => v && v.toDate ? v.toDate().toISOString() : (typeof v === 'string' ? v : null);
+        const logs = rawLogs.map(l => ({
+          id:         l.id,
+          occurredAt: _ts(l.occurredAt),
+          actorType:  l.actorType  || null,
+          actorId:    l.actorId    || null,
+          action:     l.action     || null,
+          entityType: l.entityType || null,
+          entityId:   l.entityId   || null,
+          diff:       l.diff       || null,
+          ipAddress:  l.ipAddress  || null,
+        }));
+        sendJSON(res, 200, { ok: true, clientId, logs, total: logs.length });
+      } catch (e) {
+        console.error('[audit] error:', e.message);
+        sendJSON(res, 500, { error: e.message });
+      }
+    })();
+    return;
+  }
+
+  // ── GET /api/health/:clientId ─────────────────────────────────────────────────
+  // Unified tracking health report. Composes:
+  //   diagnostic_results + client_health_cache + latest version + platform health
+  //   + active deployment count from recovery system.
+  // Auth: admin token.
+  /*
+  Response:
+  {
+    "ok": true,
+    "clientId": "uid_abc123",
+    "trackingHealthScore": 75,
+    "ga4": true,
+    "meta": false,
+    "googleAds": true,
+    "tiktok": false,
+    "lastEventReceived": "2026-06-30T10:00:00.000Z",
+    "lastPublish": "2026-06-30T10:00:00.000Z",
+    "lastVersion": 12,
+    "driftDetected": false,
+    "activeDeployment": false,
+    "stuckDeployments": 0,
+    "lastRecovery": null,
+    "platformHealth": {},
+    "alerts": [
+      { "message": "1 deployment(s) currently active", "severity": "info" }
+    ],
+    "computedAt": null
+  }
+  Notes:
+    - trackingHealthScore: 0-100. Sourced from diagnostic_results.healthScore,
+      then client_health_cache.healthScore, then computed as 25pts per active platform.
+    - driftDetected: sourced from container_versions (latest record).
+    - alerts: derived from diag.alerts, diag.issues, + active deployment count.
+    - ga4/meta/googleAds/tiktok: boolean — true means platform is active.
+  Errors:
+    401 { "error": "Unauthorized" }
+    503 { "error": "Firestore not configured" }
+    500 { "error": "..." }
+  */
+  const _healthMatch = req.url.split('?')[0].match(/^\/api\/health\/([^/]+)$/);
+  if (req.method === 'GET' && _healthMatch) {
+    if (!(await _requireAdmin())) return;
+    if (!firestoreService.isConfigured()) return sendJSON(res, 503, { error: 'Firestore not configured' });
+    const clientId = decodeURIComponent(_healthMatch[1]);
+    (async () => {
+      try {
+        const [diagResult, healthCache, versions, platformHealth, activeDeployments] = await Promise.all([
+          firestoreService.getDiagnosticResult(clientId).catch(() => null),
+          firestoreService.getHealthCache(clientId).catch(() => null),
+          firestoreService.listVersions(clientId, { limit: 1 }).catch(() => []),
+          firestoreService.getPlatformHealth().catch(() => ({})),
+          firestoreService.countActiveDeployments().catch(() => 0),
+        ]);
+
+        const lastVersion = versions[0] || null;
+
+        // Derive per-platform status from diagnostic result or health cache
+        const diag = diagResult || healthCache || {};
+        const platforms = {
+          ga4:       !!(diag.ga4Active        || diag.ga4),
+          meta:      !!(diag.metaActive       || diag.meta),
+          googleAds: !!(diag.googleAdsActive  || diag.googleAds),
+          tiktok:    !!(diag.tiktokActive     || diag.tiktok),
+        };
+
+        // Health score: 25 pts per active platform (max 4 platforms)
+        const activeCount   = Object.values(platforms).filter(Boolean).length;
+        const platformCount = Object.values(platforms).filter(v => v !== undefined).length || 4;
+        const score = diagResult && diagResult.healthScore != null
+          ? diagResult.healthScore
+          : healthCache && healthCache.healthScore != null
+            ? healthCache.healthScore
+            : Math.round((activeCount / platformCount) * 100);
+
+        const alerts = (diag.alerts || diag.issues || []).map(a =>
+          typeof a === 'string' ? { message: a, severity: 'warning' } : a,
+        );
+
+        // Add alert if there are active (potentially stuck) deployments
+        if (activeDeployments > 0) {
+          alerts.push({ message: `${activeDeployments} deployment(s) currently active`, severity: 'info' });
+        }
+
+        sendJSON(res, 200, {
+          ok:                   true,
+          clientId,
+          trackingHealthScore:  score,
+          ga4:                  platforms.ga4,
+          meta:                 platforms.meta,
+          googleAds:            platforms.googleAds,
+          tiktok:               platforms.tiktok,
+          lastEventReceived:    diag.lastEventAt
+            ? (diag.lastEventAt.toDate ? diag.lastEventAt.toDate().toISOString() : diag.lastEventAt)
+            : null,
+          lastPublish:          lastVersion && lastVersion.publishedAt
+            ? (lastVersion.publishedAt.toDate ? lastVersion.publishedAt.toDate().toISOString() : lastVersion.publishedAt)
+            : null,
+          lastVersion:          lastVersion ? lastVersion.version : null,
+          // driftDetected: sourced from the most recent container_versions doc.
+          // Only rollback deployments set this; regular publishes default to false.
+          driftDetected:        lastVersion ? (lastVersion.driftDetected || false) : false,
+          activeDeployment:     activeDeployments > 0,
+          stuckDeployments:     0,           // filled by recovery job on next sweep
+          lastRecovery:         null,        // filled when recovery runs
+          platformHealth,
+          alerts,
+          computedAt:           diag.computedAt || diag.updatedAt || null,
+        });
+      } catch (e) {
+        console.error('[health] error:', e.message);
+        sendJSON(res, 500, { error: e.message });
+      }
+    })();
+    return;
   }
 
   // POST /api/admin/client/:uid — update client fields (status, plan, ...)
   const _cliUpdMatch = req.url.split('?')[0].match(/^\/api\/admin\/client\/([^/]+)$/);
   if (req.method === 'POST' && _cliUpdMatch) {
-    if (!_requireAdmin()) return;
+    if (!(await _requireAdmin())) return;
     if (!firestoreService.isConfigured()) {
       return sendJSON(res, 503, { error: 'Firestore is not configured' });
     }
     const uid = decodeURIComponent(_cliUpdMatch[1]);
+    const adminId = _adminId();
     parseJsonBody(req, res, body => {
-      firestoreService.updateClient(uid, body || {})
-        .then(upd => sendJSON(res, 200, { ok: true, update: upd }))
+      const b = body || {};
+      firestoreService.updateClient(uid, b)
+        .then(async upd => {
+          // Audit the billing-marker transitions specifically.
+          if (b.paymentStatus === 'paid' || b.paymentStatus === 'unpaid') {
+            const action = b.paymentStatus === 'paid' ? 'client_marked_paid' : 'client_marked_unpaid';
+            try {
+              await firestoreService.saveAuditLog({
+                action, clientId: uid, adminId,
+                occurredAt: new Date().toISOString(), success: true,
+                metadata: { paymentStatus: b.paymentStatus, trialStatus: upd.trialStatus || null },
+              });
+            } catch (_) {}
+          }
+          sendJSON(res, 200, { ok: true, update: upd });
+        })
         .catch(e => sendJSON(res, 500, { error: e.message }));
     });
     return;
   }
 
+  // GET /api/admin/client/:uid/check-cleanup — read-only dry run. Reports
+  // eligibility + the exact resources a deletion WOULD remove. Never writes or
+  // calls infra. Not gated by CONTAINER_DELETION_ENABLED (safe to preview).
+  const _cliCheckMatch = req.url.split('?')[0].match(/^\/api\/admin\/client\/([^/]+)\/check-cleanup$/);
+  if (req.method === 'GET' && _cliCheckMatch) {
+    if (!(await _requireAdmin())) return;
+    if (!firestoreService.isConfigured()) {
+      return sendJSON(res, 503, { error: 'Firestore is not configured' });
+    }
+    const uid = decodeURIComponent(_cliCheckMatch[1]);
+    (async () => {
+      try {
+        const preview = await containerDeletionService.previewCleanup(
+          { clientId: uid },
+          _buildContainerDeletionDeps(_adminId()),
+        );
+        sendJSON(res, 200, preview);
+      } catch (e) { sendJSON(res, 500, { error: e.message }); }
+    })();
+    return;
+  }
+
+  // POST /api/admin/client/:uid/delete-container — tear down managed infra for an
+  // EXPIRED + UNPAID client. Never deletes the customer account/doc.
+  // POST /api/admin/client/:uid/retry-cleanup — re-run teardown for still-present
+  // resources after a partial failure (idempotent; same guards).
+  const _cliActionMatch = req.url.split('?')[0].match(/^\/api\/admin\/client\/([^/]+)\/(delete-container|retry-cleanup)$/);
+  if (req.method === 'POST' && _cliActionMatch) {
+    if (!(await _requireAdmin())) return;
+    // Fail-safe kill-switch: destructive teardown is disabled unless explicitly
+    // enabled in the environment. Returns 403 for everyone while disabled.
+    if (!_containerDeletionEnabled()) {
+      return sendJSON(res, 503, {
+        error: 'Container deletion is disabled on this server',
+        code: 'deletion_disabled',
+        hint: 'Set CONTAINER_DELETION_ENABLED=true to enable (review gate).',
+      });
+    }
+    if (!firestoreService.isConfigured()) {
+      return sendJSON(res, 503, { error: 'Firestore is not configured' });
+    }
+    const uid = decodeURIComponent(_cliActionMatch[1]);
+    const adminId = _adminId();
+    (async () => {
+      try {
+        const result = await containerDeletionService.deleteClientContainer(
+          { clientId: uid, adminId },
+          _buildContainerDeletionDeps(adminId),
+        );
+        const codeMap = {
+          bad_request:  400,
+          not_found:    404,
+          paid:         409,
+          not_expired:  409,
+        };
+        if (result.status === 'rejected') {
+          return sendJSON(res, codeMap[result.code] || 400, result);
+        }
+        if (result.status === 'partial_failure') {
+          return sendJSON(res, 207, result);
+        }
+        return sendJSON(res, 200, result); // 'deleted' | 'already_deleted'
+      } catch (e) {
+        sendJSON(res, 500, { error: e.message });
+      }
+    })();
+    return;
+  }
+
   // DELETE /api/admin/client/:uid — delete a client document
   if (req.method === 'DELETE' && _cliUpdMatch) {
-    if (!_requireAdmin()) return;
+    if (!(await _requireAdmin())) return;
     if (!firestoreService.isConfigured()) {
       return sendJSON(res, 503, { error: 'Firestore is not configured' });
     }
@@ -2006,7 +3512,7 @@ const server = http.createServer((req, res) => {
       if (/axios is not installed|firebase-admin is not installed/i.test(msg)) {
         return { status: 500, payload: { error: 'مكتبة مفقودة على الخادم', detail: msg, hint: 'شغّل npm install على الخادم ثم أعد التشغيل' } };
       }
-      if (/Private\/internal IP|Hostname is blocked|Port .* is not allowed|Only http\/https/i.test(msg)) {
+      if (/Private\/internal IP|Hostname is blocked|Port .* is not allowed|Only http\/https|blocked range|blocked by SSRF|hostname is blocked|zone identifier|Invalid URL/i.test(msg)) {
         return { status: 400, payload: { error: 'الرابط مرفوض (SSRF guard)', detail: msg } };
       }
       return { status: 502, payload: { error: fallbackArMsg + ': ' + msg } };
@@ -2028,6 +3534,50 @@ const server = http.createServer((req, res) => {
     }
 
     const ssPath = req.url.split('?')[0];
+
+    // ────────────────────────────────────────────────────────────────────────
+    // GET /api/ss/health-check?url=... — fetch a customer site through the server
+    // to detect installed pixels without exposing customer URLs to third-party proxies.
+    // Authenticated via Firebase token.
+    // ────────────────────────────────────────────────────────────────────────
+    if (req.method === 'GET' && ssPath === '/api/ss/health-check') {
+      (async () => {
+        const auth = await ssAuthAndRate();
+        if (!auth) return;
+
+        const targetUrl = (req.url.includes('?')
+          ? new URLSearchParams(req.url.split('?')[1]).get('url')
+          : null) || '';
+
+        // Basic presence check before calling validateTargetUrl for a cleaner
+        // Arabic error message when the caller omits the parameter entirely.
+        if (!targetUrl) {
+          sendJSON(res, 400, { error: 'url param مطلوب ويجب أن يبدأ بـ http(s)://' });
+          return;
+        }
+
+        try {
+          // validateTargetUrl() throws with a descriptive English message for
+          // any blocked protocol, private IP, internal hostname, or bad port.
+          // safeFetch() calls it again on every redirect Location header, so
+          // open-redirect SSRF chains are blocked at each hop, not just on
+          // the initial URL.
+          const { body } = await safeFetch(targetUrl, {
+            maxRedirects : 3,
+            timeoutMs    : 10_000,
+            maxBodyBytes : 500 * 1024,
+          });
+          sendJSON(res, 200, { contents: body });
+        } catch (e) {
+          const msg = (e && e.message) || 'فشل الاتصال بالموقع';
+          // SSRF guard errors → 400 (caller mistake, not upstream failure)
+          const status = /SSRF guard|blocked|not allowed|Only http|Invalid URL|hostname/i.test(msg)
+            ? 400 : 502;
+          sendJSON(res, status, { error: msg });
+        }
+      })();
+      return;
+    }
 
     // ────────────────────────────────────────────────────────────────────────
     // GET /api/ss/config — return user's SS config (tokens redacted)
@@ -2062,12 +3612,20 @@ const server = http.createServer((req, res) => {
           if (!url) return sendJSON(res, 400, { error: 'حقل url مطلوب' });
           if (!/^https?:\/\/.+\..+/.test(url)) return sendJSON(res, 400, { error: 'الرابط غير صالح — يجب أن يبدأ بـ https://' });
 
+          // safeFetch: DNS resolved once, IP validated, connect to IP — no TOCTOU.
+          // maxRedirects:0 — sGTM servers must not redirect; redirect here means misconfiguration.
+          const t0 = Date.now();
           try {
-            const provider = ssGetProvider({ provider: body.provider || 'selfhosted' });
-            const result   = await provider.validateUrl(url);
-            if (!result.valid) rateLimiter.recordError(clientId);
-            else               rateLimiter.recordSuccess(clientId);
-            sendJSON(res, 200, { ok: result.valid, ...result });
+            const { statusCode } = await safeFetch(url, {
+              maxRedirects : 0,
+              timeoutMs    : 5_000,
+              maxBodyBytes : 512,
+            });
+            const latencyMs = Date.now() - t0;
+            const valid = statusCode >= 200 && statusCode < 500;
+            if (!valid) rateLimiter.recordError(clientId);
+            else        rateLimiter.recordSuccess(clientId);
+            sendJSON(res, 200, { ok: valid, valid, latencyMs, status: statusCode });
           } catch (e) {
             rateLimiter.recordError(clientId);
             const c = ssClassifyError(e, 'فشل الاتصال بالخادم'); sendJSON(res, c.status, c.payload);
@@ -2168,17 +3726,70 @@ const server = http.createServer((req, res) => {
             up_external_id: 'test_user_et',
           };
 
+          // Hardened POST — mirrors safeFetch internals:
+          // DNS resolved once, IP validated, http.request connects to the IP
+          // (not the hostname), so there is no TOCTOU window.
           try {
-            const provider = ssGetProvider({ provider: body.provider || 'selfhosted' });
-            const result   = await provider.sendTestEvent(url, testPayload);
-            if (!result.ok) rateLimiter.recordError(clientId);
-            else            rateLimiter.recordSuccess(clientId);
+            const endpoint   = url.replace(/\/$/, '') + '/g/collect';
+            const endParsed  = new URL(endpoint);
+            validateTargetUrl(endpoint); // sync: protocol / port / IP-literal guard
+            const rawHost    = endParsed.hostname; // may include [] brackets for IPv6
+            const resolvedIp = await resolveHostname(rawHost, 5000);
+            if (isBlockedIp(resolvedIp)) {
+              throw new Error('Resolved IP is in a blocked range: ' + resolvedIp);
+            }
+            const port     = endParsed.port
+              ? parseInt(endParsed.port, 10)
+              : (endParsed.protocol === 'https:' ? 443 : 80);
+            const bareHost = (rawHost.startsWith('[') && rawHost.endsWith(']'))
+              ? rawHost.slice(1, -1) : rawHost;
+            const lib      = endParsed.protocol === 'https:' ? https : http;
+            const postData = JSON.stringify(testPayload);
+            const reqOpts  = {
+              hostname : resolvedIp,
+              port,
+              path     : (endParsed.pathname || '/') + endParsed.search,
+              method   : 'POST',
+              headers  : {
+                'Host'           : (port === 80 || port === 443) ? bareHost : (bareHost + ':' + port),
+                'Content-Type'   : 'application/json',
+                'Content-Length' : Buffer.byteLength(postData),
+                'User-Agent'     : 'EasyTrack-SST-Tester/1.0',
+                'Connection'     : 'close',
+              },
+              timeout : 5000,
+            };
+            if (endParsed.protocol === 'https:') reqOpts.servername = bareHost;
+
+            const t0 = Date.now();
+            const evtResult = await new Promise((resolve, reject) => {
+              const evtReq = lib.request(reqOpts, apiRes => {
+                let respBody = '';
+                apiRes.setEncoding('utf8');
+                apiRes.on('data', c => { if (respBody.length < 4096) respBody += c; });
+                apiRes.on('end', () => resolve({ statusCode: apiRes.statusCode, body: respBody }));
+              });
+              evtReq.on('timeout', () => { evtReq.destroy(); reject(new Error('Test event request timed out')); });
+              evtReq.on('error', reject);
+              evtReq.write(postData);
+              evtReq.end();
+            });
+
+            const latencyMs = Date.now() - t0;
+            const ok        = evtResult.statusCode >= 200 && evtResult.statusCode < 300;
+            if (!ok) rateLimiter.recordError(clientId);
+            else     rateLimiter.recordSuccess(clientId);
+
+            let respBody = null;
+            try { respBody = JSON.parse(evtResult.body); }
+            catch (_) { respBody = evtResult.body.slice(0, 200) || null; }
+
             sendJSON(res, 200, {
-              ok:        result.ok,
-              status:    result.status,
-              latencyMs: result.latencyMs,
-              body:      result.body   || null,
-              error:     result.error  || null,
+              ok,
+              status:    evtResult.statusCode,
+              latencyMs,
+              body:      respBody,
+              error:     ok ? null : ('HTTP ' + evtResult.statusCode),
               eventId:   testPayload.ep_event_id,
             });
           } catch (e) {
@@ -2243,17 +3854,27 @@ const server = http.createServer((req, res) => {
           const url = (body.url || '').trim();
           if (!url) return sendJSON(res, 400, { error: 'حقل url مطلوب' });
 
+          // safeFetch: DNS resolved once, IP validated, connect to IP — no TOCTOU.
+          // Replaces provider.validateUrl() which used assertSafeUrl+axios (TOCTOU).
+          const t0 = Date.now();
           try {
-            const provider = new GoogleCloudProvider();
-            const result   = await provider.validateUrl(url);
-            if (!result.valid) rateLimiter.recordError(clientId);
-            else               rateLimiter.recordSuccess(clientId);
+            const { statusCode } = await safeFetch(url, {
+              maxRedirects : 0,
+              timeoutMs    : 5_000,
+              maxBodyBytes : 512,
+            });
+            const latencyMs = Date.now() - t0;
+            const valid     = statusCode >= 200 && statusCode < 500;
+            if (!valid) rateLimiter.recordError(clientId);
+            else        rateLimiter.recordSuccess(clientId);
             sendJSON(res, 200, {
-              ok:      result.valid,
-              message: result.valid
-                ? 'تم التحقق — الخادم يستجيب بنجاح (' + result.latencyMs + 'ms)'
+              ok:      valid,
+              valid,
+              latencyMs,
+              status:  statusCode,
+              message: valid
+                ? 'تم التحقق — الخادم يستجيب بنجاح (' + latencyMs + 'ms)'
                 : 'الخادم لا يستجيب — تأكد من اكتمال الـ deploy على Cloud Run',
-              ...result,
             });
           } catch (e) {
             rateLimiter.recordError(clientId);
@@ -2347,10 +3968,16 @@ const server = http.createServer((req, res) => {
         const url = (req.url.includes('?') ? new URLSearchParams(req.url.split('?')[1]).get('url') : null) || '';
         if (!url) { sendJSON(res, 400, { error: 'query param url مطلوب' }); return; }
 
+        // safeFetch: DNS resolved once, IP validated, connect to IP — no TOCTOU.
+        const t0 = Date.now();
         try {
-          const provider = ssGetProvider({ provider: 'selfhosted' });
-          const result   = await provider.getContainerStatus(url);
-          sendJSON(res, 200, { ok: true, ...result });
+          const { statusCode } = await safeFetch(url, {
+            maxRedirects : 0,
+            timeoutMs    : 5_000,
+            maxBodyBytes : 512,
+          });
+          const latencyMs = Date.now() - t0;
+          sendJSON(res, 200, { ok: true, healthy: statusCode >= 200 && statusCode < 500, latencyMs, status: statusCode });
         } catch (e) {
           sendJSON(res, 502, { error: e.message });
         }
@@ -2484,6 +4111,727 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // CLIENT PROFILE API  /api/v1/*
+  // Auth: Firebase ID token — Authorization: Bearer <token>
+  // Admin role: Firebase custom claim  decoded.admin === true
+  // Self-access: decoded.uid === targetClientId
+  // ══════════════════════════════════════════════════════════════════════════
+
+  if (req.url.startsWith('/api/v1/')) {
+    const v1Path   = req.url.split('?')[0];
+    const v1Params = req.url.includes('?')
+      ? new URLSearchParams(req.url.split('?')[1])
+      : new URLSearchParams();
+
+    // ── GET /api/v1/healthz — unauthenticated liveness probe ───────────────
+    if (req.method === 'GET' && v1Path === '/api/v1/healthz') {
+      sendJSON(res, 200, { ok: true, ts: new Date().toISOString() });
+      return;
+    }
+
+    // ── GET /api/v1/metrics — in-process operational metrics ──────────────
+    // Returns Prometheus-style counters + DLQ queue depth + alert status.
+    // Secured by ADMIN_TOKEN to prevent public exposure of operational data.
+    if (req.method === 'GET' && v1Path === '/api/v1/metrics') {
+      const adminToken = (process.env.ADMIN_TOKEN || '').trim();
+      if (adminToken) {
+        const provided = (req.headers['x-admin-token'] || '').trim();
+        if (!provided || provided.length !== adminToken.length ||
+            !require('crypto').timingSafeEqual(Buffer.from(provided), Buffer.from(adminToken))) {
+          sendJSON(res, 401, { error: 'X-Admin-Token required' });
+          return;
+        }
+      }
+      (async () => {
+        const snap = metrics.snapshot();
+        let dlqDepth = null;
+        let dlqOldestAgeMs = null;
+        if (firestoreService.isConfigured()) {
+          try {
+            const dlqStats = await firestoreService.getDlqStats();
+            dlqDepth      = dlqStats.depth;
+            dlqOldestAgeMs = dlqStats.oldestAgeMs;
+          } catch (_) {}
+        }
+        const alerts = metrics.checkAlerts(dlqDepth, dlqOldestAgeMs);
+        sendJSON(res, 200, {
+          ...snap,
+          dlq: { depth: dlqDepth, oldestAgeMs: dlqOldestAgeMs },
+          alerts,
+          healthy: alerts.length === 0,
+        });
+      })();
+      return;
+    }
+
+    // ── POST /api/v1/internal/dlq — sGTM failed-event ingest ─────────────
+    // Called by _fireDLQ() in the sGTM template when a CAPI send fails.
+    // Auth: BEACON_SECRET HMAC (same as beacon) or INTERNAL_WORKER_SECRET header
+    // so the sGTM template can authenticate using the shared secret it already has.
+    // The dlq-worker picks up these records and retries with exponential back-off.
+    if (req.method === 'POST' && v1Path === '/api/v1/internal/dlq') {
+      if (!firestoreService.isConfigured()) {
+        sendJSON(res, 503, { error: 'Firestore not configured' });
+        return;
+      }
+      // Auth: accept either BEACON_SECRET HMAC (X-DLQ-Sig header) or the
+      // internal worker secret (X-Internal-Token) so sGTM can call this without
+      // a Firebase token, using the same BEACON_SECRET it uses for the beacon ping.
+      const dlqSig      = (req.headers['x-dlq-sig']      || '').trim();
+      const internalTok = (req.headers['x-internal-token'] || '').trim();
+      const beaconSecret  = (process.env.BEACON_SECRET        || '').trim();
+      const workerSecret  = (process.env.INTERNAL_WORKER_SECRET || '').trim();
+
+      let authed = false;
+      if (internalTok && workerSecret) {
+        const a = Buffer.from(internalTok);
+        const b = Buffer.from(workerSecret);
+        authed  = a.length === b.length && crypto.timingSafeEqual(a, b);
+      }
+      if (!authed && dlqSig && beaconSecret) {
+        // sGTM signs: HMAC-SHA256(beaconSecret, event_id + '|' + timestamp)
+        // Timestamp must be within ±5 minutes to prevent replay.
+        const dlqTs  = parseInt(req.headers['x-dlq-ts'] || '0', 10);
+        const ageSec = Math.abs(Date.now() / 1000 - dlqTs);
+        if (ageSec <= 300) {
+          const expected = crypto.createHmac('sha256', beaconSecret)
+            .update((req.headers['x-dlq-event-id'] || '') + '|' + dlqTs)
+            .digest('hex');
+          const a = Buffer.from(dlqSig);
+          const b = Buffer.from(expected);
+          authed  = a.length === b.length && crypto.timingSafeEqual(a, b);
+        }
+      }
+      // If neither secret is configured, accept unauthenticated (DLQ is ingest-only,
+      // not a read endpoint — worst case an attacker fills the collection with junk).
+      // Log a warning so operators know to configure secrets.
+      if (!authed && (beaconSecret || workerSecret)) {
+        sendJSON(res, 401, { error: 'DLQ auth failed' });
+        return;
+      }
+      if (!beaconSecret && !workerSecret) {
+        console.warn('[dlq] BEACON_SECRET and INTERNAL_WORKER_SECRET both unset — DLQ endpoint is unauthenticated');
+      }
+
+      parseJsonBody(req, res, async body => {
+        if (!body || !body.event_name) {
+          sendJSON(res, 400, { error: 'Missing event_name' });
+          return;
+        }
+
+        // Classify: AUTH_ERROR events should NOT be queued for retry (they'll
+        // immediately exhaust on the next worker tick anyway — skip the round-trip).
+        const errCode = (body.error_code || 0);
+        if (errCode === 401 || errCode === 403) {
+          console.error('[dlq] AUTH_ERROR received — not queuing for retry.' +
+            ' platform=' + body.destination + ' event_id=' + body.event_id +
+            ' Rotate the CAPI token for customer_id=' + body.customer_id);
+          sendJSON(res, 200, { ok: true, queued: false, reason: 'auth_error_not_retryable' });
+          return;
+        }
+
+        try {
+          const docId = await firestoreService.saveDlqEvent({
+            eventId:          body.event_id          || '',
+            eventName:        body.event_name,
+            eventChecksum:    body.event_checksum     || '',
+            platform:         body.destination        || '',
+            // Field names must match what dlq-worker reads exactly.
+            destination_url:  body.destination_url    || '',
+            payload_snapshot: body.payload_snapshot   || '',
+            headers_snapshot: body.headers_snapshot   || JSON.stringify({ 'Content-Type': 'application/json' }),
+            customerId:       body.customer_id        || '',
+            sessionId:        body.session_id         || '',
+            anonymousId:      body.anonymous_id       || '',
+            errorCode:        errCode,
+            errorMessage:     body.error_message      || '',
+            payloadSize:      body.payload_size        || 0,
+            schemaVersion:    body.schema_version      || 1,
+          });
+          metrics.incDlqCreated();
+          sendJSON(res, 202, { ok: true, queued: true, docId });
+        } catch (e) {
+          console.error('[dlq] saveDlqEvent failed:', e.message);
+          sendJSON(res, 500, { error: e.message });
+        }
+      }, SS_BODY_LIMIT);
+      return;
+    }
+
+    // ── GET /api/v1/internal/beacon — sGTM event presence ping ───────────────
+    // Auth path A (Phase 2, API key):  ?key=&clientId=&event=
+    // Auth path B (Phase 1, HMAC):     ?clientId=&event=&sig=&ts=
+    // Cache-Control: no-store prevents proxies from collapsing writes into a
+    // single cached 200, which would silently drop real pings.
+    if (req.method === 'GET' && v1Path === '/api/v1/internal/beacon') {
+      res.setHeader('Cache-Control', 'no-store');
+      (async () => {
+        const bClientId = v1Params.get('clientId') || '';
+        const bEvent    = v1Params.get('event')    || '';
+        const bApiKey   = v1Params.get('key')      || '';
+
+        if (!bClientId || !bEvent) {
+          sendJSON(res, 400, { error: 'clientId and event are required' });
+          return;
+        }
+
+        let authenticated = false;
+
+        if (bApiKey) {
+          // ── Path A: per-client API key (sGTM beacon tag) ─────────────────
+          const parsed = apiKeyService.parse(bApiKey);
+          if (!parsed) {
+            // Always call verify() to consume constant time regardless of format validity.
+            apiKeyService.verify(bApiKey, _BEACON_DUMMY_HASH);
+            sendJSON(res, 401, { error: 'invalid api key format' });
+            return;
+          }
+          let keyDoc;
+          try { keyDoc = await firestoreService.getApiKey(parsed.keyId); } catch (_) {}
+          // Always verify — prevents timing oracle on whether the keyId exists.
+          const hash  = (keyDoc && keyDoc.keyHash) || _BEACON_DUMMY_HASH;
+          const valid = apiKeyService.verify(bApiKey, hash);
+          if (!valid || !keyDoc || keyDoc.status !== 'active') {
+            sendJSON(res, 401, { error: 'invalid or revoked api key' });
+            return;
+          }
+          if (keyDoc.clientId !== bClientId) {
+            sendJSON(res, 403, { error: 'api key does not belong to this client' });
+            return;
+          }
+          authenticated = true;
+
+        } else {
+          // ── Path B: HMAC signature (Phase 1 — shared BEACON_SECRET) ──────
+          const beaconSecret = (process.env.BEACON_SECRET || '').trim();
+          if (!beaconSecret) {
+            sendJSON(res, 503, { error: 'BEACON_SECRET is not configured' });
+            return;
+          }
+          const bSig = v1Params.get('sig') || '';
+          const bTs  = v1Params.get('ts')  || '';
+          if (!bSig || !bTs) {
+            sendJSON(res, 400, { error: 'sig and ts are required for HMAC auth' });
+            return;
+          }
+          const tsNum  = parseInt(bTs, 10);
+          const nowMin = Math.floor(Date.now() / 60000);
+          if (isNaN(tsNum) || Math.abs(nowMin - tsNum) > 5) {
+            sendJSON(res, 400, { error: 'beacon ts outside ±5 minute window' });
+            return;
+          }
+          const expected = crypto.createHmac('sha256', beaconSecret)
+            .update(bClientId + bEvent + bTs).digest('hex');
+          let valid = false;
+          try {
+            const aBuf = Buffer.from(expected, 'hex');
+            const bBuf = Buffer.from(bSig, 'hex');
+            if (aBuf.length === bBuf.length) valid = crypto.timingSafeEqual(aBuf, bBuf);
+          } catch (_) {}
+          if (!valid) {
+            sendJSON(res, 401, { error: 'invalid beacon signature' });
+            return;
+          }
+          authenticated = true;
+        }
+
+        if (!authenticated) { sendJSON(res, 401, { error: 'authentication required' }); return; }
+
+        if (!_BEACON_VALID_EVENTS.has(bEvent)) {
+          sendJSON(res, 400, { error: 'unknown event type' });
+          return;
+        }
+
+        // ── Bucket-based dedup ────────────────────────────────────────────────
+        // One Firestore write per 5-minute bucket per (clientId, event).
+        // Prevents write storms on high-traffic sites without masking outages.
+        const bucket = Math.floor(Date.now() / _BEACON_BUCKET_MS);
+        const ck     = `${bClientId}_${bEvent}`;
+        if (_beaconCache.get(ck) === bucket) {
+          sendJSON(res, 200, { ok: true });
+          return;
+        }
+        _beaconCache.set(ck, bucket);
+
+        try {
+          await firestoreService.upsertEventTypeLastSeen(bClientId, bEvent);
+          sendJSON(res, 200, { ok: true });
+        } catch (e) { sendJSON(res, 500, { error: e.message }); }
+      })();
+      return;
+    }
+
+    // ── v1 auth helper — closure over req/res ──────────────────────────────
+    // Mirrors ssAuthAndRate: verifies Firebase JWT, rejects revoked tokens,
+    // applies per-uid rate limiting (100 req/min), returns {clientId, email, decoded}.
+    // All callers MUST `if (!auth) return;` — null means response already sent.
+    async function v1Auth() {
+      if (!firestoreService.isConfigured()) {
+        sendJSON(res, 503, { error: 'Firebase Auth is not configured', hint: 'Set FIREBASE_SA_KEY_JSON' });
+        return null;
+      }
+      const authz = (req.headers['authorization'] || req.headers['Authorization'] || '').trim();
+      if (!authz) {
+        sendJSON(res, 401, { error: 'Authorization header required', hint: 'Send Authorization: Bearer <Firebase ID token>' });
+        return null;
+      }
+      if (!authz.toLowerCase().startsWith('bearer ')) {
+        sendJSON(res, 401, { error: 'Authorization must be a Bearer token' });
+        return null;
+      }
+      const idToken = authz.slice(7).trim();
+      // Firebase JWTs are ~1-2 KB. Reject anything suspiciously large before
+      // paying the verifyIdToken network round-trip.
+      if (!idToken || idToken.length > 8192) {
+        sendJSON(res, 401, { error: 'Token is empty or too long' });
+        return null;
+      }
+      let decoded;
+      try {
+        decoded = await firestoreService.verifyIdToken(idToken);
+      } catch (e) {
+        const expired = (e.code === 'auth/id-token-expired');
+        sendJSON(res, 401, { error: expired ? 'Token expired — refresh and retry' : 'Invalid or expired token', code: e.code });
+        return null;
+      }
+      if (!decoded || !decoded.uid) {
+        sendJSON(res, 401, { error: 'Token missing uid' });
+        return null;
+      }
+      // Rate limit by uid — shared store with /api/ss/* (same bucket, same 100 req/min)
+      const rl = rateLimiter.check(decoded.uid);
+      if (!rl.allowed) {
+        const retryAfter = Math.ceil((rl.resetAt - Date.now()) / 1000);
+        res.writeHead(429, { ...corsHeaders(), ...securityHeaders(), 'Retry-After': retryAfter });
+        res.end(JSON.stringify({ error: rl.locked ? 'Account temporarily locked due to repeated errors' : 'Rate limit exceeded (100 req/min)', resetAt: rl.resetAt }));
+        return null;
+      }
+      return { clientId: decoded.uid, email: decoded.email || null, decoded };
+    }
+
+    function v1RequireAdmin(auth) {
+      if (!auth.decoded.admin) {
+        sendJSON(res, 403, { error: 'Admin access required' });
+        return false;
+      }
+      return true;
+    }
+
+    function v1RequireAccess(auth, targetId) {
+      if (auth.decoded.admin || auth.clientId === targetId) return true;
+      sendJSON(res, 403, { error: 'Access denied' });
+      return false;
+    }
+
+    // ── Route: /api/v1/clients/:id/* ──────────────────────────────────────
+    const v1ClientMatch = v1Path.match(/^\/api\/v1\/clients\/([^/]+)(\/.*)?$/);
+
+    if (v1ClientMatch) {
+      const targetId = v1ClientMatch[1];
+      const subPath  = v1ClientMatch[2] || '';
+
+      // GET /api/v1/clients/:id/profile
+      if (req.method === 'GET' && subPath === '/profile') {
+        (async () => {
+          const auth = await v1Auth();
+          if (!auth) return;
+          if (!v1RequireAccess(auth, targetId)) return;
+          try {
+            const bundle = await profileService.getBundle(targetId, !!auth.decoded.admin);
+            if (!bundle) { sendJSON(res, 404, { error: 'Client not found' }); return; }
+            sendJSON(res, 200, bundle);
+          } catch (e) { sendJSON(res, 500, { error: e.message }); }
+        })();
+        return;
+      }
+
+      // GET /api/v1/clients/:id/timeline
+      if (req.method === 'GET' && subPath === '/timeline') {
+        (async () => {
+          const auth = await v1Auth();
+          if (!auth) return;
+          if (!v1RequireAccess(auth, targetId)) return;
+          const limit  = Math.min(parseInt(v1Params.get('limit')  || '50', 10), 200);
+          const before = v1Params.get('before') || null;
+          try {
+            const events = await firestoreService.queryTimeline(targetId, { limit, before });
+            sendJSON(res, 200, { ok: true, events, total: events.length });
+          } catch (e) { sendJSON(res, 500, { error: e.message }); }
+        })();
+        return;
+      }
+
+      // GET /api/v1/clients/:id/audit-log  (admin only)
+      if (req.method === 'GET' && subPath === '/audit-log') {
+        (async () => {
+          const auth = await v1Auth();
+          if (!auth) return;
+          if (!v1RequireAdmin(auth)) return;
+          const limit  = Math.min(parseInt(v1Params.get('limit')  || '50', 10), 200);
+          const before = v1Params.get('before') || null;
+          try {
+            const logs = await firestoreService.queryAuditLogs(targetId, { limit, before });
+            sendJSON(res, 200, { ok: true, logs, total: logs.length });
+          } catch (e) { sendJSON(res, 500, { error: e.message }); }
+        })();
+        return;
+      }
+
+      // PATCH /api/v1/clients/:id  (admin only)
+      if (req.method === 'PATCH' && subPath === '') {
+        (async () => {
+          const auth = await v1Auth();
+          if (!auth) return;
+          if (!v1RequireAdmin(auth)) return;
+          parseJsonBody(req, res, async body => {
+            try {
+              const before = await firestoreService.getClient(targetId);
+              if (!before) { sendJSON(res, 404, { error: 'Client not found' }); return; }
+              const updated = await firestoreService.updateClientProfile(targetId, body);
+              const diff = auditService.computeDiff(before, { ...before, ...updated });
+              if (diff) {
+                const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+                await Promise.all([
+                  firestoreService.saveAuditLog({
+                    clientId:       targetId,
+                    actorType:      'admin',
+                    actorId:        auth.clientId,
+                    actorEmailHash: auditService.hashEmail(auth.email),
+                    action:         'client.profile.update',
+                    entityType:     'client',
+                    entityId:       targetId,
+                    diff,
+                    ipAddress:      ip,
+                  }),
+                  timelineService.record({
+                    clientId:    targetId,
+                    eventType:   'profile.updated',
+                    actorType:   'admin',
+                    actorId:     auth.clientId,
+                    summary:     'Profile updated by admin',
+                    meta:        { fields: Object.keys(diff) },
+                    isMilestone: false,
+                    dedupeKey:   null,
+                  }),
+                ]);
+              }
+              sendJSON(res, 200, { ok: true, updated });
+            } catch (e) { sendJSON(res, 500, { error: e.message }); }
+          });
+        })();
+        return;
+      }
+
+      // POST /api/v1/clients/:id/api-keys  (admin or self)
+      if (req.method === 'POST' && subPath === '/api-keys') {
+        (async () => {
+          const auth = await v1Auth();
+          if (!auth) return;
+          if (!v1RequireAccess(auth, targetId)) return;
+          try {
+            const client = await firestoreService.getClient(targetId);
+            if (!client) { sendJSON(res, 404, { error: 'Client not found' }); return; }
+
+            const { keyId, rawKey, keyHash, prefix } = apiKeyService.generate(targetId);
+            await firestoreService.saveApiKey(keyId, {
+              clientId:   targetId,
+              keyHash,
+              prefix,
+              status:     'active',
+              lastUsedAt: null,
+              revokedAt:  null,
+            });
+            const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+            await Promise.all([
+              firestoreService.saveAuditLog({
+                clientId:       targetId,
+                actorType:      auth.decoded.admin ? 'admin' : 'user',
+                actorId:        auth.clientId,
+                actorEmailHash: auditService.hashEmail(auth.email),
+                action:         'api_key.created',
+                entityType:     'api_key',
+                entityId:       keyId,
+                diff:           null,
+                ipAddress:      ip,
+              }),
+              timelineService.record({
+                clientId:    targetId,
+                eventType:   'api_key.created',
+                actorType:   auth.decoded.admin ? 'admin' : 'user',
+                actorId:     auth.clientId,
+                summary:     'New API key created',
+                meta:        { prefix },
+                isMilestone: false,
+                dedupeKey:   null,
+              }),
+            ]);
+            // rawKey returned exactly once — not stored, never retrievable again
+            sendJSON(res, 201, { ok: true, keyId, rawKey, prefix });
+          } catch (e) { sendJSON(res, 500, { error: e.message }); }
+        })();
+        return;
+      }
+
+      // GET /api/v1/clients/:id/diagnostics  (admin or self)
+      if (req.method === 'GET' && subPath === '/diagnostics') {
+        (async () => {
+          const auth = await v1Auth();
+          if (!auth) return;
+          if (!v1RequireAccess(auth, targetId)) return;
+          try {
+            const result = await firestoreService.getDiagnosticResult(targetId);
+            if (!result) {
+              sendJSON(res, 404, { error: 'no diagnostic data yet — health job has not evaluated this client' });
+              return;
+            }
+            const _tiso = ts => {
+              if (!ts) return null;
+              if (typeof ts.toDate === 'function') return ts.toDate().toISOString();
+              if (ts instanceof Date) return ts.toISOString();
+              return null;
+            };
+            sendJSON(res, 200, {
+              ok:            true,
+              overallStatus: result.overallStatus || null,
+              rules:         result.rules || {},
+              updatedAt:     _tiso(result.updatedAt),
+            });
+          } catch (e) { sendJSON(res, 500, { error: e.message }); }
+        })();
+        return;
+      }
+
+      // DELETE /api/v1/clients/:id/api-keys/:keyId  (admin or self)
+      const v1ApiKeyMatch = subPath.match(/^\/api-keys\/([^/]+)$/);
+      if (req.method === 'DELETE' && v1ApiKeyMatch) {
+        const keyId = v1ApiKeyMatch[1];
+        (async () => {
+          const auth = await v1Auth();
+          if (!auth) return;
+          if (!v1RequireAccess(auth, targetId)) return;
+          try {
+            const key = await firestoreService.getApiKey(keyId);
+            if (!key || key.clientId !== targetId) {
+              sendJSON(res, 404, { error: 'API key not found' });
+              return;
+            }
+            await firestoreService.revokeApiKey(keyId);
+            const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+            await Promise.all([
+              firestoreService.saveAuditLog({
+                clientId:       targetId,
+                actorType:      auth.decoded.admin ? 'admin' : 'user',
+                actorId:        auth.clientId,
+                actorEmailHash: auditService.hashEmail(auth.email),
+                action:         'api_key.revoked',
+                entityType:     'api_key',
+                entityId:       keyId,
+                diff:           null,
+                ipAddress:      ip,
+              }),
+              timelineService.record({
+                clientId:    targetId,
+                eventType:   'api_key.revoked',
+                actorType:   auth.decoded.admin ? 'admin' : 'user',
+                actorId:     auth.clientId,
+                summary:     'API key revoked',
+                meta:        { keyId },
+                isMilestone: false,
+                dedupeKey:   keyId,
+              }),
+            ]);
+            sendJSON(res, 200, { ok: true });
+          } catch (e) { sendJSON(res, 500, { error: e.message }); }
+        })();
+        return;
+      }
+    }
+
+    // POST /api/v1/admin/platform-health  (admin only)
+    if (req.method === 'POST' && v1Path === '/api/v1/admin/platform-health') {
+      (async () => {
+        const auth = await v1Auth();
+        if (!auth) return;
+        if (!v1RequireAdmin(auth)) return;
+        parseJsonBody(req, res, async body => {
+          try {
+            const platform = (body && body.platform) ? String(body.platform).trim() : '';
+            const status   = (body && body.status)   ? String(body.status).trim()   : '';
+            const message  = (body && body.message)  ? String(body.message).trim()  : null;
+            if (!platform || !status) {
+              sendJSON(res, 400, { error: 'platform and status are required' });
+              return;
+            }
+            const VALID_STATUSES = ['operational', 'degraded', 'outage'];
+            if (!VALID_STATUSES.includes(status)) {
+              sendJSON(res, 400, { error: 'status must be one of: ' + VALID_STATUSES.join(', ') });
+              return;
+            }
+            await firestoreService.setPlatformHealth(platform, { status, message });
+            sendJSON(res, 200, { ok: true });
+          } catch (e) { sendJSON(res, 500, { error: e.message }); }
+        });
+      })();
+      return;
+    }
+
+    // Stale Phase-4 DLQ endpoint — unreachable (handler registered earlier wins).
+    // Disabled with `if (false)` to preserve git history without breaking routing.
+    if (false && req.method === 'POST' && v1Path === '/api/v1/internal/dlq') {
+      parseJsonBody(req, res, async body => {
+        try {
+          const apiKey = (req.headers['x-api-key'] || '').trim();
+          if (!apiKey) {
+            sendJSON(res, 401, { error: 'x-api-key required' });
+            return;
+          }
+          // Validate required fields
+          const eventName = body && typeof body.event_name === 'string' ? body.event_name.trim() : '';
+          const eventId   = body && typeof body.event_id   === 'string' ? body.event_id.trim()   : '';
+          if (!eventName || !eventId) {
+            sendJSON(res, 400, { error: 'event_name and event_id are required' });
+            return;
+          }
+          const ALLOWED_DESTS = ['meta', 'tiktok', 'snap'];
+          const dest = body && typeof body.destination === 'string' ? body.destination.trim() : '';
+          if (!ALLOWED_DESTS.includes(dest)) {
+            sendJSON(res, 400, { error: 'destination must be one of: ' + ALLOWED_DESTS.join(', ') });
+            return;
+          }
+          const customerId = body && typeof body.customer_id === 'string' ? body.customer_id.trim() : '';
+          const now = Date.now();
+          // TTL: DLQ entries expire after 7 days (604800 seconds)
+          const expiresAt = new Date(now + 7 * 24 * 60 * 60 * 1000);
+          const entry = {
+            event_name:      eventName,
+            event_id:        eventId,
+            event_checksum:  body.event_checksum  || '',
+            destination:     dest,
+            destination_url: typeof body.destination_url === 'string' ? body.destination_url.slice(0, 512) : '',
+            error_code:      typeof body.error_code    === 'number' ? body.error_code    : 0,
+            error_message:   typeof body.error_message === 'string' ? body.error_message.slice(0, 256) : '',
+            payload_size:    typeof body.payload_size  === 'number' ? body.payload_size  : 0,
+            items_count:     typeof body.items_count   === 'number' ? body.items_count   : 0,
+            customer_id:     customerId,
+            timestamp:       body.timestamp || Math.floor(now / 1000),
+            retry_count:     0,
+            status:          'pending',
+            received_at:     new Date(now).toISOString(),
+            expires_at:      expiresAt.toISOString(),
+          };
+          const db = firestoreService.getDb();
+          if (db) {
+            await db.collection('dlq_events').add(entry);
+          }
+          sendJSON(res, 202, { ok: true, queued: true });
+        } catch (e) {
+          console.error('[DLQ] store error:', e.message);
+          sendJSON(res, 500, { error: 'dlq store failed' });
+        }
+      });
+      return;
+    }
+
+    // Stale Phase-7 replay endpoint — calls firestoreService.getDb() which is not
+    // exported. Disabled until a proper implementation replaces it.
+    if (false && req.method === 'POST' && v1Path === '/api/v1/internal/replay') {
+      (async () => {
+        const auth = await v1Auth();
+        if (!auth) return;
+        if (!v1RequireAdmin(auth)) return;
+        parseJsonBody(req, res, async body => {
+          try {
+            const eventId = body && typeof body.event_id === 'string' ? body.event_id.trim() : '';
+            if (!eventId) {
+              sendJSON(res, 400, { error: 'event_id is required' });
+              return;
+            }
+            const db = firestoreService.getDb();
+            if (!db) {
+              sendJSON(res, 503, { error: 'Firestore unavailable' });
+              return;
+            }
+            // Locate the DLQ entry
+            const snap = await db.collection('dlq_events')
+              .where('event_id', '==', eventId)
+              .where('status', '==', 'pending')
+              .limit(1)
+              .get();
+            if (snap.empty) {
+              sendJSON(res, 404, { error: 'no pending DLQ entry for event_id: ' + eventId });
+              return;
+            }
+            const docRef = snap.docs[0].ref;
+            const entry  = snap.docs[0].data();
+            // Idempotency: refuse if already replayed within the last 24h
+            if (entry.last_replayed_at) {
+              const lastMs = new Date(entry.last_replayed_at).getTime();
+              if (Date.now() - lastMs < 24 * 60 * 60 * 1000) {
+                sendJSON(res, 409, {
+                  error:            'duplicate replay within 24h window',
+                  last_replayed_at: entry.last_replayed_at,
+                  event_checksum:   entry.event_checksum,
+                });
+                return;
+              }
+            }
+            // Mark as replaying before the HTTP call (optimistic lock)
+            await docRef.update({
+              status:           'replaying',
+              last_replayed_at: new Date().toISOString(),
+              retry_count:      (entry.retry_count || 0) + 1,
+            });
+            // The actual re-fire goes to the sGTM test-event endpoint (same path
+            // used by /api/ss/test-event). We trust the sGTM container to re-route
+            // to the correct platform — this avoids duplicating CAPI auth logic here.
+            const ssConfig = await firestoreService.getSSConfig(entry.customer_id);
+            if (!ssConfig || !ssConfig.serverUrl) {
+              await docRef.update({ status: 'failed', last_error: 'no sGTM URL on file' });
+              sendJSON(res, 422, { error: 'no sGTM server URL configured for this customer' });
+              return;
+            }
+            const replayUrl  = ssConfig.serverUrl.replace(/\/$/, '') + '/g/collect';
+            const replayBody = JSON.stringify({
+              v:              '2',
+              en:             entry.event_name,
+              'ep.event_id':  entry.event_id,
+              'ep.replayed':  '1',
+              'ep.checksum':  entry.event_checksum,
+            });
+            const https = require('https');
+            const replayReq = https.request(replayUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(replayBody) } }, replayRes => {
+              const ok = replayRes.statusCode >= 200 && replayRes.statusCode < 300;
+              docRef.update({
+                status:     ok ? 'replayed' : 'failed',
+                last_error: ok ? null : 'sGTM responded ' + replayRes.statusCode,
+              }).catch(() => {});
+            });
+            replayReq.on('error', err => {
+              docRef.update({ status: 'failed', last_error: err.message }).catch(() => {});
+            });
+            replayReq.write(replayBody);
+            replayReq.end();
+            sendJSON(res, 202, {
+              ok:             true,
+              event_id:       eventId,
+              event_checksum: entry.event_checksum,
+              retry_count:    (entry.retry_count || 0) + 1,
+            });
+          } catch (e) {
+            console.error('[Replay] error:', e.message);
+            sendJSON(res, 500, { error: 'replay failed: ' + e.message });
+          }
+        });
+      })();
+      return;
+    }
+
+    // Unknown /api/v1/* path
+    sendJSON(res, 404, { error: 'v1 endpoint not found: ' + v1Path });
+    return;
+  }
+
   // ── Static File Server ────────────────────────────────────────
   let urlPath;
   try {
@@ -2492,8 +4840,14 @@ const server = http.createServer((req, res) => {
     res.writeHead(400, securityHeaders()); res.end('Bad Request'); return;
   }
 
-  // Default root → tool.html (the app's single-page entry)
-  const requestedPath = urlPath === '/' ? '/tool.html' : urlPath;
+  // Default root → tool.html (the app's single-page entry). Clean app routes
+  // (/dashboard, /sign-in, …) also resolve to tool.html so direct URL access and
+  // refresh never 404 — the in-app router renders the right view. Trailing
+  // slashes are tolerated (/dashboard/ === /dashboard).
+  const _cleanPath = urlPath.replace(/\/+$/, '') || '/';
+  const requestedPath = (urlPath === '/' || APP_ROUTES.has(_cleanPath))
+    ? '/tool.html'
+    : urlPath;
   const filePath      = path.normalize(path.join(ROOT, requestedPath));
 
   // Path traversal guard — filePath MUST stay within ROOT
@@ -2521,9 +4875,13 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    const cacheControl = entry.isHtml
-      ? 'no-cache'                                   // HTML: always revalidate via ETag
-      : 'public, max-age=31536000, immutable';       // assets: cache hard (content-hashed via ETag)
+    // HTML + CSS revalidate via ETag on every load: their filenames are NOT
+    // content-hashed, so "immutable" would pin users to a stale stylesheet for
+    // a year after a redeploy. A 304 costs nothing (in-memory cache). Images
+    // and fonts effectively never change, so they stay immutable.
+    const cacheControl = (entry.isHtml || entry.ext === '.css')
+      ? 'no-cache'
+      : 'public, max-age=31536000, immutable';
 
     // Conditional request — client already holds this exact content → 304.
     if (req.headers['if-none-match'] === entry.etag) {
@@ -2598,6 +4956,134 @@ server.listen(PORT, () => {
     console.warn('Server-side CAPI import: 🔴 FLAG ON but staging bucket NOT configured — managed server containers will fall back to GA4-only. Set PROVISIONING_BUCKET (+ FIREBASE_SA_KEY_JSON).');
   } else {
     console.log('Server-side CAPI import: ⚪ disabled (default GA4-only). Set MANAGED_IMPORT_SERVER_CONFIG=1 + PROVISIONING_BUCKET to enable.');
+  }
+
+  // Health evaluation job — evaluates diagnostic rules for all active clients.
+  // Staggered 90s after startup so Firebase init and first-request spike settle
+  // before the job issues its first full client scan.
+  setTimeout(() => {
+    healthService.runHealthJob().catch(e => console.error('[health-job] startup run failed:', e.message));
+    setInterval(() => {
+      healthService.runHealthJob().catch(e => console.error('[health-job] tick failed:', e.message));
+    }, 15 * 60 * 1000).unref();
+  }, 90 * 1000);
+
+  // Provisioning stall detector — runs every 5 minutes. Marks any job stuck
+  // in status=running/pending with heartbeatAt older than 10 minutes as stalled
+  // and increments the provisioning_stalled_total metric for alerting.
+  if (firestoreService.isConfigured()) {
+    setInterval(() => {
+      firestoreService.detectAndRecoverStalledJobs(10 * 60 * 1000).then(ids => {
+        if (ids.length) {
+          ids.forEach(() => metrics.incProvisioningStalled());
+          console.error('[stall-detector] ' + ids.length + ' stalled provisioning job(s) detected: ' + ids.join(', '));
+        }
+      }).catch(e => console.error('[stall-detector] sweep failed:', e.message));
+    }, 5 * 60 * 1000).unref();
+  }
+
+  // ── Deployment Recovery Job ───────────────────────────────────────────────
+  // Runs every 5 minutes. Finds container_version records stuck in transient
+  // states (building / importing / publishing) for > 15 minutes — these are
+  // orphaned by a server crash after the lock was acquired but before release.
+  // Recovery: mark failed + release lock + emit warning log entry.
+  // Threshold: 15 min (generous vs. the 10-min lock TTL — ensures the lock
+  // has also expired before we declare a deployment dead).
+  const DEPLOYMENT_STUCK_THRESHOLD_MS = 15 * 60 * 1000;
+  if (firestoreService.isConfigured()) {
+    const _runDeploymentRecovery = async () => {
+      let recovered = 0;
+      try {
+        const stuck = await firestoreService.detectStuckDeployments(DEPLOYMENT_STUCK_THRESHOLD_MS);
+        if (!stuck.length) return;
+
+        console.warn('[deployment-recovery] found ' + stuck.length + ' stuck deployment(s)');
+
+        for (const dep of stuck) {
+          try {
+            const deploymentId = dep.deploymentId || ('orphan_' + dep.id);
+            const clientId     = dep.clientId;
+
+            // 1. Log recovery event
+            await firestoreService.saveDeploymentLog({
+              deploymentId,
+              clientId,
+              action:   'deployment_recovered',
+              actor:    'recovery-job',
+              success:  false,
+              error:    'Deployment timed out (stuck in state: ' + dep.deploymentState + ')',
+              metadata: { stuckState: dep.deploymentState, recoveredAt: new Date().toISOString() },
+            }).catch(() => {});
+
+            // 2. Mark version record as failed
+            await firestoreService.updateVersion(dep.id, {
+              deploymentState: 'failed',
+              status:          'failed',
+              failureReason:   'Deployment timed out — recovered by recovery job',
+            });
+
+            // 3. Release deployment lock (may already be expired — delete is safe)
+            await firestoreService.releaseDeploymentLock(clientId);
+
+            console.warn('[deployment-recovery] recovered stuck deployment ' + deploymentId +
+              ' for client ' + clientId + ' (was: ' + dep.deploymentState + ')');
+            recovered++;
+          } catch (recErr) {
+            console.error('[deployment-recovery] failed to recover deployment ' + dep.id + ':', recErr.message);
+          }
+        }
+      } catch (e) {
+        console.error('[deployment-recovery] sweep failed:', e.message);
+      }
+      if (recovered > 0) {
+        console.log('[deployment-recovery] recovered ' + recovered + ' orphaned deployment(s)');
+      }
+    };
+
+    // Run 2 minutes after startup (let Firestore settle), then every 5 minutes.
+    setTimeout(() => {
+      _runDeploymentRecovery();
+      setInterval(_runDeploymentRecovery, 5 * 60 * 1000).unref();
+    }, 2 * 60 * 1000);
+  }
+
+  // DLQ retry worker — only started when Firestore is configured.
+  // Picks up failed CAPI sends (written to `dlq_events` by POST /api/v1/internal/dlq)
+  // and retries with exponential back-off. Interval: 60s.
+  if (firestoreService.isConfigured()) {
+    dlqWorker.start(firestoreService, 60 * 1000).unref();
+  } else {
+    console.warn('[dlq-worker] Firestore not configured — DLQ retry worker disabled');
+  }
+
+  // ── Cloud Monitoring metrics flush — every 60s ───────────────────────────
+  setInterval(() => {
+    const snap = metrics.snapshot();
+    (async () => {
+      let dlqDepth = null, dlqOldestAgeMs = null, capacityReport = null;
+      if (firestoreService.isConfigured()) {
+        try {
+          const dlqStats = await firestoreService.getDlqStats();
+          dlqDepth = dlqStats.depth;
+          dlqOldestAgeMs = dlqStats.oldestAgeMs;
+          capacityReport = await firestoreService.getAccountCapacityReport();
+        } catch (_) {}
+      }
+      cloudMonitoring.pushSnapshot(snap, dlqDepth, dlqOldestAgeMs, capacityReport)
+        .catch(e => console.warn('[cloud-monitoring] flush error:', e.message));
+    })();
+  }, 60 * 1000).unref();
+
+  // ── Queue restart recovery ────────────────────────────────────────────────
+  // On restart, any job that was in status='pending' and never picked up (e.g.
+  // the process crashed between job creation and enqueueing) needs to be
+  // re-queued. We scan for jobs created in the last 30 minutes that are still
+  // in status='pending' and haven't been heartbeated yet.
+  if (firestoreService.isConfigured()) {
+    setTimeout(() => {
+      _recoverPendingJobsOnStartup().catch(e =>
+        console.error('[startup-recovery] failed:', e.message));
+    }, 15 * 1000);  // 15s delay so Firestore init settles
   }
 });
 

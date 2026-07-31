@@ -307,8 +307,10 @@ ___SERVER_PERMISSIONS___
         {
           "key": "allowedUrls",
           "value": {
-            "type": 1,
-            "string": "any"
+            "type": 2,
+            "listItem": [
+              { "type": 1, "string": "https://business-api.tiktok.com/" }
+            ]
           }
         }
       ]
@@ -362,3 +364,19 @@ ___SERVER_PERMISSIONS___
   }
 ]
 
+___TESTS___
+
+[
+  {
+    "name": "TikTok — CompletePayment POSTs to business-api.tiktok.com with Access-Token header and calls gtmOnSuccess when code=0",
+    "code": "mock('sendHttpRequest', function(u,o,b){ if(u.indexOf('business-api.tiktok.com')===-1) throw 'wrong url: '+u; if(o.headers['Access-Token']!=='TTOK') throw 'missing Access-Token header'; return Promise.resolve({statusCode:200,body:'{\"code\":0,\"message\":\"OK\"}'}); }); mock('sha256Sync', function(s,opts){ return 'a'.repeat(64); }); mock('logToConsole', function(){}); mock('getTimestampMillis', function(){ return 1700000000000; }); data.pixelCode='TTPX123'; data.accessToken='TTOK'; data.eventName='CompletePayment'; data.eventId='tt-evt-001'; data.value='50'; data.currency='SAR'; data.userEmail='buyer@example.com'; data.ipAddress='1.2.3.4'; data.userAgent='Mozilla/5.0'; runCode(data); assertApi('sendHttpRequest').wasCalled(); assertApi('gtmOnSuccess').wasCalled();"
+  },
+  {
+    "name": "TikTok — HTTP 200 with code != 0 calls gtmOnFailure",
+    "code": "mock('sendHttpRequest', function(u,o,b){ return Promise.resolve({statusCode:200,body:'{\"code\":40001,\"message\":\"Pixel not found\"}'}); }); mock('sha256Sync', function(s,opts){ return 'a'.repeat(64); }); mock('logToConsole', function(){}); mock('getTimestampMillis', function(){ return 1700000000000; }); data.pixelCode='BAD'; data.accessToken='TOK'; data.eventName='PageView'; runCode(data); assertApi('gtmOnFailure').wasCalled(); assertApi('gtmOnSuccess').wasNotCalled();"
+  },
+  {
+    "name": "TikTok — HTTP 4xx error calls gtmOnFailure",
+    "code": "mock('sendHttpRequest', function(u,o,b){ return Promise.resolve({statusCode:401,body:'{\"code\":40100,\"message\":\"Unauthorized\"}'}); }); mock('sha256Sync', function(s,opts){ return 'a'.repeat(64); }); mock('logToConsole', function(){}); mock('getTimestampMillis', function(){ return 1700000000000; }); data.pixelCode='PX1'; data.accessToken='BADTOK'; data.eventName='AddToCart'; runCode(data); assertApi('gtmOnFailure').wasCalled(); assertApi('gtmOnSuccess').wasNotCalled();"
+  }
+]

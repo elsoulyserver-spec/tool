@@ -363,8 +363,10 @@ ___SERVER_PERMISSIONS___
         {
           "key": "allowedUrls",
           "value": {
-            "type": 1,
-            "string": "any"
+            "type": 2,
+            "listItem": [
+              { "type": 1, "string": "https://graph.facebook.com/" }
+            ]
           }
         }
       ]
@@ -415,6 +417,23 @@ ___SERVER_PERMISSIONS___
       "isEditedByUser": true
     },
     "isRequired": true
+  }
+]
+
+___TESTS___
+
+[
+  {
+    "name": "Meta — Purchase event POSTs to graph.facebook.com and calls gtmOnSuccess on 200",
+    "code": "mock('sendHttpRequest', function(u,o,b){ if(u.indexOf('graph.facebook.com')===-1) throw 'wrong url: '+u; if(u.indexOf('access_token=')===-1) throw 'missing access_token in url'; return Promise.resolve({statusCode:200,body:'{\"events_received\":1}'}); }); mock('sha256Sync', function(s,opts){ return 'a'.repeat(64); }); mock('logToConsole', function(){}); mock('getTimestampMillis', function(){ return 1700000000000; }); data.pixelId='1234567890'; data.accessToken='EAAtest'; data.eventName='Purchase'; data.eventId='evt-001'; data.value='99.9'; data.currency='SAR'; data.orderId='ORD-123'; data.userEmail='test@example.com'; data.userPhone='+966500000000'; data.clientIpAddress='1.2.3.4'; data.clientUserAgent='Mozilla/5.0'; runCode(data); assertApi('sendHttpRequest').wasCalled(); assertApi('gtmOnSuccess').wasCalled();"
+  },
+  {
+    "name": "Meta — HTTP 400 response calls gtmOnFailure",
+    "code": "mock('sendHttpRequest', function(u,o,b){ return Promise.resolve({statusCode:400,body:'{\"error\":{\"code\":190,\"message\":\"Invalid OAuth access token\"}}'}); }); mock('sha256Sync', function(s,opts){ return 'a'.repeat(64); }); mock('logToConsole', function(){}); mock('getTimestampMillis', function(){ return 1700000000000; }); data.pixelId='1234567890'; data.accessToken='BAD'; data.eventName='Purchase'; runCode(data); assertApi('gtmOnFailure').wasCalled(); assertApi('gtmOnSuccess').wasNotCalled();"
+  },
+  {
+    "name": "Meta — testEventCode is forwarded in payload only when set",
+    "code": "var reqUrl; mock('sendHttpRequest', function(u,o,b){ reqUrl=u; return Promise.resolve({statusCode:200,body:'{\"events_received\":1}'}); }); mock('sha256Sync', function(s,opts){ return 'a'.repeat(64); }); mock('logToConsole', function(){}); mock('getTimestampMillis', function(){ return 1700000000000; }); data.pixelId='PX1'; data.accessToken='TOK'; data.eventName='PageView'; data.testEventCode='TEST123'; runCode(data); assertApi('sendHttpRequest').wasCalled(); assertApi('gtmOnSuccess').wasCalled(); assertThat(reqUrl.indexOf('graph.facebook.com')).isGreaterThan(-1);"
   }
 ]
 

@@ -6,9 +6,15 @@
 .env
 .env.*
 !.env.example
+ENV.json
+ENV.*.json
 *service-account*.json
+*serviceAccount*.json
 *firebase-adminsdk*.json
 *-sa-key*.json
+*.pem
+*.p12
+*.pfx
 
 # Node modules — Cloud Build runs `npm install` inside the container
 node_modules/

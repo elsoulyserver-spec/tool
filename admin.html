@@ -1,17 +1,26 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" data-t="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Easy Track · Admin</title>
+<title>EasyTrack · Admin</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+<link rel="icon" type="image/x-icon" href="favicon.ico"/>
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png"/>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png"/>
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png"/>
+<link rel="icon" type="image/png" sizes="192x192" href="android-chrome-192x192.png"/>
+<link rel="icon" type="image/png" sizes="512x512" href="android-chrome-512x512.png"/>
+<link rel="manifest" href="site.webmanifest"/>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=JetBrains+Mono:wght@400;700&family=Outfit:wght@900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&display=block" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 :root{
-  --bg:#05090f; --sur:#0b1628; --sur2:#0f1e35;
-  --gold:#e8b84b; --gdim:rgba(232,184,75,.1); --gbdr:rgba(232,184,75,.2);
-  --teal:#0ecfb0;
-  --wht:#f0f4ff; --mut:#5a7090; --mut2:#3a5070;
+  --bg:#09090B; --sur:#18181B; --sur2:#111318;
+  --gold:#2F6BFF; --gdim:rgba(47,107,255,.10); --gbdr:rgba(47,107,255,.24);
+  --teal:#2F6BFF;
+  --wht:#FFFFFF; --mut:#94A3B8; --mut2:#64748B;
   --grn:#34d399; --red:#f87171; --blu:#60a5fa;
   --bdr:rgba(255,255,255,.06);
 }
@@ -27,7 +36,7 @@ body{background:var(--bg);color:var(--wht);font-family:'Cairo',sans-serif;min-he
   padding:48px 40px;width:100%;max-width:420px;
   box-shadow:0 40px 80px rgba(0,0,0,.5);
 }
-.login-logo{display:flex;align-items:center;gap:10px;margin-bottom:32px;justify-content:center;}
+.login-logo{display:flex;align-items:center;gap:10px;margin-bottom:32px;justify-content:center;direction:ltr;}
 .login-logo svg{width:36px;height:36px;}
 .login-logo-text{font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--gold);letter-spacing:2px;}
 .login-title{font-size:22px;font-weight:900;margin-bottom:6px;text-align:center;}
@@ -40,12 +49,12 @@ body{background:var(--bg);color:var(--wht);font-family:'Cairo',sans-serif;min-he
 .inp:focus{border-color:var(--gbdr);background:var(--gdim);}
 .inp::placeholder{color:var(--mut2);}
 .btn-login{
-  width:100%;background:linear-gradient(135deg,var(--gold),#c8922a);
-  color:#0a1520;border:none;border-radius:12px;padding:15px;
+  width:100%;background:#2F6BFF;
+  color:#FFFFFF;border:none;border-radius:12px;padding:15px;
   font-family:'Cairo',sans-serif;font-size:16px;font-weight:900;
   cursor:pointer;transition:all .25s;margin-top:4px;
 }
-.btn-login:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(232,184,75,.3);}
+.btn-login:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(47,107,255,.3);}
 .btn-login:disabled{opacity:.5;cursor:not-allowed;transform:none;}
 .login-err{display:none;color:var(--red);font-size:12px;margin-top:10px;text-align:center;padding:8px;background:rgba(248,113,113,.08);border-radius:8px;border:1px solid rgba(248,113,113,.2);}
 
@@ -57,8 +66,9 @@ body{background:var(--bg);color:var(--wht);font-family:'Cairo',sans-serif;min-he
   display:flex;flex-direction:column;padding:24px 0;z-index:100;
 }
 .sidebar-logo{padding:0 20px 24px;border-bottom:1px solid var(--bdr);margin-bottom:16px;}
-.sidebar-logo-inner{display:flex;align-items:center;gap:10px;}
+.sidebar-logo-inner{display:flex;align-items:center;gap:10px;direction:ltr;}
 .sidebar-logo svg{width:32px;height:32px;}
+.et-logo-svg{color:#FFFFFF;}
 .sidebar-brand{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--gold);letter-spacing:2px;}
 .sidebar-badge{font-size:9px;color:var(--teal);letter-spacing:1px;margin-top:2px;}
 
@@ -128,7 +138,7 @@ body{background:var(--bg);color:var(--wht);font-family:'Cairo',sans-serif;min-he
   border-radius:8px;padding:8px 14px;font-family:'Cairo',sans-serif;
   font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;
 }
-.btn-sm:hover{background:rgba(232,184,75,.2);}
+.btn-sm:hover{background:rgba(47,107,255,.16);}
 
 table{width:100%;border-collapse:collapse;}
 thead tr{background:rgba(255,255,255,.02);}
@@ -147,9 +157,9 @@ tr:hover td{background:rgba(255,255,255,.02);}
   font-family:'JetBrains Mono',monospace;
 }
 .badge-active{background:rgba(52,211,153,.1);color:var(--grn);border:1px solid rgba(52,211,153,.2);}
-.badge-pending{background:rgba(232,184,75,.1);color:var(--gold);border:1px solid rgba(232,184,75,.2);}
+.badge-pending{background:rgba(47,107,255,.10);color:var(--gold);border:1px solid rgba(47,107,255,.22);}
 .badge-basic{background:rgba(96,165,250,.1);color:var(--blu);border:1px solid rgba(96,165,250,.2);}
-.badge-growth{background:rgba(232,184,75,.1);color:var(--gold);border:1px solid rgba(232,184,75,.2);}
+.badge-growth{background:rgba(47,107,255,.10);color:var(--gold);border:1px solid rgba(47,107,255,.22);}
 .badge-enterprise{background:rgba(167,139,250,.1);color:#a78bfa;border:1px solid rgba(167,139,250,.2);}
 
 .action-btn{
@@ -201,11 +211,11 @@ select { color-scheme: dark; }
 select option { background:#0f1e35; color:#f0f4ff; }
 .modal-actions{display:flex;gap:10px;margin-top:20px;}
 .btn-modal-primary{
-  flex:1;background:linear-gradient(135deg,var(--gold),#c8922a);
-  color:#0a1520;border:none;border-radius:10px;padding:12px;
+  flex:1;background:#2F6BFF;
+  color:#FFFFFF;border:none;border-radius:10px;padding:12px;
   font-family:'Cairo',sans-serif;font-size:14px;font-weight:900;cursor:pointer;transition:all .2s;
 }
-.btn-modal-primary:hover{box-shadow:0 8px 24px rgba(232,184,75,.3);}
+.btn-modal-primary:hover{box-shadow:0 8px 24px rgba(47,107,255,.3);}
 .btn-modal-cancel{
   flex:1;background:rgba(255,255,255,.04);border:1px solid var(--bdr);
   color:var(--mut);border-radius:10px;padding:12px;
@@ -225,23 +235,22 @@ select option { background:#0f1e35; color:#f0f4ff; }
 /* ── SPLASH ── */
 #splash{position:fixed;inset:0;z-index:9999;background:#05090f;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .7s ease,transform .7s ease;}
 #splash.hide{opacity:0;transform:scale(1.04);pointer-events:none;}
-#splash::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(232,184,75,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(232,184,75,.04) 1px,transparent 1px);background-size:60px 60px;-webkit-mask-image:radial-gradient(ellipse 70% 70% at 50% 50%,black,transparent);mask-image:radial-gradient(ellipse 70% 70% at 50% 50%,black,transparent);}
-#splash::after{content:'';position:absolute;width:480px;height:480px;border-radius:50%;background:radial-gradient(circle,rgba(232,184,75,.09),transparent 65%);top:50%;left:50%;transform:translate(-50%,-50%);animation:sGlow 2.5s ease-in-out infinite alternate;}
+#splash::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(47,107,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(47,107,255,.04) 1px,transparent 1px);background-size:60px 60px;-webkit-mask-image:radial-gradient(ellipse 70% 70% at 50% 50%,black,transparent);mask-image:radial-gradient(ellipse 70% 70% at 50% 50%,black,transparent);}
+#splash::after{content:'';position:absolute;width:480px;height:480px;border-radius:50%;background:radial-gradient(circle,rgba(47,107,255,.12),transparent 65%);top:50%;left:50%;transform:translate(-50%,-50%);animation:sGlow 2.5s ease-in-out infinite alternate;}
 @keyframes sGlow{from{transform:translate(-50%,-50%) scale(.9);opacity:.7}to{transform:translate(-50%,-50%) scale(1.1);opacity:1}}
 .sp-scene{position:relative;z-index:10;perspective:700px;width:140px;height:140px;display:flex;align-items:center;justify-content:center;}
 .sp-logo{width:120px;height:120px;position:relative;animation:sp3d 1.8s cubic-bezier(.16,1,.3,1) forwards;}
 @keyframes sp3d{0%{transform:rotateX(75deg) rotateY(-45deg) scale(.15);opacity:0}25%{opacity:1}65%{transform:rotateX(-6deg) rotateY(12deg) scale(1.06)}82%{transform:rotateX(3deg) rotateY(-4deg) scale(.97)}100%{transform:none;opacity:1}}
-.sp-logo svg{position:absolute;inset:0;width:100%;height:100%;opacity:0;animation:spRing .4s ease forwards;}
-.sp-logo svg:nth-child(1){animation-delay:.35s}.sp-logo svg:nth-child(2){animation-delay:.55s}.sp-logo svg:nth-child(3){animation-delay:.72s}.sp-logo svg:nth-child(4){animation-delay:.88s}.sp-logo svg:nth-child(5){animation-delay:1.02s}
+.sp-logo svg{position:absolute;inset:0;width:100%;height:100%;opacity:0;animation:spRing .4s ease forwards;animation-delay:.35s;}
 @keyframes spRing{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:scale(1)}}
 .sp-text{position:relative;z-index:10;text-align:center;margin-top:20px;}
 .sp-brand{display:block;font-family:'Outfit',sans-serif;font-weight:900;font-size:36px;letter-spacing:-2px;color:#f0f4ff;opacity:0;transform:translateY(20px);animation:spT .6s cubic-bezier(.16,1,.3,1) 1.3s forwards;}
-.sp-brand .sg{color:#e8b84b;}
-.sp-sub{display:block;font-family:'JetBrains Mono',monospace;font-size:10px;color:#0ecfb0;letter-spacing:5px;text-transform:uppercase;margin-top:8px;opacity:0;transform:translateY(14px);animation:spT .6s cubic-bezier(.16,1,.3,1) 1.55s forwards;}
-.sp-restricted{display:block;font-family:'JetBrains Mono',monospace;font-size:8px;color:rgba(232,184,75,.55);letter-spacing:4px;text-transform:uppercase;margin-top:5px;opacity:0;animation:spT .5s cubic-bezier(.16,1,.3,1) 1.75s forwards;}
+.sp-brand .sg{color:#2F6BFF;}
+.sp-sub{display:block;font-family:'JetBrains Mono',monospace;font-size:10px;color:#A1A1AA;letter-spacing:5px;text-transform:uppercase;margin-top:8px;opacity:0;transform:translateY(14px);animation:spT .6s cubic-bezier(.16,1,.3,1) 1.55s forwards;}
+.sp-restricted{display:block;font-family:'JetBrains Mono',monospace;font-size:8px;color:rgba(47,107,255,.55);letter-spacing:4px;text-transform:uppercase;margin-top:5px;opacity:0;animation:spT .5s cubic-bezier(.16,1,.3,1) 1.75s forwards;}
 @keyframes spT{to{opacity:1;transform:translateY(0)}}
 .sp-bar{position:absolute;bottom:0;left:0;right:0;height:2px;background:rgba(255,255,255,.04);}
-.sp-fill{height:100%;background:linear-gradient(90deg,#e8b84b,#0ecfb0);width:0;animation:spBar 2s ease forwards;}
+.sp-fill{height:100%;background:#2F6BFF;width:0;animation:spBar 2s ease forwards;}
 @keyframes spBar{to{width:100%}}
 
 /* ── PROJECT DETAIL MODAL ── */
@@ -270,9 +279,9 @@ select option { background:#0f1e35; color:#f0f4ff; }
 .perm-item{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:8px;padding:8px 12px;font-size:12px;cursor:pointer;transition:border-color .2s;}
 .perm-item:hover{border-color:var(--gbdr);}
 .perm-check{width:15px;height:15px;border-radius:3px;border:1.5px solid var(--mut2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;transition:all .2s;}
-.perm-check.on{background:var(--gold);border-color:var(--gold);color:#060d18;}
+.perm-check.on{background:var(--gold);border-color:var(--gold);color:#ffffff;}
 .badge-superadmin{background:rgba(248,113,113,.1);color:#f87171;border:1px solid rgba(248,113,113,.2);}
-.badge-admin{background:rgba(232,184,75,.1);color:var(--gold);border:1px solid rgba(232,184,75,.2);}
+.badge-admin{background:rgba(47,107,255,.10);color:var(--gold);border:1px solid rgba(47,107,255,.22);}
 .badge-viewer{background:rgba(96,165,250,.1);color:var(--blu);border:1px solid rgba(96,165,250,.2);}
 .field-inp{width:100%;background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.08);border-radius:10px;padding:11px 14px;color:var(--wht);font-family:'Cairo',sans-serif;font-size:14px;outline:none;transition:all .2s;margin-bottom:12px;}
 .field-inp:focus{border-color:var(--gbdr);}
@@ -295,7 +304,385 @@ select.field-inp{cursor:pointer;}
   .main-content{margin-right:200px;padding:20px;}
   .stats-grid{grid-template-columns:repeat(2,1fr);}
 }
+
+/* ═══════════════════════════════════════════════
+   OPS CONSOLE — Phase 2.6
+═══════════════════════════════════════════════ */
+
+/* Sidebar section label */
+.nav-section{
+  padding:20px 20px 6px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:9px;color:var(--mut2);
+  letter-spacing:2px;text-transform:uppercase;
+}
+
+/* Ops client selector bar */
+.ops-bar{
+  display:flex;align-items:center;gap:10px;
+  background:var(--sur2);border:1px solid var(--bdr);
+  border-radius:12px;padding:12px 16px;margin-bottom:24px;
+}
+.ops-bar-label{
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px;color:var(--mut);letter-spacing:1px;white-space:nowrap;
+}
+.ops-bar input{
+  flex:1;background:rgba(255,255,255,.04);border:1px solid var(--bdr);
+  border-radius:8px;padding:8px 12px;color:var(--wht);
+  font-family:'JetBrains Mono',monospace;font-size:12px;outline:none;
+  transition:border-color .2s;
+}
+.ops-bar input:focus{border-color:var(--gbdr);}
+.ops-bar input::placeholder{color:var(--mut2);}
+.ops-bar-active{
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+  color:var(--teal);background:rgba(47,107,255,.08);
+  border:1px solid rgba(47,107,255,.2);border-radius:6px;
+  padding:6px 12px;white-space:nowrap;
+}
+
+/* Drift warning banner */
+.drift-banner{
+  display:flex;align-items:center;gap:12px;
+  background:rgba(250,204,21,.06);border:1px solid rgba(250,204,21,.25);
+  border-radius:12px;padding:14px 18px;margin-bottom:20px;
+}
+.drift-banner-icon{font-size:20px;}
+.drift-banner-text{font-size:13px;color:#fbbf24;font-weight:700;}
+.drift-banner-sub{font-size:11px;color:rgba(251,191,36,.7);margin-top:2px;}
+
+/* Overview cards grid (2×4) */
+.ops-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+.ops-card{
+  background:var(--sur);border:1px solid var(--bdr);
+  border-radius:14px;padding:20px;position:relative;overflow:hidden;
+  transition:border-color .2s;
+}
+.ops-card:hover{border-color:rgba(255,255,255,.1);}
+.ops-card-label{
+  font-family:'JetBrains Mono',monospace;font-size:9px;
+  color:var(--mut);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;
+}
+.ops-card-value{font-size:28px;font-weight:900;line-height:1;margin-bottom:4px;}
+.ops-card-sub{font-size:11px;color:var(--mut);}
+.ops-card-icon{
+  position:absolute;top:16px;left:16px;
+  font-size:22px;opacity:.35;
+}
+/* Health score ring */
+.health-ring-wrap{display:flex;align-items:center;gap:16px;margin-bottom:20px;}
+.health-ring{position:relative;width:90px;height:90px;flex-shrink:0;}
+.health-ring svg{transform:rotate(-90deg);}
+.health-ring-val{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  font-size:22px;font-weight:900;line-height:1;
+}
+.health-ring-label{font-size:9px;color:var(--mut);margin-top:2px;font-family:'JetBrains Mono',monospace;}
+.health-breakdown{display:flex;flex-direction:column;gap:8px;flex:1;}
+.health-row{display:flex;align-items:center;gap:10px;}
+.health-row-name{font-size:12px;font-weight:700;width:100px;}
+.health-bar-bg{flex:1;height:5px;background:rgba(255,255,255,.06);border-radius:100px;overflow:hidden;}
+.health-bar-fill{height:100%;border-radius:100px;transition:width .6s ease;}
+.health-row-pct{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--mut);width:35px;text-align:left;}
+
+/* Platform health cards */
+.platform-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+.platform-card{
+  background:var(--sur);border:1px solid var(--bdr);
+  border-radius:14px;padding:18px;text-align:center;transition:border-color .2s;
+}
+.platform-card:hover{border-color:rgba(255,255,255,.1);}
+.platform-name{font-size:11px;font-weight:700;color:var(--mut);margin-bottom:10px;font-family:'JetBrains Mono',monospace;letter-spacing:1px;}
+.platform-score{font-size:32px;font-weight:900;margin-bottom:4px;}
+.platform-status{font-size:10px;font-family:'JetBrains Mono',monospace;}
+
+/* Deployment timeline (vertical) */
+.dep-timeline{display:flex;flex-direction:column;gap:0;padding:8px 0;}
+.dep-tl-step{display:flex;align-items:flex-start;gap:12px;position:relative;}
+.dep-tl-step:not(:last-child)::after{
+  content:'';position:absolute;right:11px;top:28px;
+  width:2px;height:calc(100% - 8px);
+  background:rgba(255,255,255,.08);
+}
+.dep-tl-dot{
+  width:24px;height:24px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:700;margin-top:2px;
+  position:relative;z-index:1;
+}
+.dep-tl-dot.done{background:rgba(52,211,153,.2);color:var(--grn);border:2px solid rgba(52,211,153,.4);}
+.dep-tl-dot.active{background:rgba(47,107,255,.14);color:var(--gold);border:2px solid rgba(47,107,255,.4);animation:tlPulse 1.2s ease-in-out infinite;}
+.dep-tl-dot.failed{background:rgba(248,113,113,.15);color:var(--red);border:2px solid rgba(248,113,113,.3);}
+.dep-tl-dot.pending{background:rgba(255,255,255,.04);color:var(--mut2);border:2px solid rgba(255,255,255,.08);}
+@keyframes tlPulse{0%,100%{box-shadow:0 0 0 0 rgba(47,107,255,.4)}50%{box-shadow:0 0 0 6px rgba(47,107,255,0)}}
+.dep-tl-info{padding:2px 0 16px;}
+.dep-tl-name{font-size:12px;font-weight:700;color:var(--wht);}
+.dep-tl-time{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--mut);margin-top:2px;}
+
+/* Details drawer */
+.drawer-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);
+  z-index:600;opacity:0;pointer-events:none;transition:opacity .25s;
+}
+.drawer-overlay.open{opacity:1;pointer-events:all;}
+.drawer{
+  position:fixed;top:0;left:0;bottom:0;width:480px;max-width:95vw;
+  background:var(--sur);border-right:1px solid var(--gbdr);
+  z-index:601;transform:translateX(-100%);transition:transform .3s cubic-bezier(.16,1,.3,1);
+  overflow-y:auto;padding:28px 24px;
+}
+.drawer-overlay.open .drawer{transform:translateX(0);}
+.drawer-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;}
+.drawer-title{font-size:16px;font-weight:900;}
+.drawer-close{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);color:var(--mut);border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .2s;}
+.drawer-close:hover{color:var(--wht);}
+.drawer-section{margin-bottom:20px;}
+.drawer-section-title{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--mut);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.drawer-section-title::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.05);}
+.drawer-kv{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.drawer-field{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:8px;padding:10px 12px;}
+.drawer-flabel{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:3px;}
+.drawer-fval{font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* Config diff viewer */
+.diff-viewer{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(255,255,255,.06);border-radius:10px;overflow:hidden;margin-top:10px;}
+.diff-pane{background:var(--sur2);padding:14px;}
+.diff-pane-title{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--mut);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;}
+.diff-line{font-family:'JetBrains Mono',monospace;font-size:11px;padding:2px 4px;border-radius:3px;margin-bottom:2px;line-height:1.5;}
+.diff-line.added{background:rgba(52,211,153,.1);color:var(--grn);}
+.diff-line.removed{background:rgba(248,113,113,.08);color:var(--red);text-decoration:line-through;opacity:.7;}
+.diff-line.same{color:var(--mut);}
+
+/* Ops tabs */
+.ops-tabs{display:flex;gap:2px;background:rgba(255,255,255,.04);border-radius:10px;padding:4px;margin-bottom:20px;width:fit-content;}
+.ops-tab{padding:7px 18px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;color:var(--mut);border:none;background:none;font-family:'Cairo',sans-serif;}
+.ops-tab.active{background:var(--sur);color:var(--wht);box-shadow:0 2px 8px rgba(0,0,0,.3);}
+.ops-tab:hover:not(.active){color:var(--wht);}
+
+/* Pagination */
+.pagination{display:flex;align-items:center;gap:6px;padding:16px 20px;border-top:1px solid var(--bdr);}
+.pg-btn{background:rgba(255,255,255,.04);border:1px solid var(--bdr);color:var(--mut);border-radius:6px;width:30px;height:30px;cursor:pointer;font-size:12px;font-family:'JetBrains Mono',monospace;transition:all .2s;display:flex;align-items:center;justify-content:center;}
+.pg-btn:hover{border-color:var(--gbdr);color:var(--gold);}
+.pg-btn.active{background:var(--gdim);border-color:var(--gbdr);color:var(--gold);}
+.pg-info{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--mut);margin:0 6px;}
+
+/* Audit filter bar */
+.filter-bar{display:flex;gap:10px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--bdr);flex-wrap:wrap;}
+.filter-select{
+  background:rgba(255,255,255,.04);border:1px solid var(--bdr);border-radius:8px;
+  padding:7px 12px;color:var(--wht);font-family:'Cairo',sans-serif;font-size:12px;
+  outline:none;cursor:pointer;color-scheme:dark;
+}
+.filter-select option{background:#0f1e35;color:#f0f4ff;}
+
+/* Expanded version row */
+.ver-expand{background:var(--sur2) !important;}
+.ver-expand td{padding:0 !important;}
+.ver-expand-inner{padding:16px 20px;}
+.expand-btn{
+  background:none;border:1px solid var(--bdr);border-radius:5px;
+  padding:4px 8px;font-size:10px;color:var(--mut);cursor:pointer;transition:all .2s;
+}
+.expand-btn:hover{border-color:var(--gbdr);color:var(--gold);}
+.expand-btn.open{border-color:var(--gbdr);color:var(--gold);background:var(--gdim);}
+
+/* Recovery section */
+.recovery-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px;}
+.recovery-card{background:rgba(250,204,21,.04);border:1px solid rgba(250,204,21,.15);border-radius:14px;padding:18px;}
+.recovery-card.failed{background:rgba(248,113,113,.04);border-color:rgba(248,113,113,.15);}
+.recovery-card.stuck{background:rgba(96,165,250,.04);border-color:rgba(96,165,250,.15);}
+
+@media(max-width:1200px){
+  .ops-grid{grid-template-columns:repeat(2,1fr);}
+  .platform-grid{grid-template-columns:repeat(2,1fr);}
+}
+
+/* ══ ADMIN LIGHT THEME ══ */
+html[data-t="dark"]  .admin-t-moon{display:none;}
+html[data-t="light"] .admin-t-sun{display:none;}
+
+html[data-t="light"]{
+  --bg:#F8FAFC; --sur:#FFFFFF; --sur2:#F3F4F6;
+  --gold:#2563EB; --gdim:rgba(37,99,235,.07); --gbdr:rgba(37,99,235,.22);
+  --teal:#0891B2;
+  --wht:#111111; --mut:#6B7280; --mut2:#9CA3AF;
+  --grn:#16a34a; --red:#dc2626; --blu:#2F6BFF;
+  --bdr:#E5E7EB;
+}
+html[data-t="light"] body{background:#F8FAFC;color:#111111;}
+
+/* Login */
+html[data-t="light"] #loginScreen{background:#F8FAFC;}
+html[data-t="light"] .login-box{
+  background:#FFFFFF;
+  border:1px solid #E5E7EB;
+  box-shadow:0 4px 6px rgba(0,0,0,.05),0 24px 60px rgba(0,0,0,.08);
+}
+html[data-t="light"] .login-logo-text{color:#2F6BFF;}
+html[data-t="light"] .login-title{color:#111111;}
+html[data-t="light"] .login-sub{color:#6B7280;}
+html[data-t="light"] .inp{
+  background:#FFFFFF;border-color:#D1D5DB;color:#111111;
+}
+html[data-t="light"] .inp:focus{border-color:rgba(37,99,235,.4);background:#FFFFFF;}
+html[data-t="light"] .inp::placeholder{color:#9CA3AF;}
+html[data-t="light"] .btn-login{
+  background:linear-gradient(135deg,#2F6BFF,#1A54F0);
+  color:#FFFFFF;
+}
+html[data-t="light"] .btn-login:hover{box-shadow:0 12px 32px rgba(47,107,255,.28);}
+
+/* Sidebar */
+html[data-t="light"] .sidebar{
+  background:#FFFFFF;
+  border-left:1px solid #E5E7EB;
+  box-shadow:-4px 0 20px rgba(0,0,0,.06);
+}
+html[data-t="light"] .sidebar-logo{border-bottom-color:#E5E7EB;}
+html[data-t="light"] .et-logo-svg{color:#0A0A0A;}
+html[data-t="light"] .sidebar-brand{color:#111111;}
+html[data-t="light"] .sidebar-badge{color:#6B7280;}
+html[data-t="light"] .nav-section{color:#9CA3AF;}
+html[data-t="light"] .nav-item{color:#6B7280;border-right-color:transparent;}
+html[data-t="light"] .nav-item:hover{color:#111111;background:#F3F4F6;}
+html[data-t="light"] .nav-item.active{
+  color:#2F6BFF;background:rgba(47,107,255,.07);border-right-color:#2F6BFF;
+}
+html[data-t="light"] .sidebar-bottom{border-top-color:#E5E7EB;}
+html[data-t="light"] .admin-info{color:#6B7280;}
+html[data-t="light"] .admin-email{color:#2F6BFF;}
+html[data-t="light"] .btn-logout{
+  background:rgba(220,38,38,.05);border-color:rgba(220,38,38,.2);color:#dc2626;
+}
+html[data-t="light"] .btn-logout:hover{background:rgba(220,38,38,.1);}
+
+/* Main content */
+html[data-t="light"] .main-content{background:#F8FAFC;}
+html[data-t="light"] .page-title{color:#111111;}
+html[data-t="light"] .page-sub{color:#6B7280;}
+
+/* Cards & tables */
+html[data-t="light"] .stat-card{
+  background:#FFFFFF;border-color:#E5E7EB;
+  box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.05);
+}
+html[data-t="light"] .stat-card:hover{border-color:rgba(47,107,255,.3);}
+html[data-t="light"] .stat-label{color:#6B7280;}
+html[data-t="light"] .stat-sub{color:#9CA3AF;}
+html[data-t="light"] .stat-gold{color:#2F6BFF;}
+html[data-t="light"] .stat-grn{color:#16a34a;}
+html[data-t="light"] .stat-red{color:#dc2626;}
+html[data-t="light"] .stat-blu{color:#2563EB;}
+html[data-t="light"] .card{
+  background:#FFFFFF;border-color:#E5E7EB;
+  box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.05);
+}
+html[data-t="light"] .card-header{border-bottom-color:#E5E7EB;}
+html[data-t="light"] .card-title{color:#111111;}
+html[data-t="light"] .table thead tr{background:#F8FAFC;}
+html[data-t="light"] .table th{color:#6B7280;border-bottom-color:#E5E7EB;}
+html[data-t="light"] .table td{color:#374151;border-bottom-color:#F3F4F6;}
+html[data-t="light"] .table tbody tr:hover td{background:rgba(47,107,255,.02);}
+
+/* Splash */
+html[data-t="light"] #splash{background:#F8FAFC;}
+html[data-t="light"] .sp-brand{color:#111111;}
+html[data-t="light"] .sp-sub{color:#6B7280;}
+html[data-t="light"] .sp-restricted{color:#9CA3AF;}
+html[data-t="light"] .sp-bar{background:#E5E7EB;}
+html[data-t="light"] .sp-fill{background:#2F6BFF;}
+
+/* Badges & misc */
+html[data-t="light"] .badge-active{background:rgba(22,163,74,.1);color:#16a34a;border-color:rgba(22,163,74,.2);}
+html[data-t="light"] .badge-pending{background:rgba(47,107,255,.08);color:#2F6BFF;border-color:rgba(47,107,255,.2);}
+html[data-t="light"] .badge-inactive{background:rgba(107,114,128,.08);color:#6B7280;border-color:rgba(107,114,128,.2);}
+
+/* Ops tabs */
+html[data-t="light"] .ops-tabs{background:#F3F4F6;}
+html[data-t="light"] .ops-tab{color:#6B7280;}
+html[data-t="light"] .ops-tab.active{background:#FFFFFF;color:#111111;box-shadow:0 1px 4px rgba(0,0,0,.08);}
+html[data-t="light"] .ops-tab:hover:not(.active){color:#374151;}
+
+/* Filter bar */
+html[data-t="light"] .filter-bar{border-bottom-color:#E5E7EB;}
+html[data-t="light"] .filter-select{background:#FFFFFF;border-color:#D1D5DB;color:#374151;color-scheme:light;}
+html[data-t="light"] .filter-select option{background:#FFFFFF;color:#111111;}
+
+/* Expand buttons */
+html[data-t="light"] .expand-btn{border-color:#D1D5DB;color:#6B7280;}
+html[data-t="light"] .expand-btn:hover{border-color:rgba(47,107,255,.3);color:#2F6BFF;}
+html[data-t="light"] .expand-btn.open{border-color:#2F6BFF;color:#2F6BFF;background:rgba(47,107,255,.06);}
+
+/* Pagination */
+html[data-t="light"] .pg-btn{background:#FFFFFF;border-color:#E5E7EB;color:#6B7280;}
+html[data-t="light"] .pg-btn:hover{border-color:rgba(47,107,255,.3);color:#2F6BFF;}
+html[data-t="light"] .pg-btn.active{background:rgba(47,107,255,.07);border-color:#2F6BFF;color:#2F6BFF;}
+html[data-t="light"] .pg-info{color:#9CA3AF;}
+
+/* Unified EasyTrack premium design system */
+:root{
+  --bg:#09090B;--sur:#18181B;--sur2:#111318;--sur3:#20232B;
+  --gold:#2F6BFF;--gdim:rgba(47,107,255,.10);--gbdr:rgba(47,107,255,.28);
+  --teal:#2F6BFF;--wht:#FFFFFF;--mut:#94A3B8;--mut2:#64748B;
+  --grn:#22C55E;--red:#F87171;--blu:#2F6BFF;--bdr:rgba(255,255,255,.08);
+  --et-shadow-sm:0 1px 0 rgba(255,255,255,.04) inset,0 18px 50px rgba(0,0,0,.24);
+  --et-shadow-light:0 1px 2px rgba(15,23,42,.06),0 12px 34px rgba(15,23,42,.07);
+}
+body{background:var(--bg);color:var(--wht);}
+#loginScreen,#splash{background:var(--bg);}
+#splash::before{background-image:linear-gradient(rgba(47,107,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(47,107,255,.04) 1px,transparent 1px);}
+#splash::after{background:radial-gradient(circle,rgba(47,107,255,.12),transparent 65%);}
+.sp-brand,.login-logo-text,.sidebar-brand{font-family:'Outfit',sans-serif;text-transform:none;letter-spacing:-.35px;color:var(--wht);}
+.sp-brand .sg,.et-brand-track{color:#2F6BFF;}
+.sp-sub,.sp-restricted,.login-logo-text+div,.sidebar-badge{color:var(--mut) !important;}
+.sp-fill{background:#2F6BFF;}
+.login-box,.sidebar,.stat-card,.card,.modal,.ops-bar,.ops-card,.platform-card,.drawer,.diff-pane,.recovery-card,.recovery-card.failed,.recovery-card.stuck{background:var(--sur);border-color:var(--bdr);box-shadow:var(--et-shadow-sm);}
+.sidebar{background:var(--sur2);}
+.main-content{background:var(--bg);}
+.page-title,.card-title,.stat-num,.modal-title,.drawer-title,.ops-card-value,.platform-score{color:var(--wht);}
+.page-sub,.stat-label,.stat-sub,.admin-info,.modal-sub,.ops-card-label,.ops-card-sub,.platform-name,.activity-time,.proj-meta{color:var(--mut);}
+.nav-item{color:var(--mut);border-right-color:transparent;border-radius:10px;margin:2px 12px;padding:11px 12px;}
+.nav-item:hover{color:var(--wht);background:#20232B;}
+.nav-item.active{color:#2F6BFF;background:rgba(47,107,255,.10);border-right-color:#2F6BFF;}
+.nav-section{color:var(--mut2);padding-right:24px;}
+.inp,.field-inp,.search-inp,.plan-select,.filter-select,.ops-bar input{background:var(--sur2);border-color:var(--bdr);color:var(--wht);box-shadow:none;}
+.inp:focus,.field-inp:focus,.search-inp:focus,.plan-select:focus,.filter-select:focus,.ops-bar input:focus{border-color:rgba(47,107,255,.55);box-shadow:0 0 0 3px rgba(47,107,255,.12);}
+.btn-login,.btn-modal-primary,.btn-sm,.pg-btn.active,.ops-tab.active{background:#2F6BFF;border-color:#2F6BFF;color:#FFFFFF;box-shadow:0 10px 26px rgba(47,107,255,.25);}
+.btn-login:hover,.btn-modal-primary:hover,.btn-sm:hover{background:#1A54F0;box-shadow:0 14px 34px rgba(47,107,255,.34);}
+.btn-modal-cancel,.action-btn,.expand-btn,.pg-btn{background:transparent;border-color:var(--bdr);color:var(--mut);}
+.action-btn:hover,.expand-btn:hover,.pg-btn:hover{border-color:rgba(47,107,255,.45);color:#2F6BFF;}
+thead tr{background:var(--sur2);}
+th{color:var(--mut);border-bottom-color:var(--bdr);}
+td{color:#E5E7EB;border-bottom-color:rgba(255,255,255,.06);}
+tr:hover td{background:rgba(47,107,255,.04);}
+.badge-growth,.badge-pending,.badge-admin{background:rgba(47,107,255,.10);color:#2F6BFF;border-color:rgba(47,107,255,.24);}
+.badge-enterprise,.badge-basic{background:rgba(47,107,255,.08);color:#6B8FFF;border-color:rgba(47,107,255,.18);}
+#toast{background:var(--sur);border-color:rgba(47,107,255,.28);box-shadow:var(--et-shadow-sm);}
+html[data-t="light"]{
+  --bg:#F5F7FB;--sur:#FFFFFF;--sur2:#FFFFFF;--sur3:#F1F5F9;
+  --gold:#2F6BFF;--gdim:rgba(47,107,255,.07);--gbdr:rgba(47,107,255,.24);
+  --teal:#2F6BFF;--wht:#111827;--mut:#475569;--mut2:#64748B;
+  --grn:#22C55E;--red:#EF4444;--blu:#2F6BFF;--bdr:#E2E8F0;
+}
+html[data-t="light"] body,html[data-t="light"] #loginScreen,html[data-t="light"] #splash,html[data-t="light"] .main-content{background:#F5F7FB;color:#111827;}
+html[data-t="light"] .login-box,html[data-t="light"] .sidebar,html[data-t="light"] .stat-card,html[data-t="light"] .card,html[data-t="light"] .modal,html[data-t="light"] .ops-bar,html[data-t="light"] .ops-card,html[data-t="light"] .platform-card,html[data-t="light"] .drawer,html[data-t="light"] .diff-pane,html[data-t="light"] .recovery-card{background:#FFFFFF;border-color:#E2E8F0;box-shadow:var(--et-shadow-light);}
+html[data-t="light"] .sp-brand,html[data-t="light"] .login-logo-text,html[data-t="light"] .sidebar-brand,html[data-t="light"] .page-title,html[data-t="light"] .card-title,html[data-t="light"] .stat-num,html[data-t="light"] .modal-title{color:#111827;}
+html[data-t="light"] .inp,html[data-t="light"] .field-inp,html[data-t="light"] .search-inp,html[data-t="light"] .plan-select,html[data-t="light"] .filter-select,html[data-t="light"] .ops-bar input{background:#FFFFFF;border-color:#E2E8F0;color:#111827;color-scheme:light;}
+html[data-t="light"] thead tr{background:#F5F7FB;}
+html[data-t="light"] td{color:#475569;border-bottom-color:#E2E8F0;}
+@media(max-width:760px){
+  .sidebar{position:relative;width:auto;height:auto;bottom:auto;border-left:none;border-bottom:1px solid var(--bdr);padding:16px 0;}
+  .main-content{margin-right:0;padding:18px;}
+  .stats-grid,.ops-grid,.platform-grid,.recovery-grid{grid-template-columns:1fr;}
+  .card-header,.filter-bar,.modal-row{flex-direction:column;align-items:stretch;}
+  .search-inp{width:100%;}
+  table{min-width:680px;}
+  .card{overflow:auto;}
+}
 </style>
+<link rel="stylesheet" href="easytrack-design-system.css"/>
 </head>
 <body>
 
@@ -303,15 +690,15 @@ select.field-inp{cursor:pointer;}
 <div id="splash">
   <div class="sp-scene">
     <div class="sp-logo">
-      <svg viewBox="0 0 130 130" fill="none"><defs><linearGradient id="sg1" x1="0" y1="0" x2="130" y2="130" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#e8b84b" stop-opacity=".35"/><stop offset="100%" stop-color="#0ecfb0" stop-opacity=".35"/></linearGradient></defs><path d="M8 60 C8 30.177 32.177 6 62 6" stroke="url(#sg1)" stroke-width="3" stroke-linecap="round"/><path d="M122 60 C122 30.177 97.823 6 68 6" stroke="url(#sg1)" stroke-width="3" stroke-linecap="round"/></svg>
-      <svg viewBox="0 0 130 130" fill="none"><defs><linearGradient id="sg2" x1="0" y1="0" x2="130" y2="130" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#e8b84b" stop-opacity=".6"/><stop offset="100%" stop-color="#0ecfb0" stop-opacity=".6"/></linearGradient></defs><path d="M22 60 C22 37.909 39.909 20 62 20" stroke="url(#sg2)" stroke-width="2.5" stroke-linecap="round"/><path d="M108 60 C108 37.909 90.091 20 68 20" stroke="url(#sg2)" stroke-width="2.5" stroke-linecap="round"/></svg>
-      <svg viewBox="0 0 130 130" fill="none"><path d="M38 60 C38 47.297 48.297 37 61 37" stroke="#e8b84b" stroke-width="2.2" stroke-linecap="round"/><path d="M92 60 C92 47.297 81.703 37 69 37" stroke="#e8b84b" stroke-width="2.2" stroke-linecap="round"/></svg>
-      <svg viewBox="0 0 130 130" fill="none"><defs><radialGradient id="sdg"><stop offset="0%" stop-color="#f5d27a"/><stop offset="100%" stop-color="#e8b84b"/></radialGradient><filter id="sgf"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><circle cx="65" cy="60" r="16" fill="rgba(232,184,75,.12)" filter="url(#sgf)"/><circle cx="65" cy="60" r="9" fill="url(#sdg)"/></svg>
-      <svg viewBox="0 0 130 130" fill="none"><defs><linearGradient id="sag" x1="65" y1="76" x2="65" y2="108" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#e8b84b"/><stop offset="100%" stop-color="#0ecfb0"/></linearGradient></defs><path d="M54 78 L65 106 L76 78" stroke="url(#sag)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+      <svg viewBox="0 0 120 120" fill="none" class="et-logo-svg">
+        <path d="M72 30 L36 30 L36 90 L72 90" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M36 60 L90 60" stroke="currentColor" stroke-width="12" stroke-linecap="round"/>
+        <circle cx="98" cy="60" r="10" fill="#2F6BFF"/>
+      </svg>
     </div>
   </div>
   <div class="sp-text">
-    <span class="sp-brand">easy<span class="sg">TRACK</span></span>
+    <span class="sp-brand">Easy<span class="sg">Track</span></span>
     <span class="sp-sub">Admin Panel</span>
     <span class="sp-restricted">Restricted Access</span>
   </div>
@@ -322,34 +709,23 @@ select.field-inp{cursor:pointer;}
 <div id="loginScreen">
   <div class="login-box">
     <div class="login-logo">
-      <svg viewBox="0 0 64 64" fill="none">
-        <defs>
-          <linearGradient id="lg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stop-color="#e8b84b"/>
-            <stop offset="100%" stop-color="#0ecfb0"/>
-          </linearGradient>
-        </defs>
-        <path d="M4 30 C4 15.088 16.088 3 31 3" stroke="url(#lg)" stroke-width="2.5" stroke-linecap="round" opacity=".4" fill="none"/>
-        <path d="M60 30 C60 15.088 47.912 3 33 3" stroke="url(#lg)" stroke-width="2.5" stroke-linecap="round" opacity=".4" fill="none"/>
-        <path d="M13 30 C13 20.611 20.611 13 30 13" stroke="url(#lg)" stroke-width="2.2" stroke-linecap="round" opacity=".7" fill="none"/>
-        <path d="M51 30 C51 20.611 43.389 13 34 13" stroke="url(#lg)" stroke-width="2.2" stroke-linecap="round" opacity=".7" fill="none"/>
-        <path d="M22 30 C22 25.029 26.029 21 31 21" stroke="#e8b84b" stroke-width="2" stroke-linecap="round" fill="none"/>
-        <path d="M42 30 C42 25.029 37.971 21 33 21" stroke="#e8b84b" stroke-width="2" stroke-linecap="round" fill="none"/>
-        <circle cx="32" cy="30" r="6" fill="url(#lg)"/>
-        <path d="M27 40 L32 52 L37 40" stroke="url(#lg)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      <svg viewBox="0 0 120 120" fill="none" class="et-logo-svg" style="width:36px;height:36px;">
+        <path d="M72 30 L36 30 L36 90 L72 90" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M36 60 L90 60" stroke="currentColor" stroke-width="12" stroke-linecap="round"/>
+        <circle cx="98" cy="60" r="10" fill="#2F6BFF"/>
       </svg>
       <div>
-        <div class="login-logo-text">EASY TRACK</div>
+        <div class="login-logo-text">Easy<span class="et-brand-track">Track</span></div>
         <div style="font-size:9px;color:var(--teal);letter-spacing:2px;font-family:'JetBrains Mono',monospace;">ADMIN PANEL</div>
       </div>
     </div>
-    <div class="login-title">مرحباً يوسف 👋</div>
-    <div class="login-sub">ادخل الـ Admin Token للوحة التحكم</div>
-    <input class="inp" type="password" id="adminPass" placeholder="ADMIN_TOKEN" dir="ltr" autocomplete="off">
+    <div class="login-title">لوحة التحكم 👋</div>
+    <div class="login-sub">ادخل مفتاح الأدمن السري للوحة التحكم</div>
+    <input class="inp" type="password" id="adminPass" placeholder="ADMIN_SECRET_KEY" dir="ltr" autocomplete="off">
     <button class="btn-login" id="loginBtn" onclick="adminLogin()">دخول ←</button>
     <div class="login-err" id="loginErr"></div>
     <div style="text-align:center;margin-top:16px;font-size:10px;color:var(--mut);line-height:1.6;">
-      التوكن محفوظ في <code style="color:var(--gold);">ADMIN_TOKEN</code> env var على Railway
+      المفتاح محفوظ في <code style="color:var(--gold);">ADMIN_SECRET_KEY</code> env var على السيرفر — الجلسة في كوكي آمن
     </div>
   </div>
 </div>
@@ -361,22 +737,19 @@ select.field-inp{cursor:pointer;}
   <div class="sidebar">
     <div class="sidebar-logo">
       <div class="sidebar-logo-inner">
-        <svg viewBox="0 0 64 64" fill="none" width="32" height="32">
-          <defs><linearGradient id="lg2" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#e8b84b"/><stop offset="100%" stop-color="#0ecfb0"/></linearGradient></defs>
-          <path d="M4 30 C4 15.088 16.088 3 31 3" stroke="url(#lg2)" stroke-width="2.5" stroke-linecap="round" opacity=".4" fill="none"/>
-          <path d="M60 30 C60 15.088 47.912 3 33 3" stroke="url(#lg2)" stroke-width="2.5" stroke-linecap="round" opacity=".4" fill="none"/>
-          <path d="M13 30 C13 20.611 20.611 13 30 13" stroke="url(#lg2)" stroke-width="2.2" stroke-linecap="round" opacity=".7" fill="none"/>
-          <path d="M51 30 C51 20.611 43.389 13 34 13" stroke="url(#lg2)" stroke-width="2.2" stroke-linecap="round" opacity=".7" fill="none"/>
-          <circle cx="32" cy="30" r="6" fill="url(#lg2)"/>
-          <path d="M27 40 L32 52 L37 40" stroke="url(#lg2)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <svg viewBox="0 0 120 120" fill="none" width="28" height="28" class="et-logo-svg">
+          <path d="M72 30 L36 30 L36 90 L72 90" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M36 60 L90 60" stroke="currentColor" stroke-width="12" stroke-linecap="round"/>
+          <circle cx="98" cy="60" r="10" fill="#2F6BFF"/>
         </svg>
         <div>
-          <div class="sidebar-brand">EASY TRACK</div>
+          <div class="sidebar-brand">Easy<span class="et-brand-track">Track</span></div>
           <div class="sidebar-badge">ADMIN PANEL</div>
         </div>
       </div>
     </div>
 
+    <div class="nav-section">ADMIN</div>
     <div class="nav-item active" onclick="showPage('dashboard', this)">
       <span class="nav-icon">📊</span> Dashboard
     </div>
@@ -390,8 +763,8 @@ select.field-inp{cursor:pointer;}
       <span class="nav-icon">📁</span> المشاريع
     </div>
     <div class="nav-item" onclick="showPage('pending', this)">
-      <span class="nav-icon">⏳</span> في انتظار التفعيل
-      <span id="pendingCount" style="margin-right:auto;background:rgba(232,184,75,.2);color:var(--gold);border-radius:100px;padding:1px 8px;font-size:10px;font-family:'JetBrains Mono',monospace;display:none;">0</span>
+      <span class="nav-icon">⏳</span> انتظار التفعيل
+      <span id="pendingCount" style="margin-right:auto;background:rgba(47,107,255,.12);color:#2F6BFF;border-radius:100px;padding:1px 8px;font-size:10px;font-family:'JetBrains Mono',monospace;display:none;">0</span>
     </div>
     <div class="nav-item" onclick="showPage('activity', this)">
       <span class="nav-icon">🔔</span> النشاط الأخير
@@ -400,12 +773,33 @@ select.field-inp{cursor:pointer;}
       <span class="nav-icon">🛡️</span> المسؤولون
     </div>
 
+    <div class="nav-section">OPERATIONS</div>
+    <div class="nav-item" onclick="showOpsPage('overview', this)">
+      <span class="nav-icon">🖥</span> Overview
+    </div>
+    <div class="nav-item" onclick="showOpsPage('versions', this)">
+      <span class="nav-icon">📦</span> Versions
+    </div>
+    <div class="nav-item" onclick="showOpsPage('deployments', this)">
+      <span class="nav-icon">🚀</span> Deployments
+    </div>
+    <div class="nav-item" onclick="showOpsPage('health', this)">
+      <span class="nav-icon">❤️</span> Health
+    </div>
+    <div class="nav-item" onclick="showOpsPage('audit', this)">
+      <span class="nav-icon">📋</span> Audit Log
+    </div>
+
     <div class="sidebar-bottom">
       <div class="admin-info">
         مسجّل كـ Admin
         <span class="admin-email" id="adminEmailDisplay">Super Admin</span>
       </div>
       <button class="btn-logout" onclick="adminLogout()">خروج</button>
+      <button class="admin-theme-btn" onclick="toggleAdminTheme()" title="تبديل المظهر" style="margin-top:10px;width:100%;background:transparent;border:1px solid var(--bdr);border-radius:8px;padding:8px;color:var(--mut);cursor:pointer;font-size:12px;font-family:'Cairo',sans-serif;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;">
+        <span class="admin-t-sun">☀️</span><span class="admin-t-moon">🌙</span>
+        <span>تبديل المظهر</span>
+      </button>
     </div>
   </div>
 
@@ -446,7 +840,6 @@ select.field-inp{cursor:pointer;}
         <div class="card-header">
           <div class="card-title">آخر العملاء المسجّلين</div>
           <div class="card-actions">
-            <button class="btn-sm" onclick="downloadExport()" style="background:linear-gradient(135deg,var(--gold),#c8922a);color:#060d18;border:none;">⬇ تحميل الداتا (JSON)</button>
             <button class="btn-sm" onclick="loadAll()">↻ تحديث</button>
           </div>
         </div>
@@ -592,6 +985,115 @@ select.field-inp{cursor:pointer;}
       </div>
     </div>
 
+    <!-- ══════════════════════════════════════════
+         OPERATIONS CONSOLE PAGES
+    ══════════════════════════════════════════ -->
+
+    <!-- Shared client bar (hidden input, synced across ops pages) -->
+
+    <!-- ── OPS: OVERVIEW ── -->
+    <div class="page" id="page-ops-overview">
+      <div class="page-header">
+        <div class="page-title">Operations Overview</div>
+        <div class="page-sub">لوحة تشغيل كاملة لأي عميل</div>
+      </div>
+      <div class="ops-bar">
+        <span class="ops-bar-label">CLIENT ID</span>
+        <input id="opsClientId" type="text" placeholder="أدخل clientId لعرض كل البيانات..." oninput="syncOpsClient(this.value)">
+        <button class="btn-sm" onclick="loadOpsOverview()">↻ تحديث</button>
+        <span id="opsClientBadge" style="display:none;" class="ops-bar-active"></span>
+      </div>
+      <div id="overviewBody">
+        <div class="empty"><div class="empty-icon">🖥</div>أدخل clientId لعرض لوحة التشغيل</div>
+      </div>
+    </div>
+
+    <!-- ── OPS: VERSIONS ── -->
+    <div class="page" id="page-ops-versions">
+      <div class="page-header">
+        <div class="page-title">Version History</div>
+        <div class="page-sub">كل إصدارات النشر — rollback — diff viewer</div>
+      </div>
+      <div class="ops-bar">
+        <span class="ops-bar-label">CLIENT ID</span>
+        <input id="opsClientId2" type="text" placeholder="أدخل clientId..." oninput="syncOpsClient(this.value)">
+        <button class="btn-sm" onclick="loadOpsVersions()">↻ تحديث</button>
+        <span id="opsClientBadge2" style="display:none;" class="ops-bar-active"></span>
+      </div>
+      <div id="opsVersionsBody">
+        <div class="empty"><div class="empty-icon">📦</div>أدخل clientId لعرض Versions</div>
+      </div>
+    </div>
+
+    <!-- ── OPS: DEPLOYMENTS ── -->
+    <div class="page" id="page-ops-deployments">
+      <div class="page-header">
+        <div class="page-title">Deployments</div>
+        <div class="page-sub">Active · Failed · Recovered — مع timeline لكل deployment</div>
+      </div>
+      <div class="ops-bar">
+        <span class="ops-bar-label">CLIENT ID</span>
+        <input id="opsClientId3" type="text" placeholder="أدخل clientId..." oninput="syncOpsClient(this.value)">
+        <button class="btn-sm" onclick="loadOpsDeployments()">↻ تحديث</button>
+        <span id="opsClientBadge3" style="display:none;" class="ops-bar-active"></span>
+      </div>
+      <div id="opsDeploymentsBody">
+        <div class="empty"><div class="empty-icon">🚀</div>أدخل clientId لعرض Deployments</div>
+      </div>
+    </div>
+
+    <!-- ── OPS: HEALTH ── -->
+    <div class="page" id="page-ops-health">
+      <div class="page-header">
+        <div class="page-title">Tracking Health</div>
+        <div class="page-sub">صحة كل منصة تتبع — drift — freshness</div>
+      </div>
+      <div class="ops-bar">
+        <span class="ops-bar-label">CLIENT ID</span>
+        <input id="opsClientId4" type="text" placeholder="أدخل clientId..." oninput="syncOpsClient(this.value)">
+        <button class="btn-sm" onclick="loadOpsHealth()">↻ تحديث</button>
+        <span id="opsClientBadge4" style="display:none;" class="ops-bar-active"></span>
+      </div>
+      <div id="opsHealthBody">
+        <div class="empty"><div class="empty-icon">❤️</div>أدخل clientId لعرض Health</div>
+      </div>
+    </div>
+
+    <!-- ── OPS: AUDIT ── -->
+    <div class="page" id="page-ops-audit">
+      <div class="page-header">
+        <div class="page-title">Audit Log</div>
+        <div class="page-sub">كل العمليات — filter — search — pagination</div>
+      </div>
+      <div class="ops-bar">
+        <span class="ops-bar-label">CLIENT ID</span>
+        <input id="opsClientId5" type="text" placeholder="أدخل clientId..." oninput="syncOpsClient(this.value)">
+        <button class="btn-sm" onclick="loadOpsAudit()">↻ تحديث</button>
+        <span id="opsClientBadge5" style="display:none;" class="ops-bar-active"></span>
+      </div>
+      <div class="card">
+        <div class="filter-bar">
+          <input class="search-inp" id="auditSearch" type="text" placeholder="ابحث في Action / Actor / Deployment..." style="flex:1;min-width:200px;" oninput="filterAudit()">
+          <select class="filter-select" id="auditActionFilter" onchange="filterAudit()">
+            <option value="">كل الـ Actions</option>
+            <option value="rollback_start">rollback_start</option>
+            <option value="rollback_success">rollback_success</option>
+            <option value="rollback_failed">rollback_failed</option>
+            <option value="deployment_recovered">deployment_recovered</option>
+          </select>
+          <select class="filter-select" id="auditResultFilter" onchange="filterAudit()">
+            <option value="">كل النتائج</option>
+            <option value="success">✓ Success</option>
+            <option value="failed">✗ Failed</option>
+          </select>
+        </div>
+        <div id="opsAuditBody">
+          <div class="empty"><div class="empty-icon">📋</div>أدخل clientId لعرض Audit Log</div>
+        </div>
+        <div id="auditPagination" class="pagination" style="display:none;"></div>
+      </div>
+    </div>
+
     <!-- ── ADMINS ── -->
     <div class="page" id="page-admins">
       <div class="page-header">
@@ -601,7 +1103,7 @@ select.field-inp{cursor:pointer;}
       <div class="card">
         <div class="card-header">
           <div class="card-title">كل المسؤولين</div>
-          <button class="btn-sm" onclick="openAddAdmin()" style="background:linear-gradient(135deg,var(--gold),#c8922a);color:#060d18;border:none;">+ إضافة مسؤول</button>
+          <button class="btn-sm" onclick="openAddAdmin()" style="background:#2F6BFF;color:#FFFFFF;border:none;">+ إضافة مسؤول</button>
         </div>
         <div id="adminsBody"><div class="loading"><div class="spinner"></div><br>جاري التحميل...</div></div>
       </div>
@@ -615,7 +1117,7 @@ select.field-inp{cursor:pointer;}
   <div class="modal" style="max-width:700px;padding:0;overflow:hidden;">
 
     <!-- Header -->
-    <div style="background:linear-gradient(135deg,rgba(232,184,75,.1),rgba(14,207,176,.06));border-bottom:1px solid var(--bdr);padding:24px 28px;display:flex;align-items:flex-start;justify-content:space-between;">
+    <div style="background:linear-gradient(135deg,rgba(47,107,255,.10),rgba(47,107,255,.04));border-bottom:1px solid var(--bdr);padding:24px 28px;display:flex;align-items:flex-start;justify-content:space-between;">
       <div>
         <div style="font-size:20px;font-weight:900;color:var(--wht);" id="modalClientName">—</div>
         <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--teal);margin-top:4px;" id="modalClientEmail">—</div>
@@ -671,7 +1173,24 @@ select.field-inp{cursor:pointer;}
               <option value="suspended">Suspended ⏸</option>
             </select>
           </div>
-          <button onclick="saveClientChanges()" style="background:linear-gradient(135deg,var(--gold),#c8922a);color:#060d18;border:none;border-radius:8px;padding:9px 18px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:900;cursor:pointer;white-space:nowrap;">💾 حفظ</button>
+          <button onclick="saveClientChanges()" style="background:#2F6BFF;color:#FFFFFF;border:none;border-radius:8px;padding:9px 18px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:900;cursor:pointer;white-space:nowrap;">💾 حفظ</button>
+        </div>
+        <!-- Manual paid marker (paidAt owned by the server) — display + billing source of truth -->
+        <div style="margin-top:12px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--wht);">
+            <input type="checkbox" id="modalPaid" style="width:16px;height:16px;cursor:pointer;accent-color:#2F6BFF;" />
+            <span>💳 معلَّم كمدفوع — Mark as paid</span>
+          </label>
+          <span id="modalTrialState" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mut);"></span>
+        </div>
+        <!-- Trial detail + container teardown (server-computed) -->
+        <div id="modalTrialDetail" style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;"></div>
+        <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <button id="btnDeleteContainer" onclick="deleteContainer()" disabled
+            style="background:rgba(248,113,113,.10);color:var(--red);border:1px solid var(--red);border-radius:8px;padding:8px 16px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:900;cursor:pointer;opacity:.5;">
+            🗑️ حذف الكونتينر — Delete Container
+          </button>
+          <span id="containerActionHint" style="font-size:11px;color:var(--mut);"></span>
         </div>
       </div>
 
@@ -806,7 +1325,19 @@ select.field-inp{cursor:pointer;}
 ════════════════════════════════════════ */
 var API_BASE = '';  // same origin
 
-var _adminToken = null;
+// Double-submit CSRF token for the current admin session (echoed from the
+// server-issued et_admin_csrf cookie / login response). The session itself lives
+// in an HttpOnly cookie the browser sends automatically — never stored in JS.
+var _csrfToken = null;
+function escapeHtml(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 var _allClients = [];
 var _allProjects = [];   // normalized managed_containers
 var _modalUid = null;
@@ -828,20 +1359,25 @@ setTimeout(function() {
    SESSION
 ════════════════════════════════════════ */
 function restoreSession() {
-  var t = sessionStorage.getItem('et_admin_token');
-  if (t) {
-    _adminToken = t;
-    // Validate token against server
-    adminPing(t).then(function(ok) {
-      if (ok) showApp();
-      else {
-        _adminToken = null;
-        sessionStorage.removeItem('et_admin_token');
+  // The browser holds the HttpOnly session cookie; ask the server if it's valid.
+  fetch('/api/admin/session', { credentials: 'same-origin' })
+    .then(function(res){ return res.ok ? res.json() : null; })
+    .then(function(data){
+      if (data && data.authenticated) {
+        _csrfToken = data.csrfToken || null;
+        showApp();
+      } else {
         document.getElementById('loginScreen').style.display = 'flex';
       }
-    });
-    return;
-  }
+    })
+    .catch(function(){ document.getElementById('loginScreen').style.display = 'flex'; });
+}
+
+// Called when any admin API returns 401 mid-session (cookie expired/cleared).
+function handleSessionExpired() {
+  _csrfToken = null;
+  var app = document.getElementById('adminApp');
+  if (app) app.style.display = 'none';
   document.getElementById('loginScreen').style.display = 'flex';
 }
 
@@ -857,55 +1393,80 @@ function showApp() {
 }
 
 /* ════════════════════════════════════════
-   AUTH — ADMIN_TOKEN
+   AUTH — ADMIN_SECRET_KEY → HttpOnly session
 ════════════════════════════════════════ */
-async function adminPing(token) {
-  try {
-    var res = await fetch('/api/admin/ping', {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
-    return res.ok;
-  } catch (e) { return false; }
-}
-
 async function adminLogin() {
-  var pass = document.getElementById('adminPass').value.trim();
+  var pass = document.getElementById('adminPass').value;
   var btn  = document.getElementById('loginBtn');
   var err  = document.getElementById('loginErr');
   err.style.display = 'none';
-  if (!pass) { err.textContent = 'ادخل الـ Admin Token'; err.style.display = 'block'; return; }
+  if (!pass || !pass.trim()) { err.textContent = 'ادخل مفتاح الأدمن السري'; err.style.display = 'block'; return; }
   btn.textContent = '⏳ جاري الدخول...'; btn.disabled = true;
-  var ok = await adminPing(pass);
-  if (!ok) {
-    err.textContent = 'التوكن غلط أو منتهي الصلاحية';
+  try {
+    var res = await fetch('/api/admin/login', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secretKey: pass })
+    });
+    if (res.ok) {
+      var data = await res.json();
+      _csrfToken = data.csrfToken || null;
+      document.getElementById('adminPass').value = '';
+      btn.textContent = 'دخول ←'; btn.disabled = false;
+      showApp();
+      return;
+    }
+    if (res.status === 429) err.textContent = 'محاولات كتير — استنى شوية وجرّب تاني';
+    else if (res.status === 503) err.textContent = 'دخول الأدمن مش مضبوط على السيرفر';
+    else err.textContent = 'المفتاح غلط';
     err.style.display = 'block';
-    btn.textContent = 'دخول ←'; btn.disabled = false;
-    return;
+  } catch (e) {
+    err.textContent = 'خطأ في الاتصال';
+    err.style.display = 'block';
   }
-  _adminToken = pass;
-  sessionStorage.setItem('et_admin_token', pass);
   btn.textContent = 'دخول ←'; btn.disabled = false;
-  showApp();
 }
 
-function adminLogout() {
-  sessionStorage.clear();
-  _adminToken = null;
+async function adminLogout() {
+  try {
+    await fetch('/api/admin/logout', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: _authHeaders()
+    });
+  } catch (e) {}
+  _csrfToken = null;
   document.getElementById('loginScreen').style.display = 'flex';
   document.getElementById('adminApp').style.display = 'none';
 }
 
+function toggleAdminTheme() {
+  var h = document.documentElement;
+  var next = h.getAttribute('data-t') === 'dark' ? 'light' : 'dark';
+  h.setAttribute('data-t', next);
+  localStorage.setItem('et-admin-theme', next);
+}
+(function(){
+  var saved = localStorage.getItem('et-admin-theme');
+  if (saved) document.documentElement.setAttribute('data-t', saved);
+})();
+
 /* ════════════════════════════════════════
    ADMIN API HELPERS
 ════════════════════════════════════════ */
+// Auth is now a same-origin HttpOnly-cookie session — no bearer token in JS.
+// State-changing requests carry the CSRF token (double-submit) as a header.
 function _authHeaders(extra) {
-  var h = { 'Authorization': 'Bearer ' + _adminToken };
+  var h = {};
+  if (_csrfToken) h['X-CSRF-Token'] = _csrfToken;
   if (extra) Object.keys(extra).forEach(function(k){ h[k] = extra[k]; });
   return h;
 }
 
 async function apiFetchAll() {
-  var res = await fetch('/api/admin/export', { headers: _authHeaders() });
+  var res = await fetch('/api/admin/export', { credentials: 'same-origin', headers: _authHeaders() });
+  if (res.status === 401) { handleSessionExpired(); throw new Error('unauthenticated'); }
   if (!res.ok) throw new Error('HTTP ' + res.status);
   return res.json();
 }
@@ -913,6 +1474,7 @@ async function apiFetchAll() {
 async function apiUpdateClient(uid, fields) {
   var res = await fetch('/api/admin/client/' + encodeURIComponent(uid), {
     method: 'POST',
+    credentials: 'same-origin',
     headers: _authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(fields)
   });
@@ -922,28 +1484,36 @@ async function apiUpdateClient(uid, fields) {
 async function apiDeleteClient(uid) {
   var res = await fetch('/api/admin/client/' + encodeURIComponent(uid), {
     method: 'DELETE',
+    credentials: 'same-origin',
     headers: _authHeaders()
   });
   return res.ok;
 }
 
-async function downloadExport() {
-  try {
-    var res = await fetch('/api/admin/export?download=1', { headers: _authHeaders() });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    var blob = await res.blob();
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    var stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    a.download = 'easytrack-export-' + stamp + '.json';
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
-    toast('تم تحميل الملف ✅');
-  } catch (e) {
-    toast('خطأ في التحميل: ' + e.message + ' ❌');
-  }
+// GET the read-only cleanup preview (dry run — never modifies anything).
+async function apiCheckCleanup(uid) {
+  var res = await fetch('/api/admin/client/' + encodeURIComponent(uid) + '/check-cleanup', {
+    credentials: 'same-origin',
+    headers: _authHeaders()
+  });
+  var body = null;
+  try { body = await res.json(); } catch (e) {}
+  return { ok: res.ok, status: res.status, body: body };
 }
+
+// POST an admin container action (delete-container | retry-cleanup). Returns
+// { ok, status, body } so the caller can surface partial-failure detail.
+async function apiContainerAction(uid, action) {
+  var res = await fetch('/api/admin/client/' + encodeURIComponent(uid) + '/' + action, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: _authHeaders({ 'Content-Type': 'application/json' })
+  });
+  var body = null;
+  try { body = await res.json(); } catch (e) {}
+  return { ok: res.ok, status: res.status, body: body };
+}
+
 
 /* ════════════════════════════════════════
    NORMALIZERS — unify old and new schemas
@@ -971,7 +1541,9 @@ function normalizeClient(c) {
     plan:          c.plan || 'Basic',
     status:        c.status || 'pending',
     projects_used: c.projects_used || 0,
-    created_at:    _tsToISO(created)
+    created_at:    _tsToISO(created),
+    paidAt:        c.paidAt ? _tsToISO(c.paidAt) : null,
+    paymentStatus: c.paymentStatus || 'unpaid'
   };
 }
 
@@ -1008,6 +1580,7 @@ function normalizeContainer(p) {
 async function loadAll() {
   try {
     var dump = await apiFetchAll();
+    _trialLaunchAt = dump.trialLaunchAt || null;
     var clients    = (dump.clients    || []).map(normalizeClient);
     var containers = (dump.containers || []).map(normalizeContainer);
     _allClients  = clients;
@@ -1048,6 +1621,39 @@ async function loadProjects() {
 }
 
 /* ════════════════════════════════════════
+   TRIAL (display-only, derived) — single source: TRIAL_LAUNCH_AT from
+   /api/admin/export. paidAt is the payment source of truth; trial is derived
+   ONLY when paidAt is null. Fail-open: missing/invalid launch date → neutral.
+════════════════════════════════════════ */
+var _trialLaunchAt = null; // set in loadAll() from dump.trialLaunchAt
+function _trialMs(v) {
+  if (v == null) return null;
+  if (typeof v === 'number') return isFinite(v) ? v : null;
+  if (typeof v === 'string') { var t = Date.parse(v); return isNaN(t) ? null : t; }
+  if (typeof v === 'object') {
+    if (v._seconds !== undefined) return v._seconds * 1000;
+    if (v.seconds  !== undefined) return v.seconds * 1000;
+    if (v.toDate) { try { return v.toDate().getTime(); } catch (e) {} }
+  }
+  return null;
+}
+function computeTrialLabel(createdAt, paidAt) {
+  if (_trialMs(paidAt) != null) return { state: 'paid', label: 'Paid', days: null };
+  var created = _trialMs(createdAt), launch = _trialMs(_trialLaunchAt);
+  if (launch == null || created == null) return { state: 'unavailable', label: '—', days: null };
+  var start = Math.max(created, launch), end = start + 7 * 86400000, now = Date.now();
+  if (now < end) { var days = Math.ceil((end - now) / 86400000); return { state: 'trial', label: days + 'd trial', days: days }; }
+  return { state: 'expired', label: 'Trial Expired · Not Paid', days: 0 };
+}
+function _trialChip(c) {
+  var t = computeTrialLabel(c.created_at, c.paidAt);
+  if (t.state === 'paid')     return ' <span class="badge badge-active" title="مدفوع">💳 Paid</span>';
+  if (t.state === 'expired')  return ' <span class="badge badge-pending" style="color:var(--red);" title="انتهت التجربة ولم يدفع">⛔ ' + t.label + '</span>';
+  if (t.state === 'trial')    return ' <span class="badge badge-pending" title="تجربة مجانية">⏳ ' + t.label + '</span>';
+  return ''; // unavailable → neutral (nothing)
+}
+
+/* ════════════════════════════════════════
    RENDER — CLIENTS
 ════════════════════════════════════════ */
 function clientRow(c) {
@@ -1062,15 +1668,15 @@ function clientRow(c) {
   if (c.status !== 'active') actions += '<button class="action-btn activate" onclick="quickActivate(\'' + c._id + '\',this)">✅ تفعيل</button>';
   else actions += '<button class="action-btn suspend" onclick="quickSuspend(\'' + c._id + '\',this)">⏸ إيقاف</button>';
   var waHtml = c.whatsapp
-    ? '<a href="https://wa.me/' + String(c.whatsapp).replace(/\D/g,'') + '" target="_blank" style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--teal);text-decoration:none;direction:ltr;">' + c.whatsapp + '</a>'
+    ? '<a href="https://wa.me/' + String(c.whatsapp).replace(/\D/g,'') + '" target="_blank" style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--teal);text-decoration:none;direction:ltr;">' + escapeHtml(c.whatsapp) + '</a>'
     : '<span style="color:var(--mut);">—</span>';
   return '<tr>' +
-    '<td><div style="font-weight:700;">' + (c.name||'—') + '</div><div style="font-size:11px;color:var(--mut);font-family:\'JetBrains Mono\',monospace;margin-top:2px;">' + (c.email||'') + '</div></td>' +
-    '<td>' + statusBadge + '</td>' +
+    '<td><div style="font-weight:700;">' + escapeHtml(c.name||'—') + '</div><div style="font-size:11px;color:var(--mut);font-family:\'JetBrains Mono\',monospace;margin-top:2px;">' + escapeHtml(c.email||'') + '</div></td>' +
+    '<td>' + statusBadge + _trialChip(c) + '</td>' +
     '<td>' + planBadge + '</td>' +
-    '<td style="font-size:12px;">' + (c.country || '<span style="color:var(--mut);">—</span>') + '</td>' +
+    '<td style="font-size:12px;">' + (c.country ? escapeHtml(c.country) : '<span style="color:var(--mut);">—</span>') + '</td>' +
     '<td>' + waHtml + '</td>' +
-    '<td style="font-size:12px;color:var(--mut);">' + (c.job || '—') + '</td>' +
+    '<td style="font-size:12px;color:var(--mut);">' + escapeHtml(c.job || '—') + '</td>' +
     '<td style="font-family:\'JetBrains Mono\',monospace;font-size:12px;">' + (c.projects_used||0) + '</td>' +
     '<td style="font-size:12px;color:var(--mut);">' + created + '</td>' +
     '<td>' + actions + '</td></tr>';
@@ -1086,7 +1692,11 @@ function renderClients(clients) {
   var body = document.getElementById('clientsBody');
   if (!body) return;
   if (!clients.length) { body.innerHTML = '<div class="empty"><div class="empty-icon">👥</div>مفيش عملاء لسه</div>'; return; }
-  body.innerHTML = clientsTableHeader() + clients.map(clientRow).join('') + '</tbody></table>';
+  var expiredUnpaid = clients.filter(function(c){ return computeTrialLabel(c.created_at, c.paidAt).state === 'expired'; });
+  var notice = expiredUnpaid.length
+    ? '<div style="margin-bottom:12px;padding:10px 14px;border:1px solid var(--red);border-radius:10px;background:rgba(248,113,113,.08);color:var(--red);font-size:13px;font-weight:700;">⛔ ' + expiredUnpaid.length + ' عميل انتهت تجربته ولم يدفع — Trial Expired · Not Paid</div>'
+    : '';
+  body.innerHTML = notice + clientsTableHeader() + clients.map(clientRow).join('') + '</tbody></table>';
 }
 
 function renderRecent(clients) {
@@ -1217,6 +1827,16 @@ function openClientModal(uid) {
   document.getElementById('modalPlan').value         = c.plan || 'Basic';
   document.getElementById('modalStatusSelect').value = c.status || 'pending';
 
+  // Manual paid marker + derived trial state (display-only)
+  document.getElementById('modalPaid').checked       = !!c.paidAt;
+  (function(){ var _t = computeTrialLabel(c.created_at, c.paidAt);
+    document.getElementById('modalTrialState').textContent =
+      _t.state === 'paid'     ? '💳 Paid'
+      : _t.state === 'expired' ? '⛔ ' + _t.label
+      : _t.state === 'trial'   ? '⏳ ' + _t.label
+      : 'Trial: n/a'; })();
+  renderTrialDetail(c);
+
   // Load client's projects
   var clientProjects = _allProjects.filter(function(p){ return p.client_id === uid || p.email === c.email; });
   renderClientProjects(clientProjects, c);
@@ -1303,12 +1923,19 @@ async function saveClientChanges() {
   if (!_modalUid) return;
   var plan   = document.getElementById('modalPlan').value;
   var status = document.getElementById('modalStatusSelect').value;
-  var ok = await apiUpdateClient(_modalUid, { plan: plan, status: status });
+  var paymentStatus = document.getElementById('modalPaid').checked ? 'paid' : 'unpaid';
+  var ok = await apiUpdateClient(_modalUid, { plan: plan, status: status, paymentStatus: paymentStatus });
   if (ok) {
     toast('تم الحفظ ✅');
     // Update badge live
     var c = _allClients.find(function(x){ return x._id === _modalUid; });
-    if (c) { c.plan = plan; c.status = status; }
+    if (c) {
+      c.plan = plan; c.status = status; c.paymentStatus = paymentStatus;
+      // paidAt is server-owned; reflect optimistically for the live badge only.
+      c.paidAt = paymentStatus === 'paid' ? (c.paidAt || new Date().toISOString()) : null;
+    }
+    document.getElementById('modalTrialState').textContent =
+      paymentStatus === 'paid' ? '💳 Paid' : (c ? (function(){ var _t = computeTrialLabel(c.created_at, c.paidAt); return _t.state === 'expired' ? '⛔ ' + _t.label : _t.state === 'trial' ? '⏳ ' + _t.label : 'Trial: n/a'; })() : '');
     var sb = document.getElementById('modalStatusBadge');
     sb.textContent = status === 'active' ? '● Active' : status === 'suspended' ? '● Suspended' : '● Pending';
     sb.className = 'badge ' + (status === 'active' ? 'badge-active' : 'badge-pending');
@@ -1337,6 +1964,118 @@ async function deleteClient() {
   var ok = await apiDeleteClient(_modalUid);
   if (ok) { toast('تم الحذف'); closeModal(); loadAll(); }
   else toast('خطأ في الحذف ❌');
+}
+
+// Server-computed trial view (from /api/admin/export → client.trial). Falls back
+// to the client-side derivation for any record the server didn't enrich.
+function _clientTrial(c) {
+  if (c && c.trial) return c.trial;
+  var t = computeTrialLabel(c.created_at, c.paidAt);
+  return {
+    paymentStatus:      c && c.paidAt ? 'paid' : 'unpaid',
+    trialStatus:        t.state === 'paid' ? 'converted' : (t.state === 'expired' ? 'expired' : 'active'),
+    trialStartedAt:     c ? _tsToISO(c.created_at) : null,
+    trialEndsAt:        null,
+    trialDaysRemaining: t.days || 0,
+    containerStatus:    (c && c.containerStatus) || 'active'
+  };
+}
+
+function renderTrialDetail(c) {
+  var host = document.getElementById('modalTrialDetail');
+  if (!host) return;
+  var t = _clientTrial(c);
+  function fmt(v) { return v ? new Date(v).toLocaleDateString('ar-EG') : '—'; }
+  function cell(label, val, color) {
+    return '<div style="background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:8px 10px;">' +
+      '<div style="font-size:10px;color:var(--mut);margin-bottom:3px;">' + label + '</div>' +
+      '<div style="font-size:12px;font-weight:700;color:' + (color || 'var(--wht)') + ';">' + val + '</div></div>';
+  }
+  var payColor = t.paymentStatus === 'paid' ? 'var(--grn,#22C55E)' : 'var(--mut)';
+  var statusColor = t.trialStatus === 'expired' ? 'var(--red)' : (t.trialStatus === 'converted' ? 'var(--grn,#22C55E)' : 'var(--wht)');
+  var contColor = t.containerStatus === 'deleted' ? 'var(--red)' : 'var(--wht)';
+  host.innerHTML =
+    cell('الدفع — Payment', escapeHtml(t.paymentStatus), payColor) +
+    cell('حالة التجربة — Trial', escapeHtml(t.trialStatus), statusColor) +
+    cell('أيام متبقية — Days left', String(t.trialDaysRemaining != null ? t.trialDaysRemaining : '—')) +
+    cell('بداية — Start', fmt(t.trialStartedAt)) +
+    cell('نهاية — End', fmt(t.trialEndsAt)) +
+    cell('الكونتينر — Container', escapeHtml(t.containerStatus), contColor);
+
+  // Delete is only offered for an EXPIRED + UNPAID client whose container is live.
+  var btn = document.getElementById('btnDeleteContainer');
+  var hint = document.getElementById('containerActionHint');
+  var eligible = t.trialStatus === 'expired' && t.paymentStatus === 'unpaid' && t.containerStatus !== 'deleted';
+  btn.disabled = !eligible;
+  btn.style.opacity = eligible ? '1' : '.5';
+  btn.style.cursor  = eligible ? 'pointer' : 'not-allowed';
+  if (t.containerStatus === 'deleted') hint.textContent = 'الكونتينر متحذف بالفعل';
+  else if (!eligible) hint.textContent = 'متاح فقط بعد انتهاء التجربة وعدم الدفع';
+  else hint.textContent = '';
+}
+
+var _cleanupReasonLabels = {
+  not_found:        'العميل غير موجود',
+  already_deleted:  'الكونتينر متحذف بالفعل',
+  paid_customer:    'العميل دافع — لا يمكن الحذف',
+  trial_not_expired:'التجربة لسه ما انتهتش',
+  bad_request:      'طلب غير صالح'
+};
+
+async function deleteContainer() {
+  if (!_modalUid) return;
+  var c = _allClients.find(function(x){ return x._id === _modalUid; });
+  if (!c) return;
+  var ident = (c.email || c.name || c._id);
+
+  // 1) Read-only dry run FIRST — show exactly what will be removed. The backend
+  //    re-validates eligibility independently on the real delete; this preview
+  //    is display-only and never trusted for authorization.
+  toast('⏳ فحص الموارد...');
+  var chk = await apiCheckCleanup(_modalUid);
+  if (chk.status === 401) { handleSessionExpired(); return; }
+  if (!chk.body) { toast('❌ تعذّر فحص الموارد'); return; }
+  if (!chk.body.eligible) {
+    toast('⛔ غير مؤهل للحذف: ' + (_cleanupReasonLabels[chk.body.reason] || chk.body.reason || 'غير معروف'));
+    return;
+  }
+  var resources = chk.body.resources || [];
+  var list = resources.length
+    ? resources.map(function(r){ return '• ' + r.type + ': ' + r.id; }).join('\n')
+    : '(لا توجد موارد مُنشأة)';
+
+  // 2) Strong, destructive confirmation — admin must type DELETE.
+  var typed = prompt(
+    'حذف كونتينر GTM وتعطيل تتبّع العميل التالي؟\n\n' +
+    ident + ' (' + c._id + ')\n\n' +
+    'الموارد اللي هتتحذف:\n' + list + '\n\n' +
+    'الإجراء ده قد يكون غير قابل للتراجع.\nاكتب DELETE للتأكيد:'
+  );
+  if (typed == null) return;
+  if (String(typed).trim() !== 'DELETE') { toast('لازم تكتب DELETE بالظبط'); return; }
+
+  toast('⏳ جاري حذف الكونتينر...');
+  var r = await apiContainerAction(_modalUid, 'delete-container');
+  if (r.status === 401) { handleSessionExpired(); return; }
+  if (r.ok && r.body && (r.body.status === 'deleted' || r.body.status === 'already_deleted')) {
+    toast('تم حذف الكونتينر ✅');
+    loadAll();
+    closeModal();
+    return;
+  }
+  if (r.status === 207 && r.body) {
+    // Partial failure — report honestly, offer retry.
+    var failed = (r.body.failures || []).map(function(f){ return f.resource + ':' + f.id; }).join(', ');
+    toast('⚠️ حذف جزئي — فشل: ' + (failed || 'بعض الموارد'));
+    if (confirm('فشل حذف بعض الموارد:\n' + failed + '\n\nتحاول تنظيف تاني (Retry cleanup)؟')) {
+      var r2 = await apiContainerAction(_modalUid, 'retry-cleanup');
+      if (r2.ok && r2.body && r2.body.status === 'deleted') { toast('تم التنظيف ✅'); loadAll(); closeModal(); }
+      else toast('لسه فيه موارد فشلت — راجع اللوجز');
+    }
+    return;
+  }
+  var msg = (r.body && (r.body.message || r.body.error)) || ('HTTP ' + r.status);
+  toast('❌ ' + msg);
 }
 
 /* ════════════════════════════════════════
@@ -1403,11 +2142,11 @@ function openProjectModal(pid) {
       snipEl.innerHTML =
         '<div style="background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px;margin-bottom:8px;">' +
           '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--gold);letter-spacing:1.5px;margin-bottom:6px;">HEAD SNIPPET</div>' +
-          '<textarea readonly onclick="this.select()" style="width:100%;min-height:80px;background:#000;color:#0ecfb0;font-family:\'JetBrains Mono\',monospace;font-size:11px;direction:ltr;text-align:left;border:none;border-radius:4px;padding:8px;resize:vertical;">' + (p.snippetHead||'').replace(/</g,'&lt;') + '</textarea>' +
+          '<textarea readonly onclick="this.select()" style="width:100%;min-height:80px;background:#000;color:#2F6BFF;font-family:\'JetBrains Mono\',monospace;font-size:11px;direction:ltr;text-align:left;border:none;border-radius:4px;padding:8px;resize:vertical;">' + (p.snippetHead||'').replace(/</g,'&lt;') + '</textarea>' +
         '</div>' +
         '<div style="background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;padding:10px;">' +
           '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:var(--gold);letter-spacing:1.5px;margin-bottom:6px;">BODY SNIPPET</div>' +
-          '<textarea readonly onclick="this.select()" style="width:100%;min-height:50px;background:#000;color:#0ecfb0;font-family:\'JetBrains Mono\',monospace;font-size:11px;direction:ltr;text-align:left;border:none;border-radius:4px;padding:8px;resize:vertical;">' + (p.snippetBody||'').replace(/</g,'&lt;') + '</textarea>' +
+          '<textarea readonly onclick="this.select()" style="width:100%;min-height:50px;background:#000;color:#2F6BFF;font-family:\'JetBrains Mono\',monospace;font-size:11px;direction:ltr;text-align:left;border:none;border-radius:4px;padding:8px;resize:vertical;">' + (p.snippetBody||'').replace(/</g,'&lt;') + '</textarea>' +
         '</div>';
     } else {
       snipEl.innerHTML = '<span style="color:var(--mut);font-size:13px;">لا يوجد snippet</span>';
@@ -1572,7 +2311,7 @@ function renderRevenue() {
           var pb = '<span class="badge badge-' + (c.plan||'basic').toLowerCase() + '">' + (c.plan||'Basic') + '</span>';
           var dt = c.created_at ? new Date(c.created_at).toLocaleDateString('ar-EG') : '—';
           return '<tr>' +
-            '<td><div style="font-weight:700;">' + (c.name||'—') + '</div><div style="font-size:11px;color:var(--mut);font-family:\'JetBrains Mono\',monospace;">' + (c.email||'') + '</div></td>' +
+            '<td><div style="font-weight:700;">' + escapeHtml(c.name||'—') + '</div><div style="font-size:11px;color:var(--mut);font-family:\'JetBrains Mono\',monospace;">' + escapeHtml(c.email||'') + '</div></td>' +
             '<td>' + pb + '</td>' +
             '<td><span style="font-family:\'JetBrains Mono\',monospace;font-weight:900;color:var(--grn);">$' + price + '</span></td>' +
             '<td style="font-family:\'JetBrains Mono\',monospace;font-size:12px;">' + (c.projects_used||0) + '</td>' +
@@ -1681,7 +2420,7 @@ function renderRevenueChart() {
     if (v === 0) return;
     var x = padL + idx * step;
     var barH = (v / maxVal) * chartH * 0.4;
-    ctx.fillStyle = 'rgba(232,184,75,.35)';
+    ctx.fillStyle = 'rgba(47,107,255,.35)';
     ctx.fillRect(x - 3, padT + chartH - barH, 6, barH);
   });
 
@@ -1703,7 +2442,7 @@ function renderRevenueChart() {
   ctx.textAlign = 'right';
   ctx.fillText('إجمالي متراكم', padL + 80, 14);
 
-  ctx.fillStyle = 'rgba(232,184,75,.7)';
+  ctx.fillStyle = 'rgba(47,107,255,.7)';
   ctx.fillRect(padL + 90, 8, 12, 3);
   ctx.fillStyle = 'rgba(143,163,191,.7)';
   ctx.textAlign = 'right';
@@ -1734,6 +2473,273 @@ loadAll = async function() {
   if (am) am.addEventListener('click', function(e){ if(e.target===this) closeAddAdmin(); });
   if (ap) ap.addEventListener('keydown', function(e){ if(e.key==='Enter') adminLogin(); });
 })();
+
+/* ════════════════════════════════════════
+   DEPLOYMENTS DASHBOARD
+════════════════════════════════════════ */
+async function loadDeployments() {
+  var clientId = (document.getElementById('depClientId').value || '').trim();
+  if (!clientId) { toast('أدخل clientId أولاً ❌'); return; }
+  var body = document.getElementById('deploymentsBody');
+  body.innerHTML = '<div class="loading"><div class="spinner"></div><br>جاري التحميل...</div>';
+  try {
+    var res  = await fetch('/api/deployments/' + encodeURIComponent(clientId), { credentials: 'same-origin', headers: _authHeaders() });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
+    renderDeployments(data);
+  } catch (e) {
+    body.innerHTML = '<div style="color:var(--err);padding:16px;">خطأ: ' + e.message + '</div>';
+  }
+}
+
+function renderDeployments(data) {
+  var body = document.getElementById('deploymentsBody');
+
+  function _stateChip(state) {
+    var map = {
+      published:  ['#4ade80', 'published'],
+      building:   ['#facc15', 'building'],
+      importing:  ['#fb923c', 'importing'],
+      publishing: ['#60a5fa', 'publishing'],
+      failed:     ['#f87171', 'failed'],
+      rolled_back:['#a78bfa', 'rolled_back'],
+    };
+    var c = map[state] || ['var(--mut)', state || '—'];
+    return '<span style="background:' + c[0] + '22;color:' + c[0] + ';border-radius:100px;padding:2px 10px;font-size:11px;font-family:var(--font-mono);">' + c[1] + '</span>';
+  }
+
+  function _typeChip(type) {
+    return type === 'rollback'
+      ? '<span style="background:rgba(99,102,241,.15);color:#818cf8;border-radius:100px;padding:2px 10px;font-size:11px;">↩ rollback</span>'
+      : '<span style="background:rgba(47,107,255,.10);color:var(--teal);border-radius:100px;padding:2px 10px;font-size:11px;">↑ publish</span>';
+  }
+
+  function _actionChip(action) {
+    var map = {
+      rollback_start:     ['#60a5fa',  '▶ start'],
+      rollback_success:   ['#4ade80',  '✓ success'],
+      rollback_failed:    ['#f87171',  '✗ failed'],
+      deployment_recovered: ['#facc15','⚠ recovered'],
+    };
+    var c = map[action] || ['var(--mut)', action || '—'];
+    return '<span style="color:' + c[0] + ';font-size:11px;">' + c[1] + '</span>';
+  }
+
+  function _fmt(iso) {
+    if (!iso) return '—';
+    try { return new Date(iso).toLocaleString('ar-SA'); } catch (_) { return iso; }
+  }
+
+  function _dur(log) {
+    return '—'; // duration requires start+end timestamps; future enhancement
+  }
+
+  // ── Versions table ────────────────────────────────────────────────────────
+  var versionsHtml = '';
+  if (data.versions && data.versions.length) {
+    var vRows = data.versions.map(function(v) {
+      var drift = v.driftDetected
+        ? '<span title="Manual GTM changes detected" style="color:#facc15;font-size:12px;">⚠</span> '
+        : '';
+      var recovered = v.failureReason && v.failureReason.indexOf('recovery') !== -1
+        ? '<span style="color:#facc15;font-size:10px;"> (recovered)</span>' : '';
+      return '<tr style="border-bottom:1px solid var(--bdr2);">'
+        + '<td style="padding:10px;font-family:var(--font-mono);color:var(--teal);">v' + v.version + '</td>'
+        + '<td style="padding:10px;">' + _typeChip(v.deploymentType) + '</td>'
+        + '<td style="padding:10px;">' + _stateChip(v.deploymentState) + recovered + '</td>'
+        + '<td style="padding:10px;font-size:12px;color:var(--mut);">' + _fmt(v.publishedAt) + '</td>'
+        + '<td style="padding:10px;font-size:11px;font-family:var(--font-mono);color:var(--mut);">' + drift + (v.deploymentId || '—') + '</td>'
+        + '<td style="padding:10px;font-size:11px;color:var(--mut);">' + (v.failureReason ? '<span title="' + v.failureReason + '" style="color:#f87171;">✗ ' + v.failureReason.slice(0, 30) + '…</span>' : '—') + '</td>'
+        + '</tr>';
+    }).join('');
+
+    versionsHtml = '<div style="margin-bottom:20px;">'
+      + '<div style="font-size:12px;font-weight:700;color:var(--wht);margin-bottom:10px;">Version Records</div>'
+      + '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;min-width:700px;">'
+      + '<thead><tr style="border-bottom:1px solid var(--bdr);">'
+      + ['Version','Type','State','Published At','Deployment ID','Failure'].map(function(h){
+          return '<th style="padding:8px 10px;text-align:right;font-size:11px;color:var(--mut);font-weight:600;">' + h + '</th>';
+        }).join('')
+      + '</tr></thead><tbody>' + vRows + '</tbody></table></div></div>';
+  } else {
+    versionsHtml = '<div style="color:var(--mut);font-size:13px;margin-bottom:20px;">لا يوجد version records لهذا العميل.</div>';
+  }
+
+  // ── Audit logs table ──────────────────────────────────────────────────────
+  var logsHtml = '';
+  if (data.logs && data.logs.length) {
+    var lRows = data.logs.map(function(l) {
+      var meta = l.metadata ? JSON.stringify(l.metadata).slice(0, 60) : '—';
+      return '<tr style="border-bottom:1px solid var(--bdr2);">'
+        + '<td style="padding:10px;">' + _actionChip(l.action) + '</td>'
+        + '<td style="padding:10px;font-size:11px;font-family:var(--font-mono);color:var(--mut);">' + (l.deploymentId || '—') + '</td>'
+        + '<td style="padding:10px;font-size:12px;color:var(--mut);">' + _fmt(l.timestamp) + '</td>'
+        + '<td style="padding:10px;font-size:11px;color:var(--mut);">' + (l.actor || '—') + '</td>'
+        + '<td style="padding:10px;font-size:11px;color:' + (l.success === true ? '#4ade80' : l.success === false ? '#f87171' : 'var(--mut)') + ';">'
+        + (l.success === true ? '✓' : l.success === false ? '✗ ' + (l.error || '') : '—') + '</td>'
+        + '<td style="padding:10px;font-size:11px;color:var(--mut);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + meta + '">' + meta + '</td>'
+        + '</tr>';
+    }).join('');
+
+    logsHtml = '<div>'
+      + '<div style="font-size:12px;font-weight:700;color:var(--wht);margin-bottom:10px;">Deployment Audit Log</div>'
+      + '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;min-width:700px;">'
+      + '<thead><tr style="border-bottom:1px solid var(--bdr);">'
+      + ['Action','Deployment ID','Timestamp','Actor','Result','Metadata'].map(function(h){
+          return '<th style="padding:8px 10px;text-align:right;font-size:11px;color:var(--mut);font-weight:600;">' + h + '</th>';
+        }).join('')
+      + '</tr></thead><tbody>' + lRows + '</tbody></table></div></div>';
+  } else {
+    logsHtml = '<div style="color:var(--mut);font-size:13px;">لا يوجد deployment logs لهذا العميل بعد.</div>';
+  }
+
+  body.innerHTML = versionsHtml + logsHtml;
+}
+
+/* ════════════════════════════════════════
+   VERSION HISTORY
+════════════════════════════════════════ */
+async function loadVersions() {
+  var clientId = (document.getElementById('verClientId').value || '').trim();
+  if (!clientId) { toast('أدخل clientId أولاً ❌'); return; }
+  var body = document.getElementById('versionsBody');
+  body.innerHTML = '<div class="loading"><div class="spinner"></div><br>جاري التحميل...</div>';
+  try {
+    var res = await fetch('/api/versions/' + encodeURIComponent(clientId), { credentials: 'same-origin', headers: _authHeaders() });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
+    renderVersions(data.versions || [], clientId);
+  } catch (e) {
+    body.innerHTML = '<div style="color:var(--err);padding:16px;">خطأ: ' + e.message + '</div>';
+  }
+}
+
+function renderVersions(versions, clientId) {
+  var body = document.getElementById('versionsBody');
+  if (!versions.length) {
+    body.innerHTML = '<div style="color:var(--mut);padding:16px;">لا يوجد سجل نشر لهذا العميل بعد.</div>';
+    return;
+  }
+  var rows = versions.map(function(v) {
+    var typeLabel = v.deploymentType === 'rollback'
+      ? '<span style="background:rgba(99,102,241,.15);color:#818cf8;border-radius:100px;padding:2px 10px;font-size:11px;">Rollback</span>'
+      : '<span style="background:rgba(47,107,255,.12);color:var(--teal);border-radius:100px;padding:2px 10px;font-size:11px;">Publish</span>';
+    var statusLabel = v.status === 'rolled_back'
+      ? '<span style="color:var(--mut);font-size:11px;">مُسترجع</span>'
+      : '<span style="color:#4ade80;font-size:11px;">مفعّل</span>';
+    var date = v.publishedAt ? new Date(v.publishedAt).toLocaleString('ar-SA') : '—';
+    var rollbackBtn = v.status !== 'rolled_back'
+      ? '<button onclick="doRollback(\'' + clientId + '\',' + v.version + ')" style="background:rgba(47,107,255,.12);color:var(--gold);border:1px solid rgba(47,107,255,.3);border-radius:8px;padding:4px 12px;cursor:pointer;font-size:11px;">↩ Rollback</button>'
+      : '<span style="color:var(--mut);font-size:11px;">—</span>';
+    return '<tr style="border-bottom:1px solid var(--bdr2);">'
+      + '<td style="padding:12px 10px;font-family:var(--font-mono);color:var(--teal);">v' + v.version + '</td>'
+      + '<td style="padding:12px 10px;font-size:12px;color:var(--mut);">' + date + '</td>'
+      + '<td style="padding:12px 10px;font-size:12px;">' + (v.publishedBy || '—') + '</td>'
+      + '<td style="padding:12px 10px;font-family:var(--font-mono);font-size:11px;color:var(--mut);">' + (v.gtmVersionId || '—') + '</td>'
+      + '<td style="padding:12px 10px;">' + typeLabel + '</td>'
+      + '<td style="padding:12px 10px;">' + statusLabel + '</td>'
+      + '<td style="padding:12px 10px;">' + rollbackBtn + '</td>'
+      + '</tr>';
+  }).join('');
+
+  body.innerHTML = '<table style="width:100%;border-collapse:collapse;">'
+    + '<thead><tr style="border-bottom:1px solid var(--bdr);">'
+    + '<th style="padding:8px 10px;text-align:right;font-size:11px;color:var(--mut);font-weight:600;">الإصدار</th>'
+    + '<th style="padding:8px 10px;text-align:right;font-size:11px;color:var(--mut);font-weight:600;">التاريخ</th>'
+    + '<th style="padding:8px 10px;text-align:right;font-size:11px;color:var(--mut);font-weight:600;">نُشر بواسطة</th>'
+    + '<th style="padding:8px 10px;text-align:right;font-size:11px;color:var(--mut);font-weight:600;">GTM Version</th>'
+    + '<th style="padding:8px 10px;text-align:right;font-size:11px;color:var(--mut);font-weight:600;">النوع</th>'
+    + '<th style="padding:8px 10px;text-align:right;font-size:11px;color:var(--mut);font-weight:600;">الحالة</th>'
+    + '<th style="padding:8px 10px;text-align:right;font-size:11px;color:var(--mut);font-weight:600;">إجراء</th>'
+    + '</tr></thead>'
+    + '<tbody>' + rows + '</tbody>'
+    + '</table>';
+}
+
+async function doRollback(clientId, version) {
+  if (!confirm('هل أنت متأكد من الرجوع إلى v' + version + '؟\nسيتم إعادة بناء GTM Container من الـ config المحفوظ ونشره فوراً.')) return;
+  toast('جاري الـ Rollback... ⏳');
+  try {
+    var res = await fetch('/api/versions/rollback', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: _authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ clientId: clientId, version: version }),
+    });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
+    toast('تم الـ Rollback بنجاح ✅ — إصدار جديد: v' + data.newVersion);
+    loadVersions();
+  } catch (e) {
+    toast('فشل الـ Rollback: ' + e.message + ' ❌');
+  }
+}
+
+/* ════════════════════════════════════════
+   TRACKING HEALTH DASHBOARD
+════════════════════════════════════════ */
+async function loadHealth() {
+  var clientId = (document.getElementById('healthClientId').value || '').trim();
+  if (!clientId) { toast('أدخل clientId أولاً ❌'); return; }
+  var body = document.getElementById('healthBody');
+  body.innerHTML = '<div class="loading"><div class="spinner"></div><br>جاري الفحص...</div>';
+  try {
+    var res = await fetch('/api/health/' + encodeURIComponent(clientId), { credentials: 'same-origin', headers: _authHeaders() });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
+    renderHealth(data);
+  } catch (e) {
+    body.innerHTML = '<div style="color:var(--err);padding:16px;">خطأ: ' + e.message + '</div>';
+  }
+}
+
+function renderHealth(d) {
+  var body = document.getElementById('healthBody');
+  var score = d.trackingHealthScore || 0;
+  var scoreColor = score >= 80 ? '#4ade80' : score >= 50 ? 'var(--gold)' : 'var(--err)';
+
+  function _platform(name, active) {
+    var icon = active ? '✅' : '❌';
+    var color = active ? '#4ade80' : '#f87171';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--bdr2);">'
+      + '<span style="font-size:13px;">' + name + '</span>'
+      + '<span style="font-size:13px;color:' + color + ';">' + icon + ' ' + (active ? 'يعمل' : 'متوقف') + '</span>'
+      + '</div>';
+  }
+
+  var alertsHtml = '';
+  if (d.alerts && d.alerts.length) {
+    alertsHtml = '<div style="margin-top:16px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:10px;padding:14px 16px;">'
+      + '<div style="font-size:12px;font-weight:700;color:#f87171;margin-bottom:8px;">تنبيهات</div>'
+      + d.alerts.map(function(a){ return '<div style="font-size:12px;color:var(--mut);margin-bottom:4px;">• ' + (a.message || a) + '</div>'; }).join('')
+      + '</div>';
+  }
+
+  body.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:4px;">'
+    // Score card
+    + '<div style="background:var(--sur2);border:1px solid var(--bdr2);border-radius:12px;padding:20px;text-align:center;">'
+    + '<div style="font-size:11px;color:var(--mut);margin-bottom:8px;letter-spacing:1px;">TRACKING HEALTH SCORE</div>'
+    + '<div style="font-size:48px;font-weight:900;color:' + scoreColor + ';">' + score + '</div>'
+    + '<div style="font-size:11px;color:var(--mut);">/ 100</div>'
+    + '</div>'
+    // Meta info
+    + '<div style="background:var(--sur2);border:1px solid var(--bdr2);border-radius:12px;padding:20px;">'
+    + '<div style="font-size:11px;color:var(--mut);margin-bottom:12px;letter-spacing:1px;">آخر نشاط</div>'
+    + '<div style="font-size:12px;margin-bottom:6px;">آخر event: <span style="color:var(--teal);">' + (d.lastEventReceived ? new Date(d.lastEventReceived).toLocaleString('ar-SA') : 'غير معروف') + '</span></div>'
+    + '<div style="font-size:12px;margin-bottom:6px;">آخر نشر: <span style="color:var(--teal);">' + (d.lastPublish ? new Date(d.lastPublish).toLocaleString('ar-SA') : 'لا يوجد') + '</span></div>'
+    + '<div style="font-size:12px;">الإصدار الحالي: <span style="font-family:var(--font-mono);color:var(--gold);">' + (d.lastVersion ? 'v' + d.lastVersion : '—') + '</span></div>'
+    + '</div>'
+    + '</div>'
+    // Platforms
+    + '<div style="margin-top:16px;background:var(--sur2);border:1px solid var(--bdr2);border-radius:12px;padding:16px 20px;">'
+    + '<div style="font-size:12px;font-weight:700;color:var(--wht);margin-bottom:4px;">حالة المنصات</div>'
+    + _platform('GA4', d.ga4)
+    + _platform('Meta CAPI', d.meta)
+    + _platform('Google Ads', d.googleAds)
+    + _platform('TikTok', d.tiktok)
+    + '</div>'
+    + alertsHtml;
+}
 </script>
 </body>
 </html>
