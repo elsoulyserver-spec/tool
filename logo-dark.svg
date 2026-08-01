@@ -1,0 +1,7 @@
+<svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>EasyTrack</title>
+  <desc>EasyTrack mark, white stroke variant for dark backgrounds. 1:2 ratio of E-stroke to pipeline reach; node fixed at #2F6BFF.</desc>
+  <path d="M72 30 L36 30 L36 90 L72 90" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M36 60 L90 60" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="98" cy="60" r="10" fill="#2F6BFF"/>
+</svg>

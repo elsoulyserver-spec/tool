@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin/
+Disallow: /admin.html
+Disallow: /api/
+Disallow: /dashboard/
+Disallow: /internal/
+Disallow: /private/
+Disallow: /*.json$
+Disallow: /tool/
+Disallow: /tool.html
+
+Sitemap: https://easytrac.io/sitemap.xml
