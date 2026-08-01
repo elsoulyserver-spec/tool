@@ -1,0 +1,189 @@
+/* EasyTrac — Arabic launch campaign, shared template (1080×1080) */
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { width:1080px; height:1080px; overflow:hidden; }
+body {
+  background:#0A0A0A;
+  color:#FFFFFF;
+  font-family:'IBM Plex Sans Arabic',sans-serif;
+  position:relative;
+}
+
+/* ---- atmosphere ---- */
+.grid-layer {
+  position:absolute; inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px);
+  background-size:54px 54px;
+  -webkit-mask-image:radial-gradient(ellipse 85% 75% at 50% 45%, #000 40%, transparent 100%);
+          mask-image:radial-gradient(ellipse 85% 75% at 50% 45%, #000 40%, transparent 100%);
+}
+.glow-top {
+  position:absolute; width:1000px; height:820px;
+  left:40px; top:-280px;
+  background:radial-gradient(circle, rgba(47,107,255,.12) 0%, transparent 60%);
+}
+.glow-bottom {
+  position:absolute; width:820px; height:620px;
+  left:130px; bottom:-340px;
+  background:radial-gradient(circle, rgba(47,107,255,.06) 0%, transparent 62%);
+}
+
+/* ---- frame ---- */
+.frame {
+  position:relative;
+  width:1080px; height:1080px;
+  padding:62px 80px 52px;
+  display:flex; flex-direction:column;
+}
+
+/* ---- top: Salla ↔ EasyTrac ↔ Zid integration row ---- */
+.top-row { display:flex; align-items:center; justify-content:center; gap:22px; }
+.lockup { display:flex; align-items:center; gap:13px; }
+.lockup svg { display:block; }
+.wordmark {
+  font-family:'Outfit',sans-serif;
+  font-weight:900; font-size:27px; letter-spacing:-.5px; color:#FFFFFF;
+  direction:ltr;
+}
+.int-card {
+  display:flex; align-items:center;
+  padding:11px 26px;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:16px;
+  background:rgba(255,255,255,.035);
+  font-size:19px; font-weight:600;
+  color:rgba(255,255,255,.88);
+}
+.connector { position:relative; width:62px; height:1px; background:rgba(255,255,255,.16); }
+.connector::after {
+  content:''; position:absolute; left:50%; top:50%;
+  transform:translate(-50%,-50%);
+  width:5px; height:5px; border-radius:50%;
+  background:#2F6BFF;
+  box-shadow:0 0 10px rgba(47,107,255,.8);
+}
+
+/* ---- middle: angle content ---- */
+.mid {
+  flex:1;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  text-align:center;
+}
+.eyebrow {
+  display:inline-flex; align-items:center; gap:10px;
+  font-size:16px; font-weight:600;
+  color:#2F6BFF;
+  padding:8px 20px;
+  border:1px solid rgba(47,107,255,.38);
+  border-radius:999px;
+  background:rgba(47,107,255,.07);
+  margin-bottom:34px;
+}
+.eyebrow .emo { font-size:14px; }
+h1 { font-size:82px; font-weight:700; line-height:1.32; color:#FFFFFF; }
+h1.h-xxl { font-size:106px; }
+h1.h-lg  { font-size:66px; }
+.accent { color:#2F6BFF; }
+.accent-glow { color:#2F6BFF; text-shadow:0 0 46px rgba(47,107,255,.45); }
+.latin { font-family:'Outfit',sans-serif; font-weight:700; letter-spacing:-.01em; }
+.sub {
+  margin-top:24px;
+  font-size:30px; font-weight:600; line-height:1.6;
+  color:rgba(255,255,255,.9);
+}
+.desc {
+  margin-top:16px;
+  font-size:19px; font-weight:500; line-height:1.8;
+  color:rgba(255,255,255,.5);
+  max-width:740px;
+}
+.cta {
+  margin-top:44px;
+  display:inline-flex; align-items:center;
+  padding:17px 54px;
+  background:#2F6BFF; color:#FFFFFF;
+  font-size:22px; font-weight:700;
+  border-radius:999px;
+  box-shadow:0 0 46px rgba(47,107,255,.35);
+}
+
+/* angle 1: price + gift */
+.price-row {
+  margin-top:28px;
+  font-size:36px; font-weight:600;
+  color:rgba(255,255,255,.9);
+  display:flex; align-items:baseline; gap:16px;
+}
+.price {
+  font-size:66px; font-weight:700;
+  color:#2F6BFF; text-shadow:0 0 42px rgba(47,107,255,.4);
+}
+.gift-pill {
+  margin-top:24px;
+  display:inline-flex; align-items:center; gap:10px;
+  font-size:19px; font-weight:600; color:#FFFFFF;
+  padding:10px 26px;
+  border:1px solid rgba(47,107,255,.4);
+  border-radius:999px;
+  background:rgba(47,107,255,.08);
+}
+
+/* angle 9: platform chips hero */
+.chips {
+  display:grid;
+  grid-template-columns:repeat(3, max-content);
+  gap:16px;
+  justify-content:center;
+  margin-bottom:42px;
+}
+.chip {
+  font-family:'Outfit',sans-serif;
+  font-size:20px; font-weight:600;
+  color:rgba(255,255,255,.9);
+  padding:15px 32px;
+  border:1px solid rgba(255,255,255,.13);
+  border-radius:16px;
+  background:rgba(255,255,255,.035);
+  direction:ltr;
+}
+
+/* ---- bottom: platforms + footer ---- */
+.platforms { display:flex; justify-content:center; gap:32px; }
+.plat {
+  display:flex; align-items:center; gap:9px;
+  font-family:'Outfit',sans-serif;
+  font-size:16.5px; font-weight:600; letter-spacing:.01em;
+  color:rgba(255,255,255,.78);
+  white-space:nowrap;
+  direction:ltr;
+}
+.plat::before {
+  content:'';
+  width:14px; height:14px; flex:none;
+  background:url("data:image/svg+xml,%3Csvg width='17' height='17' viewBox='0 0 17 17' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2.5 9.2 L6.4 13 L14.5 4' stroke='%232F6BFF' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+.foot-row {
+  margin-top:30px;
+  display:flex; align-items:center;
+}
+.foot-side { flex:1; display:flex; align-items:center; }
+.soon-wrap { gap:11px; }
+.soon-label { font-size:15px; font-weight:600; color:rgba(255,255,255,.4); }
+.soon-pill {
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px; font-weight:600; letter-spacing:3.5px;
+  direction:ltr;
+  color:rgba(255,255,255,.45);
+  padding:6px 10px 6px 14px;
+  border:1px solid rgba(255,255,255,.15);
+  border-radius:999px;
+  background:rgba(255,255,255,.03);
+}
+.site {
+  font-family:'IBM Plex Mono',monospace;
+  font-size:13px; letter-spacing:2.5px;
+  color:rgba(255,255,255,.34);
+  direction:ltr;
+}
