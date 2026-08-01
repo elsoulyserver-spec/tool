@@ -1,0 +1,24 @@
+{
+  "name": "@easytrac/design-tokens",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Easy Track three-tier design token system",
+  "main": "generated/ts/tokens.js",
+  "types": "generated/ts/tokens.d.ts",
+  "exports": {
+    ".":               "./generated/ts/tokens.ts",
+    "./css/base":      "./generated/css/primitives.css",
+    "./css/light":     "./generated/css/themes/light.css",
+    "./css/dark":      "./generated/css/themes/dark.css",
+    "./tailwind":      "./generated/tailwind/tokens.js"
+  },
+  "scripts": {
+    "build":   "node style-dictionary.config.js",
+    "watch":   "nodemon --watch primitives --watch semantic --watch components --exec 'node style-dictionary.config.js'",
+    "validate":"node scripts/validate-tokens.js"
+  },
+  "devDependencies": {
+    "style-dictionary": "^3.9.0",
+    "nodemon":          "^3.0.0"
+  }
+}

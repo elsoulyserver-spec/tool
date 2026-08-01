@@ -1,0 +1,131 @@
+/* Easy Track — Dark theme tokens
+   Applied via: <html data-theme="dark"> or .dark class
+   Imports primitives.css first, then overrides semantic + component vars. */
+
+[data-theme="dark"],
+.dark {
+
+  --semantic-color-background-default:         var(--primitive-color-slate-950);
+  --semantic-color-background-subtle:          var(--primitive-color-slate-900);
+  --semantic-color-background-surface:         var(--primitive-color-slate-900);
+  --semantic-color-background-surface-raised:  var(--primitive-color-slate-850);
+  --semantic-color-background-surface-overlay: var(--primitive-color-slate-850);
+  --semantic-color-background-inset:           var(--primitive-color-slate-900);
+  --semantic-color-background-inverse:         var(--primitive-color-white);
+  --semantic-color-background-disabled:        var(--primitive-color-slate-800);
+
+  --semantic-color-overlay-backdrop: rgba(0,0,0,0.7);
+  --semantic-color-overlay-scrim:    rgba(0,0,0,0.5);
+
+  --semantic-color-text-primary:     var(--primitive-color-slate-50);
+  --semantic-color-text-secondary:   var(--primitive-color-slate-300);
+  --semantic-color-text-tertiary:    var(--primitive-color-slate-400);
+  --semantic-color-text-disabled:    var(--primitive-color-slate-600);
+  --semantic-color-text-placeholder: var(--primitive-color-slate-600);
+  --semantic-color-text-inverse:     var(--primitive-color-slate-900);
+  --semantic-color-text-link:        var(--primitive-color-indigo-400);
+  --semantic-color-text-link-hover:  var(--primitive-color-indigo-300);
+  --semantic-color-text-accent:      var(--primitive-color-indigo-400);
+
+  --semantic-color-border-default: var(--primitive-color-slate-800);
+  --semantic-color-border-strong:  var(--primitive-color-slate-700);
+  --semantic-color-border-subtle:  var(--primitive-color-slate-850);
+  --semantic-color-border-focus:   var(--primitive-color-indigo-400);
+  --semantic-color-border-inverse: var(--primitive-color-slate-300);
+
+  --semantic-color-action-primary-bg:            var(--primitive-color-indigo-500);
+  --semantic-color-action-primary-bg-hover:      var(--primitive-color-indigo-400);
+  --semantic-color-action-primary-bg-active:     var(--primitive-color-indigo-600);
+  --semantic-color-action-primary-bg-disabled:   var(--primitive-color-slate-800);
+  --semantic-color-action-primary-text:          var(--primitive-color-white);
+  --semantic-color-action-primary-text-disabled: var(--primitive-color-slate-600);
+  --semantic-color-action-primary-border:        var(--primitive-color-indigo-500);
+  --semantic-color-action-secondary-bg:          var(--primitive-color-slate-800);
+  --semantic-color-action-secondary-bg-hover:    var(--primitive-color-slate-700);
+  --semantic-color-action-secondary-text:        var(--primitive-color-slate-200);
+  --semantic-color-action-secondary-border:      var(--primitive-color-slate-700);
+  --semantic-color-action-ghost-bg-hover:        var(--primitive-color-slate-800);
+  --semantic-color-action-ghost-text:            var(--primitive-color-slate-200);
+  --semantic-color-action-danger-bg:             var(--primitive-color-red-600);
+  --semantic-color-action-danger-bg-hover:       var(--primitive-color-red-500);
+  --semantic-color-action-danger-text:           var(--primitive-color-white);
+  --semantic-color-action-danger-text-muted:     var(--primitive-color-red-400);
+
+  --semantic-color-status-success-bg:          rgba(16,185,129,0.10);
+  --semantic-color-status-success-bg-strong:   rgba(16,185,129,0.18);
+  --semantic-color-status-success-border:      rgba(16,185,129,0.25);
+  --semantic-color-status-success-text:        var(--primitive-color-emerald-400);
+  --semantic-color-status-success-icon:        var(--primitive-color-emerald-400);
+  --semantic-color-status-warning-bg:          rgba(245,158,11,0.10);
+  --semantic-color-status-warning-bg-strong:   rgba(245,158,11,0.18);
+  --semantic-color-status-warning-border:      rgba(245,158,11,0.25);
+  --semantic-color-status-warning-text:        var(--primitive-color-amber-400);
+  --semantic-color-status-warning-icon:        var(--primitive-color-amber-400);
+  --semantic-color-status-error-bg:            rgba(239,68,68,0.10);
+  --semantic-color-status-error-bg-strong:     rgba(239,68,68,0.18);
+  --semantic-color-status-error-border:        rgba(239,68,68,0.25);
+  --semantic-color-status-error-text:          var(--primitive-color-red-400);
+  --semantic-color-status-error-icon:          var(--primitive-color-red-400);
+  --semantic-color-status-info-bg:             rgba(59,130,246,0.10);
+  --semantic-color-status-info-bg-strong:      rgba(59,130,246,0.18);
+  --semantic-color-status-info-border:         rgba(59,130,246,0.25);
+  --semantic-color-status-info-text:           var(--primitive-color-blue-400);
+  --semantic-color-status-info-icon:           var(--primitive-color-blue-400);
+
+  --semantic-color-analytics-positive:       var(--primitive-color-emerald-400);
+  --semantic-color-analytics-positive-bg:    rgba(16,185,129,0.12);
+  --semantic-color-analytics-positive-muted: var(--primitive-color-emerald-500);
+  --semantic-color-analytics-negative:       var(--primitive-color-red-400);
+  --semantic-color-analytics-negative-bg:    rgba(239,68,68,0.12);
+  --semantic-color-analytics-negative-muted: var(--primitive-color-red-500);
+  --semantic-color-analytics-neutral:        var(--primitive-color-slate-400);
+  --semantic-color-analytics-neutral-bg:     var(--primitive-color-slate-800);
+  --semantic-color-analytics-stale:          var(--primitive-color-amber-400);
+  --semantic-color-analytics-stale-bg:       rgba(245,158,11,0.12);
+  --semantic-color-analytics-loading:        var(--primitive-color-slate-800);
+
+  --semantic-color-chart-series-1:       var(--primitive-color-indigo-400);
+  --semantic-color-chart-series-2:       var(--primitive-color-emerald-400);
+  --semantic-color-chart-series-3:       var(--primitive-color-amber-400);
+  --semantic-color-chart-series-4:       var(--primitive-color-red-400);
+  --semantic-color-chart-series-5:       var(--primitive-color-violet-400);
+  --semantic-color-chart-series-6:       var(--primitive-color-cyan-400);
+  --semantic-color-chart-series-7:       var(--primitive-color-pink-400);
+  --semantic-color-chart-series-8:       var(--primitive-color-orange-400);
+  --semantic-color-chart-grid:           var(--primitive-color-slate-800);
+  --semantic-color-chart-axis:           var(--primitive-color-slate-700);
+  --semantic-color-chart-axis-text:      var(--primitive-color-slate-500);
+  --semantic-color-chart-tooltip-bg:     var(--primitive-color-slate-800);
+  --semantic-color-chart-tooltip-text:   var(--primitive-color-slate-100);
+  --semantic-color-chart-tooltip-border: var(--primitive-color-slate-700);
+  --semantic-color-chart-crosshair:      var(--primitive-color-slate-700);
+  --semantic-color-chart-reference-line: var(--primitive-color-indigo-500);
+
+  --semantic-color-platform-ga4-bg:      rgba(249,115,22,0.15);
+  --semantic-color-platform-ga4-text:    var(--primitive-color-orange-400);
+  --semantic-color-platform-meta-bg:     rgba(59,130,246,0.15);
+  --semantic-color-platform-meta-text:   var(--primitive-color-blue-400);
+  --semantic-color-platform-tiktok-bg:   var(--primitive-color-slate-800);
+  --semantic-color-platform-tiktok-text: var(--primitive-color-slate-200);
+  --semantic-color-platform-snap-bg:     rgba(245,158,11,0.15);
+  --semantic-color-platform-snap-text:   var(--primitive-color-amber-400);
+  --semantic-color-platform-sgtm-bg:     rgba(99,102,241,0.15);
+  --semantic-color-platform-sgtm-text:   var(--primitive-color-indigo-400);
+
+  --semantic-shadow-card:       var(--primitive-shadow-dark-xs);
+  --semantic-shadow-elevated:   var(--primitive-shadow-dark-sm);
+  --semantic-shadow-dropdown:   var(--primitive-shadow-dark-md);
+  --semantic-shadow-modal:      var(--primitive-shadow-dark-lg);
+  --semantic-shadow-focus-ring: 0 0 0 3px rgba(99,102,241,0.5);
+
+  /* Component overrides that differ in dark mode */
+  --component-table-row-bg-selected:       rgba(99,102,241,0.15);
+  --component-table-row-bg-selected-hover: rgba(99,102,241,0.22);
+  --component-sidebar-item-bg-active:      rgba(99,102,241,0.15);
+  --component-dropdown-item-bg-selected:   rgba(99,102,241,0.15);
+  --component-skeleton-bg:                 var(--primitive-color-slate-800);
+
+  --brand-color-primary:       var(--primitive-color-indigo-500);
+  --brand-color-primary-hover: var(--primitive-color-indigo-400);
+  --brand-color-primary-light: rgba(99,102,241,0.15);
+}
