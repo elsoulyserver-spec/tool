@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>دراسة تنافسية: أدوات التتبع من جانب الخادم</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Tajawal:wght@400;500;700&display=swap');
+
+  :root{
+    --ink:#0f2430;
+    --muted:#5b6b76;
+    --primary:#0e3a5c;
+    --primary-2:#12506f;
+    --accent:#17a2a2;
+    --line:#e3eaef;
+    --bg-soft:#f4f8fb;
+    --stape:#2563eb;
+    --elevar:#7c3aed;
+    --kepixel:#0d9488;
+    --warn-bg:#fff7ed;
+    --warn-bd:#fdba74;
+    --good-bg:#ecfdf5;
+    --good-bd:#6ee7b7;
+  }
+
+  *{ box-sizing:border-box; }
+
+  @page{
+    size:A4;
+    margin:18mm 16mm 16mm 16mm;
+  }
+
+  html,body{ margin:0; padding:0; }
+
+  body{
+    font-family:'Cairo','Tajawal','Segoe UI',Tahoma,Arial,sans-serif;
+    color:var(--ink);
+    font-size:13px;
+    line-height:1.85;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+
+  h1,h2,h3{ line-height:1.4; margin:0; font-weight:800; }
+
+  p{ margin:0 0 10px; }
+
+  .break{ break-after:page; page-break-after:always; }
+
+  /* ===== Cover ===== */
+  .cover{
+    height:262mm;
+    border-radius:18px;
+    background:
+      radial-gradient(1200px 500px at 90% -10%, rgba(23,162,162,.35), transparent 60%),
+      linear-gradient(160deg,#0b3147 0%, #0e3a5c 45%, #103f63 100%);
+    color:#fff;
+    padding:40px 38px;
+    display:flex;
+    flex-direction:column;
+    position:relative;
+    overflow:hidden;
+  }
+  .cover::after{
+    content:"";
+    position:absolute; inset:0;
+    background:
+      radial-gradient(700px 320px at -10% 110%, rgba(37,99,235,.30), transparent 60%);
+    pointer-events:none;
+  }
+  .brand{
+    display:flex; align-items:center; gap:10px;
+    font-weight:800; letter-spacing:.3px; font-size:16px;
+    z-index:1;
+  }
+  .brand .dot{
+    width:12px; height:12px; border-radius:50%;
+    background:var(--accent);
+    box-shadow:0 0 0 5px rgba(23,162,162,.25);
+  }
+  .cover .kicker{
+    z-index:1; margin-top:auto;
+    color:#9fd6d6; font-weight:700; font-size:14px;
+    letter-spacing:1px;
+  }
+  .cover h1{
+    z-index:1;
+    font-size:40px; line-height:1.25; margin:14px 0 10px;
+    text-shadow:0 2px 18px rgba(0,0,0,.25);
+  }
+  .cover .sub{
+    z-index:1; font-size:17px; color:#d7e6ef; font-weight:500;
+    max-width:560px;
+  }
+  .pills{ z-index:1; display:flex; gap:10px; margin-top:26px; flex-wrap:wrap; }
+  .pill{
+    background:rgba(255,255,255,.10);
+    border:1px solid rgba(255,255,255,.22);
+    padding:8px 16px; border-radius:999px;
+    font-weight:700; font-size:14px;
+  }
+  .pill.s{ border-color:rgba(37,99,235,.6); }
+  .pill.e{ border-color:rgba(124,58,237,.6); }
+  .pill.k{ border-color:rgba(13,148,136,.7); }
+  .cover .meta{
+    z-index:1; margin-top:28px;
+    border-top:1px solid rgba(255,255,255,.18);
+    padding-top:16px;
+    display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;
+    color:#cfe0ea; font-size:12.5px;
+  }
+  .cover .meta b{ color:#fff; }
+
+  /* ===== Sections ===== */
+  .section-title{
+    display:flex; align-items:center; gap:12px;
+    margin:26px 0 14px;
+  }
+  .section-title .num{
+    flex:none;
+    width:34px; height:34px; border-radius:9px;
+    background:var(--primary); color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    font-weight:800; font-size:15px;
+  }
+  .section-title h2{ font-size:21px; color:var(--primary); }
+  .lead{ color:var(--muted); font-size:13.5px; }
+
+  .intro-grid{
+    display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:14px 0;
+  }
+  .fact{
+    background:var(--bg-soft); border:1px solid var(--line);
+    border-radius:12px; padding:12px 14px;
+  }
+  .fact h4{ margin:0 0 4px; color:var(--primary-2); font-size:13.5px; }
+  .fact p{ margin:0; color:var(--muted); font-size:12.5px; }
+
+  .layers{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:10px; }
+  .layer{
+    border:1px solid var(--line); border-radius:12px; padding:14px;
+    background:#fff;
+  }
+  .layer .tag{
+    display:inline-block; font-size:11.5px; font-weight:800;
+    padding:3px 10px; border-radius:999px; margin-bottom:8px; color:#fff;
+  }
+  .layer p{ margin:0; font-size:12.5px; color:var(--muted); }
+
+  /* ===== Tool cards ===== */
+  .tool{
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px 18px 14px;
+    border-inline-start:6px solid var(--c, var(--primary));
+    background:#fff;
+    box-shadow:0 1px 3px rgba(15,36,48,.04);
+    margin-bottom:14px;
+  }
+  .tool-head{ display:flex; align-items:baseline; gap:10px; margin-bottom:4px; flex-wrap:wrap; }
+  .tool-head h3{ font-size:20px; color:var(--c); }
+  .tool-head .role{
+    font-size:12px; font-weight:700; color:#fff; background:var(--c);
+    padding:3px 10px; border-radius:999px;
+  }
+  .tool-head .oneliner{ color:var(--muted); font-size:12.5px; font-weight:600; }
+
+  .tool dl{ margin:10px 0 0; }
+  .row{ display:flex; gap:10px; padding:7px 0; border-top:1px dashed var(--line); }
+  .row:first-of-type{ border-top:none; }
+  .row dt{
+    flex:none; width:108px; font-weight:700; color:var(--primary-2); font-size:12.5px;
+  }
+  .row dd{ margin:0; font-size:12.5px; }
+
+  .sw{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+  .sw div{ border-radius:10px; padding:10px 12px; font-size:12px; }
+  .sw .pro{ background:var(--good-bg); border:1px solid var(--good-bd); }
+  .sw .con{ background:var(--warn-bg); border:1px solid var(--warn-bd); }
+  .sw b{ display:block; margin-bottom:5px; font-size:12.5px; }
+  .sw ul{ margin:0; padding-inline-start:18px; }
+  .sw li{ margin-bottom:3px; }
+
+  /* ===== Comparison table ===== */
+  table.cmp{
+    width:100%; border-collapse:collapse; margin-top:10px;
+    font-size:12px; border-radius:12px; overflow:hidden;
+    border:1px solid var(--line);
+  }
+  table.cmp th, table.cmp td{
+    padding:10px 12px; text-align:right; vertical-align:top;
+    border-bottom:1px solid var(--line);
+  }
+  table.cmp thead th{
+    background:var(--primary); color:#fff; font-size:12.5px; font-weight:800;
+    border-bottom:none;
+  }
+  table.cmp thead th.s{ background:var(--stape); }
+  table.cmp thead th.e{ background:var(--elevar); }
+  table.cmp thead th.k{ background:var(--kepixel); }
+  table.cmp tbody tr:nth-child(even){ background:var(--bg-soft); }
+  table.cmp td.feat{ font-weight:700; color:var(--primary-2); background:#eef4f8; }
+  table.cmp tr:last-child td{ border-bottom:none; }
+
+  /* ===== Callouts ===== */
+  .callout{
+    background:linear-gradient(180deg,#f0fbfb,#e8f7f7);
+    border:1px solid #b6e6e6;
+    border-inline-start:6px solid var(--accent);
+    border-radius:12px; padding:14px 16px; margin:14px 0;
+  }
+  .callout h4{ margin:0 0 6px; color:#0c6b6b; font-size:14px; }
+  .callout p, .callout li{ font-size:12.5px; }
+  .callout ol{ margin:6px 0 0; padding-inline-start:20px; }
+  .callout li{ margin-bottom:5px; }
+
+  .ladder{ display:flex; flex-direction:column; gap:8px; margin:12px 0; }
+  .step{ display:flex; gap:12px; align-items:center; }
+  .step .b{
+    flex:none; width:120px; text-align:center; color:#fff; font-weight:800;
+    padding:8px 6px; border-radius:10px; font-size:13px;
+  }
+  .step p{ margin:0; font-size:12.5px; color:var(--muted); }
+
+  .note{
+    font-size:11.5px; color:var(--muted);
+    background:#fafbfc; border:1px dashed var(--line);
+    border-radius:10px; padding:12px 14px; margin-top:8px;
+  }
+
+  .sources{ font-size:12px; }
+  .sources li{ margin-bottom:6px; word-break:break-all; }
+  a{ color:var(--primary-2); }
+
+  .foot{
+    margin-top:22px; padding-top:12px; border-top:1px solid var(--line);
+    display:flex; justify-content:space-between; color:var(--muted); font-size:11px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== COVER ===================== -->
+<section class="cover break">
+  <div class="brand"><span class="dot"></span> easytrac.io — وحدة الاستراتيجية</div>
+
+  <div class="kicker">تقرير دراسة تنافسية</div>
+  <h1>أدوات التتبع من جانب الخادم<br>Server-Side Tracking</h1>
+  <div class="sub">تحليل مقارن لثلاث أدوات رائدة في السوق، وتحديد الموقع الاستراتيجي لمنصة easytrac.io بينها.</div>
+
+  <div class="pills">
+    <span class="pill s">Stape</span>
+    <span class="pill e">Elevar</span>
+    <span class="pill k">Kepixel</span>
+  </div>
+
+  <div class="meta">
+    <span>الإصدار: <b>1.0</b></span>
+    <span>التاريخ: <b>يونيو 2026</b></span>
+    <span>التصنيف: <b>مرجع داخلي للدراسة والتموضع</b></span>
+  </div>
+</section>
+
+<!-- ===================== 1. مقدمة ===================== -->
+<div class="section-title">
+  <div class="num">١</div>
+  <h2>لماذا وُجدت هذه الأدوات؟</h2>
+</div>
+<p class="lead">جميع هذه الأدوات ظهرت لحل مشكلة واحدة: التتبع التقليدي من المتصفح (Browser-Side Pixels) أصبح <b>يفقد جزءًا كبيرًا من البيانات</b>. والحل هو نقل التتبع إلى الخادم (Server-Side).</p>
+
+<div class="intro-grid">
+  <div class="fact">
+    <h4>أسباب فقدان البيانات</h4>
+    <p>حماية الخصوصية في Safari‏ (ITP)، وبرامج حجب الإعلانات (Ad Blockers)، وسؤال تتبّع iOS‏ (ATT)، وقيود الكوكيز ولوائح GDPR.</p>
+  </div>
+  <div class="fact">
+    <h4>ما الذي يكسبه التتبع من الخادم</h4>
+    <p>كوكيز طرف-أول بعمر أطول، تجاوز حاجبات الإعلانات، وإرسال التحويلات إلى Meta وGoogle وTikTok عبر واجهات الـ Conversion APIs بدقة أعلى.</p>
+  </div>
+</div>
+
+<div class="section-title">
+  <div class="num">٢</div>
+  <h2>طبقات السوق: المفتاح لفهم الفروق</h2>
+</div>
+<p class="lead">الخطأ الشائع هو معاملة الأدوات الثلاث كأنها متطابقة. في الحقيقة كل واحدة تقع في طبقة مختلفة من سلسلة القيمة:</p>
+
+<div class="layers">
+  <div class="layer">
+    <span class="tag" style="background:var(--stape)">طبقة البنية التحتية</span>
+    <p><b>Stape</b> — تستضيف حاوية sGTM الخاصة بجوجل نيابةً عنك. أنت تملك «العقل»، وهي توفّر «الأرض والمواسير».</p>
+  </div>
+  <div class="layer">
+    <span class="tag" style="background:var(--elevar)">طبقة الحل الجاهز</span>
+    <p><b>Elevar</b> — حل تتبّع متكامل ومُدار، مخصّص لمتاجر Shopify من البداية للنهاية.</p>
+  </div>
+  <div class="layer">
+    <span class="tag" style="background:var(--kepixel)">طبقة المنصّة</span>
+    <p><b>Kepixel</b> — منصّة تحليلات و«إسناد» (Attribution) قائمة بذاتها، التتبّع من الخادم مدمج بداخلها.</p>
+  </div>
+</div>
+
+<div class="break"></div>
+
+<!-- ===================== 3. الأدوات ===================== -->
+<div class="section-title">
+  <div class="num">٣</div>
+  <h2>تحليل الأدوات بالتفصيل</h2>
+</div>
+
+<!-- STAPE -->
+<div class="tool" style="--c:var(--stape)">
+  <div class="tool-head">
+    <h3>Stape</h3>
+    <span class="role">بنية تحتية لـ sGTM</span>
+    <span class="oneliner">«أنا أستضيف لك عقل جوجل»</span>
+  </div>
+  <dl>
+    <div class="row"><dt>التعريف</dt><dd>أشهر مزوّد <b>استضافة</b> لـ Server-Side GTM. لا يقوم بالتتبّع بنفسه، بل يوفّر البنية التي تشتغل عليها حاوية جوجل، مع أدوات تُسهّل العمل.</dd></div>
+    <div class="row"><dt>المعمارية</dt><dd>استضافة الحاوية على Google Cloud مع توسّع تلقائي (٣ إلى ٦ خوادم)، شبكة CDN عالمية، سجلّات، نطاقات ومواقع متعددة، وخيار خوادم أوروبية بالكامل (مهم لـ GDPR).</dd></div>
+    <div class="row"><dt>أقوى ميزة</dt><dd>منظومة الـ <b>Power-ups</b>: مُحمّل مخصّص لـ GTM/GA4 لتجاوز حاجبات الإعلانات، مُمدّد عمر الكوكيز (Cookie Keeper)، معرّف المستخدم، رؤوس جغرافية، وفلترة البوتات. إضافةً إلى الـ <b>Gateways</b> كحل مبسّط للمبتدئين.</dd></div>
+    <div class="row"><dt>التسعير</dt><dd><b>شفّاف</b> ويُحسب حسب عدد الطلبات — يبدأ من نحو 20$ شهريًا، مع خطة مجانية وخصم سنوي. تكلفة متوقّعة.</dd></div>
+    <div class="row"><dt>لمن؟</dt><dd>المطوّرون والوكالات (Agencies)، وأي منصّة (ليس Shopify فقط) — بشرط امتلاك معرفة تقنية.</dd></div>
+  </dl>
+  <div class="sw">
+    <div class="pro"><b>✔ نقاط القوة</b><ul><li>الأرخص والأكثر شفافية</li><li>منظومة Power-ups قوية</li><li>يعمل على أي منصّة</li><li>خوادم أوروبية + Gateways للمبتدئين</li></ul></div>
+    <div class="con"><b>✘ نقاط الضعف</b><ul><li>يتطلّب معرفة تقنية للإعداد</li><li>ليس حلاً جاهزًا «من البداية للنهاية»</li><li>أنت من يبني منطق التتبّع</li></ul></div>
+  </div>
+</div>
+
+<!-- ELEVAR -->
+<div class="tool" style="--c:var(--elevar)">
+  <div class="tool-head">
+    <h3>Elevar</h3>
+    <span class="role">حل تتبّع لـ Shopify</span>
+    <span class="oneliner">«أنا أضبط لك تتبّع Shopify بالكامل»</span>
+  </div>
+  <dl>
+    <div class="row"><dt>التعريف</dt><dd>حل <b>متكامل ومُدار</b> مخصّص لـ Shopify. لا يكتفي بالاستضافة، بل يبني طبقة البيانات (Data Layer) والتتبّع من الخادم والتعرّف على هوية الزائر — كل ذلك تلقائيًا.</dd></div>
+    <div class="row"><dt>المعمارية</dt><dd>يقع بين المتجر والمنصّات الإعلانية، يبني Data Layer منظّمًا، ويرسل أحداثًا من الخادم إلى GA4 وMeta CAPI وTikTok وPinterest وSnapchat وKlaviyo، مع إثراء الجلسات (Session Enrichment).</dd></div>
+    <div class="row"><dt>النتائج المُعلنة</dt><dd>نسبة تحويلات منسوبة أعلى بـ <b>10–20%</b>، وتحسّن أداء تدفّقات Klaviyo حتى <b>2–3 أضعاف</b>، مع تكامل جاهز لموافقات GDPR.</dd></div>
+    <div class="row"><dt>التسعير</dt><dd>خطط ثابتة + <b>رسوم زيادة</b> على الطلبات الإضافية (من 0.03$ إلى 0.4$ للطلب) — أغلى بكثير على الحجم الصغير.</dd></div>
+    <div class="row"><dt>لمن؟</dt><dd>تجّار Shopify أصحاب ميزانيات إعلانية كبيرة، الراغبون في حل جاهز دون الدخول في التفاصيل التقنية.</dd></div>
+  </dl>
+  <div class="sw">
+    <div class="pro"><b>✔ نقاط القوة</b><ul><li>حل مُدار كامل لـ Shopify</li><li>إثراء الجلسات وحلّ الهوية</li><li>نتائج مثبتة في الإسناد</li><li>تكاملات جاهزة مع المنصّات الكبرى</li></ul></div>
+    <div class="con"><b>✘ نقاط الضعف</b><ul><li>مكلف على الحجم الصغير (رسوم الزيادة)</li><li>مرتبط بـ Shopify أساسًا</li><li>ملاحظة: تشير مصادر إلى استحواذ وضمّه لمنصّة أكبر (يحتاج تأكيدًا)</li></ul></div>
+  </div>
+</div>
+
+<!-- KEPIXEL -->
+<div class="tool" style="--c:var(--kepixel)">
+  <div class="tool-head">
+    <h3>Kepixel</h3>
+    <span class="role">منصّة تحليلات + إسناد</span>
+    <span class="oneliner">«أنا منصّة تحليلات كاملة بالذكاء الاصطناعي — ويب وموبايل»</span>
+  </div>
+  <dl>
+    <div class="row"><dt>التعريف</dt><dd>ليست استضافة كـ Stape ولا حل Shopify كـ Elevar، بل <b>منصّة تحليلات قائمة بذاتها</b> دُمج فيها التتبّع من الخادم — أقرب لمزيج «تحليلات منتج + إسناد + تتبّع خادمي» في مكان واحد.</dd></div>
+    <div class="row"><dt>أبرز القدرات</dt><dd>تتبّع خادمي مع <b>تنظيف وإزالة تكرار</b> الأحداث قبل إرسالها، و<b>إسناد رحلة العميل الكاملة</b> (متعدّد اللمسات)، و<b>رؤى مدعومة بالذكاء الاصطناعي</b>، وتوحيد هوية العميل عبر الأجهزة.</dd></div>
+    <div class="row"><dt>الميزة المميِّزة</dt><dd>يعمل على <b>الويب وتطبيقات الموبايل معًا</b> — خلافًا لـ Stape وElevar اللذين يتمحوران حول الويب. هذا يقرّبه من منصّات تحليلات المنتج.</dd></div>
+    <div class="row"><dt>التسعير</dt><dd>يُوصف بأنه «شفّاف وقابل للتوسّع حسب الأحداث»، لكن الأرقام الفعلية للباقات غير معلنة في المصادر العامة (الموقع يحجب القراءة الآلية).</dd></div>
+    <div class="row"><dt>لمن؟</dt><dd>الأنشطة التي تريد <b>منصّة تحليلات وإسناد كاملة</b> (لا مجرد إرسال أحداث)، خاصةً من يملك ويبًا وتطبيق موبايل معًا.</dd></div>
+  </dl>
+  <div class="sw">
+    <div class="pro"><b>✔ نقاط القوة</b><ul><li>منصّة كاملة: تحليلات + إسناد + ذكاء اصطناعي</li><li>ويب + تطبيقات موبايل</li><li>إزالة تكرار الأحداث على الخادم</li><li>توحيد هوية العميل</li></ul></div>
+    <div class="con"><b>✘ نقاط الضعف</b><ul><li>أرقام التسعير غير معلنة</li><li>منصّة مغلقة (لا تستضيف حاوية GTM الخاصة بك)</li><li>أحدث وأقل انتشارًا من Stape</li></ul></div>
+  </div>
+</div>
+
+<div class="break"></div>
+
+<!-- ===================== 4. المقارنة ===================== -->
+<div class="section-title">
+  <div class="num">٤</div>
+  <h2>جدول المقارنة الثلاثي</h2>
+</div>
+
+<table class="cmp">
+  <thead>
+    <tr>
+      <th>المعيار</th>
+      <th class="s">Stape</th>
+      <th class="e">Elevar</th>
+      <th class="k">Kepixel</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td class="feat">النوع</td><td>استضافة sGTM (بنية تحتية)</td><td>حل تتبّع مُدار</td><td>منصّة تحليلات + إسناد</td></tr>
+    <tr><td class="feat">ماذا يفعل</td><td>يشغّل حاوية جوجل + Power-ups</td><td>Data Layer + أحداث خادمية + هوية</td><td>تتبّع + إسناد + رؤى ذكاء اصطناعي</td></tr>
+    <tr><td class="feat">المنصّة</td><td>أي منصّة (ويب)</td><td>Shopify (ويب)</td><td>ويب + تطبيقات موبايل</td></tr>
+    <tr><td class="feat">يستضيف حاوية جوجل؟</td><td>نعم — هذا جوهر عمله</td><td>جزئيًا (مُدار)</td><td>لا — منصّة خاصة</td></tr>
+    <tr><td class="feat">أقوى ميزة</td><td>Power-ups + Gateways</td><td>إثراء الجلسات + الهوية</td><td>ذكاء اصطناعي + إسناد + موبايل</td></tr>
+    <tr><td class="feat">التحكّم التقني</td><td>عالٍ (تبنيه بنفسك)</td><td>منخفض (جاهز)</td><td>منخفض (منصّة)</td></tr>
+    <tr><td class="feat">التسعير</td><td>شفّاف، من ~20$/شهر</td><td>خطط + رسوم زيادة، مرتفع</td><td>حسب الأحداث (غير معلن)</td></tr>
+    <tr><td class="feat">لمن؟</td><td>مطوّرون / وكالات</td><td>تجّار Shopify</td><td>من يريد منصّة تحليلات كاملة</td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <h4>كيف تحفظها بسرعة</h4>
+  <p style="margin:0">
+    <b style="color:var(--stape)">Stape</b> = «أستضيف لك عقل جوجل» (بنية تحتية) &nbsp;·&nbsp;
+    <b style="color:var(--elevar)">Elevar</b> = «أضبط لك Shopify بالكامل» (حل جاهز) &nbsp;·&nbsp;
+    <b style="color:var(--kepixel)">Kepixel</b> = «منصّة تحليلات كاملة، ويب وموبايل» (منصّة).
+  </p>
+</div>
+
+<div class="break"></div>
+
+<!-- ===================== 5. الربط بـ easytrac ===================== -->
+<div class="section-title">
+  <div class="num">٥</div>
+  <h2>الموقع الاستراتيجي لـ easytrac.io</h2>
+</div>
+<p class="lead">الأدوات الثلاث ترسم «سُلّمًا للتموضّع»، و easytrac يستطيع أن يحدّد بدقّة أين يقف:</p>
+
+<div class="ladder">
+  <div class="step"><span class="b" style="background:var(--stape)">Stape</span><p>الأرخص والأكثر مرونة، لكنه يتطلّب أن تبنيه بنفسك (DIY).</p></div>
+  <div class="step"><span class="b" style="background:var(--elevar)">Elevar</span><p>حل جاهز ومريح، لكنه مكلف ومحصور في Shopify.</p></div>
+  <div class="step"><span class="b" style="background:var(--kepixel)">Kepixel</span><p>قيمة أعلى عبر طبقة الإسناد والذكاء الاصطناعي، لكنه منصّة مغلقة.</p></div>
+  <div class="step"><span class="b" style="background:var(--primary)">easytrac</span><p>يقوم بـ «التزويد التلقائي» (Provisioning) لحاويات sGTM مُدارة — أي أقرب لمنطقة Elevar في الراحة، وStape في البنية.</p></div>
+</div>
+
+<div class="callout">
+  <h4>التوصيات (الدروس المستخلصة)</h4>
+  <ol>
+    <li><b>سدّ فجوة الـ CAPI أولاً:</b> الميزة التي تجعل العملاء يدفعون لـ Elevar هي أن وسوم Meta/TikTok CAPI <b>تعمل فعليًا</b>. إن كانت الحاويات المُصدَّرة تكتفي بـ GA4، فهذا شرط دخول السوق وليس ميزة إضافية.</li>
+    <li><b>اجعل سهولة التزويد سلاحك ضد Stape:</b> نقطة قوة easytrac هي الأتمتة. سوّقها في مواجهة طبيعة Stape اليدوية.</li>
+    <li><b>فكّر في طبقة «رؤى/إسناد» مبسّطة:</b> اتجاه السوق (كما يفعل Kepixel) ينتقل من «أرسل الأحداث» إلى «أعطني رؤى وإسنادًا فوقها». هذه الطبقة ترفع القيمة والسعر.</li>
+    <li><b>التموضّع المقترح:</b> «سهولة Elevar + شفافية وسعر Stape» — موقع وسطي مفيد وغير مزدحم.</li>
+    <li><b>استغل شفافية التسعير:</b> كلٌّ من Kepixel وElevar غير شفّافين في الأسعار؛ اجعل الوضوح ميزة بيع.</li>
+  </ol>
+</div>
+
+<div class="section-title">
+  <div class="num">٦</div>
+  <h2>حدود الدراسة والمصادر</h2>
+</div>
+<div class="note">
+  <b>حدود الدراسة:</b> أرقام تسعير Kepixel غير معلنة في المصادر العامة (الموقع يحجب القراءة الآلية)، وينبغي التأكّد منها مباشرةً. كذلك معلومة استحواذ Elevar مذكورة في مصدر واحد وتحتاج تأكيدًا مستقلاً. الأرقام الأخرى (النِّسب والأسعار) منقولة من صفحات المنتجات ومقارنات الطرف الثالث كما في تاريخ التقرير (يونيو 2026).
+</div>
+
+<ul class="sources">
+  <li>Stape — الموقع الرسمي والميزات والتسعير: <a href="https://stape.io/">stape.io</a> · <a href="https://stape.io/price">stape.io/price</a></li>
+  <li>Elevar — التتبّع من الخادم ومراجعة 2026: <a href="https://getelevar.com/server-side-tracking/">getelevar.com</a> · <a href="https://www.hubbvee.com/blog/elevar-server-side-tracking-review-2026">HUBBVEE</a></li>
+  <li>Kepixel — الميزات والتسعير: <a href="https://kepixel.com/features">kepixel.com/features</a> · <a href="https://kepixel.com/company-pages/pricing">kepixel.com/.../pricing</a></li>
+  <li>مقارنات السوق: <a href="https://www.littledata.io/vs/stape-vs-elevar">Littledata: Stape vs Elevar</a> · <a href="https://www.tracklution.com/learn/server-side-tracking/best-server-side-tracking-tools/">Tracklution: أفضل أدوات 2026</a></li>
+</ul>
+
+<div class="foot">
+  <span>easytrac.io — تقرير دراسة تنافسية</span>
+  <span>سرّي — للاستخدام الداخلي · يونيو 2026</span>
+</div>
+
+</body>
+</html>

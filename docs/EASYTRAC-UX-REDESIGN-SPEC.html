@@ -1,0 +1,867 @@
+<title>EasyTrac — UX Architecture Redesign Spec</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{
+  --ink:#0A0D13; --panel:#11151E; --panel-2:#161B26; --panel-3:#1C2230;
+  --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.15);
+  --text:#E7EBF3; --muted:#8B94A7; --faint:#5A6377;
+  --acc:#3B7BFF; --acc-soft:rgba(59,123,255,.14); --acc-line:rgba(59,123,255,.45);
+  --good:#2FBE8F; --good-soft:rgba(47,190,143,.14);
+  --warn:#F5A524; --warn-soft:rgba(245,165,36,.14);
+  --crit:#F5566E; --crit-soft:rgba(245,86,110,.14);
+  --mono:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --r:14px; --r-sm:9px;
+}
+:root[data-theme="light"]{
+  --ink:#F5F6F9; --panel:#FFFFFF; --panel-2:#F3F5F9; --panel-3:#E9EDF4;
+  --line:rgba(14,20,35,.10); --line-2:rgba(14,20,35,.18);
+  --text:#141A26; --muted:#5C6478; --faint:#98A0B2;
+  --acc:#2F6BFF; --acc-soft:rgba(47,107,255,.10); --acc-line:rgba(47,107,255,.4);
+  --good:#12996B; --good-soft:rgba(18,153,107,.12);
+  --warn:#B9770B; --warn-soft:rgba(185,119,11,.12);
+  --crit:#D63B54; --crit-soft:rgba(214,59,84,.12);
+}
+@media (prefers-color-scheme:light){
+  :root:not([data-theme="dark"]){
+    --ink:#F5F6F9; --panel:#FFFFFF; --panel-2:#F3F5F9; --panel-3:#E9EDF4;
+    --line:rgba(14,20,35,.10); --line-2:rgba(14,20,35,.18);
+    --text:#141A26; --muted:#5C6478; --faint:#98A0B2;
+    --acc:#2F6BFF; --acc-soft:rgba(47,107,255,.10); --acc-line:rgba(47,107,255,.4);
+    --good:#12996B; --good-soft:rgba(18,153,107,.12);
+    --warn:#B9770B; --warn-soft:rgba(185,119,11,.12);
+    --crit:#D63B54; --crit-soft:rgba(214,59,84,.12);
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
+body{margin:0;background:var(--ink);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.shell{display:grid;grid-template-columns:270px minmax(0,1fr);gap:0;max-width:1320px;margin:0 auto}
+
+/* ── TOC ── */
+.toc{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;border-right:1px solid var(--line);padding:26px 20px 40px;background:linear-gradient(180deg,var(--panel),var(--ink))}
+.toc-brand{display:flex;align-items:center;gap:10px;margin-bottom:22px}
+.toc-logo{width:30px;height:30px;border-radius:8px;background:var(--acc-soft);border:1px solid var(--acc-line);display:grid;place-items:center;flex-shrink:0}
+.toc-logo svg{width:18px;height:18px}
+.toc-brand b{font-size:14px;letter-spacing:-.2px}
+.toc-brand span{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:1.5px;color:var(--faint);text-transform:uppercase;margin-top:2px}
+.toc a{display:flex;gap:9px;align-items:baseline;text-decoration:none;color:var(--muted);font-size:13px;padding:6px 10px;border-radius:8px;line-height:1.35}
+.toc a .n{font-family:var(--mono);font-size:10.5px;color:var(--faint);min-width:20px}
+.toc a:hover{color:var(--text);background:var(--panel-2)}
+.toc a.on{color:var(--text);background:var(--acc-soft)}
+.toc a.on .n{color:var(--acc)}
+.toc-sec{font-family:var(--mono);font-size:9.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--faint);margin:18px 0 6px 10px}
+
+/* ── Main ── */
+main{padding:0 clamp(20px,4vw,60px) 120px;min-width:0}
+section{padding-top:56px;scroll-margin-top:20px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--acc)}
+h1{font-size:clamp(30px,4.6vw,46px);line-height:1.05;letter-spacing:-1.2px;margin:14px 0 0;text-wrap:balance;font-weight:800}
+h2{font-size:clamp(22px,3vw,30px);letter-spacing:-.7px;margin:8px 0 4px;font-weight:750;text-wrap:balance}
+h3{font-size:17px;letter-spacing:-.2px;margin:26px 0 8px;font-weight:700}
+h4{font-size:13.5px;margin:18px 0 6px;font-weight:700;color:var(--text)}
+p{margin:10px 0;max-width:74ch;color:var(--text)}
+.lead{font-size:18px;color:var(--muted);max-width:70ch}
+.muted{color:var(--muted)}
+strong{color:var(--text);font-weight:680}
+code{font-family:var(--mono);font-size:.86em;background:var(--panel-2);border:1px solid var(--line);border-radius:5px;padding:1px 5px;color:var(--text)}
+hr.sep{border:0;border-top:1px solid var(--line);margin:52px 0 0}
+a.inline{color:var(--acc);text-decoration:none;border-bottom:1px solid var(--acc-line)}
+
+/* hero */
+.hero{border:1px solid var(--line);border-radius:20px;padding:38px;background:
+  radial-gradient(120% 140% at 100% 0%,var(--acc-soft),transparent 55%),var(--panel);margin-top:22px}
+.hero .lead{margin-top:14px}
+.metastrip{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+.metastrip .m{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--panel-2);border:1px solid var(--line);border-radius:100px;padding:5px 12px}
+.metastrip .m b{color:var(--text)}
+
+/* callout */
+.callout{border:1px solid var(--line);border-left:3px solid var(--acc);background:var(--panel);border-radius:0 12px 12px 0;padding:16px 20px;margin:20px 0}
+.callout.crit{border-left-color:var(--crit)}
+.callout.good{border-left-color:var(--good)}
+.callout .k{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+
+/* finding cards */
+.find{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);margin:16px 0;overflow:hidden}
+.find-h{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+.find-h .tag{font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--faint)}
+.find-h b{font-size:15px}
+.sev{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.sev.hi{background:var(--crit);box-shadow:0 0 0 3px var(--crit-soft)}
+.sev.md{background:var(--warn);box-shadow:0 0 0 3px var(--warn-soft)}
+.sev.lo{background:var(--good);box-shadow:0 0 0 3px var(--good-soft)}
+.tri{display:grid;grid-template-columns:1fr 1fr 1fr}
+.tri>div{padding:14px 18px;border-right:1px solid var(--line)}
+.tri>div:last-child{border-right:0}
+.tri .lab{font-family:var(--mono);font-size:9.5px;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.tri .stape .lab{color:var(--good)}
+.tri .et .lab{color:var(--crit)}
+.tri .win .lab{color:var(--acc)}
+.tri p{font-size:13px;margin:0;color:var(--muted);max-width:none}
+.tri .win{background:var(--acc-soft)}
+@media(max-width:720px){.tri{grid-template-columns:1fr}.tri>div{border-right:0;border-bottom:1px solid var(--line)}}
+
+/* wireframe */
+.wf{border:1px solid var(--line-2);border-radius:12px;background:var(--panel);overflow:hidden;margin:14px 0;font-family:var(--mono);box-shadow:0 20px 50px -30px rgba(0,0,0,.6)}
+.wf-bar{display:flex;align-items:center;gap:6px;padding:9px 12px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+.wf-bar .dot{width:8px;height:8px;border-radius:50%;background:var(--line-2)}
+.wf-bar .u{margin-left:10px;font-size:10px;color:var(--faint);background:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 10px;flex:1}
+.wf-body{display:flex;min-height:120px}
+.wf-side{width:150px;border-right:1px solid var(--line);padding:12px 10px;background:linear-gradient(180deg,var(--panel-2),var(--panel));flex-shrink:0}
+.wf-side .np{font-size:10px;color:var(--muted);padding:6px 8px;border-radius:6px;margin-bottom:3px;display:flex;gap:7px;align-items:center}
+.wf-side .np::before{content:"";width:11px;height:11px;border-radius:3px;background:var(--line-2);flex-shrink:0}
+.wf-side .np.on{background:var(--acc-soft);color:var(--acc)}
+.wf-side .np.on::before{background:var(--acc)}
+.wf-side .grp{font-size:8.5px;letter-spacing:1.4px;color:var(--faint);margin:12px 0 5px 4px;text-transform:uppercase}
+.wf-main{flex:1;padding:16px;min-width:0}
+.wf-h{font-size:12px;color:var(--text);margin-bottom:3px;font-family:var(--sans);font-weight:700}
+.wf-sub{font-size:10px;color:var(--faint);margin-bottom:12px}
+.wf-line{height:8px;border-radius:4px;background:var(--panel-3);margin:6px 0}
+.wf-line.s{width:40%}.wf-line.m{width:65%}.wf-line.l{width:88%}
+.wf-grid{display:grid;gap:8px;margin:8px 0}
+.wf-card{border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--panel-2);min-height:52px}
+.wf-card .t{font-size:10px;color:var(--muted);font-family:var(--sans);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.wf-btn{display:inline-block;font-size:10px;padding:6px 12px;border-radius:6px;font-family:var(--sans);font-weight:700}
+.wf-btn.pri{background:var(--acc);color:#fff}
+.wf-btn.gho{background:transparent;border:1px solid var(--line-2);color:var(--muted)}
+.wf-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;padding:2px 8px;border-radius:100px;font-family:var(--sans);font-weight:600}
+.wf-pill::before{content:"";width:6px;height:6px;border-radius:50%}
+.wf-pill.good{background:var(--good-soft);color:var(--good)}.wf-pill.good::before{background:var(--good)}
+.wf-pill.warn{background:var(--warn-soft);color:var(--warn)}.wf-pill.warn::before{background:var(--warn)}
+.wf-pill.crit{background:var(--crit-soft);color:var(--crit)}.wf-pill.crit::before{background:var(--crit)}
+.wf-pill.idle{background:var(--panel-3);color:var(--faint)}.wf-pill.idle::before{background:var(--faint)}
+.wf-note{font-family:var(--sans);font-size:12px;color:var(--muted);margin:6px 0 20px;padding-left:14px;border-left:2px solid var(--line)}
+.wf-cap{font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--acc);margin:24px 0 2px}
+
+/* stepper mini */
+.rail{display:flex;gap:0;margin:10px 0}
+.rail .st{flex:1;text-align:center;position:relative;font-family:var(--sans)}
+.rail .st .c{width:20px;height:20px;border-radius:50%;margin:0 auto 5px;display:grid;place-items:center;font-size:9px;font-family:var(--mono);border:1px solid var(--line-2);color:var(--faint);background:var(--panel)}
+.rail .st.done .c{background:var(--good);border-color:var(--good);color:#fff}
+.rail .st.now .c{background:var(--acc);border-color:var(--acc);color:#fff}
+.rail .st .l{font-size:9px;color:var(--muted)}
+.rail .st.now .l{color:var(--text)}
+.rail .st::after{content:"";position:absolute;top:10px;left:60%;width:80%;height:1px;background:var(--line-2)}
+.rail .st:last-child::after{display:none}
+.rail .st.done::after{background:var(--good)}
+
+/* flow */
+.flow{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;margin:16px 0}
+.flow .node{flex:1;min-width:150px;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 14px;position:relative}
+.flow .node .s{font-family:var(--mono);font-size:9.5px;letter-spacing:1px;color:var(--acc);text-transform:uppercase}
+.flow .node .t{font-size:13px;font-weight:700;margin:5px 0 3px}
+.flow .node .d{font-size:11.5px;color:var(--muted)}
+.flow .node .pa{margin-top:8px;font-family:var(--mono);font-size:9.5px;color:var(--good);display:flex;align-items:center;gap:5px}
+.flow .arr{align-self:center;color:var(--faint);font-size:18px}
+@media(max-width:720px){.flow{flex-direction:column}.flow .arr{transform:rotate(90deg)}}
+
+/* nav map tree */
+.tree{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:22px 24px;font-family:var(--mono);font-size:13px;margin:16px 0;overflow-x:auto}
+.tree .l0{color:var(--text);font-weight:700;padding:5px 0;display:flex;gap:10px;align-items:center}
+.tree .l1{color:var(--muted);padding:3px 0 3px 26px;position:relative}
+.tree .l1::before{content:"";position:absolute;left:8px;top:0;bottom:50%;width:12px;border-left:1px solid var(--line-2);border-bottom:1px solid var(--line-2)}
+.tree .l2{color:var(--faint);padding:2px 0 2px 52px;font-size:12px}
+.tree .badge{font-size:9px;font-family:var(--sans);padding:1px 7px;border-radius:100px;margin-left:6px}
+.tree .badge.core{background:var(--acc-soft);color:var(--acc)}
+.tree .badge.adv{background:var(--panel-3);color:var(--faint)}
+.tree .pa{color:var(--good);font-family:var(--sans);font-size:10px;margin-left:8px}
+
+/* component tree */
+.ctree{font-family:var(--mono);font-size:12.5px;line-height:1.85;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:20px 24px;overflow-x:auto;white-space:pre;color:var(--muted)}
+.ctree b{color:var(--text);font-weight:700}
+.ctree .c{color:var(--acc)}
+
+/* table */
+.tbl-wrap{overflow-x:auto;margin:16px 0;border:1px solid var(--line);border-radius:var(--r)}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:640px}
+th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--faint);background:var(--panel-2);position:sticky;top:0}
+tbody tr:hover{background:var(--panel-2)}
+td.n{font-family:var(--mono);color:var(--faint);font-variant-numeric:tabular-nums}
+.chip{font-family:var(--sans);font-size:10.5px;font-weight:700;padding:2px 9px;border-radius:100px;white-space:nowrap}
+.chip.h{background:var(--crit-soft);color:var(--crit)}
+.chip.m{background:var(--warn-soft);color:var(--warn)}
+.chip.l{background:var(--good-soft);color:var(--good)}
+.chip.p0{background:var(--acc-soft);color:var(--acc)}
+
+/* principle grid */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:18px 0}
+.pcard{border:1px solid var(--line);border-radius:12px;padding:16px;background:var(--panel)}
+.pcard .i{font-family:var(--mono);font-size:11px;color:var(--acc)}
+.pcard b{display:block;margin:6px 0 4px;font-size:14px}
+.pcard p{font-size:12.5px;color:var(--muted);margin:0}
+
+.themebtn{position:fixed;top:14px;right:16px;z-index:20;font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--panel);border:1px solid var(--line-2);border-radius:100px;padding:7px 14px;cursor:pointer}
+.themebtn:hover{color:var(--text);border-color:var(--acc-line)}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px}
+
+@media(max-width:900px){
+  .shell{grid-template-columns:1fr}
+  .toc{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}
+  .themebtn{position:static;margin:12px}
+}
+</style>
+
+<button class="themebtn" onclick="(function(){var r=document.documentElement;var d=r.getAttribute('data-theme')==='dark'||(!r.getAttribute('data-theme')&&matchMedia('(prefers-color-scheme:dark)').matches);r.setAttribute('data-theme',d?'light':'dark');})()">◐ theme</button>
+
+<div class="shell">
+  <nav class="toc" aria-label="Contents">
+    <div class="toc-brand">
+      <span class="toc-logo"><svg viewBox="0 0 120 120" fill="none"><path d="M72 30 L36 30 L36 90 L72 90" stroke="var(--acc)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 60 L88 60" stroke="var(--acc)" stroke-width="12" stroke-linecap="round"/><circle cx="98" cy="60" r="9" fill="var(--acc)"/></svg></span>
+      <div><b>EasyTrac</b><span>UX Redesign · v1</span></div>
+    </div>
+    <div class="toc-sec">Diagnosis</div>
+    <a href="#intro"><span class="n">00</span><span>The core problem</span></a>
+    <a href="#audit"><span class="n">01</span><span>Full UI/UX audit</span></a>
+    <div class="toc-sec">Redesign</div>
+    <a href="#ia"><span class="n">02</span><span>Information architecture</span></a>
+    <a href="#modes"><span class="n">03</span><span>Progressive disclosure</span></a>
+    <a href="#nav"><span class="n">04</span><span>Navigation map</span></a>
+    <a href="#screens"><span class="n">05</span><span>Screen hierarchy</span></a>
+    <a href="#wireframes"><span class="n">06</span><span>Wireframes</span></a>
+    <a href="#components"><span class="n">07</span><span>Component system</span></a>
+    <a href="#flows"><span class="n">08</span><span>User flows</span></a>
+    <div class="toc-sec">Execution</div>
+    <a href="#migration"><span class="n">09</span><span>Migration strategy</span></a>
+    <a href="#priorities"><span class="n">10</span><span>Prioritized roadmap</span></a>
+    <a href="#approve"><span class="n">11</span><span>Status &amp; next step</span></a>
+  </nav>
+
+  <main>
+    <section id="intro">
+      <div class="hero">
+        <div class="eyebrow">UX Architecture Spec · v1 approved · amendments applied</div>
+        <h1>Redesigning EasyTrac from a tool into a product.</h1>
+        <p class="lead">Studied against Stape's information architecture, navigation, dashboard model, onboarding and status design — then rebuilt around one idea: <strong>people don't think in GTM containers, they think in "is my store's tracking working"</strong> — while keeping GTM reachable for the pros via progressive disclosure. v1 approved; the P0 build plan is now in progress (§11).</p>
+        <div class="metastrip">
+          <span class="m"><b>19,850</b> lines in one tool.html</span>
+          <span class="m"><b>1,049</b> inline style attrs</span>
+          <span class="m"><b>8</b> media queries total</span>
+          <span class="m"><b>5 / 10</b> nav items are "Soon"</span>
+          <span class="m"><b>3</b> heroes on one screen</span>
+        </div>
+      </div>
+
+      <h2>The one problem underneath all the others</h2>
+      <p>The current app names itself after its plumbing. The sidebar reads <code>Pixel Config</code>, <code>GTM Container</code>, <code>Managed sGTM</code>, <code>Versions</code>, <code>Deployments</code>, <code>Audit</code> — these are <em>implementation stages</em>, not things a merchant wants. A Salla store owner has exactly two questions: <strong>"is my tracking set up?"</strong> and <strong>"is my ad data accurate right now?"</strong> Nothing in the nav answers either directly.</p>
+      <p>Stripe never makes you think about idempotency keys to see whether you got paid — but the full developer surface is always there when you reach for it. That's the model: <strong>reorganize around the merchant's objects (Store → Destinations → Data) as the default, and keep the GTM machinery visible under an "Operations" group that a user opens when they want to go deeper.</strong> Outcomes for merchants, full control for pros — progressive disclosure, not two products.</p>
+
+      <div class="callout">
+        <div class="k">Guiding constraints (yours — kept literally)</div>
+        <p style="margin:8px 0 0">Reduce cognitive load · never show everything at once · progressive disclosure · one primary action per page · clear success/failure on every action · every page states system status immediately · onboarding under 5 minutes.</p>
+      </div>
+    </section>
+
+    <hr class="sep">
+    <section id="audit">
+      <div class="eyebrow">01 · Diagnosis</div>
+      <h2>Full UI/UX audit</h2>
+      <p class="lead">Every dimension you listed, graded against Stape. Each card: what Stape does better, what EasyTrac does worse today, and the move that lets us surpass them. Severity reflects impact on the merchant's ability to succeed.</p>
+
+      <!-- 1 -->
+      <div class="find">
+        <div class="find-h"><span class="sev hi"></span><span class="tag">01 · Information architecture</span><b>The nav exposes plumbing, not outcomes</b></div>
+        <div class="tri">
+          <div class="stape"><div class="lab">◆ Stape better</div><p>Top level is objects a user owns: Containers, Gateways, power-ups. Machinery (Cloud Run, LBs) is never named. You navigate by <em>what you have</em>, not <em>how it's built</em>.</p></div>
+          <div class="et"><div class="lab">✕ EasyTrac worse</div><p>Sidebar mixes 4 overlapping models — Pixel Config, GTM Container, Managed sGTM, My Projects — with no clue which to use. "Container" and "Config" are the same job at different stages.</p></div>
+          <div class="win"><div class="lab">▲ How we surpass</div><p>Collapse to a single spine: <strong>Store → Destinations → Data</strong>. GTM/sGTM/versions/deployments become one "Infrastructure" drawer, opened only by power users.</p></div>
+        </div>
+      </div>
+
+      <!-- 2 -->
+      <div class="find">
+        <div class="find-h"><span class="sev hi"></span><span class="tag">02 · Navigation hierarchy</span><b>Half the navigation is dead</b></div>
+        <div class="tri">
+          <div class="stape"><div class="lab">◆ Stape better</div><p>Every nav entry leads somewhere real. Unbuilt/premium capability appears contextually as an upsell inside the relevant screen, not as a permanently greyed peer.</p></div>
+          <div class="et"><div class="lab">✕ EasyTrac worse</div><p>5 of 10 items carry a "Soon" badge (Managed sGTM, Versions, Deployments, Health, Audit). The user scans a menu that's 50% broken promises — pure cognitive load and eroded trust.</p></div>
+          <div class="win"><div class="lab">▲ How we surpass</div><p>Ship <strong>4 real destinations</strong>. Roadmap items live in a separate "Coming soon" tray or unlock progressively as the store matures — never as inert nav.</p></div>
+        </div>
+      </div>
+
+      <!-- 3 -->
+      <div class="find">
+        <div class="find-h"><span class="sev hi"></span><span class="tag">03 · Dashboard / visual hierarchy</span><b>Three heroes, zero system status</b></div>
+        <div class="tri">
+          <div class="stape"><div class="lab">◆ Stape better</div><p>Dashboard opens with request volume, health, and logs — the answer to "is it working?" is the first thing you see. Summary before detail.</p></div>
+          <div class="et"><div class="lab">✕ EasyTrac worse</div><p>Overview stacks a profile card + a marketing hero ("Setup pixels in minutes not hours") + Active Pixels + a Bento "Setup Summary." A marketing hero <em>inside</em> the app is the wrong altitude, and there are two competing primary CTAs.</p></div>
+          <div class="win"><div class="lab">▲ How we surpass</div><p>A <strong>tracking command center</strong>: health headline ("Your tracking is healthy · 1,204 events today · 0 issues"), connected destinations, and a recent-activity feed — the four tracking questions, always. One state-driven primary action. Kill the in-app marketing hero; never a generic SaaS dashboard.</p></div>
+        </div>
+      </div>
+
+      <!-- 4 -->
+      <div class="find">
+        <div class="find-h"><span class="sev hi"></span><span class="tag">04 · Onboarding / first-run</span><b>No guided first 5 minutes</b></div>
+        <div class="tri">
+          <div class="stape"><div class="lab">◆ Stape better</div><p>Free tier, no card, a Setup Assistant and Tracking Checker that walk you from zero to a live container with verification at the end.</p></div>
+          <div class="et"><div class="lab">✕ EasyTrac worse</div><p>New user lands on a dashboard for a store that has nothing yet, plus an "account under review" wall. Empty state is a marketing hero, not a first step. No verification that the first event actually fired.</p></div>
+          <div class="win"><div class="lab">▲ How we surpass</div><p>A 4-step guided run (<strong>Store → Platform → First destination → Verify live event</strong>) with a persistent checklist. Success = a real event appears. Target &lt;5 min, provable.</p></div>
+        </div>
+      </div>
+
+      <!-- 5 -->
+      <div class="find">
+        <div class="find-h"><span class="sev md"></span><span class="tag">05 · Provisioning / deployment progress</span><b>The most impressive moment is invisible</b></div>
+        <div class="tri">
+          <div class="stape"><div class="lab">◆ Stape better</div><p>Container spin-up shows discrete states and lands on a clear "live" screen with the endpoint URL.</p></div>
+          <div class="et"><div class="lab">✕ EasyTrac worse</div><p>Real end-to-end automation (create GTM → deploy → wire transport) runs as fire-and-forget with a 5-dot stepper buried in a tab. The genuinely hard, valuable work reads as a spinner.</p></div>
+          <div class="win"><div class="lab">▲ How we surpass</div><p>A full-screen <strong>live provisioning theater</strong>: named steps streaming in real time, per-step success ticks, retry-on-fail per step, ending on "Container live + first event verified."</p></div>
+        </div>
+      </div>
+
+      <!-- 6 -->
+      <div class="find">
+        <div class="find-h"><span class="sev hi"></span><span class="tag">06 · Health visualization / status indicators</span><b>The headline promise is gated "Soon"</b></div>
+        <div class="tri">
+          <div class="stape"><div class="lab">◆ Stape better</div><p>Ships Logs + Monitoring rules as everyday features — real request/response inspection and alerts.</p></div>
+          <div class="et"><div class="lab">✕ EasyTrac worse</div><p>There's a Health view (score ring + per-platform grid) but it's locked behind "Soon," and the app goes blind after provisioning. Your #1 sales promise ("24/7 monitoring + auto-fix") has no shipped surface.</p></div>
+          <div class="win"><div class="lab">▲ How we surpass</div><p>Make <strong>Data Health the second nav item</strong> and ship it first. Per-destination status, match-quality score, drift alerts, "last event N sec ago." This is the differentiator — treat it as core, not premium.</p></div>
+        </div>
+      </div>
+
+      <!-- 7 -->
+      <div class="find">
+        <div class="find-h"><span class="sev md"></span><span class="tag">07 · Logs UX</span><b>No live event stream at all</b></div>
+        <div class="tri">
+          <div class="stape"><div class="lab">◆ Stape better</div><p>Filterable logs by client, event name, status code — the tool people actually debug with, and a retention upsell ladder (3→10 days→export).</p></div>
+          <div class="et"><div class="lab">✕ EasyTrac worse</div><p>No request log exists. A merchant who suspects tracking broke has nothing to look at and must trust or churn.</p></div>
+          <div class="win"><div class="lab">▲ How we surpass</div><p>A <strong>live event inspector</strong>: streaming rows, filter by event/destination/status, click a row → full payload + which destinations accepted it. Retention tiers mirror Stape's ladder.</p></div>
+        </div>
+      </div>
+
+      <!-- 8 -->
+      <div class="find">
+        <div class="find-h"><span class="sev md"></span><span class="tag">08 · Platform configuration UX</span><b>Events + credentials crammed into accordions inside a wizard tab</b></div>
+        <div class="tri">
+          <div class="stape"><div class="lab">◆ Stape better</div><p>Each destination (Meta, TikTok…) is its own Gateway with a focused, single-platform setup — no-code, one thing at a time.</p></div>
+          <div class="et"><div class="lab">✕ EasyTrac worse</div><p>Per-platform events + credentials live in stacked accordions (<code>pc-ss-accordions</code>) under a sub-tab of Pixel Config. Everything is visible at once; nothing is focused.</p></div>
+          <div class="win"><div class="lab">▲ How we surpass</div><p>A <strong>Destination is a first-class object</strong> with its own detail page: Overview · Events · Credentials · Health · Logs as tabs. Add one at a time via a focused sheet.</p></div>
+        </div>
+      </div>
+
+      <!-- 9 -->
+      <div class="find">
+        <div class="find-h"><span class="sev md"></span><span class="tag">09 · Empty & loading states</span><b>Marketing where guidance belongs; spinners where skeletons belong</b></div>
+        <div class="tri">
+          <div class="stape"><div class="lab">◆ Stape better</div><p>Empty states point at the next action; loading uses structured placeholders so the layout doesn't jump.</p></div>
+          <div class="et"><div class="lab">✕ EasyTrac worse</div><p>Empty overview = a hero ad. "Active Pixels" simply doesn't render until data exists, so first-run is a void. ~89 loading/placeholder references but no consistent skeleton system.</p></div>
+          <div class="win"><div class="lab">▲ How we surpass</div><p>Every list gets a purposeful empty state (illustration + one CTA) and a matching skeleton. Empty = "here's your next step," never a billboard.</p></div>
+        </div>
+      </div>
+
+      <!-- 10 -->
+      <div class="find">
+        <div class="find-h"><span class="sev hi"></span><span class="tag">10 · Mobile responsiveness</span><b>Effectively desktop-only</b></div>
+        <div class="tri">
+          <div class="stape"><div class="lab">◆ Stape better</div><p>Fully responsive marketing + usable app on tablet/phone.</p></div>
+          <div class="et"><div class="lab">✕ EasyTrac worse</div><p>8 <code>@media</code> rules across 19,850 lines and 1,049 inline styles. The fixed sidebar + inline widths don't collapse. KSA merchants are mobile-first — this is a reach problem, not a polish problem.</p></div>
+          <div class="win"><div class="lab">▲ How we surpass</div><p>Rebuild in the existing Next.js + design-token scaffold, mobile-first: sidebar → bottom tab bar / drawer, cards reflow, wizard is single-column by default.</p></div>
+        </div>
+      </div>
+
+      <!-- 11 -->
+      <div class="find">
+        <div class="find-h"><span class="sev md"></span><span class="tag">11 · Forms · error & success feedback</span><b>Feedback is ad-hoc, not systematic</b></div>
+        <div class="tri">
+          <div class="stape"><div class="lab">◆ Stape better</div><p>Inline validation, explicit success confirmation, consistent toasts.</p></div>
+          <div class="et"><div class="lab">✕ EasyTrac worse</div><p>~39 scattered toast/alert references, no unified pattern. Credential fields (pixel IDs, tokens) lack inline validation, so a typo surfaces as a silent tracking failure days later.</p></div>
+          <div class="win"><div class="lab">▲ How we surpass</div><p>One feedback contract: inline validate on blur, optimistic action → toast that names the result ("Meta connected · test event received"), errors that say what to fix.</p></div>
+        </div>
+      </div>
+
+      <!-- 12 -->
+      <div class="find">
+        <div class="find-h"><span class="sev lo"></span><span class="tag">12 · Settings · search · tables · maintainability</span><b>Settings in a modal; no search; one unsplittable file</b></div>
+        <div class="tri">
+          <div class="stape"><div class="lab">◆ Stape better</div><p>Dedicated settings area, searchable tables, componentized UI that scales.</p></div>
+          <div class="et"><div class="lab">✕ EasyTrac worse</div><p>Settings is a <code>toggleSettings()</code> modal; only ~10 tables and no global search/filter; 1,049 inline styles make consistent change impossible. The Next.js rebuild target exists but is empty.</p></div>
+          <div class="win"><div class="lab">▲ How we surpass</div><p>Settings as a real sectioned page; ⌘K command palette + per-table filter; ship the token-based component library the scaffold is already set up for.</p></div>
+        </div>
+      </div>
+
+      <div class="callout good">
+        <div class="k">What's already right — protect it</div>
+        <p style="margin:8px 0 0">Real end-to-end GTM automation (not a mockup) · Arabic-first + Salla/Zid native · Snapchat strength for KSA · a design-token + Next.js scaffold already in place. The redesign <strong>keeps EasyTrac's brand and these strengths</strong> — it only changes structure.</p>
+      </div>
+    </section>
+
+    <hr class="sep">
+    <section id="ia">
+      <div class="eyebrow">02 · Redesign</div>
+      <h2>New information architecture</h2>
+      <p class="lead">Shift from a <em>stage-based</em> model (config → container → deploy → monitor) to an <em>object-based</em> model. The user manipulates three nouns; everything else is infrastructure the system manages for them.</p>
+
+      <div class="pgrid">
+        <div class="pcard"><div class="i">OBJECT 01</div><b>Store</b><p>The workspace. One per merchant site (Salla/Zid/custom). Holds brand, plan, team, and the connection to the CMS. The top-level switcher.</p></div>
+        <div class="pcard"><div class="i">OBJECT 02</div><b>Destination</b><p>One ad/analytics endpoint: Meta CAPI, TikTok, Snapchat, GA4, Google Ads. First-class, with its own events, credentials, health and logs. This is where value lives.</p></div>
+        <div class="pcard"><div class="i">OBJECT 03</div><b>Event stream</b><p>The live flow of tracked actions (purchase, add_to_cart…) fanning out to destinations. The thing Health and Logs read from — the proof it works.</p></div>
+      </div>
+
+      <h3>GTM &amp; the machinery move to "Operations" — visible, not hidden</h3>
+      <p>The GTM container, the managed sGTM server, versions, deployments and the audit trail are <strong>not</strong> the top-level spine anymore — but they are <strong>not hidden either</strong>. They group under an expandable <strong>Operations</strong> section that stays visible to everyone, and they open on demand via progressive disclosure (§03). A store owner can ignore Operations; an agency or technical marketer expects GTM to be right there, and it is. The launch roadmap ("Soon" capabilities) also lives here, visible — not deleted. This is progressive disclosure by <em>intent, growth and context</em>, not by removal or a mode setting.</p>
+
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Merchant question</th><th>Old answer (stage)</th><th>New answer (object)</th></tr></thead>
+        <tbody>
+          <tr><td>Is my tracking set up?</td><td class="muted">Pixel Config → GTM Container → Managed sGTM (which?)</td><td><strong>Home</strong> — one status line + one action</td></tr>
+          <tr><td>Is Meta getting good data?</td><td class="muted">Not answerable</td><td><strong>Destinations → Meta → Health</strong></td></tr>
+          <tr><td>Did my sale get tracked?</td><td class="muted">Not answerable</td><td><strong>Events</strong> — live stream, click the row</td></tr>
+          <tr><td>Something broke — what?</td><td class="muted">No surface</td><td><strong>Home banner → Data Health → Logs</strong></td></tr>
+          <tr><td>Roll back a bad change</td><td class="muted">Versions / Deployments (Soon)</td><td><strong>Operations → Versions</strong> (expand to reach)</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <hr class="sep">
+    <section id="modes">
+      <div class="eyebrow">03 · Redesign</div>
+      <h2>Progressive disclosure — one product, revealed by depth</h2>
+      <p class="lead">There is <strong>no mode switch</strong> and no "two products." There is one continuous product. Technical capability isn't hidden behind a toggle — it <strong>surfaces where and when a user reaches for it</strong>: by opening Operations, expanding a "technical details" disclosure, or simply as their store matures. A merchant and an agency use the same screens; the agency just goes deeper.</p>
+
+      <div class="pgrid">
+        <div class="pcard"><div class="i">MECHANISM 1</div><b>Reveal by intent</b><p>Depth appears when the user asks for it: opening the <strong>Operations</strong> section, clicking a destination's <strong>GTM tab</strong>, or a "Show technical details" expander on a card. Nothing is pre-committed for them.</p></div>
+        <div class="pcard"><div class="i">MECHANISM 2</div><b>Reveal by growth</b><p>Capability unlocks as it becomes relevant: infrastructure detail appears once a container is live; version history appears after the first re-publish; export/alerts surface as volume grows.</p></div>
+        <div class="pcard"><div class="i">MECHANISM 3</div><b>Reveal by context</b><p>When something needs attention, the relevant depth comes to the user — a drift banner links straight into the GTM container view — rather than living behind a persistent "advanced" wall.</p></div>
+      </div>
+
+      <h4>Every technical surface has a default-collapsed disclosure — not a mode</h4>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Surface</th><th>Always shown (outcome)</th><th>Revealed on demand (how)</th></tr></thead>
+        <tbody>
+          <tr><td>Home</td><td>Health headline · events today · destinations · one action</td><td>Infra detail via "Show infrastructure" — appears once a container is live</td></tr>
+          <tr><td>Destination detail</td><td>Overview · Health · Credentials</td><td>GTM tag mapping · transport URL — under a <em>GTM</em> tab you open</td></tr>
+          <tr><td>Events</td><td>Event name · destinations ok/failed</td><td>Full JSON payload · headers — expand the row</td></tr>
+          <tr><td>Operations</td><td>Section visible in nav, collapsed</td><td>GTM · Versions · Deployments · Audit — expand the section</td></tr>
+          <tr><td>Provisioning</td><td>Friendly named steps</td><td>Raw job log · container IDs — "View log" link</td></tr>
+        </tbody>
+      </table></div>
+      <div class="callout"><div class="k">Why disclosure beats a mode switch</div><p style="margin:8px 0 0">A mode toggle forces users to self-classify up front and splits the product in two. Progressive disclosure keeps <strong>one path</strong>: the merchant sees outcomes, the agency reaches one level deeper on the same screen, and a growing merchant graduates naturally with <em>no wall and no setting to discover</em>. The wedge stays <em>Arabic-first AND agency-credible</em> — without ever feeling like two apps.</p></div>
+    </section>
+
+    <hr class="sep">
+    <section id="nav">
+      <div class="eyebrow">04 · Redesign</div>
+      <h2>Navigation map</h2>
+      <p class="lead">From 10 flat items (5 dead peers) to a <strong>5-item core spine</strong> + a visible, expandable <strong>Operations</strong> group that holds GTM and the launch roadmap + a mode toggle. Nothing is deleted — the roadmap stays on the map.</p>
+
+      <div class="tree">
+        <div class="l0">⊞ &nbsp;Store switcher <span class="pa">← top of sidebar, swaps entire workspace</span></div>
+        <div class="l0" style="margin-top:14px">◉ &nbsp;Home <span class="badge core">core</span> <span class="pa">system status + the single next action</span></div>
+        <div class="l0" style="margin-top:10px">⇄ &nbsp;Destinations <span class="badge core">core</span> <span class="pa">the object list — Meta, TikTok, Snap, GA4, Ads</span></div>
+        <div class="l1">Destination detail → Overview · Events · Credentials · Health · Logs <span class="pa">(+ GTM tab in Advanced)</span></div>
+        <div class="l0" style="margin-top:10px">♥ &nbsp;Data Health <span class="badge core">core</span> <span class="pa">ships FIRST — the monitoring promise, made real</span></div>
+        <div class="l0" style="margin-top:10px">≣ &nbsp;Events <span class="badge core">core</span> <span class="pa">live inspector / logs</span></div>
+        <div class="l0" style="margin-top:10px">⚙ &nbsp;Settings <span class="badge core">core</span></div>
+        <div class="l1">Store · CMS connection · Team · Billing &amp; plan · API keys</div>
+        <div class="l0" style="margin-top:18px">▾ &nbsp;Operations <span class="badge adv">expandable · visible to all</span> <span class="pa">GTM &amp; roadmap — collapsed by default, expand to go deeper</span></div>
+        <div class="l1">GTM Container <span class="pa">live · advanced capability, not hidden</span></div>
+        <div class="l1">Managed sGTM <span class="badge adv">Soon → active</span></div>
+        <div class="l1">Versions <span class="badge adv">Soon → active</span></div>
+        <div class="l1">Deployments <span class="badge adv">Soon → active</span></div>
+        <div class="l1">Audit <span class="badge adv">Soon → active</span></div>
+        <div class="l1" style="color:var(--faint)">↑ slots are permanent — launching a feature flips its badge to active, in place</div>
+      </div>
+
+      <h4>Rules encoded in this map</h4>
+      <div class="pgrid">
+        <div class="pcard"><div class="i">RULE</div><b>Core is 5, always live</b><p>No dead peers in the primary spine. Every core item leads somewhere real and ships first.</p></div>
+        <div class="pcard"><div class="i">RULE</div><b>Roadmap stays visible</b><p>"Soon" items keep their badges, grouped under Operations — a roadmap, not clutter in the main nav.</p></div>
+        <div class="pcard"><div class="i">RULE</div><b>Operations is dynamic</b><p>The nav structure never reshuffles. When a feature launches, its "Soon" badge flips to active <em>in the same slot</em> — the map users learned stays stable.</p></div>
+        <div class="pcard"><div class="i">RULE</div><b>GTM is reachable, not hidden</b><p>Operations is visible to everyone and expands on demand. Agencies find GTM exactly where they expect it.</p></div>
+      </div>
+    </section>
+
+    <hr class="sep">
+    <section id="screens">
+      <div class="eyebrow">05 · Redesign</div>
+      <h2>Screen hierarchy</h2>
+      <p class="lead">Every screen, its single job, its one primary action, and the status it must communicate on load. Wireframe-level detail follows in §05.</p>
+
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Screen</th><th>Single job</th><th>One primary action</th><th>Status shown on load</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Onboarding wizard</strong></td><td>Zero → first verified event</td><td>Next step (contextual)</td><td>Step N of 4 + live checklist</td></tr>
+          <tr><td><strong>Home</strong> <span class="wf-pill good" style="font-size:9px">tracking-first</span></td><td>Answer "is my tracking working?"</td><td>State-driven: Set up / Fix / View events</td><td>Tracking health + events today (live) + connected destinations + recent activity</td></tr>
+          <tr><td><strong>Destinations (list)</strong></td><td>See all endpoints &amp; their status</td><td>Add destination</td><td>Per-row health pill + last event time</td></tr>
+          <tr><td><strong>Destination detail</strong></td><td>Manage one endpoint</td><td>Tab-driven (fix credential / view health)</td><td>Connected / Degraded / Down banner</td></tr>
+          <tr><td><strong>Add-destination sheet</strong></td><td>Connect one platform, focused</td><td>Connect</td><td>Inline validation + test-event result</td></tr>
+          <tr><td><strong>Data Health</strong></td><td>Match-quality &amp; drift at a glance</td><td>Resolve top issue</td><td>Overall score ring + per-destination grid</td></tr>
+          <tr><td><strong>Events (inspector)</strong></td><td>Prove/debug individual events</td><td>Filter / inspect payload</td><td>Live stream + "last event N sec ago"</td></tr>
+          <tr><td><strong>Provisioning theater</strong></td><td>Show the deploy happening</td><td>None (auto) · Retry on fail</td><td>Named steps streaming, per-step ticks</td></tr>
+          <tr><td><strong>Settings</strong></td><td>Manage store/team/plan/keys</td><td>Section-scoped save</td><td>Plan + usage vs limit</td></tr>
+          <tr><td><strong>Operations → GTM Container</strong></td><td>Inspect the container (advanced)</td><td>Open in GTM / re-sync</td><td>Container live? · published version · drift</td></tr>
+          <tr><td><strong>Operations → Versions/Deploys</strong> <span class="wf-pill idle" style="font-size:9px">Soon</span></td><td>Rollback / deploy history</td><td>Roll back / redeploy</td><td>Last deploy · rollback-safe?</td></tr>
+          <tr><td><strong>Empty states</strong></td><td>Point at the next action</td><td>The one CTA that unblocks</td><td>—</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <hr class="sep">
+    <section id="wireframes">
+      <div class="eyebrow">06 · Redesign</div>
+      <h2>Wireframes</h2>
+      <p class="lead">Low-fidelity, structure only — no visual design. In every frame the <strong>one primary action is the only blue element</strong>, so "one primary action per page" is literally visible.</p>
+
+      <div class="wf-cap">5.1 — Home (status-first)</div>
+      <div class="wf">
+        <div class="wf-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="u">app.easytrac.io / home</span></div>
+        <div class="wf-body">
+          <div class="wf-side">
+            <div class="np" style="font-weight:700;color:var(--text)">◻ متجر سلة ▾</div>
+            <div class="grp">Workspace</div>
+            <div class="np on">◉ Home</div>
+            <div class="np">⇄ Destinations</div>
+            <div class="np">♥ Data Health</div>
+            <div class="np">≣ Events</div>
+            <div class="np">⚙ Settings</div>
+            <div class="grp">Operations ▸ (collapsed)</div>
+            <div class="np" style="font-size:9px;color:var(--faint)">▤ GTM · Versions · Audit…</div>
+          </div>
+          <div class="wf-main">
+            <div class="wf-h">Your tracking is healthy</div>
+            <div class="wf-sub">1,204 events today · 4 destinations live · 0 issues</div>
+            <div class="wf-grid" style="grid-template-columns:repeat(3,1fr)">
+              <div class="wf-card"><div class="t">Events today <span class="wf-pill good">live</span></div><div class="wf-line l"></div><div class="wf-line s"></div></div>
+              <div class="wf-card"><div class="t">Match quality <span class="wf-pill good">92</span></div><div class="wf-line m"></div></div>
+              <div class="wf-card"><div class="t">Destinations <span class="wf-pill good">4/4</span></div><div class="wf-line m"></div></div>
+            </div>
+            <div class="wf-card" style="margin-top:8px"><div class="t">Recent activity <span style="font-family:var(--mono);font-size:8px;color:var(--faint)">last event 2s ago</span></div>
+              <div style="font-family:var(--mono);font-size:9px;color:var(--muted);line-height:1.9">purchase → 4/4 ok · add_to_cart → <span style="color:var(--warn)">3/4</span> · view_item → 4/4 ok</div></div>
+            <div style="margin-top:12px"><span class="wf-btn pri">View live events →</span> &nbsp;<span class="wf-btn gho">Add destination</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="wf-note"><strong>Progressive disclosure:</strong> the primary action mutates with state. No store yet → <em>"Set up tracking."</em> Issue detected → a red banner + <em>"Fix Meta connection."</em> Healthy → <em>"View live events."</em> The user never chooses from a menu of maybes.</div>
+      <div class="callout"><div class="k">Identity guardrail — this is a tracking platform, not a generic dashboard</div><p style="margin:8px 0 0">Home must <strong>always</strong> answer four tracking questions above the fold, in this order: <strong>(1) tracking health</strong> ("healthy / degraded / down"), <strong>(2) tracking status</strong> (events today, live indicator), <strong>(3) connected destinations</strong> (which platforms, their state), <strong>(4) recent tracking activity</strong> (latest events / last-seen). No generic "welcome / revenue / MRR / getting-started-tiles" dashboard. If a card doesn't speak to tracking, it doesn't belong on Home. The Stripe/Linear/Vercel references are for <em>craft</em> — spacing, states, hierarchy — never for turning EasyTrac into a look-alike SaaS shell.</p></div>
+
+      <div class="wf-cap">5.2 — Destinations list (the object list)</div>
+      <div class="wf">
+        <div class="wf-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="u">app.easytrac.io / destinations</span></div>
+        <div class="wf-body">
+          <div class="wf-side"><div class="np">◉ Home</div><div class="np on">⇄ Destinations</div><div class="np">♥ Data Health</div><div class="np">≣ Events</div><div class="np">⚙ Settings</div></div>
+          <div class="wf-main">
+            <div style="display:flex;justify-content:space-between;align-items:center"><div class="wf-h">Destinations</div><span class="wf-btn pri">+ Add destination</span></div>
+            <div class="wf-sub">Where your store's events are sent</div>
+            <div class="wf-grid">
+              <div class="wf-card" style="display:flex;justify-content:space-between;align-items:center"><span style="font-family:var(--sans);font-size:11px;color:var(--text)">■ Meta CAPI</span><span style="display:flex;gap:8px;align-items:center"><span class="wf-pill good">healthy · 2s ago</span></span></div>
+              <div class="wf-card" style="display:flex;justify-content:space-between;align-items:center"><span style="font-family:var(--sans);font-size:11px;color:var(--text)">■ TikTok Events</span><span class="wf-pill warn">degraded · 40% match</span></div>
+              <div class="wf-card" style="display:flex;justify-content:space-between;align-items:center"><span style="font-family:var(--sans);font-size:11px;color:var(--text)">■ Snapchat CAPI</span><span class="wf-pill good">healthy · 5s ago</span></div>
+              <div class="wf-card" style="display:flex;justify-content:space-between;align-items:center"><span style="font-family:var(--sans);font-size:11px;color:var(--text)">■ GA4</span><span class="wf-pill crit">no events · 3h</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="wf-note"><strong>Status in form + color:</strong> every row carries a pill (healthy / degraded / down) and time-since-last-event, so what needs attention reads at a glance without reading text. Row click → destination detail.</div>
+
+      <div class="wf-cap">5.3 — Add-destination sheet (focused, one platform)</div>
+      <div class="wf">
+        <div class="wf-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="u">modal · connect Meta</span></div>
+        <div class="wf-body"><div class="wf-main" style="max-width:none">
+          <div class="wf-h">Connect Meta Conversions API</div>
+          <div class="wf-sub">Step 2 of 3 · one platform at a time</div>
+          <div class="rail"><div class="st done"><div class="c">✓</div><div class="l">Pick</div></div><div class="st now"><div class="c">2</div><div class="l">Credentials</div></div><div class="st"><div class="c">3</div><div class="l">Verify</div></div></div>
+          <div class="wf-card" style="margin-top:10px"><div class="t">Pixel ID</div><div class="wf-line m"></div></div>
+          <div class="wf-card"><div class="t">Access token <span class="wf-pill good">valid ✓</span></div><div class="wf-line l"></div></div>
+          <div style="margin-top:12px"><span class="wf-btn pri">Send test event</span></div>
+        </div></div>
+      </div>
+      <div class="wf-note"><strong>Verification is the success state.</strong> Instead of "saved," step 3 fires a real test event and confirms Meta received it — the merchant sees proof, not a checkmark on a form. Credentials validate inline (token format checked on blur).</div>
+
+      <div class="wf-cap">5.4 — Data Health (the differentiator)</div>
+      <div class="wf">
+        <div class="wf-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="u">app.easytrac.io / health</span></div>
+        <div class="wf-body">
+          <div class="wf-side"><div class="np">◉ Home</div><div class="np">⇄ Destinations</div><div class="np on">♥ Data Health</div><div class="np">≣ Events</div><div class="np">⚙ Settings</div></div>
+          <div class="wf-main">
+            <div class="wf-h">Data Health</div>
+            <div class="wf-sub">Match quality &amp; delivery across destinations</div>
+            <div class="wf-grid" style="grid-template-columns:170px 1fr">
+              <div class="wf-card" style="display:grid;place-items:center;min-height:96px"><div style="font-family:var(--sans);font-size:30px;font-weight:800;color:var(--good)">86</div><div class="t" style="justify-content:center">overall / 100</div></div>
+              <div class="wf-grid" style="grid-template-columns:1fr 1fr;margin:0">
+                <div class="wf-card"><div class="t">Meta <span class="wf-pill good">94</span></div><div class="wf-line m"></div></div>
+                <div class="wf-card"><div class="t">TikTok <span class="wf-pill warn">40</span></div><div class="wf-line s"></div></div>
+                <div class="wf-card"><div class="t">Snap <span class="wf-pill good">91</span></div><div class="wf-line m"></div></div>
+                <div class="wf-card"><div class="t">GA4 <span class="wf-pill crit">0</span></div><div class="wf-line s"></div></div>
+              </div>
+            </div>
+            <div style="margin-top:12px"><span class="wf-btn pri">Fix TikTok match quality →</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="wf-note"><strong>One primary action = resolve the worst issue.</strong> The page ranks problems and the CTA points at #1. Drift banner appears here when manual GTM edits threaten rollback safety.</div>
+
+      <div class="wf-cap">5.5 — Provisioning theater (make the magic visible)</div>
+      <div class="wf">
+        <div class="wf-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="u">provisioning · متجر سلة</span></div>
+        <div class="wf-body"><div class="wf-main" style="max-width:none">
+          <div class="wf-h">Setting up your tracking infrastructure…</div>
+          <div class="wf-sub">This usually takes about 60 seconds — progress updates here in real time. Keep working; it continues in the background.</div>
+          <div style="font-family:var(--sans);font-size:12px;line-height:2.1;margin-top:8px">
+            <div style="color:var(--good)">✓ &nbsp;Created GTM web + server containers</div>
+            <div style="color:var(--good)">✓ &nbsp;Deployed sGTM server to Cloud Run</div>
+            <div style="color:var(--acc)">◈ &nbsp;Wiring transport URL &amp; publishing… <span class="wf-pill idle">running</span></div>
+            <div style="color:var(--faint)">○ &nbsp;Verifying first live event</div>
+          </div>
+          <div style="margin-top:14px"><span class="wf-btn gho">Continue in the background</span></div>
+        </div></div>
+      </div>
+      <div class="wf-note"><strong>No fire-and-forget.</strong> Steps stream from the real job runner. Any step can fail loudly with its own <em>Retry</em>, so a hung deploy is recoverable instead of a silent dead-end. Terminal state: "Live + first event verified."</div>
+      <div class="callout"><div class="k">Launch constraint — in-app feedback only, no email</div><p style="margin:8px 0 0">All provisioning / deployment / setup progress, success, failure and retry feedback appears <strong>inside the app only</strong>. No "we'll email you," no "notify me," no completion/failure emails, no notification preferences. "Continue in the background" keeps the job running and surfaces its state in-app (a status chip / the Home activity feed) — it does <em>not</em> send email. Email notifications are a <strong>future roadmap item only</strong>: no email provider, queue, templates, notification jobs, or email env vars are introduced.</p></div>
+
+      <div class="wf-cap">5.6 — Events inspector (logs UX)</div>
+      <div class="wf">
+        <div class="wf-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="u">app.easytrac.io / events</span></div>
+        <div class="wf-body">
+          <div class="wf-side"><div class="np">◉ Home</div><div class="np">⇄ Destinations</div><div class="np">♥ Data Health</div><div class="np on">≣ Events</div><div class="np">⚙ Settings</div></div>
+          <div class="wf-main">
+            <div style="display:flex;justify-content:space-between;align-items:center"><div class="wf-h">Live events</div><span style="font-family:var(--sans);font-size:10px;color:var(--muted)">filter: event ▾ · destination ▾ · status ▾</span></div>
+            <div class="wf-sub">last event 2s ago · streaming</div>
+            <div style="font-family:var(--mono);font-size:10px;line-height:2">
+              <div style="display:flex;gap:10px"><span style="color:var(--faint)">12:04:02</span><span style="color:var(--text)">purchase</span><span class="wf-pill good">4/4 ok</span></div>
+              <div style="display:flex;gap:10px"><span style="color:var(--faint)">12:03:58</span><span style="color:var(--text)">add_to_cart</span><span class="wf-pill warn">3/4 · TikTok 400</span></div>
+              <div style="display:flex;gap:10px"><span style="color:var(--faint)">12:03:51</span><span style="color:var(--text)">view_item</span><span class="wf-pill good">4/4 ok</span></div>
+            </div>
+            <div style="margin-top:12px"><span class="wf-btn pri">Inspect payload →</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="wf-note"><strong>Row → drawer</strong> with the full event payload and per-destination accept/reject + reason. This is the debugging surface that today doesn't exist, and the ladder for a retention/export upsell.</div>
+
+      <div class="wf-cap">5.7 — First-run empty state (Home, no store yet)</div>
+      <div class="wf">
+        <div class="wf-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="u">app.easytrac.io / home · first run</span></div>
+        <div class="wf-body"><div class="wf-main" style="max-width:none;text-align:center;padding:26px">
+          <div style="font-size:26px">◎</div>
+          <div class="wf-h" style="margin-top:8px">Let's get your store tracking in ~5 minutes</div>
+          <div class="wf-sub" style="margin:4px auto 14px">4 steps · we'll verify a real event at the end</div>
+          <div class="rail" style="max-width:340px;margin:0 auto"><div class="st now"><div class="c">1</div><div class="l">Store</div></div><div class="st"><div class="c">2</div><div class="l">Platform</div></div><div class="st"><div class="c">3</div><div class="l">Destination</div></div><div class="st"><div class="c">4</div><div class="l">Verify</div></div></div>
+          <div style="margin-top:16px"><span class="wf-btn pri">Start setup →</span></div>
+        </div></div>
+      </div>
+      <div class="wf-note"><strong>Empty = the first step</strong>, not a marketing hero. The 4-step rail is the persistent onboarding checklist that follows the user until the first event is verified.</div>
+
+      <div class="wf-cap">5.8 — Same Home, disclosure expanded (no mode switch)</div>
+      <div class="wf">
+        <div class="wf-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="u">app.easytrac.io / home · Operations open</span></div>
+        <div class="wf-body">
+          <div class="wf-side">
+            <div class="np" style="font-weight:700;color:var(--text)">◻ متجر سلة ▾</div>
+            <div class="np on">◉ Home</div>
+            <div class="np">⇄ Destinations</div>
+            <div class="np">♥ Data Health</div>
+            <div class="np">≣ Events</div>
+            <div class="np">⚙ Settings</div>
+            <div class="grp" style="color:var(--acc)">Operations ▾ (user opened)</div>
+            <div class="np" style="font-size:9px">▤ GTM Container</div>
+            <div class="np" style="font-size:9px;color:var(--faint)">▤ Managed sGTM · Soon</div>
+            <div class="np" style="font-size:9px;color:var(--faint)">▤ Versions · Soon</div>
+            <div class="np" style="font-size:9px;color:var(--faint)">▤ Deployments · Soon</div>
+            <div class="np" style="font-size:9px;color:var(--faint)">▤ Audit · Soon</div>
+          </div>
+          <div class="wf-main">
+            <div class="wf-h">Your tracking is healthy</div>
+            <div class="wf-sub">1,204 events today · 4 destinations live · 0 issues</div>
+            <div class="wf-grid" style="grid-template-columns:repeat(3,1fr)">
+              <div class="wf-card"><div class="t">Events today <span class="wf-pill good">live</span></div><div class="wf-line l"></div></div>
+              <div class="wf-card"><div class="t">Match quality <span class="wf-pill good">92</span></div><div class="wf-line m"></div></div>
+              <div class="wf-card"><div class="t">Destinations <span class="wf-pill good">4/4</span></div><div class="wf-line m"></div></div>
+            </div>
+            <div class="wf-card" style="margin-top:8px;border-color:var(--acc-line)"><div class="t" style="color:var(--acc)">⚙ Infrastructure <span style="font-family:var(--mono);font-size:8px">▾ shown on demand</span></div><div style="font-family:var(--mono);font-size:9px;color:var(--muted);line-height:1.9">container <span style="color:var(--good)">● live</span> · v42 published · sGTM rev 00007-abc · <span style="color:var(--good)">no drift</span></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="wf-note"><strong>Same page, deeper read — reached by intent, not a setting.</strong> The user expanded Operations and clicked "Show infrastructure," revealing container state, published version, sGTM revision and drift. A merchant who never opens these simply never sees them; nothing is behind a mode they had to choose.</div>
+
+      <h4 style="margin-top:30px">Secondary screens — wireframe-level notes</h4>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Screen</th><th>Layout in one line</th></tr></thead>
+        <tbody>
+          <tr><td>Destination detail</td><td>Header (name + status banner) → tabs: Overview · Events · Credentials · Health · Logs. One primary action per tab.</td></tr>
+          <tr><td>Settings</td><td>Left sub-nav (Store / CMS / Team / Billing / API keys) → focused panel, section-scoped Save, plan+usage meter pinned top.</td></tr>
+          <tr><td>Operations (GTM &amp; roadmap)</td><td>Visible group, collapsed in Simple / open in Advanced. GTM Container (live? drift?), sGTM server, Versions + rollback, Deployments, Audit — roadmap items keep "Soon" badges.</td></tr>
+          <tr><td>Billing / plan</td><td>Usage vs request limit meter, plan ladder mirroring a free→pro→business shape, upgrade CTA when nearing cap.</td></tr>
+          <tr><td>Command palette (⌘K)</td><td>Global: jump to any store/destination/setting, run "add destination", "send test event".</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <hr class="sep">
+    <section id="components">
+      <div class="eyebrow">07 · Redesign</div>
+      <h2>Component system</h2>
+      <p class="lead">Built on the existing <code>frontend/</code> scaffold (Next.js + design tokens + Tailwind + CVA + Radix + next-intl for RTL). A small, disciplined primitive set — this is what replaces 1,049 inline styles.</p>
+
+      <div class="ctree"><b>AppShell</b>            <span class="c">// store switcher · sidebar · mobile bottom-bar · ⌘K</span>
+├─ <b>StoreSwitcher</b>
+├─ <b>SideNav</b> / <b>MobileTabBar</b>
+└─ <b>CommandPalette</b>
+
+<b>Primitives</b>            <span class="c">// the vocabulary — themeable via tokens</span>
+├─ Button (pri / ghost / danger)   ← only ONE pri per screen
+├─ StatusPill (good / warn / crit / idle)
+├─ Card · StatCard · MetricRing
+├─ Banner (info / warn / crit)     ← system status
+├─ Field (input · validate-on-blur · error slot)
+├─ Toast (result-named feedback)
+├─ Skeleton (every list has one)
+├─ EmptyState (icon · line · one CTA)
+├─ Tabs · Drawer · Sheet · Modal
+├─ Table (sortable · filterable · sticky head)
+└─ Stepper (onboarding · wizard · provisioning)
+
+<b>Domain components</b>     <span class="c">// composed from primitives</span>
+├─ <b>HealthScoreRing</b>        ← Data Health hero
+├─ <b>DestinationRow</b> / <b>DestinationCard</b>
+├─ <b>EventStreamRow</b> + <b>PayloadDrawer</b>
+├─ <b>ProvisioningStep</b>       ← streams from job runner
+├─ <b>ConnectPlatformSheet</b>   ← focused, per-platform
+├─ <b>OnboardingChecklist</b>    ← persistent until verified
+├─ <b>UsageMeter</b>             ← plan vs requests
+├─ <b>OperationsGroup</b>        ← expandable nav section (GTM + roadmap slots)
+├─ <b>Disclosure</b>             <span class="c">// "Show technical details" expander — the disclosure primitive</span>
+├─ <b>InfraCard</b>              ← container/sGTM/drift, inside a Disclosure
+├─ <b>RoadmapSlot</b>            <span class="c">// nav slot that flips Soon → active on launch</span>
+└─ <b>DriftBanner</b></div>
+
+      <p class="muted">Reused across screens: <code>StatusPill</code> and <code>Banner</code> appear on Home, Destinations, Health, Events and Operations — one status language everywhere, so "communicate system status immediately" is a component contract, not a per-page effort.</p>
+      <p class="muted"><code>&lt;Disclosure&gt;</code> is the mechanism for progressive disclosure — <strong>there is no mode flag</strong>. Technical affordances (raw payloads, container IDs, GTM tab, InfraCard) live inside a default-collapsed <code>Disclosure</code> or a route the user navigates to (Operations). A merchant never expands them; an agency does. <code>RoadmapSlot</code> keeps Operations dynamic: a launched feature flips its slot from "Soon" to a live link with no structural change. Each migrated route (§09) composes these same primitives.</p>
+    </section>
+
+    <hr class="sep">
+    <section id="flows">
+      <div class="eyebrow">08 · Redesign</div>
+      <h2>User flows</h2>
+
+      <h3>Flow A — First run, zero to verified (&lt; 5 min)</h3>
+      <div class="flow">
+        <div class="node"><div class="s">Step 1</div><div class="t">Create store</div><div class="d">Name + pick Salla / Zid / custom.</div><div class="pa">✓ store exists</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="s">Step 2</div><div class="t">Connect platform</div><div class="d">Guided CMS snippet / native link.</div><div class="pa">✓ datalayer seen</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="s">Step 3</div><div class="t">Add first destination</div><div class="d">Pick Meta → paste creds → auto-provision (theater).</div><div class="pa">✓ container live</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="s">Step 4</div><div class="t">Verify live event</div><div class="d">Fire test purchase → confirm Meta received it.</div><div class="pa">✓ event verified 🎉</div></div>
+      </div>
+      <div class="wf-note">One primary action per step; the checklist persists; success is a <em>real event</em>, not a saved form. This is the whole onboarding-under-5-minutes requirement, made concrete.</div>
+
+      <h3>Flow B — Add another destination (returning user)</h3>
+      <div class="flow">
+        <div class="node"><div class="s">A</div><div class="t">Destinations → Add</div><div class="d">Grid of platforms.</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="s">B</div><div class="t">Sheet: credentials</div><div class="d">Inline-validated, one platform.</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="s">C</div><div class="t">Test event</div><div class="d">Proof it works.</div><div class="pa">✓ toast: "TikTok connected"</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="s">D</div><div class="t">Row appears healthy</div><div class="d">Back to list, live pill.</div></div>
+      </div>
+
+      <h3>Flow C — Something broke (the retention moment)</h3>
+      <div class="flow">
+        <div class="node"><div class="s">A</div><div class="t">Home shows red banner</div><div class="d">"GA4 stopped receiving events 3h ago."</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="s">B</div><div class="t">Fix → Data Health</div><div class="d">Ranked issue + likely cause.</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="s">C</div><div class="t">Events / payload drawer</div><div class="d">See the rejected event + reason.</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="s">D</div><div class="t">One-click remedy / re-provision</div><div class="d">Resolve, re-verify.</div><div class="pa">✓ back to healthy</div></div>
+      </div>
+      <div class="wf-note">This flow is why churn drops: today the merchant has <em>nowhere to look</em> when tracking breaks (the SWOT's "churn #1"). This turns the platform's fragility into EasyTrac's proof of value.</div>
+    </section>
+
+    <hr class="sep">
+    <section id="migration">
+      <div class="eyebrow">09 · Execution</div>
+      <h2>Migration strategy — no rewrite, no downtime</h2>
+      <p class="lead">The current <code>tool.html</code> stays <strong>fully operational in production</strong> the entire time. The Next.js app in <code>frontend/</code> becomes the migration target, and clean app routes move across one at a time behind a route switch — a <strong>strangler-fig</strong>, not a big-bang rewrite.</p>
+
+      <div class="callout"><div class="k">Grounded in the real code — two things that make this cheap</div><p style="margin:8px 0 0"><strong>1 · The split is at the app server, not the sGTM edge-router.</strong> <code>tool.html</code> is an SPA that <code>server.js</code> already serves for clean routes (<code>/dashboard</code>, <code>/sign-in</code>… → <code>tool.html</code>). The migration switch lives here (or a thin proxy in front): named routes go to Next.js, the rest fall through to <code>tool.html</code>. (The <code>edge-router/</code> is unrelated — it proxies <em>tenant tracking traffic</em> <code>{slug}.sgtm.easytrac.io</code> → each customer's Cloud Run container, not the app UI.) <strong>2 · Shared auth is free.</strong> Auth is Firebase ID tokens verified server-side; the browser holds the Firebase session. Same origin ⇒ both UIs share it automatically — <em>no bridge to build</em>.</p></div>
+
+      <div class="flow">
+        <div class="node"><div class="s">Layer</div><div class="t">Route switch</div><div class="d">In <code>server.js</code> (or a front proxy): named paths → Next.js, everything else → <code>tool.html</code>. Per-route, per-cohort flag.</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="s">New</div><div class="t">Next.js app</div><div class="d">Serves migrated routes (Shell, Home, Health…) from the token scaffold, same origin.</div><div class="pa">✓ ships incrementally</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="s">Legacy</div><div class="t">tool.html</div><div class="d">Serves everything not yet migrated. Untouched, stable.</div><div class="pa">✓ always live</div></div>
+      </div>
+
+      <h4>Sequenced cutover (matches the roadmap phases)</h4>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Wave</th><th>Route moved to Next.js</th><th>Legacy still serves</th><th>Gate</th></tr></thead>
+        <tbody>
+          <tr><td class="n">0</td><td>AppShell + route switch (same-origin Firebase session, no bridge)</td><td>All app routes</td><td>Internal only</td></tr>
+          <tr><td class="n">1</td><td><code>/home</code>, onboarding, <code>/health</code></td><td>Destinations, Events, Pixel Config, GTM</td><td>New signups → new; existing → legacy</td></tr>
+          <tr><td class="n">2</td><td><code>/destinations</code> (+detail), add-destination sheet</td><td>Events, GTM, Operations</td><td>Opt-in beta banner in legacy</td></tr>
+          <tr><td class="n">3</td><td><code>/events</code>, provisioning theater</td><td>GTM Container, Operations</td><td>Cohort ramp 25→50→100%</td></tr>
+          <tr><td class="n">4</td><td>Operations (GTM, versions, deploys, audit), Settings</td><td>—</td><td>Legacy retired when parity proven</td></tr>
+        </tbody>
+      </table></div>
+      <div class="callout"><div class="k">Why this is safe</div><p style="margin:8px 0 0">Shared auth + a single set of tokens means both UIs render the same brand and read the same backend/job-runner. A route can flip back to legacy instantly if something regresses. You launch on the <em>new</em> Home + Health (the first-impression wins) while the deep, working machinery keeps running on <code>tool.html</code> until its replacement is proven at parity.</p></div>
+    </section>
+
+    <hr class="sep">
+    <section id="priorities">
+      <div class="eyebrow">10 · Execution</div>
+      <h2>Prioritized roadmap</h2>
+      <p class="lead">Ordered by impact on the merchant's ability to succeed and on your stated goals (cognitive load, status-first, &lt;5-min onboarding). Impact/effort are relative.</p>
+
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>#</th><th>Improvement</th><th>Impact</th><th>Effort</th><th>Phase</th></tr></thead>
+        <tbody>
+          <tr><td class="n">0</td><td><strong>Migration harness</strong> — edge-router split + shared auth (strangler-fig, tool.html stays live)</td><td><span class="chip h">Critical</span></td><td><span class="chip m">Med</span></td><td><span class="chip p0">P0</span></td></tr>
+          <tr><td class="n">1</td><td><strong>New IA + nav</strong> — object spine, 5-item core, Operations group (GTM + roadmap visible)</td><td><span class="chip h">Critical</span></td><td><span class="chip m">Med</span></td><td><span class="chip p0">P0</span></td></tr>
+          <tr><td class="n">2</td><td><strong>Status-first Home</strong> — one status line, one state-driven action</td><td><span class="chip h">Critical</span></td><td><span class="chip l">Low</span></td><td><span class="chip p0">P0</span></td></tr>
+          <tr><td class="n">3</td><td><strong>Guided onboarding + verify</strong> — 4 steps, real event, &lt;5 min</td><td><span class="chip h">Critical</span></td><td><span class="chip m">Med</span></td><td><span class="chip p0">P0</span></td></tr>
+          <tr><td class="n">4</td><td><strong>Data Health shipped as core</strong> — the differentiator, un-gated</td><td><span class="chip h">Critical</span></td><td><span class="chip m">Med</span></td><td><span class="chip p0">P0</span></td></tr>
+          <tr><td class="n">5</td><td><strong>Destination as first-class object</strong> — list + detail + focused sheet</td><td><span class="chip h">High</span></td><td><span class="chip m">Med</span></td><td>P1</td></tr>
+          <tr><td class="n">6</td><td><strong>Provisioning theater</strong> — stream real job steps, per-step retry</td><td><span class="chip h">High</span></td><td><span class="chip m">Med</span></td><td>P1</td></tr>
+          <tr><td class="n">7</td><td><strong>Events inspector</strong> — live stream + payload drawer</td><td><span class="chip h">High</span></td><td><span class="chip h">High</span></td><td>P1</td></tr>
+          <tr><td class="n">8</td><td><strong>Feedback contract</strong> — inline validation + result-named toasts</td><td><span class="chip m">Med</span></td><td><span class="chip l">Low</span></td><td>P1</td></tr>
+          <tr><td class="n">9</td><td><strong>Empty + skeleton system</strong> — every list, purposeful</td><td><span class="chip m">Med</span></td><td><span class="chip l">Low</span></td><td>P1</td></tr>
+          <tr><td class="n">10</td><td><strong>Progressive disclosure</strong> — <code>Disclosure</code> expanders + Operations depth across Home/Destination/Events (no mode flag)</td><td><span class="chip h">High</span></td><td><span class="chip m">Med</span></td><td>P1</td></tr>
+          <tr><td class="n">11</td><td><strong>Mobile-first migration</strong> of each route as it moves (bottom-bar, reflow)</td><td><span class="chip h">High</span></td><td><span class="chip h">High</span></td><td>P1</td></tr>
+          <tr><td class="n">12</td><td><strong>Settings as a page</strong> + ⌘K + table filters</td><td><span class="chip m">Med</span></td><td><span class="chip m">Med</span></td><td>P2</td></tr>
+          <tr><td class="n">13</td><td><strong>Operations depth</strong> — GTM inspector, versions/deploys/audit (Advanced)</td><td><span class="chip m">Med</span></td><td><span class="chip m">Med</span></td><td>P2</td></tr>
+        </tbody>
+      </table></div>
+
+      <div class="callout">
+        <div class="k">Sequencing logic</div>
+        <p style="margin:8px 0 0"><strong>P0 = migration harness + new spine + first impression</strong> (edge-router split, IA, Home, onboarding, Health) — shipped on the new stack <em>while <code>tool.html</code> keeps serving everything else</em>. Mostly composition, not new backend. <strong>P1 = the objects + proof + Advanced mode</strong> (destinations, provisioning, events, mode toggle, mobile). <strong>P2 = power-user depth</strong> (Settings, Operations/GTM inspector). No big-bang cutover: each route flips only when it reaches parity, and can roll back instantly. Nothing in P0 requires the CAPI/logs backend to be finished — the UI ships against the existing job runner and wires up as data lands.</p>
+      </div>
+    </section>
+
+    <hr class="sep">
+    <section id="approve">
+      <div class="eyebrow">11 · Status</div>
+      <h2>Approved — amendments &amp; final adjustments applied</h2>
+      <p class="lead">You approved the audit, wireframes, IA, component system and flows across two rounds. All seven course corrections are now baked in:</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Your instruction</th><th>Where it now lives</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Keep the launch roadmap visible</strong> — group "Soon" under expandable Operations</td><td>§04 nav tree (Operations group, badges retained) · §05 screen table</td></tr>
+          <tr><td><strong>Don't hide GTM</strong> — an advanced capability, reachable</td><td>§02 IA ("visible, not hidden") · §03 · §04 Operations · Destination GTM tab</td></tr>
+          <tr><td><strong>No full rewrite</strong> — gradual migration, production stays live</td><td>§09 (strangler-fig via <code>server.js</code> route switch, same-origin auth) · roadmap row 0</td></tr>
+          <tr><td><strong>Progressive disclosure, not a mode switch</strong> — depth appears by intent / growth / context</td><td>§03 rewritten · <code>Disclosure</code> + <code>RoadmapSlot</code> in §07 · wireframe 5.8 · roadmap row 10</td></tr>
+          <tr><td><strong>Operations stays dynamic</strong> — "Soon" flips to active in the same slot</td><td>§04 rule "Operations is dynamic" + <code>RoadmapSlot</code> · slots-are-permanent note</td></tr>
+          <tr><td><strong>Preserve tracking identity</strong> — Home always shows health, status, destinations, activity</td><td>§01 finding 3 · §04 wireframe 5.1 + identity guardrail · §05 Home row</td></tr>
+        </tbody>
+      </table></div>
+
+      <div class="callout good"><div class="k">Proceeding now — the P0 implementation plan</div><p style="margin:8px 0 0">Per your instruction, I'm moving to the <strong>P0 implementation plan</strong>: the route-switch migration harness + the first two migrated routes — <strong>AppShell + a tracking-first Home</strong> — component-by-component, wired to the existing Firebase auth, backend endpoints and job runner, with <code>tool.html</code> untouched. Delivered as a separate build-plan document.</p></div>
+      <p>This spec is saved at <code>docs/EASYTRAC-UX-REDESIGN-SPEC.html</code>. The P0 plan follows as its own artifact.</p>
+      <p class="muted" style="font-size:13px">Scope note: UI/UX architecture only, as requested — it deliberately doesn't re-litigate pricing, CAPI-default, or account-sharding, which live in your SWOT. Brand, colors and Arabic-first identity are preserved throughout; only structure changes.</p>
+    </section>
+  </main>
+</div>
+
+<script>
+(function(){
+  var links=[].slice.call(document.querySelectorAll('.toc a'));
+  var map={};links.forEach(function(a){map[a.getAttribute('href').slice(1)]=a;});
+  var obs=new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){ links.forEach(function(l){l.classList.remove('on');}); var m=map[e.target.id]; if(m)m.classList.add('on'); } });
+  },{rootMargin:'-10% 0px -80% 0px'});
+  document.querySelectorAll('section[id]').forEach(function(s){obs.observe(s);});
+})();
+</script>

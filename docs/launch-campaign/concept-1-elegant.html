@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=block" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:1080px; background:#0A0A0A; }
+  body { font-family:'IBM Plex Sans Arabic', 'Segoe UI', sans-serif; color:#FFFFFF; }
+  .canvas { position:relative; width:1080px; height:1080px; background:#0A0A0A; overflow:hidden;
+            display:flex; flex-direction:column; padding:60px 72px 52px; }
+
+  /* soft blue glows */
+  .glow-top { position:absolute; top:-340px; right:50%; transform:translateX(50%); width:900px; height:640px;
+              background:radial-gradient(closest-side, rgba(47,107,255,.34), rgba(47,107,255,0) 72%); }
+  .glow-side { position:absolute; bottom:-260px; left:-260px; width:700px; height:700px;
+               background:radial-gradient(closest-side, rgba(47,107,255,.14), rgba(47,107,255,0) 70%); }
+  /* subtle confetti */
+  .confetti { position:absolute; inset:0; }
+  .confetti span { position:absolute; border-radius:50%; }
+
+  .content { position:relative; display:flex; flex-direction:column; height:100%; }
+
+  /* header: lockup + badge */
+  .header { display:flex; align-items:center; justify-content:space-between; }
+  .lockup { display:flex; align-items:center; gap:14px; }
+  .lockup svg { width:52px; height:52px; }
+  .lockup .name { font-weight:700; font-size:30px; letter-spacing:.2px; direction:ltr; }
+  .badge { display:flex; align-items:center; gap:16px; padding:14px 26px; border-radius:999px;
+           border:1px solid rgba(47,107,255,.45); background:rgba(47,107,255,.10);
+           font-size:25px; font-weight:500; }
+  .badge .sep { width:5px; height:5px; border-radius:50%; background:rgba(255,255,255,.35); }
+
+  /* headline */
+  .hero { text-align:center; margin-top:64px; }
+  .hero .l1 { font-size:46px; font-weight:500; color:rgba(255,255,255,.85); }
+  .hero .l2 { font-size:92px; font-weight:700; line-height:1.35; margin-top:10px; }
+  .hero .l2 .disc { color:#2F6BFF; }
+  .hero .sub { margin-top:20px; font-size:30px; font-weight:400; color:rgba(255,255,255,.62); }
+  .hero .sub b { color:rgba(255,255,255,.9); font-weight:500; }
+
+  /* cards */
+  .cards { display:flex; gap:26px; margin-top:56px; }
+  .card { flex:1; min-width:0; border-radius:26px; padding:34px 34px; background:rgba(255,255,255,.035);
+          border:1px solid rgba(255,255,255,.09); position:relative; }
+  .card.offer { flex:1.45; border-color:rgba(47,107,255,.55);
+                background:linear-gradient(160deg, rgba(47,107,255,.16), rgba(47,107,255,.05)); }
+  .offer .row { display:flex; align-items:center; justify-content:center; gap:16px; height:100%; }
+  .offer .big { font-size:36px; font-weight:700; white-space:nowrap; }
+  .offer .plus { font-size:32px; font-weight:700; color:#2F6BFF; }
+  .card .title { font-size:29px; font-weight:500; color:rgba(255,255,255,.85); }
+  .stores { display:flex; align-items:center; gap:18px; margin-top:24px; }
+  .store { display:flex; align-items:center; gap:12px; padding:10px 22px; border-radius:14px;
+           background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12);
+           font-size:27px; font-weight:700; }
+  .store .dot { width:16px; height:16px; border-radius:50%; }
+  .dot.salla { background:#FF9548; box-shadow:0 0 14px rgba(255,149,72,.6); }
+  .dot.zid { background:#4D9FFF; box-shadow:0 0 14px rgba(77,159,255,.6); }
+  .mins { margin-top:20px; font-size:23px; color:rgba(255,255,255,.6); white-space:nowrap; }
+  .mins b { color:#2F6BFF; font-weight:700; }
+
+  /* platforms */
+  .platforms { margin-top:56px; text-align:center; }
+  .platforms .label { font-size:22px; font-weight:500; color:rgba(255,255,255,.45); letter-spacing:.5px; }
+  .pills { display:flex; justify-content:center; gap:14px; margin-top:18px; direction:ltr; }
+  .pill { padding:11px 22px; border-radius:999px; border:1px solid rgba(255,255,255,.14);
+          background:rgba(255,255,255,.04); font-size:21px; font-weight:500; color:rgba(255,255,255,.85); }
+
+  /* footer */
+  .footer { margin-top:auto; display:flex; align-items:center; justify-content:space-between; }
+  .soon { display:flex; align-items:center; gap:14px; font-size:26px; font-weight:500; color:rgba(255,255,255,.8); }
+  .soon .tag { font-size:19px; font-weight:700; letter-spacing:1.5px; color:#7FA5FF; padding:6px 16px;
+               border-radius:999px; border:1px solid rgba(47,107,255,.6); background:rgba(47,107,255,.12); direction:ltr; }
+  .site { font-size:30px; font-weight:700; direction:ltr; }
+  .site .d { color:#2F6BFF; }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="glow-top"></div>
+  <div class="glow-side"></div>
+  <div class="confetti">
+    <span style="top:140px; right:120px; width:7px; height:7px; background:rgba(47,107,255,.75)"></span>
+    <span style="top:220px; left:180px;  width:5px; height:5px; background:rgba(255,255,255,.5)"></span>
+    <span style="top:90px;  left:340px;  width:6px; height:6px; background:rgba(47,107,255,.5)"></span>
+    <span style="top:320px; right:250px; width:4px; height:4px; background:rgba(255,255,255,.4)"></span>
+    <span style="top:300px; left:90px;   width:8px; height:8px; background:rgba(47,107,255,.35)"></span>
+    <span style="top:170px; left:520px;  width:4px; height:4px; background:rgba(255,255,255,.55)"></span>
+    <span style="top:420px; right:90px;  width:6px; height:6px; background:rgba(47,107,255,.4)"></span>
+    <span style="top:60px;  right:420px; width:5px; height:5px; background:rgba(255,255,255,.45)"></span>
+  </div>
+
+  <div class="content">
+    <div class="header">
+      <div class="lockup">
+        <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M72 30 L36 30 L36 90 L72 90" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M36 60 L90 60" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round"/>
+          <circle cx="98" cy="60" r="10" fill="#2F6BFF"/>
+        </svg>
+        <div class="name">EasyTrac</div>
+      </div>
+      <div class="badge">
+        <span>🎂 عيد ميلادي</span>
+        <span class="sep"></span>
+        <span>🚀 وإطلاق EasyTrac</span>
+      </div>
+    </div>
+
+    <div class="hero">
+      <div class="l1">بمناسبة عيد ميلادي...</div>
+      <div class="l2">أهديكم <span class="disc">خصم 50٪</span> 🎁</div>
+      <div class="sub">على جميع الباقات الحالية · <b>لفترة محدودة</b></div>
+    </div>
+
+    <div class="cards">
+      <div class="card offer">
+        <div class="row">
+          <div class="big">✅ خصم 50%</div>
+          <div class="plus">+</div>
+          <div class="big">🎁 شهر مجاني</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="title">ابدأ تتبع متجرك على:</div>
+        <div class="stores">
+          <div class="store"><span class="dot salla"></span> سلة</div>
+          <div class="store"><span class="dot zid"></span> زد</div>
+        </div>
+        <div class="mins">الربط والإعداد <b>خلال دقائق</b></div>
+      </div>
+    </div>
+
+    <div class="platforms">
+      <div class="label">المنصّات المدعومة</div>
+      <div class="pills">
+        <div class="pill">Google Analytics 4</div>
+        <div class="pill">Google Ads</div>
+        <div class="pill">Meta Pixel</div>
+        <div class="pill">TikTok Pixel</div>
+        <div class="pill">Snapchat Pixel</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="soon">تتبع الخادم <span class="tag">SOON</span></div>
+      <div class="site">easytrac<span class="d">.io</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

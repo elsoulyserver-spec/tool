@@ -1,0 +1,426 @@
+<title>EasyTrac — P0 Implementation Plan</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{
+  --ink:#0A0D13; --panel:#11151E; --panel-2:#161B26; --panel-3:#1C2230;
+  --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.15);
+  --text:#E7EBF3; --muted:#8B94A7; --faint:#5A6377;
+  --acc:#3B7BFF; --acc-soft:rgba(59,123,255,.14); --acc-line:rgba(59,123,255,.45);
+  --good:#2FBE8F; --good-soft:rgba(47,190,143,.14);
+  --warn:#F5A524; --warn-soft:rgba(245,165,36,.14);
+  --crit:#F5566E; --crit-soft:rgba(245,86,110,.14);
+  --mono:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --r:14px;
+}
+:root[data-theme="light"]{
+  --ink:#F5F6F9; --panel:#FFFFFF; --panel-2:#F3F5F9; --panel-3:#E9EDF4;
+  --line:rgba(14,20,35,.10); --line-2:rgba(14,20,35,.18);
+  --text:#141A26; --muted:#5C6478; --faint:#98A0B2;
+  --acc:#2F6BFF; --acc-soft:rgba(47,107,255,.10); --acc-line:rgba(47,107,255,.4);
+  --good:#12996B; --good-soft:rgba(18,153,107,.12);
+  --warn:#B9770B; --warn-soft:rgba(185,119,11,.12);
+  --crit:#D63B54; --crit-soft:rgba(214,59,84,.12);
+}
+@media (prefers-color-scheme:light){
+  :root:not([data-theme="dark"]){
+    --ink:#F5F6F9; --panel:#FFFFFF; --panel-2:#F3F5F9; --panel-3:#E9EDF4;
+    --line:rgba(14,20,35,.10); --line-2:rgba(14,20,35,.18);
+    --text:#141A26; --muted:#5C6478; --faint:#98A0B2;
+    --acc:#2F6BFF; --acc-soft:rgba(47,107,255,.10); --acc-line:rgba(47,107,255,.4);
+    --good:#12996B; --good-soft:rgba(18,153,107,.12);
+    --warn:#B9770B; --warn-soft:rgba(185,119,11,.12);
+    --crit:#D63B54; --crit-soft:rgba(214,59,84,.12);
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
+body{margin:0;background:var(--ink);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.shell{display:grid;grid-template-columns:262px minmax(0,1fr);max-width:1300px;margin:0 auto}
+.toc{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;border-right:1px solid var(--line);padding:26px 18px 40px;background:linear-gradient(180deg,var(--panel),var(--ink))}
+.toc-brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.toc-logo{width:30px;height:30px;border-radius:8px;background:var(--acc-soft);border:1px solid var(--acc-line);display:grid;place-items:center;flex-shrink:0}
+.toc-logo svg{width:18px;height:18px}
+.toc-brand b{font-size:14px;letter-spacing:-.2px}
+.toc-brand span{display:block;font-family:var(--mono);font-size:9px;letter-spacing:1.4px;color:var(--faint);text-transform:uppercase;margin-top:2px}
+.toc-tag{font-family:var(--mono);font-size:9.5px;color:var(--good);background:var(--good-soft);border:1px solid var(--good);border-radius:100px;padding:3px 9px;display:inline-block;margin:10px 0 16px}
+.toc a{display:flex;gap:9px;align-items:baseline;text-decoration:none;color:var(--muted);font-size:13px;padding:6px 10px;border-radius:8px;line-height:1.35}
+.toc a .n{font-family:var(--mono);font-size:10.5px;color:var(--faint);min-width:18px}
+.toc a:hover{color:var(--text);background:var(--panel-2)}
+.toc a.on{color:var(--text);background:var(--acc-soft)}
+.toc a.on .n{color:var(--acc)}
+main{padding:0 clamp(20px,4vw,58px) 120px;min-width:0}
+section{padding-top:54px;scroll-margin-top:20px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--acc)}
+h1{font-size:clamp(28px,4.4vw,44px);line-height:1.05;letter-spacing:-1.1px;margin:14px 0 0;text-wrap:balance;font-weight:800}
+h2{font-size:clamp(21px,2.8vw,29px);letter-spacing:-.6px;margin:6px 0 4px;font-weight:750;text-wrap:balance}
+h3{font-size:16.5px;letter-spacing:-.2px;margin:24px 0 8px;font-weight:700}
+h4{font-size:13px;margin:16px 0 6px;font-weight:700;font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+p{margin:10px 0;max-width:76ch}
+.lead{font-size:18px;color:var(--muted);max-width:72ch}
+.muted{color:var(--muted)}
+strong{color:var(--text);font-weight:680}
+code{font-family:var(--mono);font-size:.85em;background:var(--panel-2);border:1px solid var(--line);border-radius:5px;padding:1px 5px;color:var(--text)}
+hr.sep{border:0;border-top:1px solid var(--line);margin:50px 0 0}
+.hero{border:1px solid var(--line);border-radius:20px;padding:36px;background:radial-gradient(120% 140% at 100% 0%,var(--acc-soft),transparent 55%),var(--panel);margin-top:22px}
+.metastrip{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+.metastrip .m{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--panel-2);border:1px solid var(--line);border-radius:100px;padding:5px 12px}
+.metastrip .m b{color:var(--text)}
+.callout{border:1px solid var(--line);border-left:3px solid var(--acc);background:var(--panel);border-radius:0 12px 12px 0;padding:16px 20px;margin:20px 0}
+.callout.good{border-left-color:var(--good)}
+.callout.warn{border-left-color:var(--warn)}
+.callout .k{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.callout p{max-width:none}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:12px;margin:18px 0}
+.pcard{border:1px solid var(--line);border-radius:12px;padding:16px;background:var(--panel)}
+.pcard .i{font-family:var(--mono);font-size:11px;color:var(--acc)}
+.pcard b{display:block;margin:6px 0 4px;font-size:14px}
+.pcard p{font-size:12.5px;color:var(--muted);margin:0;max-width:none}
+.tbl-wrap{overflow-x:auto;margin:16px 0;border:1px solid var(--line);border-radius:var(--r)}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:680px}
+th,td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--faint);background:var(--panel-2)}
+tbody tr:hover{background:var(--panel-2)}
+td.n{font-family:var(--mono);color:var(--faint);font-variant-numeric:tabular-nums}
+code.k{white-space:nowrap}
+.chip{font-family:var(--sans);font-size:10.5px;font-weight:700;padding:2px 9px;border-radius:100px;white-space:nowrap}
+.chip.h{background:var(--crit-soft);color:var(--crit)}
+.chip.m{background:var(--warn-soft);color:var(--warn)}
+.chip.l{background:var(--good-soft);color:var(--good)}
+.chip.new{background:var(--acc-soft);color:var(--acc)}
+.chip.have{background:var(--good-soft);color:var(--good)}
+.ctree{font-family:var(--mono);font-size:12.5px;line-height:1.8;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:20px 22px;overflow-x:auto;white-space:pre;color:var(--muted)}
+.ctree b{color:var(--text);font-weight:700}
+.ctree .c{color:var(--acc)}
+.ctree .g{color:var(--good)}
+.ctree .n{color:var(--warn)}
+.code{font-family:var(--mono);font-size:12.5px;line-height:1.75;background:var(--panel);border:1px solid var(--line-2);border-radius:12px;padding:18px 20px;overflow-x:auto;white-space:pre;color:var(--text);margin:14px 0}
+.code .c{color:var(--faint)}
+.code .kw{color:var(--acc)}
+.code .g{color:var(--good)}
+.flow{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;margin:16px 0}
+.flow .node{flex:1;min-width:150px;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 14px}
+.flow .node .s{font-family:var(--mono);font-size:9.5px;letter-spacing:1px;color:var(--acc);text-transform:uppercase}
+.flow .node .t{font-size:13px;font-weight:700;margin:5px 0 3px}
+.flow .node .d{font-size:11.5px;color:var(--muted)}
+.flow .arr{align-self:center;color:var(--faint);font-size:18px}
+@media(max-width:720px){.flow{flex-direction:column}.flow .arr{transform:rotate(90deg)}}
+.check{list-style:none;padding:0;margin:14px 0}
+.check li{position:relative;padding:8px 0 8px 30px;border-bottom:1px solid var(--line);font-size:13.5px}
+.check li::before{content:"";position:absolute;left:2px;top:11px;width:14px;height:14px;border:1.5px solid var(--acc-line);border-radius:4px}
+.check li b{color:var(--text)}
+.check li .meta{font-family:var(--mono);font-size:10px;color:var(--faint);display:block;margin-top:2px}
+.pr{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin:12px 0;overflow:hidden}
+.pr-h{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--panel-2);border-bottom:1px solid var(--line)}
+.pr-h .num{font-family:var(--mono);font-size:11px;color:#fff;background:var(--acc);border-radius:6px;padding:2px 8px}
+.pr-h b{font-size:14px}
+.pr-h .dep{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--faint)}
+.pr-b{padding:12px 16px;font-size:13px;color:var(--muted)}
+.pr-b ul{margin:6px 0;padding-left:18px}
+.pr-b li{margin:3px 0}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:2px 8px;border-radius:100px;font-weight:600}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%}
+.pill.good{background:var(--good-soft);color:var(--good)}.pill.good::before{background:var(--good)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}.pill.warn::before{background:var(--warn)}
+.pill.crit{background:var(--crit-soft);color:var(--crit)}.pill.crit::before{background:var(--crit)}
+.pill.idle{background:var(--panel-3);color:var(--faint)}.pill.idle::before{background:var(--faint)}
+.themebtn{position:fixed;top:14px;right:16px;z-index:20;font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--panel);border:1px solid var(--line-2);border-radius:100px;padding:7px 14px;cursor:pointer}
+.themebtn:hover{color:var(--text);border-color:var(--acc-line)}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px}
+@media(max-width:900px){.shell{grid-template-columns:1fr}.toc{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}.themebtn{position:static;margin:12px}}
+</style>
+
+<button class="themebtn" onclick="(function(){var r=document.documentElement;var d=r.getAttribute('data-theme')==='dark'||(!r.getAttribute('data-theme')&&matchMedia('(prefers-color-scheme:dark)').matches);r.setAttribute('data-theme',d?'light':'dark');})()">◐ theme</button>
+
+<div class="shell">
+  <nav class="toc" aria-label="Contents">
+    <div class="toc-brand">
+      <span class="toc-logo"><svg viewBox="0 0 120 120" fill="none"><path d="M72 30 L36 30 L36 90 L72 90" stroke="var(--acc)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 60 L88 60" stroke="var(--acc)" stroke-width="12" stroke-linecap="round"/><circle cx="98" cy="60" r="9" fill="var(--acc)"/></svg></span>
+      <div><b>EasyTrac</b><span>P0 Build Plan</span></div>
+    </div>
+    <span class="toc-tag">▸ implementation · phase P0</span>
+    <a href="#scope"><span class="n">00</span><span>Scope &amp; non-goals</span></a>
+    <a href="#arch"><span class="n">01</span><span>Migration architecture</span></a>
+    <a href="#switch"><span class="n">02</span><span>The route switch</span></a>
+    <a href="#auth"><span class="n">03</span><span>Auth integration</span></a>
+    <a href="#structure"><span class="n">04</span><span>App structure</span></a>
+    <a href="#shell"><span class="n">05</span><span>AppShell components</span></a>
+    <a href="#home"><span class="n">06</span><span>Home components</span></a>
+    <a href="#data"><span class="n">07</span><span>Data contract</span></a>
+    <a href="#states"><span class="n">08</span><span>Home states</span></a>
+    <a href="#dod"><span class="n">09</span><span>Definition of done</span></a>
+    <a href="#prs"><span class="n">10</span><span>PR sequence</span></a>
+    <a href="#risks"><span class="n">11</span><span>Risks &amp; questions</span></a>
+  </nav>
+
+  <main>
+    <section id="scope">
+      <div class="hero">
+        <div class="eyebrow">P0 · Implementation Plan · executable</div>
+        <h1>Strangler harness + a tracking-first Home.</h1>
+        <p class="lead">The smallest slice that proves the migration works and ships the new first impression: a route switch in <code>server.js</code>, the Next.js <strong>AppShell</strong>, and a <strong>Home</strong> that answers "is my tracking working?" — all on the same origin, wired to existing Firebase auth and APIs, with <code>tool.html</code> untouched.</p>
+        <div class="metastrip">
+          <span class="m">seam: <b>server.js:4579</b></span>
+          <span class="m">auth: <b>Firebase ID token</b></span>
+          <span class="m">target: <b>frontend/ (Next 14)</b></span>
+          <span class="m">routes migrated: <b>/home</b></span>
+          <span class="m">legacy: <b>100% live</b></span>
+        </div>
+      </div>
+
+      <h3>In scope (P0)</h3>
+      <ul class="check">
+        <li><b>Route switch</b> in the app server so one route (<code>/home</code>) is served by Next.js and everything else falls through to <code>tool.html</code>.<span class="meta">strangler seam · reversible per-route</span></li>
+        <li><b>AppShell</b> — sidebar (5 core items + collapsed Operations), store switcher, mobile bottom-bar, RTL, theme.<span class="meta">the frame every future route mounts into</span></li>
+        <li><b>Home</b> — tracking-first: health headline, events-today, connected destinations, recent activity, one state-driven CTA.<span class="meta">the identity guardrail from spec §04</span></li>
+        <li><b>Home states</b> — loading skeleton, first-run empty, error, healthy/degraded/down.<span class="meta">every state designed, not just the happy path</span></li>
+        <li><b>Firebase auth wiring</b> — reuse the existing client session, attach ID token to API calls, SSR route guard.<span class="meta">same origin ⇒ shared session</span></li>
+        <li><b>Data layer</b> — typed fetchers for Home against existing endpoints + a thin BFF for the 2 gaps.<span class="meta">see §07</span></li>
+      </ul>
+
+      <h3>Explicitly NOT in P0 (deferred to P1+)</h3>
+      <p class="muted">Destinations list/detail · add-destination sheet · Events inspector · Data Health page · provisioning theater · Settings page · Operations depth · onboarding wizard (Home's empty state links to the <em>legacy</em> setup for now) · any change to <code>tool.html</code> · any pricing/CAPI/backend-architecture work. P0 is the harness and the first impression — nothing more.</p>
+    </section>
+
+    <hr class="sep">
+    <section id="arch">
+      <div class="eyebrow">01 · Architecture</div>
+      <h2>Migration architecture</h2>
+      <p class="lead">Two processes behind one origin. The app server owns the front door and decides, per request path, who renders.</p>
+
+      <div class="flow">
+        <div class="node"><div class="s">Browser</div><div class="t">app.easytrac.io</div><div class="d">One origin ⇒ one Firebase Auth session, shared by both UIs.</div></div>
+        <div class="arr">→</div>
+        <div class="node"><div class="s">Front door</div><div class="t">server.js</div><div class="d">Path in <code>MIGRATED_ROUTES</code>? → proxy to Next. Else → existing <code>tool.html</code> / <code>/api/*</code> logic.</div></div>
+        <div class="arr">⇄</div>
+        <div class="node"><div class="s">New</div><div class="t">Next.js (frontend/)</div><div class="d">Renders <code>/home</code>. Calls back to <code>/api/*</code> with the user's ID token.</div></div>
+      </div>
+
+      <div class="pgrid">
+        <div class="pcard"><div class="i">DECISION</div><b>Same origin, reverse-proxy</b><p>Next.js runs as a sidecar process; <code>server.js</code> proxies migrated paths to it. Keeps cookies/Firebase session shared and avoids CORS. (Alt: Next static export served as files — rejected: Home needs runtime data + SSR guard.)</p></div>
+        <div class="pcard"><div class="i">DECISION</div><b>Backend unchanged</b><p>Next calls the same <code>/api/managed/*</code> and <code>/api/v1/*</code> endpoints <code>tool.html</code> uses. No new auth system, no data migration.</p></div>
+        <div class="pcard"><div class="i">DECISION</div><b>Reversible per route</b><p><code>MIGRATED_ROUTES</code> is a Set + env flag. Remove <code>/home</code> from it → instantly back to legacy. This is the rollback.</p></div>
+      </div>
+      <div class="callout warn"><div class="k">Deploy note — verify before building</div><p style="margin:8px 0 0">Confirm how the app is hosted today (per memory: prod deploys the <code>main</code> of a separate public repo; Railway may force NIXPACKS and ignore the Dockerfile). The sidecar needs the host to run <em>two</em> processes (node <code>server.js</code> + <code>next start</code>) or a single container that boots both. <strong>PR-0 is a spike to confirm this.</strong> If two-process hosting is blocked, fallback is deploying Next as a separate service and proxying by absolute URL — same code path, different upstream.</p></div>
+    </section>
+
+    <hr class="sep">
+    <section id="switch">
+      <div class="eyebrow">02 · Architecture</div>
+      <h2>The route switch</h2>
+      <p>The seam already exists. <code>server.js:4578-4581</code> maps clean SPA routes to <code>tool.html</code> via an <code>APP_ROUTES</code> set. The switch is one check <em>before</em> it:</p>
+      <div class="code"><span class="c">// server.js — add near APP_ROUTES definition</span>
+<span class="kw">const</span> MIGRATED_ROUTES = <span class="kw">new</span> Set(
+  (process.env.MIGRATED_ROUTES || <span class="g">'/home'</span>).split(<span class="g">','</span>).map(s => s.trim())
+);
+<span class="kw">const</span> NEXT_UPSTREAM = process.env.NEXT_UPSTREAM || <span class="g">'http://127.0.0.1:3000'</span>;
+
+<span class="c">// ── in the request handler, BEFORE the APP_ROUTES → tool.html block ──</span>
+<span class="kw">const</span> _clean = urlPath.replace(/\/+$/, <span class="g">''</span>) || <span class="g">'/'</span>;
+<span class="kw">if</span> (MIGRATED_ROUTES.has(_clean) || _clean.startsWith(<span class="g">'/_next'</span>)) {
+  <span class="kw">return</span> proxyToNext(req, res, NEXT_UPSTREAM);  <span class="c">// same-origin reverse proxy</span>
+}
+<span class="c">// …existing APP_ROUTES / tool.html / /api logic continues unchanged…</span></div>
+      <p class="muted"><code>proxyToNext</code> is a ~20-line <code>http.request</code> pass-through (mirror the pattern already in <code>edge-router/server.js:proxyTo</code> — pipe method, headers, body, stream the response). <code>/_next/*</code> must proxy too so Next's assets load. <code>/api/*</code> is matched earlier in <code>server.js</code> and is untouched, so Home's data calls keep hitting the existing handlers.</p>
+      <div class="callout good"><div class="k">Why this is the whole harness</div><p style="margin:8px 0 0">Migrating a future route = add its path to <code>MIGRATED_ROUTES</code> and build the Next page. No router rewrite, no infra change. The strangler grows one entry at a time; <code>tool.html</code> shrinks only when a route is proven at parity.</p></div>
+    </section>
+
+    <hr class="sep">
+    <section id="auth">
+      <div class="eyebrow">03 · Architecture</div>
+      <h2>Auth integration</h2>
+      <p class="lead">No new auth. The browser already holds a Firebase Auth session for this origin; Next.js reuses it. The backend already verifies <code>Authorization: Bearer &lt;idToken&gt;</code> via <code>firestoreService.verifyIdToken</code>.</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Concern</th><th>P0 approach</th></tr></thead>
+        <tbody>
+          <tr><td>Client SDK</td><td>Initialize Firebase Web SDK in Next with the <strong>same config</strong> <code>tool.html</code> uses (extract to a shared <code>NEXT_PUBLIC_FIREBASE_*</code> env). Same origin ⇒ <code>onAuthStateChanged</code> resolves the existing user with no re-login.</td></tr>
+          <tr><td>Token on API calls</td><td>A <code>fetcher</code> wrapper calls <code>auth.currentUser.getIdToken()</code> and sets the <code>Authorization</code> header on every <code>/api/*</code> request — exactly what the backend expects.</td></tr>
+          <tr><td>Route guard</td><td>Client-side guard in AppShell: if no user after auth init → redirect to the existing <code>/sign-in</code> (still served by <code>tool.html</code>). SSR stays unauthenticated-safe (renders skeleton, hydrates with user).</td></tr>
+          <tr><td>Not in P0</td><td>Server-side session cookies / SSR-authenticated data fetching. Home fetches client-side after auth resolves — simplest correct path. Revisit if SEO/SSR-data needed later.</td></tr>
+        </tbody>
+      </table></div>
+      <div class="callout"><div class="k">Spike input needed</div><p style="margin:8px 0 0">Pull the exact Firebase client config + which auth persistence <code>tool.html</code> uses (local vs session) so Next matches it. If <code>tool.html</code> uses session persistence, Home must too, or the shared-session assumption breaks. <em>PR-1 acceptance depends on confirming this.</em></p></div>
+    </section>
+
+    <hr class="sep">
+    <section id="structure">
+      <div class="eyebrow">04 · Build</div>
+      <h2>App structure to create</h2>
+      <p>The scaffold has tokens, fonts, theme, typography components and an <code>EventsTable</code> — but no route tree, no <code>middleware</code>, no providers. P0 establishes them.</p>
+      <div class="ctree">frontend/
+├─ <b>middleware.ts</b>                 <span class="n">NEW</span> <span class="c">// next-intl locale (ar default, RTL) — layout already expects params.locale</span>
+├─ app/
+│  ├─ layout.tsx                    <span class="g">exists</span> <span class="c">// fonts + dir; keep</span>
+│  ├─ <b>[locale]/</b>                    <span class="n">NEW</span> <span class="c">// locale segment layout expects</span>
+│  │  ├─ <b>layout.tsx</b>              <span class="n">NEW</span> <span class="c">// Providers: Auth, Theme, Query, Store context</span>
+│  │  ├─ <b>(app)/</b>                  <span class="n">NEW</span> <span class="c">// authed group → renders inside AppShell</span>
+│  │  │  ├─ <b>layout.tsx</b>           <span class="n">NEW</span> <span class="c">// mounts &lt;AppShell&gt;</span>
+│  │  │  └─ <b>home/page.tsx</b>        <span class="n">NEW</span> <span class="c">// the Home route (/home)</span>
+│  │  └─ <b>loading.tsx</b>             <span class="n">NEW</span> <span class="c">// route-level skeleton</span>
+├─ <b>components/app/</b>                 <span class="n">NEW</span> <span class="c">// AppShell + nav (see §05)</span>
+├─ <b>components/home/</b>                <span class="n">NEW</span> <span class="c">// Home widgets (see §06)</span>
+├─ <b>components/ui/</b>                  <span class="n">NEW</span> <span class="c">// primitives: Button, StatusPill, Card, Banner, Skeleton, EmptyState, Disclosure</span>
+├─ <b>lib/auth.ts</b>                     <span class="n">NEW</span> <span class="c">// firebase client init + useUser()</span>
+├─ <b>lib/fetcher.ts</b>                  <span class="n">NEW</span> <span class="c">// token-attaching fetch + typed Home fetchers</span>
+├─ <b>lib/store-context.tsx</b>           <span class="n">NEW</span> <span class="c">// current store + switcher state</span>
+├─ components/analytics/EventsTable.tsx <span class="g">exists</span> <span class="c">// reuse for recent-activity</span>
+├─ components/typography/*             <span class="g">exists</span> <span class="c">// MetricValue, EventName, CurrencyValue — reuse</span>
+└─ lib/theme.ts, lib/formatters.ts     <span class="g">exists</span> <span class="c">// reuse</span></div>
+      <p class="muted">Add deps: Firebase Web SDK (<code>firebase</code>), a data-fetching lib (<code>@tanstack/react-query</code>) for polling Home + cache. <code>next-intl</code>, <code>cva</code>, <code>tailwind-merge</code>, <code>@radix-ui/react-slot</code> are already in <code>package.json</code>.</p>
+    </section>
+
+    <hr class="sep">
+    <section id="shell">
+      <div class="eyebrow">05 · Build</div>
+      <h2>AppShell components</h2>
+      <p>The frame every future route mounts into. Built from primitives; RTL and theme come free from the existing token/font setup.</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Component</th><th>File</th><th>Responsibility · props</th><th>States</th></tr></thead>
+        <tbody>
+          <tr><td><b>AppShell</b></td><td><code class="k">components/app/AppShell.tsx</code></td><td>Grid: SideNav + StoreSwitcher + main slot + MobileTabBar. <code>{children}</code></td><td>authed / auth-loading / signed-out→redirect</td></tr>
+          <tr><td><b>SideNav</b></td><td><code class="k">components/app/SideNav.tsx</code></td><td>5 core links + <code>OperationsGroup</code>. <code>{activePath}</code></td><td>active / hover / focus</td></tr>
+          <tr><td><b>OperationsGroup</b></td><td><code class="k">components/app/OperationsGroup.tsx</code></td><td>Collapsed disclosure; renders <code>RoadmapSlot</code>s. <code>{items}</code></td><td>collapsed / expanded</td></tr>
+          <tr><td><b>RoadmapSlot</b></td><td><code class="k">components/app/RoadmapSlot.tsx</code></td><td>Nav row that is a live link or a "Soon" badge. <code>{label, href?, status}</code></td><td>active / soon</td></tr>
+          <tr><td><b>StoreSwitcher</b></td><td><code class="k">components/app/StoreSwitcher.tsx</code></td><td>Current store + dropdown. <code>{stores, current, onSwitch}</code></td><td>single-store / multi / loading</td></tr>
+          <tr><td><b>MobileTabBar</b></td><td><code class="k">components/app/MobileTabBar.tsx</code></td><td>Bottom bar &lt;900px: Home · Destinations · Health · Events</td><td>active</td></tr>
+        </tbody>
+      </table></div>
+      <h4>UI primitives (components/ui) needed for P0</h4>
+      <p class="muted"><code>Button</code> (pri/ghost, one pri per view) · <code>StatusPill</code> (good/warn/crit/idle) · <code>Card</code> · <code>StatCard</code> · <code>Banner</code> (info/warn/crit) · <code>Skeleton</code> · <code>EmptyState</code> (icon+line+one CTA) · <code>Disclosure</code> (expander). Each is CVA-styled against the existing semantic tokens — this is the vocabulary that replaces <code>tool.html</code>'s 1,049 inline styles.</p>
+    </section>
+
+    <hr class="sep">
+    <section id="home">
+      <div class="eyebrow">06 · Build</div>
+      <h2>Home components</h2>
+      <p class="lead">Tracking-first, per the spec identity guardrail: the four tracking signals above the fold, one state-driven action. Composed of five widgets.</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Widget</th><th>Answers</th><th>Data source (§07)</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><b>HealthHeadline</b></td><td>"Is my tracking working?" (1)</td><td><code>/api/managed/health</code></td><td>Big status line + <code>StatusPill</code>. Drives the page's primary CTA.</td></tr>
+          <tr><td><b>TrackingStatusRow</b></td><td>Events today + live (2)</td><td><code>/api/v1/metrics</code></td><td>StatCards: events today, match quality, live indicator (last-seen).</td></tr>
+          <tr><td><b>DestinationsStrip</b></td><td>Connected destinations (3)</td><td>BFF <code>/api/home/summary</code> <span class="chip new">new</span></td><td>Per-destination pill row. Read-only in P0 (detail is P1).</td></tr>
+          <tr><td><b>RecentActivityFeed</b></td><td>Recent activity (4)</td><td>BFF <code>/api/home/recent-events</code> <span class="chip new">new</span></td><td>Reuse <code>EventsTable</code>. Last ~10 events, dest accept/fail.</td></tr>
+          <tr><td><b>PrimaryActionCard</b></td><td>"What do I do next?"</td><td>derived from health state</td><td>Set up / Fix &lt;X&gt; / View live events — never a menu.</td></tr>
+        </tbody>
+      </table></div>
+      <div class="ctree"><b>HomePage</b> <span class="c">(app/[locale]/(app)/home/page.tsx)</span>
+├─ <b>HealthHeadline</b>        ← health query
+├─ <b>PrimaryActionCard</b>     ← derived(state)
+├─ <span class="c">grid</span>
+│  ├─ <b>TrackingStatusRow</b>  ← StatCard ×3
+│  └─ <b>DestinationsStrip</b>  ← StatusPill ×N
+└─ <b>RecentActivityFeed</b>    ← EventsTable (existing)</div>
+    </section>
+
+    <hr class="sep">
+    <section id="data">
+      <div class="eyebrow">07 · Build</div>
+      <h2>Data contract</h2>
+      <p class="lead">Honest inventory: what exists in <code>server.js</code> today vs. the two thin endpoints Home needs. No backend re-architecture — the "new" ones are read-only aggregators over data already in Firestore.</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Endpoint</th><th>Status</th><th>Returns / to build</th><th>Feeds</th></tr></thead>
+        <tbody>
+          <tr><td><code class="k">GET /api/managed/health</code></td><td><span class="chip have">exists</span></td><td>Container/platform health (spec §health)</td><td>HealthHeadline</td></tr>
+          <tr><td><code class="k">GET /api/v1/metrics</code></td><td><span class="chip have">exists</span></td><td>Event volume / metrics</td><td>TrackingStatusRow</td></tr>
+          <tr><td><code class="k">GET /api/managed/client/{id}</code></td><td><span class="chip have">exists</span></td><td>Client + provisioning status</td><td>store context, empty-state gating</td></tr>
+          <tr><td><code class="k">GET /api/managed/server</code></td><td><span class="chip have">exists</span></td><td>Managed server info</td><td>Infra disclosure (later)</td></tr>
+          <tr><td><code class="k">GET /api/home/summary</code></td><td><span class="chip new">new · thin BFF</span></td><td>Aggregate: {storeName, plan, destinations:[{id,name,status,lastEventAt}]}</td><td>DestinationsStrip, header</td></tr>
+          <tr><td><code class="k">GET /api/home/recent-events</code></td><td><span class="chip new">new · thin BFF</span></td><td>Last N events: {name, ts, destinations:[{id,ok,code}]}</td><td>RecentActivityFeed</td></tr>
+        </tbody>
+      </table></div>
+      <p class="muted">Both new endpoints live in <code>server.js</code> beside the existing <code>/api/managed/*</code> handlers, reuse the same Firebase-token auth and <code>clientId</code>-ownership check (<code>server.js:2083</code> pattern), and read existing Firestore docs — they aggregate, they don't create schema. If event-level data isn't yet persisted per-destination, <code>recent-events</code> ships behind an empty-state (returns <code>[]</code>) and the feed shows its "no events yet" state — no fake data.</p>
+      <div class="callout"><div class="k">Typed contract first</div><p style="margin:8px 0 0">Define these as TypeScript types in <code>lib/fetcher.ts</code> up front so Home builds against the contract while the two BFF endpoints are implemented in parallel. React Query polls health + metrics every ~15s for the "live" feel.</p></div>
+    </section>
+
+    <hr class="sep">
+    <section id="states">
+      <div class="eyebrow">08 · Build</div>
+      <h2>Home states — all designed, not just the happy path</h2>
+      <div class="pgrid">
+        <div class="pcard"><div class="i">STATE · loading</div><b>Skeleton</b><p><code>Skeleton</code> cards matching final layout — no spinner, no layout shift. Route-level <code>loading.tsx</code> + per-widget suspense.</p></div>
+        <div class="pcard"><div class="i">STATE · first-run</div><b>Empty</b><p>No store/container yet → <code>EmptyState</code>: "Let's get your store tracking." One CTA → the <em>existing</em> legacy setup route (P0 doesn't rebuild onboarding). <span class="pill idle">tracking-identity kept</span></p></div>
+        <div class="pcard"><div class="i">STATE · healthy</div><b>Green</b><p>HealthHeadline "Your tracking is healthy", live activity, primary CTA = "View live events" (→ legacy events for now).</p></div>
+        <div class="pcard"><div class="i">STATE · degraded/down</div><b>Banner</b><p><code>Banner crit</code> at top: "GA4 stopped receiving events 3h ago." Primary CTA = "Fix &lt;destination&gt;" (→ legacy for now). Status in color + text.</p></div>
+        <div class="pcard"><div class="i">STATE · error</div><b>Fetch failed</b><p>Card-level error with <em>Retry</em> — names what failed ("Couldn't load tracking health"), never a blank screen or raw stack.</p></div>
+        <div class="pcard"><div class="i">STATE · signed-out</div><b>Redirect</b><p>Auth resolves to no user → redirect to legacy <code>/sign-in</code>. Skeleton shows until auth settles.</p></div>
+      </div>
+      <p class="muted">P0 rule honored: <strong>every action has success/failure feedback</strong> (toasts wired via the primitive), <strong>the page communicates system status immediately</strong> (health headline is the first paint after skeleton), and <strong>one primary action</strong> (PrimaryActionCard is the only <code>Button pri</code>).</p>
+    </section>
+
+    <hr class="sep">
+    <section id="dod">
+      <div class="eyebrow">09 · Verification</div>
+      <h2>Definition of done</h2>
+      <p class="lead">Measurable acceptance — this is what "P0 complete" means at your verify gate.</p>
+      <ul class="check">
+        <li><b>Legacy untouched:</b> every route except <code>/home</code> still serves <code>tool.html</code>; <code>tool.html</code> file is byte-identical; all existing <code>/api/*</code> pass.<span class="meta">diff shows no change to tool.html</span></li>
+        <li><b>Same-session:</b> a user logged into <code>tool.html</code> visits <code>/home</code> and is recognized with no re-login.<span class="meta">shared Firebase session proven</span></li>
+        <li><b>Tracking-first Home:</b> health, events-today, connected destinations, and recent activity all render above the fold from real APIs.<span class="meta">spec identity guardrail met</span></li>
+        <li><b>All six states</b> reachable and correct (loading, empty, healthy, degraded, error, signed-out).<span class="meta">demoed each</span></li>
+        <li><b>One primary action</b> only; it changes with health state.<span class="meta">visual audit</span></li>
+        <li><b>Mobile:</b> at 375px the shell uses the bottom bar and Home reflows single-column, no horizontal scroll.<span class="meta">responsive proven</span></li>
+        <li><b>RTL + theme:</b> Arabic renders RTL; light/dark both legible.<span class="meta">both directions</span></li>
+        <li><b>Rollback:</b> removing <code>/home</code> from <code>MIGRATED_ROUTES</code> returns the user to legacy with no error.<span class="meta">strangler reversibility</span></li>
+      </ul>
+    </section>
+
+    <hr class="sep">
+    <section id="prs">
+      <div class="eyebrow">10 · Execution</div>
+      <h2>PR sequence</h2>
+      <p class="lead">Small, reviewable, each independently verifiable. Your Codex-implements / you-verify gate applies per PR.</p>
+
+      <div class="pr">
+        <div class="pr-h"><span class="num">PR-0</span><b>Hosting spike + proxy skeleton</b><span class="dep">no deps</span></div>
+        <div class="pr-b">Confirm two-process hosting (or fallback upstream). Add <code>proxyToNext</code> + <code>MIGRATED_ROUTES</code> guard in <code>server.js</code> behind an env flag defaulting to empty, proxying <code>/_next</code> + a throwaway <code>/__next-ping</code>. <b>Verify:</b> ping route hits a hello-world Next page; every other route unchanged.</div>
+      </div>
+      <div class="pr">
+        <div class="pr-h"><span class="num">PR-1</span><b>Next app skeleton + auth</b><span class="dep">deps: PR-0</span></div>
+        <div class="pr-b"><code>middleware.ts</code>, <code>[locale]</code> tree, providers, <code>lib/auth.ts</code> (Firebase client matching tool.html config), <code>lib/fetcher.ts</code>. A bare authed page prints the current user's email. <b>Verify:</b> shared session recognized, token attaches to a test <code>/api/*</code> call.</div>
+      </div>
+      <div class="pr">
+        <div class="pr-h"><span class="num">PR-2</span><b>UI primitives + AppShell</b><span class="dep">deps: PR-1</span></div>
+        <div class="pr-b"><code>components/ui/*</code> primitives + <code>AppShell</code>, <code>SideNav</code>, <code>OperationsGroup</code>, <code>RoadmapSlot</code>, <code>StoreSwitcher</code>, <code>MobileTabBar</code>. Home route renders an empty shell. <b>Verify:</b> nav, RTL, theme, mobile bottom-bar all correct; Operations collapses/expands.</div>
+      </div>
+      <div class="pr">
+        <div class="pr-h"><span class="num">PR-3</span><b>Home BFF endpoints</b><span class="dep">deps: PR-1 · parallel to PR-2</span></div>
+        <div class="pr-b"><code>/api/home/summary</code> + <code>/api/home/recent-events</code> in <code>server.js</code>, typed, owned-by-user checked, empty-safe. <b>Verify:</b> returns real aggregated data for a seeded client; <code>[]</code> path renders nothing broken.</div>
+      </div>
+      <div class="pr">
+        <div class="pr-h"><span class="num">PR-4</span><b>Home widgets + states</b><span class="dep">deps: PR-2, PR-3</span></div>
+        <div class="pr-b">The five widgets, React Query polling, all six states, one primary action. Flip <code>MIGRATED_ROUTES=/home</code> on. <b>Verify:</b> the full §09 DoD checklist.</div>
+      </div>
+      <div class="callout good"><div class="k">Ship gate</div><p style="margin:8px 0 0">Roll <code>/home</code> to a cohort first (e.g. internal + new signups) via the env flag, watch for a session, then widen. Legacy <code>/dashboard</code> stays the default entry until Home is proven — so there is never a moment users can't work.</p></div>
+    </section>
+
+    <hr class="sep">
+    <section id="risks">
+      <div class="eyebrow">11 · Execution</div>
+      <h2>Risks &amp; open questions</h2>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>#</th><th>Risk / question</th><th>Mitigation / needed answer</th></tr></thead>
+        <tbody>
+          <tr><td class="n">1</td><td>Host can't run two processes (Railway/NIXPACKS constraints per memory)</td><td>PR-0 spike decides; fallback = Next as separate service, proxy by absolute URL (same code)</td></tr>
+          <tr><td class="n">2</td><td>Firebase auth persistence mismatch breaks shared session</td><td>Extract exact config + persistence from <code>tool.html</code>; match in <code>lib/auth.ts</code> (PR-1 gate)</td></tr>
+          <tr><td class="n">3</td><td>Per-destination event data may not be persisted yet</td><td><code>recent-events</code> ships empty-safe; feed shows "no events yet" — never fabricated</td></tr>
+          <tr><td class="n">4</td><td>CSP: <code>server.js</code> sends strict CSP for <code>tool.html</code></td><td>Next assets need their own CSP/headers on migrated routes — add in proxy path (PR-0)</td></tr>
+          <tr><td class="n">5</td><td>Two design languages live at once during migration</td><td>Accept intentionally; brand tokens shared so both feel like EasyTrac; Home is a deliberately distinct "new" surface</td></tr>
+        </tbody>
+      </table></div>
+      <div class="callout"><div class="k">Answers I need from you to start PR-0/PR-1</div><p style="margin:8px 0 0"><b>(a)</b> Current prod host + whether it can run node + next together (or preferred: Next as its own service?). <b>(b)</b> The Firebase web config + auth persistence <code>tool.html</code> uses. <b>(c)</b> Confirm Home's first-run and CTAs may link into the <em>existing legacy</em> setup/events for P0 (rebuilding those is P1). Give me these and I'll start PR-0.</p></div>
+    </section>
+  </main>
+</div>
+
+<script>
+(function(){
+  var links=[].slice.call(document.querySelectorAll('.toc a'));
+  var map={};links.forEach(function(a){map[a.getAttribute('href').slice(1)]=a;});
+  var obs=new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){ links.forEach(function(l){l.classList.remove('on');}); var m=map[e.target.id]; if(m)m.classList.add('on'); } });
+  },{rootMargin:'-10% 0px -80% 0px'});
+  document.querySelectorAll('section[id]').forEach(function(s){obs.observe(s);});
+})();
+</script>

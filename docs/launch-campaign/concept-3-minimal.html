@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=block" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:1080px; background:#0A0A0A; }
+  body { font-family:'IBM Plex Sans Arabic', 'Segoe UI', sans-serif; color:#FFFFFF; }
+  .canvas { position:relative; width:1080px; height:1080px; overflow:hidden;
+            background:linear-gradient(180deg, #0C0E13 0%, #0A0A0A 34%);
+            display:flex; flex-direction:column; padding:72px 84px 64px; }
+
+  /* linear-style aurora, very restrained */
+  .aurora { position:absolute; top:-420px; right:50%; transform:translateX(50%); width:1200px; height:620px;
+            background:radial-gradient(closest-side, rgba(47,107,255,.17), rgba(47,107,255,0) 74%); }
+  /* baseline grid hint */
+  .grid { position:absolute; inset:0;
+          background-image:linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+                           linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+          background-size:108px 108px;
+          -webkit-mask-image:radial-gradient(ellipse 90% 55% at 50% 0%, #000 30%, transparent 100%);
+                  mask-image:radial-gradient(ellipse 90% 55% at 50% 0%, #000 30%, transparent 100%); }
+
+  .content { position:relative; display:flex; flex-direction:column; height:100%; }
+
+  .header { display:flex; align-items:center; justify-content:space-between; }
+  .lockup { display:flex; align-items:center; gap:13px; }
+  .lockup svg { width:46px; height:46px; }
+  .lockup .name { font-weight:700; font-size:27px; direction:ltr; }
+  .badge { display:flex; align-items:center; gap:14px; padding:11px 22px; border-radius:10px;
+           border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.03);
+           font-size:22px; font-weight:500; color:rgba(255,255,255,.9); }
+  .badge .sep { width:1px; height:20px; background:rgba(255,255,255,.15); }
+
+  .kicker { margin-top:88px; font-size:19px; font-weight:700; letter-spacing:3px; color:#5B8BFF;
+            direction:ltr; text-align:center; }
+
+  .hero { text-align:center; }
+  .hero .l1 { margin-top:20px; font-size:42px; font-weight:400; color:rgba(255,255,255,.72); }
+  .hero .l2 { font-size:96px; font-weight:700; line-height:1.32; margin-top:6px; letter-spacing:-.5px; }
+  .hero .l2 .disc { color:#2F6BFF; }
+  .hero .sub { margin-top:18px; font-size:28px; font-weight:400; color:rgba(255,255,255,.55); }
+
+  .cards { display:flex; gap:20px; margin-top:66px; }
+  .card { flex:1; min-width:0; border-radius:16px; padding:32px 36px; background:#101216;
+          border:1px solid rgba(255,255,255,.08); display:flex; flex-direction:column; }
+  .card.offer { flex:1.35; }
+  .card .cap { font-size:17px; font-weight:700; letter-spacing:2.5px; color:rgba(255,255,255,.4);
+               direction:ltr; text-align:right; }
+  .card.offer .cap { color:#5B8BFF; }
+  .offer .row { display:flex; align-items:center; justify-content:center; gap:16px; margin:auto 0; padding:12px 0; }
+  .offer .big { font-size:37px; font-weight:700; white-space:nowrap; }
+  .offer .plus { font-size:34px; font-weight:700; color:#2F6BFF; }
+  .card .title { font-size:26px; font-weight:500; color:rgba(255,255,255,.85); margin-top:20px; }
+  .stores { display:flex; align-items:center; gap:14px; margin-top:18px; }
+  .store { display:flex; align-items:center; gap:11px; padding:9px 20px; border-radius:10px;
+           background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1);
+           font-size:26px; font-weight:700; }
+  .store .dot { width:13px; height:13px; border-radius:50%; }
+  .dot.salla { background:#FF9548; }
+  .dot.zid { background:#4D9FFF; }
+  .mins { display:block; margin-top:18px; font-size:22px; color:rgba(255,255,255,.55); white-space:nowrap; }
+  .mins b { color:#FFFFFF; font-weight:500; }
+
+  .platforms { margin-top:52px; display:flex; align-items:center; gap:22px; }
+  .platforms .label { font-size:20px; color:rgba(255,255,255,.4); font-weight:500; white-space:nowrap; }
+  .platforms .line { flex:1; height:1px; background:rgba(255,255,255,.08); }
+  .pills { display:flex; gap:12px; direction:ltr; }
+  .pill { padding:9px 18px; border-radius:8px; border:1px solid rgba(255,255,255,.1);
+          background:rgba(255,255,255,.03); font-size:19px; font-weight:500; color:rgba(255,255,255,.75); }
+
+  .footer { margin-top:auto; display:flex; align-items:center; justify-content:space-between; }
+  .soon { display:flex; align-items:center; gap:12px; font-size:24px; font-weight:500; color:rgba(255,255,255,.75); }
+  .soon .tag { font-size:17px; font-weight:700; letter-spacing:1.5px; padding:5px 14px; border-radius:7px;
+               color:#0A0A0A; background:#2F6BFF; direction:ltr; }
+  .site { font-size:28px; font-weight:700; direction:ltr; }
+  .site .d { color:#2F6BFF; }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="aurora"></div>
+  <div class="grid"></div>
+
+  <div class="content">
+    <div class="header">
+      <div class="lockup">
+        <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M72 30 L36 30 L36 90 L72 90" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M36 60 L90 60" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round"/>
+          <circle cx="98" cy="60" r="10" fill="#2F6BFF"/>
+        </svg>
+        <div class="name">EasyTrac</div>
+      </div>
+      <div class="badge">
+        <span>🎂 عيد ميلادي</span>
+        <span class="sep"></span>
+        <span>🚀 وإطلاق EasyTrac</span>
+      </div>
+    </div>
+
+    <div class="kicker">BIRTHDAY × LAUNCH</div>
+    <div class="hero">
+      <div class="l1">بمناسبة عيد ميلادي...</div>
+      <div class="l2">أهديكم <span class="disc">خصم 50٪</span> 🎁</div>
+      <div class="sub">على جميع الباقات الحالية — لفترة محدودة</div>
+    </div>
+
+    <div class="cards">
+      <div class="card offer">
+        <div class="cap">LAUNCH OFFER</div>
+        <div class="row">
+          <div class="big">✅ خصم 50%</div>
+          <div class="plus">+</div>
+          <div class="big">🎁 شهر مجاني</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cap">INTEGRATIONS</div>
+        <div class="title">ابدأ تتبع متجرك على:</div>
+        <div class="stores">
+          <div class="store"><span class="dot salla"></span> سلة</div>
+          <div class="store"><span class="dot zid"></span> زد</div>
+        </div>
+        <div class="mins">الربط والإعداد <b>خلال دقائق</b></div>
+      </div>
+    </div>
+
+    <div class="platforms">
+      <div class="label">المنصّات المدعومة</div>
+      <div class="line"></div>
+      <div class="pills">
+        <div class="pill">GA4</div>
+        <div class="pill">Google Ads</div>
+        <div class="pill">Meta Pixel</div>
+        <div class="pill">TikTok Pixel</div>
+        <div class="pill">Snapchat Pixel</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="soon">تتبع الخادم <span class="tag">SOON</span></div>
+      <div class="site">easytrac<span class="d">.io</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
