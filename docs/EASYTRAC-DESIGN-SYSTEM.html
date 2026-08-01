@@ -1,0 +1,608 @@
+<title>EasyTrac — Design System & Visual Identity</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{
+  /* ── Brand palette (exact, as specified) ── */
+  --bg:#0A0A0A;
+  --primary:#2F6BFF;
+  --white:#FFFFFF;
+  --muted:#A1A1AA;      /* zinc-400 — secondary text */
+  --success:#22C55E;
+  --warning:#F59E0B;
+  --danger:#EF4444;
+  /* ── Derived neutrals (zinc family, chosen to sit under #0A0A0A) ── */
+  --panel:#101013;
+  --panel-2:#161619;
+  --panel-3:#1D1D21;
+  --line:rgba(255,255,255,.07);
+  --line-2:rgba(255,255,255,.12);
+  --text:#F4F4F5;        /* zinc-100 — primary text */
+  --faint:#71717A;       /* zinc-500 */
+  /* ── Accent supports ── */
+  --primary-2:#5B8BFF;
+  --primary-soft:rgba(47,107,255,.12);
+  --primary-line:rgba(47,107,255,.42);
+  --glow:0 0 40px -6px rgba(47,107,255,.45);
+  --success-soft:rgba(34,197,94,.13);
+  --warning-soft:rgba(245,158,11,.13);
+  --danger-soft:rgba(239,68,68,.13);
+  /* ── Elevation (soft shadows) ── */
+  --sh-1:0 1px 2px rgba(0,0,0,.4);
+  --sh-2:0 8px 30px -12px rgba(0,0,0,.7);
+  --sh-3:0 30px 80px -40px rgba(0,0,0,.85);
+  /* ── Radius (12–16px system) ── */
+  --r-sm:10px; --r:14px; --r-lg:18px; --r-pill:999px;
+  /* ── Type ── */
+  --sans:"IBM Plex Sans Arabic",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Arabic",Tahoma,sans-serif;
+  --mono:ui-monospace,"JetBrains Mono","SF Mono","Cascadia Code",Menlo,Consolas,monospace;
+  --sp:8px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
+body{
+  margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
+  font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(1100px 600px at 88% -8%,rgba(47,107,255,.10),transparent 60%);
+  background-attachment:fixed;
+}
+.shell{display:grid;grid-template-columns:260px minmax(0,1fr);max-width:1340px;margin:0 auto}
+
+/* ── side nav ── */
+.toc{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;border-right:1px solid var(--line);padding:28px 20px 48px}
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.brand .mk{width:38px;height:38px;border-radius:11px;background:linear-gradient(160deg,#141418,#0c0c0f);border:1px solid var(--line-2);display:grid;place-items:center;box-shadow:var(--glow),var(--sh-1);flex-shrink:0}
+.brand .mk svg{width:22px;height:22px}
+.brand b{font-size:15px;letter-spacing:-.3px;font-weight:750}
+.brand span{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:2px;color:var(--faint);text-transform:uppercase;margin-top:3px}
+.toc-ey{font-family:var(--mono);font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--faint);margin:26px 0 8px 10px}
+.toc a{display:flex;gap:10px;align-items:baseline;text-decoration:none;color:var(--muted);font-size:13.5px;padding:8px 12px;border-radius:10px;line-height:1.3;transition:background .15s,color .15s}
+.toc a .n{font-family:var(--mono);font-size:10.5px;color:var(--faint);min-width:18px}
+.toc a:hover{color:var(--text);background:var(--panel-2)}
+.toc a.on{color:var(--white);background:var(--primary-soft);box-shadow:inset 0 0 0 1px var(--primary-line)}
+.toc a.on .n{color:var(--primary-2)}
+
+main{padding:0 clamp(20px,4.5vw,72px) 140px;min-width:0}
+section{padding-top:80px;scroll-margin-top:24px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:var(--primary-2)}
+h1{font-size:clamp(34px,5.4vw,58px);line-height:1.02;letter-spacing:-1.6px;margin:16px 0 0;font-weight:800;text-wrap:balance}
+h2{font-size:clamp(24px,3.2vw,34px);letter-spacing:-.9px;margin:0 0 6px;font-weight:760;text-wrap:balance}
+h3{font-size:17px;letter-spacing:-.2px;margin:30px 0 10px;font-weight:700}
+p{margin:12px 0;max-width:72ch;color:var(--muted)}
+.lead{font-size:19px;color:#D4D4D8;max-width:66ch;line-height:1.6}
+strong{color:var(--text);font-weight:640}
+code{font-family:var(--mono);font-size:.85em;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:2px 6px;color:#D4D4D8}
+.hr{height:1px;background:linear-gradient(90deg,var(--line-2),transparent);margin:0;border:0}
+
+/* ── hero ── */
+.hero{position:relative;border:1px solid var(--line);border-radius:24px;padding:clamp(28px,4vw,52px);margin-top:26px;overflow:hidden;
+  background:linear-gradient(180deg,#0e0e11,#0a0a0c);box-shadow:var(--sh-3)}
+.hero::before{content:"";position:absolute;inset:0;background:radial-gradient(600px 300px at 100% 0%,rgba(47,107,255,.18),transparent 60%);pointer-events:none}
+.hero::after{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:34px 34px;mask-image:radial-gradient(500px 300px at 90% 0%,#000,transparent 70%);pointer-events:none}
+.hero>*{position:relative}
+.pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:26px}
+.tag{font-family:var(--mono);font-size:11px;color:var(--muted);background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:var(--r-pill);padding:6px 13px}
+.tag b{color:var(--text)}
+
+/* ── swatches ── */
+.sw-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin:22px 0}
+.sw{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--panel);transition:transform .18s,box-shadow .18s}
+.sw:hover{transform:translateY(-3px);box-shadow:var(--sh-2)}
+.sw .chip{height:78px}
+.sw .meta{padding:12px 14px}
+.sw .nm{font-size:13px;font-weight:650;color:var(--text)}
+.sw .hx{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:2px}
+.sw .role{font-size:10.5px;color:var(--faint);margin-top:6px}
+
+/* ── generic cards ── */
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.card{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:20px;box-shadow:var(--sh-1);transition:transform .18s,box-shadow .18s,border-color .18s}
+.card:hover{transform:translateY(-2px);box-shadow:var(--sh-2);border-color:var(--line-2)}
+.card .k{font-family:var(--mono);font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--primary-2)}
+.card h4{margin:8px 0 4px;font-size:15px;font-weight:700}
+.card p{margin:0;font-size:13px}
+.glass{background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.015));backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line-2)}
+
+/* ── buttons ── */
+.btns{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:16px 0}
+.btn{font-family:var(--sans);font-size:14px;font-weight:650;border-radius:var(--r-sm);padding:11px 20px;cursor:pointer;border:1px solid transparent;transition:transform .12s,box-shadow .2s,background .2s,border-color .2s;display:inline-flex;align-items:center;gap:9px}
+.btn:active{transform:translateY(1px)}
+.btn-pri{background:linear-gradient(180deg,#3d78ff,#2f6bff);color:#fff;box-shadow:0 8px 24px -10px rgba(47,107,255,.7),inset 0 1px 0 rgba(255,255,255,.25)}
+.btn-pri:hover{box-shadow:0 10px 34px -8px rgba(47,107,255,.85),inset 0 1px 0 rgba(255,255,255,.3)}
+.btn-ghost{background:rgba(255,255,255,.03);color:var(--text);border-color:var(--line-2)}
+.btn-ghost:hover{background:rgba(255,255,255,.06);border-color:var(--muted)}
+.btn-danger{background:var(--danger-soft);color:#fca5a5;border-color:rgba(239,68,68,.3)}
+
+/* ── status pills ── */
+.pills{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0}
+.pill{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:var(--r-pill);border:1px solid transparent}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;box-shadow:0 0 0 3px rgba(255,255,255,.04)}
+.pill.ok{background:var(--success-soft);color:#4ade80;border-color:rgba(34,197,94,.28)}.pill.ok::before{background:var(--success);box-shadow:0 0 8px var(--success)}
+.pill.warn{background:var(--warning-soft);color:#fbbf24;border-color:rgba(245,158,11,.28)}.pill.warn::before{background:var(--warning);box-shadow:0 0 8px var(--warning)}
+.pill.crit{background:var(--danger-soft);color:#f87171;border-color:rgba(239,68,68,.28)}.pill.crit::before{background:var(--danger);box-shadow:0 0 8px var(--danger)}
+.pill.idle{background:var(--panel-3);color:var(--muted);border-color:var(--line)}.pill.idle::before{background:var(--faint)}
+.pill.info{background:var(--primary-soft);color:var(--primary-2);border-color:var(--primary-line)}.pill.info::before{background:var(--primary);box-shadow:0 0 8px var(--primary)}
+
+/* ── skeleton ── */
+.sk{background:linear-gradient(90deg,var(--panel-2) 25%,var(--panel-3) 37%,var(--panel-2) 63%);background-size:400% 100%;animation:sh 1.4s ease infinite;border-radius:8px}
+@keyframes sh{0%{background-position:100% 0}100%{background-position:-100% 0}}
+.sk.l{height:12px}.sk.h{height:22px}
+
+/* ── empty state ── */
+.empty{border:1px dashed var(--line-2);border-radius:var(--r-lg);padding:40px 28px;text-align:center;background:radial-gradient(400px 200px at 50% 0%,rgba(47,107,255,.06),transparent 70%)}
+.empty .ic{width:56px;height:56px;border-radius:16px;margin:0 auto 16px;display:grid;place-items:center;background:var(--primary-soft);border:1px solid var(--primary-line);box-shadow:var(--glow);color:var(--primary-2);font-size:24px}
+.empty h4{margin:0 0 6px;font-size:16px}
+.empty p{margin:0 auto 18px;font-size:13px;max-width:44ch}
+
+/* ── toasts ── */
+.toast{display:flex;gap:12px;align-items:flex-start;border-radius:var(--r);padding:14px 16px;border:1px solid var(--line-2);background:var(--panel-2);box-shadow:var(--sh-2);max-width:420px}
+.toast .dot{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;flex-shrink:0;font-size:13px}
+.toast.ok .dot{background:var(--success-soft);color:#4ade80}
+.toast.err .dot{background:var(--danger-soft);color:#f87171}
+.toast .tt{font-size:13.5px;font-weight:650;color:var(--text)}
+.toast .ds{font-size:12px;color:var(--muted);margin-top:2px}
+
+/* ── command center mock ── */
+.cc{border:1px solid var(--line-2);border-radius:22px;overflow:hidden;box-shadow:var(--sh-3);background:var(--bg);margin:20px 0}
+.cc-top{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#101013,#0b0b0d)}
+.cc-top .dots{display:flex;gap:6px}.cc-top .dots i{width:9px;height:9px;border-radius:50%;background:var(--line-2)}
+.cc-top .store{margin-inline-start:6px;font-size:12.5px;font-weight:650;color:var(--text);display:flex;align-items:center;gap:7px}
+.cc-top .env{margin-inline-start:auto;font-family:var(--mono);font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:var(--r-pill);padding:4px 11px}
+.cc-body{display:grid;grid-template-columns:180px 1fr;min-height:420px}
+.cc-nav{border-inline-end:1px solid var(--line);padding:16px 12px;background:linear-gradient(180deg,#0d0d10,#0a0a0c)}
+.cc-nav .np{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--muted);padding:9px 11px;border-radius:10px;margin-bottom:2px;transition:background .15s,color .15s;cursor:default}
+.cc-nav .np .i{width:15px;text-align:center;opacity:.85}
+.cc-nav .np.on{background:var(--primary-soft);color:var(--white);box-shadow:inset 0 0 0 1px var(--primary-line)}
+.cc-nav .grp{font-family:var(--mono);font-size:8.5px;letter-spacing:1.6px;color:var(--faint);text-transform:uppercase;margin:16px 0 6px 8px}
+.cc-main{padding:22px;min-width:0}
+.cc-h{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;justify-content:space-between}
+.cc-status{font-size:22px;font-weight:780;letter-spacing:-.5px;color:var(--white);display:flex;align-items:center;gap:12px}
+.cc-sub{color:var(--muted);font-size:13px;margin-top:4px}
+.cc-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}
+.mtile{border:1px solid var(--line);border-radius:var(--r);padding:14px;background:var(--panel);position:relative;overflow:hidden}
+.mtile .lb{font-family:var(--mono);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;color:var(--faint)}
+.mtile .vl{font-size:26px;font-weight:800;letter-spacing:-.5px;color:var(--white);margin-top:6px;font-variant-numeric:tabular-nums}
+.mtile .dl{font-size:11px;color:var(--muted);margin-top:2px}
+.spark{display:flex;align-items:flex-end;gap:3px;height:26px;margin-top:8px}
+.spark i{flex:1;background:linear-gradient(180deg,var(--primary),rgba(47,107,255,.25));border-radius:2px;min-height:3px}
+.ring-wrap{display:flex;align-items:center;gap:16px}
+@media(max-width:640px){.cc-body{grid-template-columns:1fr}.cc-nav{display:none}.cc-metrics{grid-template-columns:repeat(2,1fr)}}
+
+.dest-row{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:8px;transition:border-color .15s,transform .15s}
+.dest-row:hover{border-color:var(--line-2);transform:translateX(-2px)}
+.dest-row .lft{display:flex;align-items:center;gap:11px;font-size:13px;color:var(--text)}
+.dest-row .ic{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:12px;background:var(--panel-3);border:1px solid var(--line)}
+.feed{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:2}
+.feed .t{color:var(--faint)}.feed .ev{color:var(--text)}
+
+.qgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0}
+@media(max-width:700px){.qgrid{grid-template-columns:1fr}.cc-metrics{grid-template-columns:repeat(2,1fr)}}
+.q{border:1px solid var(--line);border-radius:var(--r);padding:18px;background:var(--panel);border-top:2px solid var(--primary)}
+.q .qq{font-size:14px;font-weight:700;color:var(--white)}
+.q p{margin:8px 0 0;font-size:12.5px}
+
+.rtl{direction:rtl;text-align:right}
+.do-dont{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0}
+@media(max-width:640px){.do-dont{grid-template-columns:1fr}}
+.dd{border:1px solid var(--line);border-radius:var(--r);padding:18px 20px}
+.dd.do{border-color:rgba(34,197,94,.3);background:var(--success-soft)}
+.dd.dont{border-color:rgba(239,68,68,.3);background:var(--danger-soft)}
+.dd h4{margin:0 0 10px;font-size:14px;display:flex;align-items:center;gap:8px}
+.dd ul{margin:0;padding-inline-start:18px}.dd li{font-size:13px;margin:6px 0;color:#D4D4D8}
+.foot{margin-top:60px;padding-top:24px;border-top:1px solid var(--line);font-size:12.5px;color:var(--faint)}
+.note{border:1px solid var(--line);border-inline-start:3px solid var(--primary);border-radius:0 12px 12px 0;padding:14px 18px;margin:18px 0;background:var(--panel)}
+.note .k{font-family:var(--mono);font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted)}
+.note p{margin:6px 0 0;color:#D4D4D8}
+/* ── lexicon ── */
+.lex{border:1px solid var(--line);border-radius:var(--r);overflow-x:auto;margin:20px 0}
+.lex table{width:100%;border-collapse:collapse;min-width:660px;font-size:13.5px}
+.lex th{font-family:var(--mono);font-size:9.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--faint);text-align:left;padding:12px 16px;background:var(--panel-2);border-bottom:1px solid var(--line)}
+.lex td{padding:13px 16px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--muted)}
+.lex tr:last-child td{border-bottom:0}
+.lex tr:hover td{background:rgba(255,255,255,.015)}
+.lex .term{font-weight:700;color:var(--white);font-size:14px}
+.lex .ar{font-size:14px;color:var(--primary-2);white-space:nowrap}
+.lex .not{color:var(--faint);text-decoration:line-through;text-decoration-color:rgba(239,68,68,.55);text-decoration-thickness:1.5px}
+
+/* ── motion language ── */
+.mtokens{display:grid;gap:10px;margin:20px 0}
+.mtok{display:grid;grid-template-columns:150px 78px 1fr;align-items:center;gap:16px;border:1px solid var(--line);border-radius:12px;padding:13px 18px;background:var(--panel)}
+.mtok .nm{font-weight:650;font-size:13.5px;color:var(--text)}
+.mtok .ms{font-family:var(--mono);font-size:12px;color:var(--primary-2)}
+.mtok .bar{height:8px;border-radius:4px;background:var(--panel-3);position:relative;overflow:hidden}
+.mtok .bar i{position:absolute;left:0;top:0;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--primary),var(--primary-2));animation:run 3.2s cubic-bezier(.2,.7,.2,1) infinite}
+@keyframes run{0%{width:0;opacity:.35}55%{opacity:1}100%{width:100%;opacity:.35}}
+@media(max-width:560px){.mtok{grid-template-columns:1fr;gap:8px}}
+.ease-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:12px;margin:14px 0}
+.ease{border:1px solid var(--line);border-radius:12px;padding:14px 14px 12px;background:var(--panel)}
+.ease svg{width:100%;height:52px;display:block}
+.ease .nm{font-size:13px;font-weight:650;margin-top:10px;color:var(--text)}
+.ease .cb{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px}
+.ease .us{font-size:11px;color:var(--faint);margin-top:6px}
+.live-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--success);position:relative;flex-shrink:0}
+.live-dot::after{content:"";position:absolute;inset:0;border-radius:50%;background:var(--success);animation:ping 2s ease-in-out infinite}
+@keyframes ping{0%{transform:scale(1);opacity:.55}70%,100%{transform:scale(2.9);opacity:0}}
+.live-dot.blue{background:var(--primary)}.live-dot.blue::after{background:var(--primary)}
+#liveStream .r{display:flex;gap:12px;align-items:center;font-family:var(--mono);font-size:11.5px;padding:8px 12px;border-radius:9px;margin-bottom:4px;border:1px solid transparent}
+#liveStream .r.fresh{animation:evin .6s cubic-bezier(.16,1,.3,1)}
+@keyframes evin{from{opacity:0;transform:translateY(-9px);background:var(--primary-soft);border-color:var(--primary-line)}to{opacity:1;transform:translateY(0)}}
+#liveStream .r .t{color:var(--faint)}#liveStream .r .e{color:var(--text);min-width:104px}
+.mrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;margin:16px 0}
+:focus-visible{outline:2px solid var(--primary);outline-offset:3px;border-radius:6px}
+@media(max-width:920px){.shell{grid-template-columns:1fr}.toc{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}}
+</style>
+
+<div class="shell">
+  <nav class="toc" aria-label="Contents">
+    <div class="brand">
+      <span class="mk"><svg viewBox="0 0 120 120" fill="none"><path d="M74 30 L38 30 L38 90 L74 90" stroke="#fff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/><path d="M38 60 L84 60" stroke="#fff" stroke-width="12" stroke-linecap="round"/><circle cx="96" cy="60" r="10" fill="#2F6BFF"/></svg></span>
+      <div><b>EasyTrac</b><span>Design System</span></div>
+    </div>
+    <div class="toc-ey">Identity</div>
+    <a href="#intro"><span class="n">00</span><span>The identity</span></a>
+    <a href="#palette"><span class="n">01</span><span>Color</span></a>
+    <a href="#type"><span class="n">02</span><span>Typography</span></a>
+    <a href="#found"><span class="n">03</span><span>Space · radius · light</span></a>
+    <div class="toc-ey">Components</div>
+    <a href="#buttons"><span class="n">04</span><span>Buttons &amp; actions</span></a>
+    <a href="#status"><span class="n">05</span><span>Status &amp; health</span></a>
+    <a href="#states"><span class="n">06</span><span>Empty · loading · feedback</span></a>
+    <div class="toc-ey">Application</div>
+    <a href="#command"><span class="n">07</span><span>Tracking Command Center</span></a>
+    <a href="#questions"><span class="n">08</span><span>The three questions</span></a>
+    <div class="toc-ey">Language &amp; Motion</div>
+    <a href="#lexicon"><span class="n">09</span><span>Product vocabulary</span></a>
+    <a href="#motion"><span class="n">10</span><span>Motion language</span></a>
+    <a href="#boundary"><span class="n">11</span><span>Not Stape — the boundary</span></a>
+  </nav>
+
+  <main>
+    <section id="intro">
+      <div class="hero">
+        <div class="eyebrow">Visual Identity · v1</div>
+        <h1>A tracking command center — not a generic SaaS panel.</h1>
+        <p class="lead">EasyTrac borrows Stape's <strong>information architecture and UX patterns</strong> — and nothing of its look. This is our own identity: dark, confident, Arabic‑first, technical but approachable. High contrast, generous space, a disciplined blue, and glass only where it sharpens hierarchy.</p>
+        <div class="pill-row">
+          <span class="tag">ground <b>#0A0A0A</b></span>
+          <span class="tag">signal <b>#2F6BFF</b></span>
+          <span class="tag"><b>Arabic‑first</b> · RTL native</span>
+          <span class="tag">radius <b>12–16px</b></span>
+          <span class="tag"><b>soft shadows</b> · subtle glow</span>
+        </div>
+      </div>
+      <h3>Personality in one line</h3>
+      <p><strong>Modern · Premium · Clean · Enterprise · Confident · Minimal.</strong> Every screen should feel engineered — like instrumentation for a store's tracking, not a dashboard template. The EasyTrac mark, wordmark, and voice stay; the visual language below makes the product unmistakably ours and visibly a tier above Stape.</p>
+    </section>
+
+    <hr class="hr">
+    <section id="palette">
+      <div class="eyebrow">01 · Foundations</div>
+      <h2>Color</h2>
+      <p>A near‑black ground with one decisive blue. Zinc neutrals for text and surfaces; semantic colors reserved strictly for state — never decoration. The accent hue and the semantic hues are kept separate so "needs attention" always reads instantly.</p>
+      <div class="sw-grid">
+        <div class="sw"><div class="chip" style="background:#0A0A0A;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)"></div><div class="meta"><div class="nm">Background</div><div class="hx">#0A0A0A</div><div class="role">App ground</div></div></div>
+        <div class="sw"><div class="chip" style="background:#2F6BFF;box-shadow:var(--glow)"></div><div class="meta"><div class="nm">Primary</div><div class="hx">#2F6BFF</div><div class="role">Actions · focus · signal</div></div></div>
+        <div class="sw"><div class="chip" style="background:#FFFFFF"></div><div class="meta"><div class="nm">White</div><div class="hx">#FFFFFF</div><div class="role">Primary emphasis text</div></div></div>
+        <div class="sw"><div class="chip" style="background:#A1A1AA"></div><div class="meta"><div class="nm">Secondary text</div><div class="hx">#A1A1AA</div><div class="role">Muted / labels</div></div></div>
+        <div class="sw"><div class="chip" style="background:#22C55E"></div><div class="meta"><div class="nm">Success</div><div class="hx">#22C55E</div><div class="role">Healthy · delivered</div></div></div>
+        <div class="sw"><div class="chip" style="background:#F59E0B"></div><div class="meta"><div class="nm">Warning</div><div class="hx">#F59E0B</div><div class="role">Degraded · attention</div></div></div>
+        <div class="sw"><div class="chip" style="background:#EF4444"></div><div class="meta"><div class="nm">Danger</div><div class="hx">#EF4444</div><div class="role">Down · failed</div></div></div>
+        <div class="sw"><div class="chip" style="background:linear-gradient(135deg,#161619,#101013);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)"></div><div class="meta"><div class="nm">Surfaces</div><div class="hx">#101013 · #161619</div><div class="role">Panels (derived zinc)</div></div></div>
+      </div>
+      <div class="note"><div class="k">Rule</div><p>Blue is for <strong>what you can act on</strong>. Green/amber/red are for <strong>system state</strong> only. If a color isn't communicating an action or a state, it shouldn't be colored — the ground stays black and the type stays zinc.</p></div>
+    </section>
+
+    <hr class="hr">
+    <section id="type">
+      <div class="eyebrow">02 · Foundations</div>
+      <h2>Typography</h2>
+      <p>Arabic‑first, set in <strong>IBM Plex Sans Arabic</strong> for UI and <strong>ThmanyahSans</strong> for brand moments, with <strong>Inter</strong> for Latin &amp; numerics and <strong>JetBrains Mono</strong> for technical values (IDs, timestamps, labels). Tight tracking on large display, roomy line‑height on body, uppercase mono for eyebrows.</p>
+      <div class="grid g2">
+        <div class="card">
+          <div class="k">Display · AR</div>
+          <div style="font-size:30px;font-weight:800;letter-spacing:-.8px;color:var(--white);margin-top:8px" class="rtl">تتبّعك يعمل بشكل ممتاز</div>
+          <div style="font-size:15px;color:var(--muted);margin-top:8px" class="rtl">١٬٢٠٤ حدث اليوم · ٤ وجهات نشطة · لا مشاكل</div>
+        </div>
+        <div class="card">
+          <div class="k">Display · EN</div>
+          <div style="font-size:30px;font-weight:800;letter-spacing:-.8px;color:var(--white);margin-top:8px">Your tracking is healthy</div>
+          <div style="font-size:15px;color:var(--muted);margin-top:8px">1,204 events today · 4 destinations live</div>
+        </div>
+      </div>
+      <div class="grid g3" style="margin-top:16px">
+        <div class="card"><div class="k">Body</div><p style="color:#D4D4D8;font-size:14px">The reading size, ~15px, zinc‑100 on black. Comfortable measure, 1.65 line‑height.</p></div>
+        <div class="card"><div class="k">Numeric</div><div style="font-family:var(--mono);font-size:22px;color:var(--white);font-variant-numeric:tabular-nums;margin-top:6px">92.4%</div><p style="font-size:12px">Tabular figures for aligned metrics.</p></div>
+        <div class="card"><div class="k">Technical</div><div style="font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:6px">GTM‑7K2X9 · 12:04:02</div><p style="font-size:12px">Mono for IDs, times, endpoints.</p></div>
+      </div>
+      <p class="foot" style="margin-top:14px;border:0;padding:0">Production fonts are self‑hosted (per <code>frontend/app/fonts.ts</code>). This spec previews with a system Arabic stack where webfonts can't load.</p>
+    </section>
+
+    <hr class="hr">
+    <section id="found">
+      <div class="eyebrow">03 · Foundations</div>
+      <h2>Space, radius &amp; light</h2>
+      <p>Generous spacing is the biggest lever for "premium." An 8px rhythm, radii of 12–16px, soft low‑opacity shadows, and a single restrained blue glow reserved for the primary object on a screen. Glass (backdrop‑blur) appears only to lift the one panel that matters — never as wallpaper.</p>
+      <div class="grid g3">
+        <div class="card"><div class="k">Spacing</div><h4>8px rhythm</h4><p>Component padding 16–24px; section gaps 60–80px. Let it breathe.</p><div style="display:flex;gap:6px;margin-top:12px;align-items:flex-end">
+          <span style="width:8px;height:8px;background:var(--primary-soft);border:1px solid var(--primary-line);border-radius:3px"></span>
+          <span style="width:16px;height:16px;background:var(--primary-soft);border:1px solid var(--primary-line);border-radius:3px"></span>
+          <span style="width:24px;height:24px;background:var(--primary-soft);border:1px solid var(--primary-line);border-radius:4px"></span>
+          <span style="width:40px;height:40px;background:var(--primary-soft);border:1px solid var(--primary-line);border-radius:6px"></span>
+        </div></div>
+        <div class="card"><div class="k">Radius</div><h4>12–16px</h4><p>Rounded, not pill (except tags/status). Consistent across every surface.</p><div style="display:flex;gap:10px;margin-top:12px"><span style="width:44px;height:44px;background:var(--panel-3);border:1px solid var(--line-2);border-radius:10px"></span><span style="width:44px;height:44px;background:var(--panel-3);border:1px solid var(--line-2);border-radius:14px"></span><span style="width:44px;height:44px;background:var(--panel-3);border:1px solid var(--line-2);border-radius:18px"></span></div></div>
+        <div class="card glass"><div class="k">Elevation + glass</div><h4>Soft &amp; subtle</h4><p>Large, faint shadows. Glass only to lift the hero panel — like this card.</p></div>
+      </div>
+    </section>
+
+    <hr class="hr">
+    <section id="buttons">
+      <div class="eyebrow">04 · Components</div>
+      <h2>Buttons &amp; actions</h2>
+      <p>One primary action per screen — a single gradient‑blue button with an inner highlight and a soft blue cast. Everything else is a quiet ghost. Hover lifts subtly; press settles. Motion is 120–200ms, eased, and honors reduced‑motion.</p>
+      <div class="btns">
+        <button class="btn btn-pri">◆ &nbsp;Add destination</button>
+        <button class="btn btn-ghost">View live events</button>
+        <button class="btn btn-ghost">Settings</button>
+        <button class="btn btn-danger">Disconnect</button>
+      </div>
+      <div class="btns rtl">
+        <button class="btn btn-pri">إضافة وجهة &nbsp;◆</button>
+        <button class="btn btn-ghost">عرض الأحداث</button>
+      </div>
+    </section>
+
+    <hr class="hr">
+    <section id="status">
+      <div class="eyebrow">05 · Components</div>
+      <h2>Status &amp; health</h2>
+      <p>State is encoded in <strong>form and color together</strong> — a glowing dot plus a word — so what needs attention reads at a glance, never from text alone. This is the heart of a command center.</p>
+      <div class="pills">
+        <span class="pill ok">Healthy · 2s ago</span>
+        <span class="pill warn">Degraded · 40% match</span>
+        <span class="pill crit">Down · no events 3h</span>
+        <span class="pill info">Live</span>
+        <span class="pill idle">Not connected</span>
+      </div>
+      <h3>Health score</h3>
+      <div class="grid g2">
+        <div class="card glass ring-wrap">
+          <svg width="112" height="112" viewBox="0 0 112 112" style="flex-shrink:0">
+            <circle cx="56" cy="56" r="46" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="9"/>
+            <circle cx="56" cy="56" r="46" fill="none" stroke="#22C55E" stroke-width="9" stroke-linecap="round" stroke-dasharray="289" stroke-dashoffset="40" transform="rotate(-90 56 56)" style="filter:drop-shadow(0 0 6px rgba(34,197,94,.6))"/>
+            <text x="56" y="52" text-anchor="middle" fill="#fff" font-size="26" font-weight="800" font-family="ui-monospace,monospace">86</text>
+            <text x="56" y="70" text-anchor="middle" fill="#A1A1AA" font-size="9" font-family="ui-monospace,monospace">/ 100</text>
+          </svg>
+          <div>
+            <div style="font-size:14px;font-weight:700;color:var(--white)">Data health</div>
+            <div style="font-size:12.5px;color:var(--muted);margin-top:4px">Match quality &amp; delivery across all destinations. One primary action points at the worst issue.</div>
+            <div style="margin-top:12px"><span class="pill warn">Fix TikTok match →</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="k">Per destination</div>
+          <div class="dest-row" style="margin-top:12px"><span class="lft"><span class="ic">M</span> Meta CAPI</span><span class="pill ok">94</span></div>
+          <div class="dest-row"><span class="lft"><span class="ic">T</span> TikTok</span><span class="pill warn">40</span></div>
+          <div class="dest-row" style="margin-bottom:0"><span class="lft"><span class="ic">G</span> GA4</span><span class="pill crit">0</span></div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="hr">
+    <section id="states">
+      <div class="eyebrow">06 · Components</div>
+      <h2>Empty, loading &amp; feedback</h2>
+      <p>The states most products neglect are where premium is won. Empty states guide; skeletons preserve layout; feedback names the exact result.</p>
+      <h3>Premium empty state</h3>
+      <div class="empty">
+        <div class="ic">◎</div>
+        <h4>Connect your first destination</h4>
+        <p>Send your store's events to Meta, TikTok, Snapchat or GA4. We'll verify a live event before you leave.</p>
+        <button class="btn btn-pri">◆ &nbsp;Add destination</button>
+      </div>
+      <h3>Loading skeleton</h3>
+      <div class="grid g3">
+        <div class="card"><div class="sk l" style="width:40%"></div><div class="sk h" style="width:70%;margin-top:12px"></div><div class="sk l" style="width:90%;margin-top:12px"></div></div>
+        <div class="card"><div class="sk l" style="width:50%"></div><div class="sk h" style="width:60%;margin-top:12px"></div><div class="sk l" style="width:80%;margin-top:12px"></div></div>
+        <div class="card"><div class="sk l" style="width:45%"></div><div class="sk h" style="width:75%;margin-top:12px"></div><div class="sk l" style="width:85%;margin-top:12px"></div></div>
+      </div>
+      <h3>Success &amp; error</h3>
+      <div class="grid g2">
+        <div class="toast ok"><div class="dot">✓</div><div><div class="tt">Meta connected</div><div class="ds">Test event received — 1 purchase in the last 5s.</div></div></div>
+        <div class="toast err"><div class="dot">!</div><div><div class="tt">Couldn't reach TikTok</div><div class="ds">Access token expired. Update it in Credentials to resume delivery.</div></div></div>
+      </div>
+    </section>
+
+    <hr class="hr">
+    <section id="command">
+      <div class="eyebrow">07 · Application</div>
+      <h2>The Tracking Command Center</h2>
+      <p class="lead">The first screen. Not a welcome page — an instrument panel. It answers <em>"is my tracking working?"</em> before anything else, and surfaces the six signals that matter, in the EasyTrac identity.</p>
+      <div class="cc">
+        <div class="cc-top"><span class="dots"><i></i><i></i><i></i></span><span class="store">◻ متجر سلة ▾</span><span class="env">app.easytrac.io</span></div>
+        <div class="cc-body">
+          <div class="cc-nav">
+            <div class="np on"><span class="i">◉</span> Home</div>
+            <div class="np"><span class="i">⇄</span> Destinations</div>
+            <div class="np"><span class="i">♥</span> Data Health</div>
+            <div class="np"><span class="i">≣</span> Events</div>
+            <div class="np"><span class="i">⚙</span> Settings</div>
+            <div class="grp">Operations</div>
+            <div class="np" style="font-size:11.5px;color:var(--faint)"><span class="i">▤</span> GTM · Versions…</div>
+          </div>
+          <div class="cc-main">
+            <div class="cc-h">
+              <div>
+                <div class="cc-status"><span class="pill ok" style="font-size:11px">●</span> تتبّعك يعمل بشكل ممتاز</div>
+                <div class="cc-sub">١٬٢٠٤ حدث اليوم · آخر حدث قبل ٢ ثانية · لا مشاكل</div>
+              </div>
+              <button class="btn btn-pri">عرض الأحداث المباشرة →</button>
+            </div>
+            <div class="cc-metrics">
+              <div class="mtile"><div class="lb">Tracking status</div><div class="vl" style="color:#4ade80">Live</div><div class="dl">4/4 destinations</div></div>
+              <div class="mtile"><div class="lb">Events today</div><div class="vl">1,204</div><div class="spark"><i style="height:40%"></i><i style="height:55%"></i><i style="height:45%"></i><i style="height:70%"></i><i style="height:60%"></i><i style="height:85%"></i><i style="height:100%"></i></div></div>
+              <div class="mtile"><div class="lb">Health</div><div class="vl">86<span style="font-size:13px;color:var(--muted)"> / 100</span></div><div class="dl">match quality</div></div>
+              <div class="mtile"><div class="lb">Plan</div><div class="vl" style="font-size:20px">Growth</div><div class="dl">Trial · 5 days left</div></div>
+            </div>
+            <div class="grid g2" style="grid-template-columns:1fr 1fr">
+              <div class="card" style="padding:16px">
+                <div class="k">Connected platforms</div>
+                <div class="dest-row" style="margin-top:12px"><span class="lft"><span class="ic">M</span> Meta CAPI</span><span class="pill ok">2s</span></div>
+                <div class="dest-row"><span class="lft"><span class="ic">S</span> Snapchat</span><span class="pill ok">5s</span></div>
+                <div class="dest-row" style="margin-bottom:0"><span class="lft"><span class="ic">T</span> TikTok</span><span class="pill warn">40%</span></div>
+              </div>
+              <div class="card" style="padding:16px">
+                <div class="k">Recent tracking activity</div>
+                <div class="feed" style="margin-top:10px">
+                  <div><span class="t">12:04:02</span> · <span class="ev">purchase</span> → <span style="color:#4ade80">4/4 ok</span></div>
+                  <div><span class="t">12:03:58</span> · <span class="ev">add_to_cart</span> → <span style="color:#fbbf24">3/4</span></div>
+                  <div><span class="t">12:03:51</span> · <span class="ev">view_item</span> → <span style="color:#4ade80">4/4 ok</span></div>
+                  <div><span class="t">12:03:44</span> · <span class="ev">purchase</span> → <span style="color:#4ade80">4/4 ok</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p><strong>Six signals, above the fold:</strong> tracking status · connected platforms · active store (switcher) · recent activity · health · current plan. That is the identity — a merchant sees the state of their tracking in one glance, in a surface that could only be EasyTrac.</p>
+    </section>
+
+    <hr class="hr">
+    <section id="questions">
+      <div class="eyebrow">08 · Principle</div>
+      <h2>Every page answers three questions</h2>
+      <div class="qgrid">
+        <div class="q"><div class="qq">What is happening?</div><p>A status headline + live signals are the first paint. State before detail, always.</p></div>
+        <div class="q"><div class="qq">What should I do next?</div><p>Exactly one primary (blue) action per screen, driven by current state.</p></div>
+        <div class="q"><div class="qq">Anything need attention?</div><p>A single amber/red banner rises to the top when — and only when — something is wrong.</p></div>
+      </div>
+    </section>
+
+    <hr class="hr">
+    <section id="lexicon">
+      <div class="eyebrow">09 · Language</div>
+      <h2>Product vocabulary</h2>
+      <p class="lead">EasyTrac names things in its own voice — the language of an instrument, not a generic admin panel. Terms are technical but approachable, and Arabic‑first. Use these words consistently everywhere: UI, docs, support, marketing.</p>
+      <div class="lex">
+        <table>
+          <thead><tr><th>EasyTrac term</th><th>بالعربية</th><th>What it names</th><th>Not…</th></tr></thead>
+          <tbody>
+            <tr><td class="term">Tracking Command Center</td><td class="ar">مركز التتبّع</td><td>The first screen — the live instrument panel for a store's tracking.</td><td class="not">Dashboard</td></tr>
+            <tr><td class="term">Destinations</td><td class="ar">الوجهات</td><td>Where events are sent: Meta, TikTok, Snapchat, GA4, Google Ads.</td><td class="not">Integrations / Connectors</td></tr>
+            <tr><td class="term">Live Event Stream</td><td class="ar">البثّ المباشر للأحداث</td><td>The real‑time flow of tracked events and their delivery.</td><td class="not">Logs</td></tr>
+            <tr><td class="term">Tracking Health</td><td class="ar">صحّة التتبّع</td><td>The monitoring surface — match quality, delivery, drift.</td><td class="not">Monitoring / Analytics</td></tr>
+            <tr><td class="term">Data Quality</td><td class="ar">جودة البيانات</td><td>The score for how complete and matchable the data is.</td><td class="not">Metrics / Stats</td></tr>
+            <tr><td class="term">Verification Status</td><td class="ar">حالة التحقّق</td><td>Proof a live test event was received by a destination.</td><td class="not">Test result</td></tr>
+            <tr><td class="term">Active Tracking</td><td class="ar">تتبّع نشط</td><td>The live state — events flowing and delivered right now.</td><td class="not">Enabled / On</td></tr>
+            <tr><td class="term">Signal</td><td class="ar">إشارة</td><td>A single tracked event as it moves through the system.</td><td class="not">Row / Record</td></tr>
+            <tr><td class="term">Delivery</td><td class="ar">التسليم</td><td>Whether a signal reached each destination (accepted/rejected).</td><td class="not">Send status</td></tr>
+            <tr><td class="term">Configuration Drift</td><td class="ar">انحراف الإعداد</td><td>Manual container changes that threaten rollback safety.</td><td class="not">Diff / Change</td></tr>
+            <tr><td class="term">Operations</td><td class="ar">العمليات</td><td>The advanced surface: GTM container, versions, deployments.</td><td class="not">Advanced / Admin</td></tr>
+            <tr><td class="term">Go Live</td><td class="ar">التفعيل المباشر</td><td>Provisioning a store's tracking end‑to‑end, verified.</td><td class="not">Setup / Deploy</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><div class="k">Voice</div><p>Active, exact, instrument‑like. A control says what it does (“Add destination”, then “Meta connected · test event received”). Errors name the fix. Numbers speak (“1,204 signals today”), never vague (“activity”). Every label reinforces that EasyTrac is <strong>watching the tracking, in real time.</strong></p></div>
+    </section>
+
+    <hr class="hr">
+    <section id="motion">
+      <div class="eyebrow">10 · Motion</div>
+      <h2>Motion language</h2>
+      <p class="lead">The product should feel <strong>alive</strong> — continuously monitoring — while staying calm and premium. The rule that makes both true: <em>ambient motion is slow and quiet; interactive motion is fast and precise; only one thing moves at a time.</em> Everything honors <code>prefers‑reduced‑motion</code>.</p>
+
+      <h3>Timing scale</h3>
+      <div class="mtokens">
+        <div class="mtok"><span class="nm">Instant</span><span class="ms">80ms</span><span class="bar"><i style="animation-duration:2.4s"></i></span></div>
+        <div class="mtok"><span class="nm">Quick</span><span class="ms">140ms</span><span class="bar"><i style="animation-duration:2.7s"></i></span></div>
+        <div class="mtok"><span class="nm">Standard</span><span class="ms">200ms</span><span class="bar"><i style="animation-duration:3s"></i></span></div>
+        <div class="mtok"><span class="nm">Deliberate</span><span class="ms">320ms</span><span class="bar"><i style="animation-duration:3.4s"></i></span></div>
+        <div class="mtok"><span class="nm">Ambient (loop)</span><span class="ms">1.4–2s</span><span class="bar"><i style="animation-duration:4s"></i></span></div>
+      </div>
+      <p><strong>Instant</strong> = hover tints, press. <strong>Quick</strong> = buttons, toggles, pill state. <strong>Standard</strong> = panel &amp; content cross‑fades, toasts. <strong>Deliberate</strong> = section/modal entrance, the health ring filling. <strong>Ambient</strong> = live pulse, skeleton shimmer, breathing glow — always ≥1.4s so it reads as calm monitoring, never busywork.</p>
+
+      <h3>Easing</h3>
+      <div class="ease-grid">
+        <div class="ease"><svg viewBox="0 0 100 60" fill="none"><path d="M0 60 C20 18 20 0 100 0" stroke="#2F6BFF" stroke-width="2.5"/><circle cx="0" cy="60" r="2.5" fill="#71717A"/><circle cx="100" cy="0" r="2.5" fill="#2F6BFF"/></svg><div class="nm">Standard</div><div class="cb">cubic-bezier(.2,.7,.2,1)</div><div class="us">State changes, cross‑fades</div></div>
+        <div class="ease"><svg viewBox="0 0 100 60" fill="none"><path d="M0 60 C16 0 30 0 100 0" stroke="#22C55E" stroke-width="2.5"/><circle cx="0" cy="60" r="2.5" fill="#71717A"/><circle cx="100" cy="0" r="2.5" fill="#22C55E"/></svg><div class="nm">Entrance</div><div class="cb">cubic-bezier(.16,1,.3,1)</div><div class="us">Things arriving (events, toasts)</div></div>
+        <div class="ease"><svg viewBox="0 0 100 60" fill="none"><path d="M0 60 C40 60 100 0 100 0" stroke="#A1A1AA" stroke-width="2.5"/><circle cx="0" cy="60" r="2.5" fill="#71717A"/><circle cx="100" cy="0" r="2.5" fill="#A1A1AA"/></svg><div class="nm">Exit</div><div class="cb">cubic-bezier(.4,0,1,1)</div><div class="us">Things leaving (dismiss)</div></div>
+        <div class="ease"><svg viewBox="0 0 100 60" fill="none"><path d="M0 60 C42 60 58 0 100 0" stroke="#F59E0B" stroke-width="2.5"/><circle cx="0" cy="60" r="2.5" fill="#71717A"/><circle cx="100" cy="0" r="2.5" fill="#F59E0B"/></svg><div class="nm">Ambient</div><div class="cb">ease-in-out (sine)</div><div class="us">Pulses &amp; breathing loops</div></div>
+      </div>
+
+      <div class="mrow">
+        <div class="card">
+          <div class="k">Live indicators</div>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:14px"><span class="live-dot"></span><span style="font-size:13px;color:var(--text)">Active Tracking</span></div>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:12px"><span class="live-dot blue"></span><span style="font-size:13px;color:var(--text)">Live Event Stream</span></div>
+          <p style="margin-top:14px;font-size:12.5px">A single breathing dot (2s ease‑in‑out) says "watching." Low amplitude, never blinking. One per context.</p>
+        </div>
+        <div class="card">
+          <div class="k">Live Event Stream <span class="live-dot blue" style="margin-inline-start:6px"></span></div>
+          <div id="liveStream" style="margin-top:12px"></div>
+          <p style="margin-top:6px;font-size:12px;color:var(--faint)">New signals arrive with a 320ms Entrance ease + a brief blue highlight that fades over ~1.2s. Unhurried — calm real‑time.</p>
+        </div>
+      </div>
+
+      <h3>Behavior specs</h3>
+      <div class="grid g2">
+        <div class="card"><div class="k">Status transitions</div><p style="margin-top:8px">On a state change, the pill <strong>cross‑fades color over 200ms</strong> and its dot pulses <strong>once</strong> for attention, then settles. Errors never loop — calm, not alarming. The health ring animates its fill over 320ms; numbers count up on first load (tabular).</p></div>
+        <div class="card"><div class="k">Loading transitions</div><p style="margin-top:8px">Skeletons shimmer on a <strong>1.4s linear loop</strong> and hold the final layout (zero shift). When data lands, the skeleton cross‑fades out and content rises in with Entrance ease; lists <strong>stagger 40–60ms</strong> per row.</p></div>
+        <div class="card"><div class="k">Success feedback</div><p style="margin-top:8px">Toast slides up + fades in (Standard, Entrance ease); the check‑mark <strong>draws its stroke</strong> (300ms). Auto‑dismiss after ~4s with a thin progress hairline; exits down + fades (Quick).</p></div>
+        <div class="card"><div class="k">Error feedback</div><p style="margin-top:8px">Same calm entrance — then a single ≤6px horizontal nudge (one cycle, never a violent shake). <strong>Persists</strong> until addressed, and names the fix. Red is used once, at the top.</p></div>
+      </div>
+      <div class="note"><div class="k">The feeling</div><p>Alive but calm: ambient loops are slow and faint; interactions are crisp and immediate; one primary motion at a time. Under reduced‑motion, all ambient/looping stops — state still changes instantly, just without the theater.</p></div>
+    </section>
+
+    <hr class="hr">
+    <section id="boundary">
+      <div class="eyebrow">11 · Guardrail</div>
+      <h2>Not Stape — the boundary</h2>
+      <p>We studied Stape's structure and copied none of its skin. This line is explicit so no future screen drifts into imitation.</p>
+      <div class="do-dont">
+        <div class="dd do"><h4>✓ Study from Stape</h4><ul><li>Information architecture &amp; object model</li><li>Navigation &amp; dashboard hierarchy</li><li>Onboarding &amp; user flows</li><li>Progressive disclosure &amp; UX patterns</li></ul></div>
+        <div class="dd dont"><h4>✕ Never copy from Stape</h4><ul><li>Colors, icons, cards, layout styling</li><li>Typography &amp; branding</li><li>Visual identity of any kind</li><li>Anything that makes us look like a clone</li></ul></div>
+      </div>
+      <div class="note"><div class="k">North star</div><p>A user should recognize EasyTrac instantly as its own product — Arabic‑first, darker, more confident, more premium than Stape. Same problem space; a stronger visual identity.</p></div>
+      <div class="foot">
+        Design system v1 · palette and direction as specified. This is a design reference only — <strong>not wired into the app</strong> during the launch freeze. Applying it (design tokens + components) is part of the post‑launch clean follow‑up alongside the deferred UI work. Brand mark, wordmark, and voice are preserved throughout.
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+(function(){
+  var links=[].slice.call(document.querySelectorAll('.toc a'));
+  var map={};links.forEach(function(a){map[a.getAttribute('href').slice(1)]=a;});
+  var obs=new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){ links.forEach(function(l){l.classList.remove('on');}); var m=map[e.target.id]; if(m)m.classList.add('on'); } });
+  },{rootMargin:'-8% 0px -82% 0px'});
+  document.querySelectorAll('section[id]').forEach(function(s){obs.observe(s);});
+})();
+
+/* Live Event Stream demo — calm real-time. Honors reduced-motion. */
+(function(){
+  var el=document.getElementById('liveStream'); if(!el) return;
+  var reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  var samples=[
+    ['purchase','4/4 ok','#4ade80'],
+    ['add_to_cart','3/4 · TikTok 400','#fbbf24'],
+    ['view_item','4/4 ok','#4ade80'],
+    ['begin_checkout','4/4 ok','#4ade80'],
+    ['purchase','4/4 ok','#4ade80'],
+    ['search','4/4 ok','#4ade80']
+  ];
+  function ts(){var d=new Date();function p(n){return(n<10?'0':'')+n;}return p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());}
+  function add(){
+    var s=samples[Math.floor(Math.random()*samples.length)];
+    var r=document.createElement('div'); r.className='r'+(reduce?'':' fresh');
+    r.innerHTML='<span class="t">'+ts()+'</span><span class="e">'+s[0]+'</span><span style="color:'+s[2]+'">→ '+s[1]+'</span>';
+    el.insertBefore(r,el.firstChild);
+    while(el.children.length>6) el.removeChild(el.lastChild);
+    if(!reduce) setTimeout(function(){r.classList.remove('fresh');},700);
+  }
+  for(var i=0;i<6;i++) add();
+  if(!reduce) setInterval(add,2600);
+})();
+</script>

@@ -5,6 +5,10 @@ const path   = require('path');
 const zlib   = require('zlib');
 const crypto = require('crypto');
 
+// UI migration seam (strangler-fig). Inert unless NEXT_UI_ENABLED=true — see
+// lib/next-proxy.js and docs/EASYTRAC-P0-IMPLEMENTATION-PLAN.html.
+const nextProxy = require('./lib/next-proxy');
+
 // ══════════════════════════════════════════════════════════════════════════════
 // Zero-dependency .env loader — runs BEFORE any service modules that read
 // process.env. Handles `KEY=value` lines, ignores comments/blank lines, does
@@ -141,6 +145,14 @@ const timelineService = optionalStartupRequire('./lib/timeline-service', () => r
 const profileService  = optionalStartupRequire('./lib/profile-service', () => require('./lib/profile-service'), {
   getBundle: async () => null,
 });
+// Admin session/auth (secret-key → HttpOnly-cookie session, storage-agnostic).
+const adminSession    = require('./lib/admin-session');
+// Server-owned 7-day trial derivation (pure).
+const { computeTrial } = require('./lib/trial-service');
+// Managed-infra teardown for expired+unpaid clients (injected deps at call site).
+const containerDeletionService = require('./lib/container-deletion-service');
+// Task-owned adapter: isolates deletion from managed-hosting WIP (committed APIs only).
+const containerInfraAdapter = require('./lib/container-infrastructure-adapter');
 // Health evaluation job (Phase 2)
 const healthService   = optionalStartupRequire('./lib/health-service', () => require('./lib/health-service'), {
   runHealthJob: async () => {},
@@ -243,15 +255,22 @@ const provisionQueue = (function createProvisionQueueSingleton() {
 // We print exactly which vars are missing and which routes that breaks. Values
 // are never logged.
 (function envCheck() {
-  const REQUIRED = [
+  // CRITICAL vars abort a production boot when absent (deploy-time mistake, not
+  // a transient outage). RECOMMENDED vars only warn — they gate newer optional
+  // features and may legitimately be unset on older deployments.
+  const CRITICAL = [
     { key: 'GTM_SA_KEY_JSON',      breaks: '/api/managed/* and /api/ss/create-containers (GTM provisioning)' },
     { key: 'GTM_ACCOUNT_ID',       breaks: '/api/managed/* and /api/ss/create-containers (GTM provisioning)' },
     { key: 'FIREBASE_SA_KEY_JSON', breaks: '/api/ss/* auth + ALL job storage (jobs are Firestore-backed)' },
     { key: 'MASTER_ENCRYPTION_KEY',breaks: '/api/ss/save-config (token encryption)' },
+  ];
+  const RECOMMENDED = [
     { key: 'API_KEY_SECRET',       breaks: '/api/v1/clients/:id/api-keys (API key generation + HMAC verification)' },
     { key: 'BEACON_SECRET',        breaks: '/api/v1/internal/beacon (sGTM event presence beacons — HMAC validation)' },
   ];
-  const missing = REQUIRED.filter(r => !((process.env[r.key] || '').trim()));
+  const missingCritical    = CRITICAL.filter(r => !((process.env[r.key] || '').trim()));
+  const missingRecommended = RECOMMENDED.filter(r => !((process.env[r.key] || '').trim()));
+  const missing = missingCritical.concat(missingRecommended);
   if (missing.length) {
     console.warn('');
     console.warn('⚠️  STARTUP WARNING: missing required environment variables:');
@@ -261,6 +280,18 @@ const provisionQueue = (function createProvisionQueueSingleton() {
     console.warn('');
   } else {
     console.log('✓ All required environment variables are set.');
+  }
+  // Fail-fast in production: a container missing its core secrets can only serve
+  // 503s, so exit with a clear message instead of limping. ALLOW_DEGRADED_START=1
+  // is the emergency escape hatch (e.g. bring the container up to debug).
+  const isProduction = process.env.NODE_ENV === 'production' ||
+                       !!process.env.K_SERVICE ||               // Cloud Run
+                       !!process.env.RAILWAY_ENVIRONMENT;       // Railway
+  if (missingCritical.length && isProduction && process.env.ALLOW_DEGRADED_START !== '1') {
+    console.error('✖ FATAL: refusing to start in production without: ' +
+      missingCritical.map(r => r.key).join(', '));
+    console.error('  Set the variables above, or set ALLOW_DEGRADED_START=1 to boot anyway.');
+    process.exit(1);
   }
 })();
 
@@ -277,6 +308,19 @@ secretManager.validateAtStartup().catch(e => {
 
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CLIENT-ROUTER APP ROUTES
+// The app (tool.html) is a single-page app with a lightweight History-API router.
+// These clean paths have no backing .html file — we serve the SPA entry (tool.html)
+// for each so a direct visit or a browser refresh returns 200 (never 404). The
+// in-app router then renders the correct view and enforces auth guards / redirects.
+// Cloudflare is DNS + SSL + proxy ONLY — no page rules / rewrites are needed
+// because the origin already returns the app for every app route.
+// ══════════════════════════════════════════════════════════════════════════════
+const APP_ROUTES = new Set([
+  '/register', '/sign-in', '/dashboard', '/tool', '/pricing', '/account', '/settings',
+]);
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PHASE-1 FEATURE FLAG — import managed server containers via versions:import
@@ -562,7 +606,9 @@ async function _runManagedProvisionJob(jobId) {
       configJson,
       serverConfigJson,
       publishLive: mode === 'client_server' ? false : !!publishLive,
-      inviteEmail: clientEmail || null,
+      // GTM read-access invite intentionally disabled — we don't email the client
+      // container access; the response returns the GTM Container ID only.
+      inviteEmail: null,
       onProgress: (p) => { _setJob(jobId, { stage: 'gtm_provisioning', progress: p }, { progressOnly: true }); },
     };
 
@@ -835,7 +881,8 @@ async function _runSsProvisionJob(jobId) {
       projectName: projectName || ((email || clientId.slice(0, 8)) + ' — SS Setup'),
       configJson:   finalConfigJson,
       publishLive:  false,
-      inviteEmail:  email || null,
+      // GTM read-access invite intentionally disabled — no email is sent.
+      inviteEmail:  null,
       onProgress:   (p) => { _setJob(jobId, { stage: 'gtm_provisioning', progress: p }, { progressOnly: true }); },
     });
 
@@ -1674,6 +1721,87 @@ function sendJSON(res, code, obj) {
   res.end(body);
 }
 
+// JSON response that also sets one or more Set-Cookie headers.
+function sendJSONWithCookies(res, code, obj, cookies) {
+  const body = JSON.stringify(obj);
+  res.writeHead(code, {
+    'Content-Type': 'application/json; charset=utf-8',
+    ...corsHeaders(),
+    ...securityHeaders(),
+    'Set-Cookie': cookies,
+  });
+  res.end(body);
+}
+
+// ── Admin cookie / CSRF helpers ────────────────────────────────────────────────
+function _isProd() { return String(process.env.NODE_ENV) === 'production'; }
+
+function _parseCookies(req) {
+  const raw = req.headers['cookie'] || '';
+  const out = {};
+  raw.split(';').forEach(part => {
+    const i = part.indexOf('=');
+    if (i < 0) return;
+    const k = part.slice(0, i).trim();
+    if (!k) return;
+    out[k] = decodeURIComponent(part.slice(i + 1).trim());
+  });
+  return out;
+}
+
+// Cookie attributes shared by the session + csrf cookies. `httpOnly` is opt-in:
+// the csrf cookie is intentionally readable so the SPA can echo it as a header.
+function _adminCookie(name, value, { httpOnly, maxAgeSec }) {
+  const parts = [`${name}=${value}`, 'Path=/', 'SameSite=Strict'];
+  if (httpOnly) parts.push('HttpOnly');
+  if (_isProd()) parts.push('Secure');
+  if (maxAgeSec != null) parts.push('Max-Age=' + maxAgeSec);
+  return parts.join('; ');
+}
+
+// Same-origin guard for state-changing admin requests. If neither Origin nor
+// Referer is present (typical of a non-browser Bearer caller) we allow it — CSRF
+// only threatens the ambient-cookie path, which always carries an Origin.
+function _adminOriginOk(req) {
+  const host = req.headers['host'];
+  if (!host) return false;
+  const origin = req.headers['origin'];
+  if (origin) {
+    try { return new URL(origin).host === host; } catch (_) { return false; }
+  }
+  const referer = req.headers['referer'];
+  if (referer) {
+    try { return new URL(referer).host === host; } catch (_) { return false; }
+  }
+  return true;
+}
+
+// Global kill-switch for the destructive container-deletion action. Disabled by
+// default (fail-safe) — deletion is impossible for ALL clients unless an operator
+// explicitly sets CONTAINER_DELETION_ENABLED=true in the server environment. This
+// keeps the feature off during review even for an authenticated admin.
+function _containerDeletionEnabled() {
+  const v = (process.env.CONTAINER_DELETION_ENABLED || '').trim().toLowerCase();
+  return v === '1' || v === 'true';
+}
+
+// Wire the injected dependencies for the container-deletion service. Kept here
+// (not inside the service) so the service stays infra-free and unit-testable.
+function _buildContainerDeletionDeps(adminId) {
+  // Infrastructure access is delegated to the task-owned adapter, which depends
+  // only on committed firestore APIs and never require()s managed-hosting WIP.
+  // No Cloud Run provider is injected here, so teardown reports
+  // provider_unavailable (honest, non-destructive) until such a provider exists.
+  return {
+    getClient:                   (uid)    => firestoreService.getClient(uid),
+    updateClientContainerStatus: (uid, p) => firestoreService.updateClientContainerStatus(uid, p),
+    saveAuditLog:                (rec)    => firestoreService.saveAuditLog(rec),
+    now: () => new Date(),
+    adminId,
+    infra: containerInfraAdapter,
+  };
+}
+
 function _managedDeployProvider() {
   return (process.env.MANAGED_DEPLOY_PROVIDER || '').trim().toLowerCase();
 }
@@ -1781,6 +1909,16 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(204, { ...corsHeaders(), ...securityHeaders() });
     res.end();
     return;
+  }
+
+  // ── Migration seam ──────────────────────────────────────────
+  // Proxy ONLY explicitly-migrated UI routes (+ Next runtime assets) to the
+  // separate Next.js service. Inert unless NEXT_UI_ENABLED=true; never matches
+  // /api/*; on upstream failure/timeout it falls back to the legacy app, so a
+  // dead Next service cannot take EasyTrac down. This is the whole strangler
+  // harness — migrating a route later = add it to MIGRATED_ROUTES (env).
+  if (nextProxy.shouldProxyToNext(req.url)) {
+    return nextProxy.proxyToNext(req, res);
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -2324,48 +2462,130 @@ const server = http.createServer(async (req, res) => {
   //      decoded token has the `admin: true` custom claim (same convention
   //      as /api/v1/* — see line ~3459) or an email in ADMIN_EMAILS.
   // ══════════════════════════════════════════════════════════════════════════
+  // Identity of the authenticated admin for audit logging.
+  function _adminId() {
+    return (req.adminUser && req.adminUser.adminId) || 'admin';
+  }
+
   async function _requireAdmin() {
-    const auth = req.headers['authorization'] || req.headers['Authorization'] || '';
+    // 1) Session cookie — PRIMARY, browser path (secret-key login → HttpOnly cookie).
+    const cookies   = _parseCookies(req);
+    const sessToken = cookies['et_admin_session'];
+    if (sessToken) {
+      const session = await adminSession.verifySession(sessToken);
+      if (session) {
+        // CSRF + same-origin only for the ambient-cookie path on state-changing methods.
+        if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
+          if (!_adminOriginOk(req)) {
+            sendJSON(res, 403, { error: 'Cross-origin request rejected' });
+            return false;
+          }
+          const csrfHeader = req.headers['x-csrf-token'] || '';
+          if (!(await adminSession.verifyCsrf(sessToken, csrfHeader))) {
+            sendJSON(res, 403, { error: 'Invalid or missing CSRF token' });
+            return false;
+          }
+        }
+        req.adminUser = { via: 'session', adminId: session.adminId };
+        return true;
+      }
+    }
+
+    const auth  = req.headers['authorization'] || req.headers['Authorization'] || '';
     const token = auth.replace(/^Bearer\s+/i, '').trim();
 
-    if (!token) {
-      sendJSON(res, 401, { error: 'Unauthorized' });
-      return false;
-    }
-
-    // 1) Legacy ADMIN_TOKEN — constant-time comparison to prevent timing attacks
-    const expected = process.env.ADMIN_TOKEN;
-    if (expected) {
-      const a = Buffer.from(token);
-      const b = Buffer.from(expected);
-      if (a.length === b.length && require('crypto').timingSafeEqual(a, b)) {
-        return true;
+    if (token) {
+      // 2) Legacy ADMIN_TOKEN Bearer — server-to-server / back-compat fallback.
+      // Constant-time comparison to prevent timing attacks.
+      const expected = process.env.ADMIN_TOKEN;
+      if (expected) {
+        const a = Buffer.from(token);
+        const b = Buffer.from(expected);
+        if (a.length === b.length && require('crypto').timingSafeEqual(a, b)) {
+          req.adminUser = { via: 'token', adminId: 'admin-token' };
+          return true;
+        }
       }
-    }
 
-    // 2) Firebase ID token with admin claim or ADMIN_EMAILS allowlist
-    try {
-      const decoded = await firestoreService.verifyIdToken(token);
-      const admins = (process.env.ADMIN_EMAILS || '')
-        .split(',')
-        .map(v => v.trim().toLowerCase())
-        .filter(Boolean);
-      const decodedEmail = (decoded?.email || '').trim().toLowerCase();
-      // TEMP: remove once ADMIN_EMAILS auth is confirmed working in prod
-      console.log('[ADMIN AUTH]', {
-        email: decoded?.email,
-        admin: decoded?.admin,
-        role: decoded?.role,
-        allowed: admins.includes(decodedEmail),
-      });
-      if (decoded.admin === true || decoded.role === 'admin' || admins.includes(decodedEmail)) {
-        req.adminUser = decoded;
-        return true;
-      }
-    } catch (_) {}
+      // 3) Firebase ID token with admin claim or ADMIN_EMAILS allowlist.
+      try {
+        const decoded = await firestoreService.verifyIdToken(token);
+        const admins = (process.env.ADMIN_EMAILS || '')
+          .split(',')
+          .map(v => v.trim().toLowerCase())
+          .filter(Boolean);
+        const decodedEmail = (decoded?.email || '').trim().toLowerCase();
+        if (decoded.admin === true || decoded.role === 'admin' || admins.includes(decodedEmail)) {
+          req.adminUser = { via: 'firebase', adminId: decodedEmail || 'firebase-admin', decoded };
+          return true;
+        }
+      } catch (_) {}
+    }
 
     sendJSON(res, 401, { error: 'Unauthorized' });
     return false;
+  }
+
+  // ── Admin session lifecycle (secret-key → HttpOnly-cookie session) ──────────
+  // POST /api/admin/login — exchange ADMIN_SECRET_KEY for a session cookie.
+  if (req.method === 'POST' && req.url.split('?')[0] === '/api/admin/login') {
+    const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+    if (adminSession.isLoginDisabled()) {
+      return sendJSON(res, 503, { error: 'Admin login is not configured on this server' });
+    }
+    if (adminSession.isLockedOut(ip)) {
+      return sendJSON(res, 429, { error: 'Too many failed attempts. Try again later.' });
+    }
+    parseJsonBody(req, res, async body => {
+      // NOTE: never log body.secretKey.
+      const ok = adminSession.checkSecret(body && body.secretKey);
+      if (!ok) {
+        adminSession.recordFailure(ip);
+        try {
+          await firestoreService.saveAuditLog({
+            action: 'admin_login_failed', clientId: null, adminId: null,
+            occurredAt: new Date().toISOString(), success: false, metadata: { ip },
+          });
+        } catch (_) {}
+        return sendJSON(res, 401, { error: 'Invalid secret key' });
+      }
+      adminSession.recordSuccess(ip);
+      const { token, csrf } = await adminSession.createSession('super-admin');
+      const maxAgeSec = Math.floor(adminSession.SESSION_TTL_MS / 1000);
+      const cookies = [
+        _adminCookie('et_admin_session', token, { httpOnly: true,  maxAgeSec }),
+        _adminCookie('et_admin_csrf',    csrf,  { httpOnly: false, maxAgeSec }),
+      ];
+      try {
+        await firestoreService.saveAuditLog({
+          action: 'admin_login_success', clientId: null, adminId: 'super-admin',
+          occurredAt: new Date().toISOString(), success: true, metadata: { ip },
+        });
+      } catch (_) {}
+      return sendJSONWithCookies(res, 200, { ok: true, csrfToken: csrf }, cookies);
+    });
+    return;
+  }
+
+  // POST /api/admin/logout — destroy the session + clear cookies.
+  if (req.method === 'POST' && req.url.split('?')[0] === '/api/admin/logout') {
+    const cookies = _parseCookies(req);
+    const t = cookies['et_admin_session'];
+    if (t) { try { await adminSession.destroySession(t); } catch (_) {} }
+    const cleared = [
+      _adminCookie('et_admin_session', '', { httpOnly: true,  maxAgeSec: 0 }),
+      _adminCookie('et_admin_csrf',    '', { httpOnly: false, maxAgeSec: 0 }),
+    ];
+    return sendJSONWithCookies(res, 200, { ok: true }, cleared);
+  }
+
+  // GET /api/admin/session — is the caller an authenticated admin session?
+  if (req.method === 'GET' && req.url.split('?')[0] === '/api/admin/session') {
+    const cookies = _parseCookies(req);
+    const t = cookies['et_admin_session'];
+    const s = t ? await adminSession.verifySession(t) : null;
+    if (!s) return sendJSON(res, 401, { authenticated: false });
+    return sendJSON(res, 200, { authenticated: true, adminId: s.adminId, csrfToken: s.csrf });
   }
 
   // GET /api/admin/export — internal admin data dump (JSON only, no file download)
@@ -3080,11 +3300,95 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 503, { error: 'Firestore is not configured' });
     }
     const uid = decodeURIComponent(_cliUpdMatch[1]);
+    const adminId = _adminId();
     parseJsonBody(req, res, body => {
-      firestoreService.updateClient(uid, body || {})
-        .then(upd => sendJSON(res, 200, { ok: true, update: upd }))
+      const b = body || {};
+      firestoreService.updateClient(uid, b)
+        .then(async upd => {
+          // Audit the billing-marker transitions specifically.
+          if (b.paymentStatus === 'paid' || b.paymentStatus === 'unpaid') {
+            const action = b.paymentStatus === 'paid' ? 'client_marked_paid' : 'client_marked_unpaid';
+            try {
+              await firestoreService.saveAuditLog({
+                action, clientId: uid, adminId,
+                occurredAt: new Date().toISOString(), success: true,
+                metadata: { paymentStatus: b.paymentStatus, trialStatus: upd.trialStatus || null },
+              });
+            } catch (_) {}
+          }
+          sendJSON(res, 200, { ok: true, update: upd });
+        })
         .catch(e => sendJSON(res, 500, { error: e.message }));
     });
+    return;
+  }
+
+  // GET /api/admin/client/:uid/check-cleanup — read-only dry run. Reports
+  // eligibility + the exact resources a deletion WOULD remove. Never writes or
+  // calls infra. Not gated by CONTAINER_DELETION_ENABLED (safe to preview).
+  const _cliCheckMatch = req.url.split('?')[0].match(/^\/api\/admin\/client\/([^/]+)\/check-cleanup$/);
+  if (req.method === 'GET' && _cliCheckMatch) {
+    if (!(await _requireAdmin())) return;
+    if (!firestoreService.isConfigured()) {
+      return sendJSON(res, 503, { error: 'Firestore is not configured' });
+    }
+    const uid = decodeURIComponent(_cliCheckMatch[1]);
+    (async () => {
+      try {
+        const preview = await containerDeletionService.previewCleanup(
+          { clientId: uid },
+          _buildContainerDeletionDeps(_adminId()),
+        );
+        sendJSON(res, 200, preview);
+      } catch (e) { sendJSON(res, 500, { error: e.message }); }
+    })();
+    return;
+  }
+
+  // POST /api/admin/client/:uid/delete-container — tear down managed infra for an
+  // EXPIRED + UNPAID client. Never deletes the customer account/doc.
+  // POST /api/admin/client/:uid/retry-cleanup — re-run teardown for still-present
+  // resources after a partial failure (idempotent; same guards).
+  const _cliActionMatch = req.url.split('?')[0].match(/^\/api\/admin\/client\/([^/]+)\/(delete-container|retry-cleanup)$/);
+  if (req.method === 'POST' && _cliActionMatch) {
+    if (!(await _requireAdmin())) return;
+    // Fail-safe kill-switch: destructive teardown is disabled unless explicitly
+    // enabled in the environment. Returns 403 for everyone while disabled.
+    if (!_containerDeletionEnabled()) {
+      return sendJSON(res, 503, {
+        error: 'Container deletion is disabled on this server',
+        code: 'deletion_disabled',
+        hint: 'Set CONTAINER_DELETION_ENABLED=true to enable (review gate).',
+      });
+    }
+    if (!firestoreService.isConfigured()) {
+      return sendJSON(res, 503, { error: 'Firestore is not configured' });
+    }
+    const uid = decodeURIComponent(_cliActionMatch[1]);
+    const adminId = _adminId();
+    (async () => {
+      try {
+        const result = await containerDeletionService.deleteClientContainer(
+          { clientId: uid, adminId },
+          _buildContainerDeletionDeps(adminId),
+        );
+        const codeMap = {
+          bad_request:  400,
+          not_found:    404,
+          paid:         409,
+          not_expired:  409,
+        };
+        if (result.status === 'rejected') {
+          return sendJSON(res, codeMap[result.code] || 400, result);
+        }
+        if (result.status === 'partial_failure') {
+          return sendJSON(res, 207, result);
+        }
+        return sendJSON(res, 200, result); // 'deleted' | 'already_deleted'
+      } catch (e) {
+        sendJSON(res, 500, { error: e.message });
+      }
+    })();
     return;
   }
 
@@ -4536,8 +4840,14 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(400, securityHeaders()); res.end('Bad Request'); return;
   }
 
-  // Default root → tool.html (the app's single-page entry)
-  const requestedPath = urlPath === '/' ? '/tool.html' : urlPath;
+  // Default root → tool.html (the app's single-page entry). Clean app routes
+  // (/dashboard, /sign-in, …) also resolve to tool.html so direct URL access and
+  // refresh never 404 — the in-app router renders the right view. Trailing
+  // slashes are tolerated (/dashboard/ === /dashboard).
+  const _cleanPath = urlPath.replace(/\/+$/, '') || '/';
+  const requestedPath = (urlPath === '/' || APP_ROUTES.has(_cleanPath))
+    ? '/tool.html'
+    : urlPath;
   const filePath      = path.normalize(path.join(ROOT, requestedPath));
 
   // Path traversal guard — filePath MUST stay within ROOT
@@ -4565,9 +4875,13 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const cacheControl = entry.isHtml
-      ? 'no-cache'                                   // HTML: always revalidate via ETag
-      : 'public, max-age=31536000, immutable';       // assets: cache hard (content-hashed via ETag)
+    // HTML + CSS revalidate via ETag on every load: their filenames are NOT
+    // content-hashed, so "immutable" would pin users to a stale stylesheet for
+    // a year after a redeploy. A 304 costs nothing (in-memory cache). Images
+    // and fonts effectively never change, so they stay immutable.
+    const cacheControl = (entry.isHtml || entry.ext === '.css')
+      ? 'no-cache'
+      : 'public, max-age=31536000, immutable';
 
     // Conditional request — client already holds this exact content → 304.
     if (req.headers['if-none-match'] === entry.etag) {

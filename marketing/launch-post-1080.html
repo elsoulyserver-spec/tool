@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>EasyTrac — Launch Day 1080×1080</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:1080px; overflow:hidden; }
+  body {
+    background:#0A0A0A;
+    color:#FFFFFF;
+    font-family:'Outfit',sans-serif;
+    position:relative;
+  }
+
+  /* ---- atmosphere ---- */
+  .grid-layer {
+    position:absolute; inset:0;
+    background-image:
+      linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px);
+    background-size:54px 54px;
+    -webkit-mask-image:radial-gradient(ellipse 90% 80% at 50% 42%, #000 40%, transparent 100%);
+            mask-image:radial-gradient(ellipse 90% 80% at 50% 42%, #000 40%, transparent 100%);
+  }
+  .glow-a {
+    position:absolute; width:920px; height:920px;
+    left:-260px; top:60px;
+    background:radial-gradient(circle, rgba(47,107,255,.13) 0%, transparent 62%);
+  }
+  .glow-b {
+    position:absolute; width:700px; height:700px;
+    right:-280px; bottom:-300px;
+    background:radial-gradient(circle, rgba(47,107,255,.07) 0%, transparent 62%);
+  }
+
+  /* ---- frame ---- */
+  .frame {
+    position:relative;
+    width:1080px; height:1080px;
+    padding:84px 92px 88px;
+    display:flex; flex-direction:column;
+  }
+
+  /* ---- top: logo lockup ---- */
+  .top {
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .lockup { display:flex; align-items:center; gap:16px; }
+  .lockup svg { display:block; }
+  .wordmark {
+    font-weight:900; font-size:30px; letter-spacing:-.5px; color:#FFFFFF;
+  }
+  .site {
+    font-family:'IBM Plex Mono',monospace;
+    font-size:14px; letter-spacing:2.5px;
+    color:rgba(255,255,255,.34);
+  }
+
+  /* ---- middle: headline stack ---- */
+  .mid { flex:1; display:flex; flex-direction:column; justify-content:center; padding-bottom:24px; }
+  .eyebrow {
+    display:flex; align-items:center; gap:14px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:14px; font-weight:500; letter-spacing:5px;
+    color:#2F6BFF;
+    margin-bottom:34px;
+  }
+  .eyebrow .tick {
+    width:34px; height:1px; background:rgba(47,107,255,.55);
+  }
+  h1 {
+    font-size:138px; font-weight:700; letter-spacing:-.045em; line-height:.98;
+    color:#FFFFFF;
+  }
+  h1 .node-dot { color:#2F6BFF; }
+  h2 {
+    margin-top:42px;
+    font-size:35px; font-weight:600; letter-spacing:-.012em; line-height:1.32;
+    color:rgba(255,255,255,.92);
+    max-width:830px;
+  }
+  .desc {
+    margin-top:26px;
+    font-size:19.5px; font-weight:500; line-height:1.6;
+    color:rgba(255,255,255,.52);
+    max-width:640px;
+  }
+
+  /* ---- pipeline divider ---- */
+  .pipeline {
+    position:relative; height:11px; display:flex; align-items:center;
+    margin-bottom:44px;
+  }
+  .pipeline .line {
+    height:1px; width:100%;
+    background:linear-gradient(90deg, rgba(255,255,255,.14) 0%, rgba(255,255,255,.10) 78%, rgba(47,107,255,.55) 97%);
+  }
+  .pipeline .node {
+    position:absolute; right:0; top:50%;
+    width:11px; height:11px; border-radius:50%;
+    transform:translateY(-50%);
+    background:#2F6BFF;
+    box-shadow:0 0 22px 4px rgba(47,107,255,.45);
+  }
+
+  /* ---- bottom: platforms + soon ---- */
+  .bottom {
+    display:flex; justify-content:space-between; align-items:flex-end;
+  }
+  .platforms {
+    display:grid;
+    grid-template-columns:repeat(3, max-content);
+    column-gap:52px; row-gap:22px;
+  }
+  .plat {
+    display:flex; align-items:center; gap:13px;
+    font-size:19px; font-weight:600; letter-spacing:.01em;
+    color:rgba(255,255,255,.82);
+    white-space:nowrap;
+  }
+  .plat svg { display:block; flex:none; }
+
+  .soon {
+    display:flex; flex-direction:column; align-items:flex-end; gap:13px;
+  }
+  .soon-label {
+    font-family:'IBM Plex Mono',monospace;
+    font-size:14px; font-weight:500; letter-spacing:2.6px;
+    color:rgba(255,255,255,.62);
+    text-transform:uppercase;
+  }
+  .soon-pill {
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px; font-weight:600; letter-spacing:4.5px;
+    color:#2F6BFF;
+    padding:9px 16px 9px 20px;
+    border:1px solid rgba(47,107,255,.38);
+    border-radius:999px;
+    background:rgba(47,107,255,.07);
+    box-shadow:0 0 26px rgba(47,107,255,.14), inset 0 0 14px rgba(47,107,255,.05);
+  }
+</style>
+</head>
+<body>
+  <div class="grid-layer"></div>
+  <div class="glow-a"></div>
+  <div class="glow-b"></div>
+
+  <div class="frame">
+
+    <div class="top">
+      <div class="lockup">
+        <!-- EasyTrac mark — locked spec: 1:2 bracket:pipeline, node #2F6BFF -->
+        <svg width="46" height="46" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M72 30 L36 30 L36 90 L72 90" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M36 60 L90 60" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round"/>
+          <circle cx="98" cy="60" r="10" fill="#2F6BFF"/>
+        </svg>
+        <div class="wordmark">EasyTrac</div>
+      </div>
+      <div class="site">easytrac.io</div>
+    </div>
+
+    <div class="mid">
+      <div class="eyebrow"><span class="tick"></span>NOW AVAILABLE</div>
+      <h1>Launch Day<span class="node-dot">.</span></h1>
+      <h2>Generate Production-Ready Google Tag Manager Containers in&nbsp;Minutes.</h2>
+      <div class="desc">EasyTrac helps eCommerce stores generate clean, organized GTM containers for modern tracking.</div>
+    </div>
+
+    <div class="pipeline">
+      <div class="line"></div>
+      <div class="node"></div>
+    </div>
+
+    <div class="bottom">
+      <div class="platforms">
+        <div class="plat">
+          <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M2.5 9.2 L6.4 13 L14.5 4" stroke="#2F6BFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Google Analytics 4
+        </div>
+        <div class="plat">
+          <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M2.5 9.2 L6.4 13 L14.5 4" stroke="#2F6BFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Google Ads
+        </div>
+        <div class="plat">
+          <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M2.5 9.2 L6.4 13 L14.5 4" stroke="#2F6BFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Meta Pixel
+        </div>
+        <div class="plat">
+          <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M2.5 9.2 L6.4 13 L14.5 4" stroke="#2F6BFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          TikTok Pixel
+        </div>
+        <div class="plat">
+          <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M2.5 9.2 L6.4 13 L14.5 4" stroke="#2F6BFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Snapchat Pixel
+        </div>
+      </div>
+
+      <div class="soon">
+        <div class="soon-label">Server-Side Tracking</div>
+        <div class="soon-pill">SOON</div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

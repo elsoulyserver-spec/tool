@@ -77,13 +77,18 @@ function svc() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 1. importContainerJSON: duplicate variable → PUT
+// NOTE: GTM API v2 has NO import endpoint (verified live + discovery doc:
+// versions:import / workspaces:import both 404). importContainerJSON therefore
+// creates entities one-by-one into a workspace, UPSERTing by name, then DELETES
+// our own ("ET"-prefixed) stale entities left from a previous generation.
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 1. importContainerJSON: duplicate variable → PUT (not POST)
 // ══════════════════════════════════════════════════════════════════════════════
 test('importContainerJSON: existing variable triggers PUT (not POST)', async () => {
   _mockHttp([
     tokenOK(),
-    // bulk import → 405 not supported
-    { statusCode: 405, body: { error: { message: 'Method not allowed' } } },
     // pre-load vars → existing "ET - Test Var"
     ok200({ variable: [{ name: 'ET - Test Var', variableId: '77' }] }),
     // pre-load triggers → empty
@@ -104,6 +109,7 @@ test('importContainerJSON: existing variable triggers PUT (not POST)', async () 
 
   const result = await g.importContainerJSON('ct1', 'ws1', cfg, null, null);
   assert.equal(result.importedVariableCount, 1);
+  assert.equal(result.method, 'item_by_item');
 
   // Must have issued a PUT to /variables/77
   const putCall = _calls.find(c => c.method === 'PUT' && c.path.includes('/variables/77'));
@@ -113,16 +119,19 @@ test('importContainerJSON: existing variable triggers PUT (not POST)', async () 
   const postVarCall = _calls.find(c => c.method === 'POST' && c.path.endsWith('/variables'));
   assert.ok(!postVarCall, 'must not POST a duplicate variable');
 
+  // Existing var IS in the new config → must NOT be deleted.
+  const delCall = _calls.find(c => c.method === 'DELETE');
+  assert.ok(!delCall, 'must not delete an entity that is still in the config');
+
   _restoreHttp();
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 2. importContainerJSON: inline 400 duplicate → skipped
+// 2. importContainerJSON: inline 400 duplicate → skipped, no throw
 // ══════════════════════════════════════════════════════════════════════════════
 test('importContainerJSON: inline 400 duplicate on POST is skipped, no throw', async () => {
   _mockHttp([
     tokenOK(),
-    { statusCode: 405, body: { error: { message: 'not allowed' } } },
     empty('variable'),   // pre-load vars (no existing)
     empty('trigger'),
     // POST → 400 duplicate
@@ -145,31 +154,43 @@ test('importContainerJSON: inline 400 duplicate on POST is skipped, no throw', a
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 3. importContainerJSON: bulk import happy path
+// 3. importContainerJSON: DELETES our stale entity left from a prior generation
 // ══════════════════════════════════════════════════════════════════════════════
-test('importContainerJSON: bulk import uses 1 API call (token + :import)', async () => {
+test('importContainerJSON: stale ET-entity not in new config is deleted', async () => {
   _mockHttp([
     tokenOK(),
-    ok200({}),   // :import succeeds
+    empty('variable'),                                             // pre-load vars
+    empty('trigger'),                                              // pre-load triggers
+    // pre-load tags → an OLD "ET" tag (from a previous generation) + a user tag
+    ok200({ tag: [
+      { name: 'ET - Meta Pixel - Lead', tagId: '901' },           // NOT in new config → delete
+      { name: 'User Own Tag',           tagId: '902' },           // not ours → never touch
+    ]}),
+    ok200({ tagId: '900', name: 'ET - Meta Pixel - AddToCart' }), // POST new tag
+    ok200({}),                                                    // DELETE /tags/901
   ]);
 
   const g = svc();
   const cfg = {
     containerVersion: {
-      variable: [{ name: 'V1' }, { name: 'V2' }],
-      trigger:  [{ name: 'T1' }],
-      tag:      [{ name: 'TAG1' }],
+      variable: [], trigger: [],
+      tag: [{ name: 'ET - Meta Pixel - AddToCart', type: 'html', parameter: [] }],
     },
   };
 
   const r = await g.importContainerJSON('ct1', 'ws1', cfg, null, null);
-  assert.equal(r.importedVariableCount, 2);
-  assert.equal(r.importedTriggerCount,  1);
-  assert.equal(r.importedTagCount,      1);
+  assert.equal(r.method, 'item_by_item');
+  assert.equal(r.deletedCount, 1, 'exactly one stale ET tag deleted');
 
-  // Only 2 HTTP calls: token exchange + :import
-  assert.equal(_calls.length, 2, `expected 2 calls, got ${_calls.length}`);
-  assert.ok(_calls[1].path.includes(':import'), 'second call must be :import');
+  const delStale = _calls.find(c => c.method === 'DELETE' && c.path.includes('/tags/901'));
+  assert.ok(delStale, 'must delete the stale ET tag (901)');
+
+  const delOwn = _calls.find(c => c.method === 'DELETE' && c.path.includes('/tags/902'));
+  assert.ok(!delOwn, 'must NOT delete a non-ET (user-owned) tag');
+
+  const delKept = _calls.find(c => c.method === 'DELETE' && c.path.includes('/tags/900'));
+  assert.ok(!delKept, 'must NOT delete a tag that is still in the config');
+
   _restoreHttp();
 });
 
@@ -245,11 +266,7 @@ test('provisionForClientWithServer: uses serverConfigJson and returns containerC
     // ── SERVER ───────────────────────────────────────────────────────────────
     ok200({ containerId: 'srv-ct', publicId: 'GTM-SRVXX', containerConfig: null }), // createServerContainer
     ok200({ workspace: [{ workspaceId: 'ws-srv' }] }),                              // getDefaultWorkspace
-    { statusCode: 405, body: { error: { message: 'n/a' } } },                      // bulk import → fallback
-    empty('variable'), empty('trigger'),                                             // pre-loads
-    ok200({ variableId: 'v1', name: 'ET - GA4 Measurement ID' }),                  // POST variable
-    empty('tag'),                                                                    // pre-load tags
-    ok200({ containerVersion: { containerVersionId: 'sv1' } }),                     // createVersion
+    ok200({ containerVersion: { containerVersionId: 'sv1' } }),                     // versions:import
     ok200({ containerVersion: { containerVersionId: 'sv1' } }),                     // publishVersion
     ok200({ containerId: 'srv-ct', publicId: 'GTM-SRVXX',
             containerConfig: 'CONTAINER_CONFIG_BLOB' }),                            // getContainerConfig
@@ -277,10 +294,10 @@ test('provisionForClientWithServer: uses serverConfigJson and returns containerC
   assert.equal(result.server.importedVariableCount, 1,
     'server container should have imported 1 variable from serverConfigJson');
 
-  // Verify server's variable was POSTed to ws-srv (not to web workspace)
-  const srvVarPost = _calls.find(c =>
-    c.method === 'POST' && c.path.includes('ws-srv') && c.path.includes('variables'));
-  assert.ok(srvVarPost, 'must POST server variable to server workspace');
+  // Full server configs must use versions:import so clients/customTemplate are preserved.
+  const serverImport = _calls.find(c =>
+    c.method === 'POST' && c.path.includes('/containers/srv-ct/versions:import'));
+  assert.ok(serverImport, 'must import serverConfigJson via versions:import');
 
   _restoreHttp();
 });

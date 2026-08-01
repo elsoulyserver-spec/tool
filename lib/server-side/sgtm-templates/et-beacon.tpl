@@ -84,8 +84,10 @@ ___SERVER_PERMISSIONS___
         {
           "key": "allowedUrls",
           "value": {
-            "type": 1,
-            "string": "any"
+            "type": 2,
+            "listItem": [
+              { "type": 1, "string": "https://tool.easytrac.io/" }
+            ]
           }
         }
       ]

@@ -1,0 +1,26 @@
+/* P0 base styles — self-contained, no external assets. Replaced by the design
+   token + font pipeline in PR-2. */
+:root {
+  --ink: #0A0D13;
+  --panel: #11151E;
+  --line: rgba(255, 255, 255, 0.09);
+  --text: #E7EBF3;
+  --muted: #8B94A7;
+  --acc: #3B7BFF;
+  --good: #2FBE8F;
+  --warn: #F5A524;
+  --crit: #F5566E;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--ink);
+  color: var(--text);
+  font-family: "IBM Plex Sans Arabic", "Noto Sans Arabic", system-ui,
+    -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+}
+a { color: var(--acc); }
+:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; border-radius: 6px; }

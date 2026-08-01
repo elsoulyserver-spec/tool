@@ -341,8 +341,10 @@ ___SERVER_PERMISSIONS___
         {
           "key": "allowedUrls",
           "value": {
-            "type": 1,
-            "string": "any"
+            "type": 2,
+            "listItem": [
+              { "type": 1, "string": "https://googleads.googleapis.com/" }
+            ]
           }
         }
       ]
@@ -396,3 +398,19 @@ ___SERVER_PERMISSIONS___
   }
 ]
 
+___TESTS___
+
+[
+  {
+    "name": "Google Ads EC — uploadClickConversions POSTs to googleads.googleapis.com with Authorization header and calls gtmOnSuccess",
+    "code": "mock('sendHttpRequest', function(u,o,b){ if(u.indexOf('googleads.googleapis.com')===-1) throw 'wrong url: '+u; if(u.indexOf('uploadClickConversions')===-1) throw 'wrong endpoint: '+u; if(o.headers['Authorization']!=='Bearer ACCTOKEN') throw 'bad auth'; return Promise.resolve({statusCode:200,body:'{\"results\":[{}]}'}); }); mock('sha256Sync', function(s,opts){ return 'a'.repeat(64); }); mock('logToConsole', function(){}); mock('getTimestampMillis', function(){ return 1700000000000; }); data.customerId='1234567890'; data.developerToken='DEVTOK'; data.accessToken='ACCTOKEN'; data.conversionActionId='AW-123/AbCd'; data.gclid='GCLID_test_value'; data.value='299'; data.currency='SAR'; data.userEmail='buyer@example.com'; runCode(data); assertApi('sendHttpRequest').wasCalled(); assertApi('gtmOnSuccess').wasCalled();"
+  },
+  {
+    "name": "Google Ads EC — HTTP 400 error calls gtmOnFailure",
+    "code": "mock('sendHttpRequest', function(u,o,b){ return Promise.resolve({statusCode:400,body:'{\"error\":{\"code\":400,\"message\":\"Request contains an invalid argument\"}}'}); }); mock('sha256Sync', function(s,opts){ return 'a'.repeat(64); }); mock('logToConsole', function(){}); mock('getTimestampMillis', function(){ return 1700000000000; }); data.customerId='123'; data.developerToken='D'; data.accessToken='A'; data.conversionActionId='AW-X/Y'; data.gclid='GCL1'; runCode(data); assertApi('gtmOnFailure').wasCalled(); assertApi('gtmOnSuccess').wasNotCalled();"
+  },
+  {
+    "name": "Google Ads EC — partialFailureError in 200 body calls gtmOnFailure",
+    "code": "mock('sendHttpRequest', function(u,o,b){ return Promise.resolve({statusCode:200,body:'{\"partialFailureError\":{\"code\":3,\"message\":\"gclid expired\"}}'}); }); mock('sha256Sync', function(s,opts){ return 'a'.repeat(64); }); mock('logToConsole', function(){}); mock('getTimestampMillis', function(){ return 1700000000000; }); data.customerId='1234567890'; data.developerToken='DEVTOK'; data.accessToken='ACCTOKEN'; data.conversionActionId='AW-123/AbCd'; data.gclid='EXPIRED_GCLID'; runCode(data); assertApi('gtmOnFailure').wasCalled(); assertApi('gtmOnSuccess').wasNotCalled();"
+  }
+]

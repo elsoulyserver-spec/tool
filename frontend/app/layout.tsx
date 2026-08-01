@@ -1,79 +1,37 @@
 /**
- * Easy Track — Root Layout
+ * Easy Track — Root Layout (P0)
  *
- * Font loading strategy:
- *  - IBM Plex Sans Arabic + Inter: served via next/font/google (CDN, auto-subset, preload)
- *  - ThmanyahSans: served via next/font/local (self-hosted WOFF2, preload Regular only)
- *  - JetBrains Mono: local, NOT preloaded (deferred — technical contexts only)
- *  - Serif families: NOT in this layout — loaded only in PDF renderer via dynamic import
+ * Deliberately minimal and self-contained so the migrated /home route BUILDS
+ * today. The full next/font + design-token pipeline in fonts.ts / globals.css
+ * references assets that are not generated yet (public/fonts/*, packages/
+ * design-tokens/generated/css/*) — those are wired back in during PR-2 once the
+ * assets exist. P0 uses a system font stack (incl. Arabic) and inline base CSS.
  *
- * CLS prevention: fallback @font-face metrics in typography.css match primary fonts.
+ * Arabic-first: lang="ar" dir="rtl" by default. Locale routing (next-intl)
+ * arrives with the AppShell in PR-2.
  */
 
-import type { Metadata, Viewport } from 'next'
-import {
-  ibmPlexSansArabic,
-  inter,
-  thmanyahSans,
-  jetbrainsMono,
-  criticalFontVariables,
-} from './fonts'
-import '../styles/typography.css'
+import type { Metadata, Viewport } from 'next';
+import './p0.css';
+import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title:       { default: 'Easy Track', template: '%s | Easy Track' },
-  description: 'Enterprise analytics platform for Saudi Arabia and GCC markets',
-  // Prevents mobile browsers from inflating font sizes
+  title: { default: 'Easy Track', template: '%s | Easy Track' },
+  description: 'Server-side tracking for Saudi & GCC e-commerce',
   other: { 'format-detection': 'telephone=no' },
-}
+};
 
 export const viewport: Viewport = {
-  width:        'device-width',
+  width: 'device-width',
   initialScale: 1,
-  // Prevent iOS from adjusting font sizes in landscape
-  userScalable: false,
-}
+};
 
-interface RootLayoutProps {
-  children:           React.ReactNode
-  params: {
-    locale: string    // injected by next-intl middleware
-  }
-}
-
-export default function RootLayout({ children, params: { locale } }: RootLayoutProps) {
-  const dir = locale === 'ar' ? 'rtl' : 'ltr'
-
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html
-      lang={locale}
-      dir={dir}
-      // All four next/font CSS variable names are injected here.
-      // Components reference var(--font-*) — never raw font names.
-      className={criticalFontVariables}
-      // Prevent iOS from auto-adjusting font sizes
-      style={{ WebkitTextSizeAdjust: '100%' }}
-      suppressHydrationWarning
-    >
-      <head>
-        {/*
-          Preconnect to Google Fonts for IBM Plex Sans Arabic + Inter.
-          next/font/google self-hosts by default in production — these hints
-          only matter in development. Keep them here for safety.
-        */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-      </head>
-      <body
-        className={[
-          // Base typography via CSS var(--font-sans) which switches per dir
-          'font-sans antialiased',
-          // Prevent invisible text during font load (font-display: swap handles this)
-          'text-base',
-        ].join(' ')}
-      >
-        {children}
+    <html lang="ar" dir="rtl" suppressHydrationWarning>
+      <body>
+        <Providers>{children}</Providers>
       </body>
     </html>
-  )
+  );
 }

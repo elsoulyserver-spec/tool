@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>EasyTrac — خصم الإطلاق ٥٠٪ 1080×1080</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@500;600;700&family=Outfit:wght@700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1080px; height:1080px; overflow:hidden; }
+  body {
+    background:#0A0A0A;
+    color:#FFFFFF;
+    font-family:'IBM Plex Sans Arabic',sans-serif;
+    position:relative;
+  }
+
+  /* ---- atmosphere ---- */
+  .grid-layer {
+    position:absolute; inset:0;
+    background-image:
+      linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px);
+    background-size:54px 54px;
+    -webkit-mask-image:radial-gradient(ellipse 90% 80% at 50% 40%, #000 40%, transparent 100%);
+            mask-image:radial-gradient(ellipse 90% 80% at 50% 40%, #000 40%, transparent 100%);
+  }
+  .glow-a {
+    position:absolute; width:940px; height:940px;
+    right:-280px; top:0px;
+    background:radial-gradient(circle, rgba(47,107,255,.13) 0%, transparent 62%);
+  }
+  .glow-b {
+    position:absolute; width:720px; height:720px;
+    left:-300px; bottom:-320px;
+    background:radial-gradient(circle, rgba(47,107,255,.07) 0%, transparent 62%);
+  }
+
+  /* ---- frame ---- */
+  .frame {
+    position:relative;
+    width:1080px; height:1080px;
+    padding:70px 88px 60px;
+    display:flex; flex-direction:column;
+  }
+
+  /* ---- top: logo lockup ---- */
+  .top { display:flex; align-items:center; justify-content:space-between; }
+  .lockup { display:flex; align-items:center; gap:15px; }
+  .lockup svg { display:block; }
+  .wordmark {
+    font-family:'Outfit',sans-serif;
+    font-weight:900; font-size:28px; letter-spacing:-.5px; color:#FFFFFF;
+    direction:ltr;
+  }
+
+  /* ---- middle: headline stack ---- */
+  .mid { flex:1; display:flex; flex-direction:column; justify-content:center; align-items:flex-start; }
+  .badge {
+    display:inline-flex; align-items:center; gap:10px;
+    font-size:16px; font-weight:600;
+    color:#2F6BFF;
+    padding:8px 19px;
+    border:1px solid rgba(47,107,255,.38);
+    border-radius:999px;
+    background:rgba(47,107,255,.07);
+    margin-bottom:32px;
+  }
+  .badge .rocket { font-size:14px; }
+  h1 {
+    font-size:88px; font-weight:700; line-height:1.3;
+    color:#FFFFFF;
+  }
+  h1 .pct { color:#2F6BFF; text-shadow:0 0 46px rgba(47,107,255,.45); }
+  h2 {
+    margin-top:22px;
+    font-size:31px; font-weight:600; line-height:1.6;
+    color:rgba(255,255,255,.92);
+  }
+  h2 .latin { font-family:'Outfit',sans-serif; font-weight:700; letter-spacing:-.01em; }
+  .desc {
+    margin-top:16px;
+    font-size:19px; font-weight:500; line-height:1.8;
+    color:rgba(255,255,255,.52);
+    max-width:760px;
+  }
+
+  /* ---- offer card ---- */
+  .offer {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:30px 40px;
+    border:1px solid rgba(47,107,255,.5);
+    border-radius:22px;
+    background:linear-gradient(135deg, rgba(47,107,255,.10) 0%, rgba(47,107,255,.04) 100%);
+    box-shadow:0 0 50px rgba(47,107,255,.16), inset 0 0 30px rgba(47,107,255,.05);
+    margin-bottom:40px;
+  }
+  .offer-main { display:flex; align-items:center; gap:18px; }
+  .offer-main .party { font-size:30px; }
+  .offer-main .offer-title {
+    font-size:42px; font-weight:700; color:#FFFFFF; line-height:1.2;
+  }
+  .offer-main .offer-title .pct { color:#2F6BFF; }
+  .offer-sub {
+    font-size:22px; font-weight:600; color:rgba(255,255,255,.82);
+  }
+  .offer-pill {
+    font-size:15.5px; font-weight:600;
+    color:#2F6BFF;
+    padding:10px 22px;
+    border:1px solid rgba(47,107,255,.42);
+    border-radius:999px;
+    background:rgba(10,10,10,.55);
+    white-space:nowrap;
+  }
+
+  /* ---- bottom: platforms (left) + SOON (right) ---- */
+  .bottom { display:flex; justify-content:space-between; align-items:flex-end; }
+  .soon { display:flex; flex-direction:column; align-items:flex-start; gap:10px; }
+  .soon-label {
+    font-size:17px; font-weight:600;
+    color:rgba(255,255,255,.42);
+  }
+  .soon-pill {
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px; font-weight:600; letter-spacing:4.5px;
+    direction:ltr;
+    color:rgba(255,255,255,.45);
+    padding:8px 14px 8px 18px;
+    border:1px solid rgba(255,255,255,.16);
+    border-radius:999px;
+    background:rgba(255,255,255,.03);
+  }
+  .platforms {
+    display:grid;
+    grid-template-columns:repeat(3, max-content);
+    column-gap:42px; row-gap:18px;
+    justify-content:end;
+  }
+  .plat {
+    display:flex; align-items:center; gap:11px;
+    font-family:'Outfit',sans-serif;
+    font-size:17.5px; font-weight:600; letter-spacing:.01em;
+    color:rgba(255,255,255,.82);
+    white-space:nowrap;
+    direction:ltr;
+  }
+  .plat svg { display:block; flex:none; }
+
+  /* ---- footer ---- */
+  .footer {
+    margin-top:34px;
+    display:flex; justify-content:center;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13.5px; letter-spacing:2.5px;
+    color:rgba(255,255,255,.34);
+    direction:ltr;
+  }
+</style>
+</head>
+<body>
+  <div class="grid-layer"></div>
+  <div class="glow-a"></div>
+  <div class="glow-b"></div>
+
+  <div class="frame">
+
+    <div class="top">
+      <div class="lockup">
+        <!-- EasyTrac mark — locked spec: never mirrored, node stays #2F6BFF -->
+        <svg width="43" height="43" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M72 30 L36 30 L36 90 L72 90" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M36 60 L90 60" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round"/>
+          <circle cx="98" cy="60" r="10" fill="#2F6BFF"/>
+        </svg>
+        <div class="wordmark">EasyTrac</div>
+      </div>
+    </div>
+
+    <div class="mid">
+      <div class="badge"><span class="rocket">🚀</span>إطلاق رسمي</div>
+      <h1>خصم <span class="pct">٥٠٪</span><br>بمناسبة الإطلاق</h1>
+      <h2>ابدأ رحلتك مع <span class="latin">EasyTrac</span> بأفضل سعر لفترة محدودة</h2>
+      <div class="desc">أنشئ كونتينرز Google Tag Manager الجاهزة للإنتاج خلال دقائق، لبنية تتبع احترافية ومنظمة.</div>
+    </div>
+
+    <div class="offer">
+      <div class="offer-main">
+        <span class="party">🎉</span>
+        <div class="offer-title">خصم <span class="pct">٥٠٪</span></div>
+      </div>
+      <div class="offer-sub">على جميع الباقات الحالية</div>
+      <div class="offer-pill">لفترة محدودة فقط</div>
+    </div>
+
+    <div class="bottom">
+      <div class="soon">
+        <div class="soon-label">سيرفر سايد</div>
+        <div class="soon-pill">SOON</div>
+      </div>
+
+      <div class="platforms">
+        <div class="plat">
+          <svg width="16" height="16" viewBox="0 0 17 17" fill="none"><path d="M2.5 9.2 L6.4 13 L14.5 4" stroke="#2F6BFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Google Analytics 4
+        </div>
+        <div class="plat">
+          <svg width="16" height="16" viewBox="0 0 17 17" fill="none"><path d="M2.5 9.2 L6.4 13 L14.5 4" stroke="#2F6BFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Google Ads
+        </div>
+        <div class="plat">
+          <svg width="16" height="16" viewBox="0 0 17 17" fill="none"><path d="M2.5 9.2 L6.4 13 L14.5 4" stroke="#2F6BFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Meta Pixel
+        </div>
+        <div class="plat">
+          <svg width="16" height="16" viewBox="0 0 17 17" fill="none"><path d="M2.5 9.2 L6.4 13 L14.5 4" stroke="#2F6BFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          TikTok Pixel
+        </div>
+        <div class="plat">
+          <svg width="16" height="16" viewBox="0 0 17 17" fill="none"><path d="M2.5 9.2 L6.4 13 L14.5 4" stroke="#2F6BFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Snapchat Pixel
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">easytrac.io</div>
+
+  </div>
+</body>
+</html>

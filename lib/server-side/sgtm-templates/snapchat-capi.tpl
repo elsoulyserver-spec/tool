@@ -270,8 +270,10 @@ ___SERVER_PERMISSIONS___
         {
           "key": "allowedUrls",
           "value": {
-            "type": 1,
-            "string": "any"
+            "type": 2,
+            "listItem": [
+              { "type": 1, "string": "https://tr.snapchat.com/" }
+            ]
           }
         }
       ]
@@ -325,3 +327,19 @@ ___SERVER_PERMISSIONS___
   }
 ]
 
+___TESTS___
+
+[
+  {
+    "name": "Snapchat — PURCHASE event POSTs to tr.snapchat.com/v3 and calls gtmOnSuccess on 200",
+    "code": "mock('sendHttpRequest', function(u,o,b){ if(u.indexOf('tr.snapchat.com/v3')===-1) throw 'wrong url: '+u; if(u.indexOf('access_token=')===-1) throw 'missing access_token in url'; return Promise.resolve({statusCode:200,body:'{\"status\":\"SUCCESS\"}'}); }); mock('sha256Sync', function(s,opts){ return 'a'.repeat(64); }); mock('logToConsole', function(){}); mock('getTimestampMillis', function(){ return 1700000000000; }); data.pixelId='SNPX123'; data.accessToken='SNAPTOK'; data.eventType='PURCHASE'; data.eventId='snap-001'; data.price='149'; data.currency='SAR'; data.transactionId='TXN-456'; data.userEmail='buyer@example.com'; data.ipAddress='1.2.3.4'; data.userAgent='Mozilla/5.0'; runCode(data); assertApi('sendHttpRequest').wasCalled(); assertApi('gtmOnSuccess').wasCalled();"
+  },
+  {
+    "name": "Snapchat — HTTP 400 response calls gtmOnFailure",
+    "code": "mock('sendHttpRequest', function(u,o,b){ return Promise.resolve({statusCode:400,body:'{\"status\":\"FAILED\",\"reason\":\"INVALID_TOKEN\"}'}); }); mock('sha256Sync', function(s,opts){ return 'a'.repeat(64); }); mock('logToConsole', function(){}); mock('getTimestampMillis', function(){ return 1700000000000; }); data.pixelId='SNPX123'; data.accessToken='BAD'; data.eventType='PAGE_VIEW'; runCode(data); assertApi('gtmOnFailure').wasCalled(); assertApi('gtmOnSuccess').wasNotCalled();"
+  },
+  {
+    "name": "Snapchat — event_time in payload is seconds-input multiplied by 1000 (milliseconds)",
+    "code": "mock('sendHttpRequest', function(u,o,b){ return Promise.resolve({statusCode:200,body:'{\"status\":\"SUCCESS\"}'}); }); mock('sha256Sync', function(s,opts){ return 'a'.repeat(64); }); mock('logToConsole', function(){}); mock('getTimestampMillis', function(){ return 1700000000000; }); data.pixelId='SNPX1'; data.accessToken='TOK'; data.eventType='PAGE_VIEW'; data.eventTime='1700000000'; runCode(data); assertApi('sendHttpRequest').wasCalled(); assertApi('gtmOnSuccess').wasCalled();"
+  }
+]
