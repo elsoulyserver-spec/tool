@@ -303,7 +303,7 @@ Customer promise: "server ready within 60 minutes." Operator reality: ~10 minute
 
 | # | Task | Est | Notes |
 |---|---|---|---|
-| 1 | GCP project `easytrack-prod-1`, enable APIs, provisioner SA | 0.5h | **Start tonight** |
+| 1 | GCP project `<gcp-project-id>`, enable APIs, provisioner SA | 0.5h | **Start tonight** |
 | 2 | Wildcard cert `*.easytrack.io` (Cert Manager, DNS authz TXT) | 0.5h + wait | Validation can take hours — first task |
 | 3 | Global ALB: static IP → cert map → serverless NEG, URL mask `<service>.easytrack.io` | 2h | One-time; makes every future service instantly routable |
 | 4 | Wildcard DNS `*.easytrack.io → LB IP` (+ `edge.easytrack.io` A record for custom-domain CNAMEs) | 0.25h | |
