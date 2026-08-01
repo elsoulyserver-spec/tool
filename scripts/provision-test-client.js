@@ -64,6 +64,7 @@ const { slugFor, urlsForSlug } = require('../lib/provision/context');
 const { createServer } = require('../lib/provision/create-server');
 const runner           = require('../lib/provision/runner');
 const { getHostingProvider } = require('../lib/providers');
+const { buildServerConfig }  = require('../lib/gtm-config-builder');
 
 // ── Output helpers ───────────────────────────────────────────────────────────
 const CHK  = '[PASS]';
@@ -82,6 +83,25 @@ function fail(msg) {
 function assert(cond, msg) {
   if (!cond) fail(msg);
   log(CHK, msg);
+}
+
+// ── Native HTTP generator contract (offline — no GCP/GTM calls) ───────────────
+// Validates the current architecture BEFORE any live provisioning: the server
+// config builder must emit native Server GTM HTTP Request tags (type: 'http')
+// for the CAPI destinations and carry NO community custom templates.
+function assertNativeHttpGeneratorContract() {
+  const cfg = buildServerConfig({
+    platforms:  ['meta', 'tiktok', 'snap'],
+    pixelIds:   { meta: '123', tiktok: '456', snap: '789' },
+    capiTokens: { meta: 'm', tiktok: 't', snap: 's' },
+    events:     ['purchase', 'add_to_cart'],
+    sgtmUrl:    'https://sgtm.example.com',
+  });
+  const ct = cfg.containerVersion.customTemplate;
+  assert(Array.isArray(ct) && ct.length === 0, 'generator: containerVersion.customTemplate is empty (Native HTTP)');
+  const capiTags = cfg.containerVersion.tag.filter(t => /^ET - (Meta CAPI|TikTok Events API|Snapchat CAPI) -/.test(t.name));
+  assert(capiTags.length > 0, 'generator: CAPI destination tags present');
+  assert(capiTags.every(t => t.type === 'http'), 'generator: all CAPI tags use native type "http"');
 }
 
 // ── HTTP GET health check ────────────────────────────────────────────────────
@@ -168,6 +188,9 @@ async function runProvisionAndAssert() {
   if (!shardRegistry.isConfigured()) fail('Shard registry not configured — set MANAGED_SHARDS + MANAGED_DEFAULT_SHARD');
   log(CHK, 'All services configured');
 
+  // 1b. Native HTTP generator contract (offline — validates architecture before provisioning).
+  assertNativeHttpGeneratorContract();
+
   const slug = slugFor(clientId);
   const urls = urlsForSlug(slug);
   log(INFO, `  slug=${slug}`);
@@ -177,7 +200,7 @@ async function runProvisionAndAssert() {
   // 2. Create managed server job (createServer picks shard + creates Firestore docs)
   let txResult;
   try {
-    txResult = await createServer({ clientId, email: 'e2e-test@easytrac.io' });
+    txResult = await createServer({ clientId, email: 'e2e-test@example.com' });
   } catch (e) {
     fail(`createServer failed: ${e.message}`);
   }
@@ -205,7 +228,15 @@ async function runProvisionAndAssert() {
   const previewRunUrl = serverDoc.previewRunUrl;
   assert(!!taggingRunUrl, `taggingRunUrl recorded: ${taggingRunUrl}`);
   assert(!!previewRunUrl, `previewRunUrl recorded: ${previewRunUrl}`);
-  assert(!taggingRunUrl.includes('sgtm.easytrac.io'), 'taggingRunUrl must be run.app, not wildcard');
+  // The direct tagging URL must be the tenant's run.app URL, NOT the wildcard edge
+  // domain. Read the wildcard base from config — never hardcode a real domain.
+  const baseDomain = String(process.env.SGTM_BASE_DOMAIN || '')
+    .trim().toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/\/+$/, '');
+  if (!baseDomain) fail('SGTM_BASE_DOMAIN is not set — required to verify taggingRunUrl is the direct run.app URL');
+  assert(!taggingRunUrl.toLowerCase().includes(baseDomain),
+    `taggingRunUrl must be the direct run.app URL, not the wildcard domain (${baseDomain})`);
 
   log(INFO, `  Checking run.app health: ${taggingRunUrl}/healthy`);
   try {
@@ -243,16 +274,21 @@ async function runProvisionAndAssert() {
       assert(!!config, 'containerConfig is valid JSON');
 
       if (config) {
-        // No community (cvt_) templates
-        const customTemplates = (config.customTemplates || []).map(t => t.templateId || t.name || '');
-        const hasCvt = customTemplates.some(id => String(id).startsWith('cvt_'));
-        assert(!hasCvt, `No cvt_ community templates in container (found: [${customTemplates.join(', ')}])`);
+        // Native HTTP architecture: CAPI destinations are native HTTP Request
+        // tags, NOT community (cvt_) templates. GTM's export field is
+        // `customTemplate` (singular); accept the plural defensively.
+        const ctList = (config.customTemplate || config.customTemplates || []);
+        const ctIds  = ctList.map(t => t.templateId || t.name || '');
+        const hasCvtTemplate = ctIds.some(id => String(id).startsWith('cvt_'));
+        assert(!hasCvtTemplate, `no cvt_ community templates in container (found: [${ctIds.join(', ')}])`);
 
-        // Required tags present (GA4 MP at minimum)
-        const tagNames = ((config.tag || []).concat(config.tags || [])).map(t => t.name || t.type || '');
-        const types    = ((config.tag || []).concat(config.tags || [])).map(t => t.type || t.tagType || '');
+        const allTags  = (config.tag || []).concat(config.tags || []);
+        const tagNames = allTags.map(t => t.name || t.type || '');
+        const tagTypes = allTags.map(t => t.type || t.tagType || '');
+        const cvtTags  = allTags.filter(t => String(t.type || t.tagType || '').startsWith('cvt_'));
+        assert(cvtTags.length === 0, `no community-template (cvt_) tags in container (found: [${cvtTags.map(t => t.name).join(', ')}])`);
         log(INFO, `  Container tags: [${tagNames.slice(0, 8).join(', ')}]`);
-        log(INFO, `  Container types: [${types.slice(0, 8).join(', ')}]`);
+        log(INFO, `  Container types: [${tagTypes.slice(0, 8).join(', ')}]`);
       }
     } catch (e) {
       log(INFO, `  GTM structure check warning: ${e.message} (non-fatal)`);
