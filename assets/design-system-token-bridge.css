@@ -1,0 +1,47 @@
+/* EasyTrac design-system aliases. Deliberately scoped so the existing UI is untouched. */
+.et-design-system-scope {
+  --surface-canvas: var(--bg);
+  --surface-1: var(--sur);
+  --surface-2: var(--sur2);
+  --surface-3: var(--sur3);
+  --surface-overlay: var(--sur2);
+  --surface-sunken: var(--bg);
+
+  --text-primary: var(--wht);
+  --text-secondary: var(--wht2);
+  --text-tertiary: var(--mut);
+  --text-disabled: var(--mut2);
+
+  --brand: var(--acc);
+  --brand-strong: var(--acc2);
+  --on-brand: #fff;
+
+  --border-subtle: var(--bdr2);
+  --border-default: var(--bdr);
+  --border-strong: var(--mut2);
+
+  --status-positive-fg: var(--grn);
+  --status-positive-bg: color-mix(in srgb, var(--grn) 16%, transparent);
+  --status-positive-border: var(--grn);
+  --status-progress-fg: var(--blu);
+  --status-progress-bg: color-mix(in srgb, var(--blu) 16%, transparent);
+  --status-progress-border: var(--blu);
+  --status-caution-fg: var(--amber);
+  --status-caution-bg: color-mix(in srgb, var(--amber) 16%, transparent);
+  --status-caution-border: var(--amber);
+  --status-critical-fg: var(--red);
+  --status-critical-bg: color-mix(in srgb, var(--red) 16%, transparent);
+  --status-critical-border: var(--red);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .18);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, .24);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, .32);
+  --focus-ring: 0 0 0 2px var(--surface-canvas), 0 0 0 4px var(--blu);
+
+  /* Medium-density defaults; an explicit data-density value overrides these. */
+  --d-row: 44px;
+  --d-pad: 16px;
+  --d-gap: 20px;
+  --d-fs: var(--p-fs-4);
+  --d-icon: 20px;
+}

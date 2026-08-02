@@ -1,0 +1,78 @@
+/* ============================================================
+   COMPONENT TOKENS
+   Third layer: each block below maps ONE component's surface to
+   semantic tokens. Components consume ONLY these — never primitives
+   or semantic tokens directly. This is the layer a rebrand or a
+   theme change can touch without editing component code.
+   ============================================================ */
+
+/* --- Button tokens --- */
+:root {
+  --button-radius: var(--p-radius-2);
+  --button-padding-y: 9px; --button-padding-x: var(--p-space-5);
+  --button-fs: var(--p-fs-4); --button-fw: var(--p-fw-semibold);
+  --button-primary-bg: var(--brand); --button-primary-bg-hover: var(--brand-strong); --button-primary-fg: var(--on-brand);
+  --button-secondary-bg: var(--surface-2); --button-secondary-bg-hover: var(--surface-3); --button-secondary-fg: var(--text-primary); --button-secondary-border: var(--border-default);
+  --button-danger-bg: var(--status-critical-fg); --button-danger-fg: #fff;
+  --button-disabled-bg: var(--surface-2); --button-disabled-fg: var(--text-disabled);
+}
+
+/* --- Input tokens --- */
+:root {
+  --input-bg: var(--surface-2); --input-fg: var(--text-primary); --input-border: var(--border-default);
+  --input-border-focus: var(--brand); --input-border-error: var(--status-critical-border);
+  --input-radius: var(--p-radius-2); --input-padding: 8px 10px; --input-fs: var(--p-fs-4);
+  --input-placeholder: var(--text-tertiary);
+}
+
+/* --- Card tokens --- */
+:root {
+  --card-bg: var(--surface-1); --card-border: var(--border-subtle); --card-radius: var(--p-radius-3);
+  --card-padding: var(--p-space-7); --card-shadow: var(--shadow-sm);
+}
+
+/* --- Sidebar tokens --- */
+:root {
+  --sidebar-width: 236px; --sidebar-bg: var(--surface-canvas); --sidebar-border: var(--border-subtle);
+  --sidebar-item-fg: var(--text-secondary); --sidebar-item-fg-active: var(--text-primary);
+  --sidebar-item-bg-active: var(--surface-2); --sidebar-item-bg-hover: var(--surface-1);
+  --sidebar-item-radius: var(--p-radius-2);
+}
+
+/* --- Dialog tokens --- */
+:root {
+  --dialog-bg: var(--surface-overlay); --dialog-radius: var(--p-radius-3); --dialog-shadow: var(--shadow-lg);
+  --dialog-scrim: rgba(0,0,0,.5); --dialog-padding: var(--p-space-7); --dialog-width-sm: 380px; --dialog-width-md: 560px;
+}
+
+/* --- Table tokens --- */
+:root {
+  --table-border: var(--border-subtle); --table-header-border: var(--border-default);
+  --table-row-hover-bg: var(--surface-1); --table-header-fg: var(--text-tertiary);
+  --table-cell-padding: 8px 10px; --table-fs: var(--p-fs-4);
+}
+
+/* --- Status tokens (component-facing aliases onto the theme-independent status classes) --- */
+:root {
+  --status-chip-radius: var(--p-radius-1); --status-chip-padding: 3px 9px; --status-chip-fs: var(--p-fs-2); --status-chip-fw: var(--p-fw-semibold);
+  --status-banner-radius: var(--p-radius-2); --status-banner-padding: var(--p-space-5) var(--p-space-6);
+}
+
+/* --- Timeline tokens --- */
+:root {
+  --timeline-line-color: var(--border-default); --timeline-marker-size: 10px; --timeline-track-height: 2px;
+  --timeline-label-fs: var(--p-fs-2); --timeline-detail-fg: var(--text-tertiary);
+  --timeline-code-bg: var(--surface-2); --timeline-code-border: var(--border-subtle); --timeline-code-radius: var(--p-radius-1);
+}
+
+/* --- HealthScore tokens --- */
+:root {
+  --healthscore-ring-size: 64px; --healthscore-ring-width: 4px; --healthscore-fs: var(--p-fs-7);
+  --healthscore-label-fs: var(--p-fs-4); --healthscore-meta-fg: var(--text-tertiary);
+}
+
+/* --- IncidentCard tokens --- */
+:root {
+  --incidentcard-bg: var(--surface-1); --incidentcard-border: var(--border-subtle); --incidentcard-radius: var(--p-radius-3);
+  --incidentcard-padding: var(--p-space-5); --incidentcard-title-fs: var(--p-fs-4); --incidentcard-meta-fg: var(--text-tertiary);
+}

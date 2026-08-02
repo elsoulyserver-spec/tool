@@ -1608,7 +1608,7 @@ const mime = {
 // Everything NOT in this set (server.js, package.json, Dockerfile, .env, ...)
 // is blocked with 403 even if present in the root folder.
 const STATIC_ALLOW_EXT = new Set([
-  '.html', '.css',
+  '.html', '.css', '.js',
   '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico',
   '.woff', '.woff2', '.ttf', '.otf',
   '.txt', '.map',
