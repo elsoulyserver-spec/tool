@@ -1,0 +1,280 @@
+/* Phase B1 shell tokens and chrome. Every selector is isolated under the inert mount point. */
+#appShellV2Root {
+  --sidebar-width: 256px;
+  --sidebar-bg: var(--sur);
+  --sidebar-border: var(--bdr);
+  --sidebar-item-bg-hover: var(--sur2);
+  --sidebar-item-bg-active: var(--acc-dim);
+  --sidebar-item-fg: var(--wht2);
+  --sidebar-item-fg-active: var(--wht);
+  --sidebar-item-radius: 8px;
+}
+
+#appShellV2Root .et-shell-v2-appshell {
+  min-width: 0;
+  width: 100%;
+}
+
+#appShellV2Root .et-shell-v2-sidebar-chrome {
+  flex: 0 0 var(--sidebar-width);
+  min-height: 100vh;
+  padding: 16px 10px;
+}
+
+#appShellV2Root .et-shell-v2-store-switcher {
+  position: relative;
+  z-index: 101;
+  margin-bottom: 12px;
+}
+
+#appShellV2Root .et-shell-v2-page-chrome {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  padding: 0;
+}
+
+#appShellV2Root .et-shell-v2-toolbar-chrome {
+  min-width: 0;
+  padding: 0;
+  border-bottom: 0;
+}
+
+#appShellV2Root .et-shell-v2-workspace-panel {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+#appShellV2Root .et-shell-v2-workspace-section {
+  min-width: 0;
+  margin-top: 0;
+}
+
+/* Neutralize .main's legacy margin-right (tool.html:3174, meant to clear the
+   fixed-position sidebar when .main was its full-width sibling) — the new
+   flex chrome already reserves that space via .et-shell-v2-sidebar-chrome,
+   so the old margin would double-offset the workspace. Logical property so
+   this holds under both dir="rtl" (today's default) and dir="ltr". */
+#appShellV2Root .et-shell-v2-workspace-section > .main {
+  margin-inline: 0 !important;
+}
+
+@media (max-width: 900px) {
+  #appShellV2Root .et-shell-v2-sidebar-chrome {
+    display: none;
+  }
+}
+
+/* Dashboard integration — restyle the existing real-data Overview cards with
+   design-system card tokens when nested inside the new shell. No markup or
+   JS change: these selectors only ever match once .main is reparented under
+   #appShellV2Root (flag on), and this file is only ever loaded when the flag
+   is on in the first place (see assets/app-shell-bootstrap.js). Flag-off
+   Dashboard is unaffected by construction. */
+/* The legacy easytrack-design-system.css already applies !important to these
+   same classes (background/border-color/border-radius) — matching !important
+   here is required to actually take effect, not stylistic preference. */
+#appShellV2Root .ov-pixel-card,
+#appShellV2Root .ov-recent-card,
+#appShellV2Root .ov-stat-card {
+  background: var(--card-bg, var(--sur2)) !important;
+  border-color: var(--card-border, rgba(255, 255, 255, .05)) !important;
+  border-radius: var(--card-radius, 20px) !important;
+}
+
+/* #ovGtmStatus carries its own inline background/border in tool.html, which
+   beats any external stylesheet rule regardless of selector specificity —
+   !important is required here, and only here, to actually take effect. */
+#appShellV2Root #ovGtmStatus {
+  background: var(--card-bg, var(--sur2)) !important;
+  border-color: var(--card-border, var(--bdr2)) !important;
+  border-radius: var(--card-radius, 16px) !important;
+}
+
+/* Destinations — real-data list built by app-shell-bootstrap.js, inserted
+   after the existing #overviewPixels grid. Design-system tokens only. */
+#appShellV2Root .et-shell-v2-destinations {
+  margin-top: 24px;
+}
+
+#appShellV2Root .et-shell-v2-destinations-heading {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary, var(--wht2));
+  margin-bottom: 12px;
+}
+
+#appShellV2Root .et-shell-v2-destinations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#appShellV2Root .et-shell-v2-destination-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+#appShellV2Root .et-shell-v2-destination-detail {
+  font-size: 11.5px;
+  color: var(--text-tertiary, var(--mut));
+  padding-inline-start: 14px;
+}
+
+#appShellV2Root .et-shell-v2-destinations-empty {
+  background: var(--surface-1, var(--sur2));
+  border: 1px dashed var(--border-default, var(--bdr2));
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  color: var(--text-tertiary, var(--mut));
+  font-size: 12.5px;
+}
+
+/* Setup Wizard (#view-pixels) — restyle existing step chrome with
+   design-system card/button tokens. No markup, handler, or step-logic
+   change: goStep(), updateProg(), buildEvGrid(), buildPixInputs(), and
+   every id (s1 through s5, the pc/pl/pcon progress ids, btn1 through
+   btn3, cmsGrid, evGrid, outWrap) are untouched. The legacy
+   easytrack-design-system.css already applies !important to
+   background/border-color on these same classes — matching !important
+   here is required to take effect. */
+#appShellV2Root .panel,
+#appShellV2Root .cms-card,
+#appShellV2Root .cbtn {
+  background: var(--card-bg, var(--sur2)) !important;
+  border-color: var(--card-border, rgba(255, 255, 255, .05)) !important;
+  border-radius: var(--card-radius, 20px) !important;
+}
+
+#appShellV2Root .bnxt {
+  background: var(--brand, var(--acc)) !important;
+  color: var(--on-brand, #fff) !important;
+  border-radius: var(--button-radius, 10px) !important;
+}
+
+#appShellV2Root .bbk {
+  background: var(--surface-2, var(--sur2)) !important;
+  border-color: var(--border-default, var(--bdr)) !important;
+  color: var(--text-secondary, var(--wht2)) !important;
+  border-radius: var(--button-radius, 10px) !important;
+}
+
+/* Billing/plan UI — targets every element with class="plan-badge"
+   (#userPlanBadge, #settingsPlanBadge; #ovPlanBadge on the Dashboard has
+   its own inline styling, not this class, so it's correctly untouched
+   here). Confirmed live: only #userPlanBadge is actually reachable today,
+   because it lives inside #userBar, which app-shell-bootstrap.js wraps
+   into the toolbar chrome. #settingsPlanBadge (inside #settingsPanel) and
+   #limitBanner both sit outside .app / are siblings never reparented by
+   the shell (see the App Shell integration brief §4) — this rule simply
+   won't match them yet, which is correct and not a bug; it will start
+   applying automatically if a future phase ever brings those regions
+   in-scope, with no change needed here. No trial-status, payment-status,
+   or paid/unpaid UI exists anywhere in tool.html to restyle — that logic
+   lives only in the separate, still-inactive Next.js TrialBanner, which
+   this shell has no reach into. Legacy easytrack-design-system.css
+   already applies !important to background/color/border-color on
+   .plan-badge — matching !important here is required to take effect. */
+#appShellV2Root .plan-badge {
+  background: var(--status-progress-bg, rgba(47, 107, 255, .1)) !important;
+  color: var(--status-progress-fg, var(--acc)) !important;
+  border-color: var(--status-progress-border, rgba(47, 107, 255, .22)) !important;
+}
+
+/* Profile identity — the two profile-identity surfaces actually reachable
+   inside the shell today: the account block in the sidebar (.sb-project,
+   showing real #sbUserName/#sbUserPlan) and the avatar in the toolbar
+   (.ub-profile/#ubProfileInitial, inside #userBar). The Settings *form*
+   (#settingsPanel) is a separate, unreached surface — see the plan-badge
+   comment above for why, same reasoning applies here; not restyled in
+   this pass. Legacy easytrack-design-system.css already applies
+   !important to background/border on .sb-project/.sb-project-icon —
+   matching !important here is required to take effect. */
+#appShellV2Root .sb-project {
+  background: var(--surface-1, rgba(47, 107, 255, .08)) !important;
+  border-color: var(--border-subtle, var(--bdr2)) !important;
+}
+
+#appShellV2Root .sb-project-icon {
+  /* --card-bg resolves empty at this nesting depth (inside the sidebar
+     chrome) for reasons not fully root-caused under time constraints —
+     --surface-1 is confirmed resolving correctly at this exact location,
+     used directly instead rather than silently falling back to the
+     legacy --et-card value and changing nothing. */
+  background: var(--surface-1, var(--et-card)) !important;
+  border-color: var(--border-subtle, var(--et-border)) !important;
+  color: var(--brand, var(--acc));
+}
+
+#appShellV2Root .ub-profile {
+  background: var(--surface-2, var(--sur2));
+  border-radius: 999px;
+}
+
+/* Consolidated pass — Operations Console family (GTM Container, Versions,
+   Deployments, Health, Audit views) plus the Server-Side card in Pixel
+   Config, none touched by any prior pass. Legacy easytrack-design-system.css
+   already applies !important to background/border on .gtm-publish-panel,
+   .gtm-stepper, .ops-table-wrap, .ops-card, .ops-metric-card, .pc-ss-card
+   — matching !important is required. The ops-badge variants, ops-btn-details,
+   and ops-drawer-inner are tool.html's own styles (no legacy !important),
+   included here for token consistency across the same visual family.
+   Re-verified directly (getPropertyValue) rather than assumed: --card-bg
+   and --card-border resolve empty on these specific elements — the same
+   class of issue found for .sb-project-icon, evidently not limited to the
+   sidebar nesting depth as first assumed. --card-radius does resolve
+   correctly and is kept; --surface-1/--border-subtle are used for
+   background/border instead, both confirmed resolving on this element. */
+#appShellV2Root .ops-card,
+#appShellV2Root .ops-metric-card,
+#appShellV2Root .ops-table-wrap,
+#appShellV2Root .gtm-publish-panel,
+#appShellV2Root .gtm-stepper,
+#appShellV2Root .pc-ss-card {
+  background: var(--surface-1, var(--et-card)) !important;
+  border-color: var(--border-subtle, var(--et-border)) !important;
+  border-radius: var(--card-radius, 16px) !important;
+}
+
+#appShellV2Root .ops-drawer-inner {
+  background: var(--surface-1, var(--sur)) !important;
+  border-color: var(--border-subtle, var(--bdr)) !important;
+}
+
+#appShellV2Root .ops-btn-details {
+  background: var(--surface-2, var(--sur3)) !important;
+  border-color: var(--border-default, var(--bdr2)) !important;
+  color: var(--text-secondary, var(--mut)) !important;
+}
+
+#appShellV2Root .ops-badge-green {
+  background: var(--status-positive-bg, rgba(47, 107, 255, .12)) !important;
+  color: var(--status-positive-fg, var(--grn)) !important;
+}
+
+#appShellV2Root .ops-badge-red {
+  background: var(--status-critical-bg, rgba(255, 180, 171, .12)) !important;
+  color: var(--status-critical-fg, var(--red)) !important;
+}
+
+#appShellV2Root .ops-badge-amber {
+  background: var(--status-caution-bg, rgba(245, 158, 11, .12)) !important;
+  color: var(--status-caution-fg, var(--amber)) !important;
+}
+
+#appShellV2Root .ops-badge-blue {
+  background: var(--status-progress-bg, rgba(107, 143, 255, .12)) !important;
+  color: var(--status-progress-fg, var(--blu)) !important;
+}
+
+#appShellV2Root .ops-badge-dim {
+  background: var(--surface-2, var(--sur3)) !important;
+  color: var(--text-tertiary, var(--mut)) !important;
+  border-color: var(--border-subtle, var(--bdr2)) !important;
+}
