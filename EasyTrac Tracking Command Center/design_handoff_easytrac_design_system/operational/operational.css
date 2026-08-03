@@ -1,0 +1,20 @@
+/* Operational component classes. The ONLY components allowed to render the five status classes. */
+.et-healthscore { display:flex; gap:16px; align-items:center; background:var(--card-bg); border:1px solid var(--card-border); border-radius:var(--card-radius); padding:20px; }
+.et-healthscore__ring { width:var(--healthscore-ring-size); height:var(--healthscore-ring-size); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:var(--healthscore-fs); font-weight:700; font-variant-numeric:tabular-nums; }
+.et-statuschip { display:inline-flex; align-items:center; gap:6px; border-radius:var(--status-chip-radius); padding:var(--status-chip-padding); font-size:var(--status-chip-fs); font-weight:var(--status-chip-fw); border:1px solid; }
+.et-statuschip__dot { width:6px; height:6px; border-radius:50%; }
+.et-statusbanner { border-radius:var(--status-banner-radius); padding:var(--status-banner-padding); display:flex; justify-content:space-between; align-items:center; border:1px solid; }
+.et-progresstrace { display:flex; }
+.et-progresstrace__step { flex:1; text-align:center; }
+.et-progresstrace__dot { width:22px; height:22px; border-radius:50%; margin:0 auto 6px; border:2px solid; display:flex; align-items:center; justify-content:center; font-size:11px; }
+.et-eventtrace { display:flex; flex-direction:column; border-left:2px solid var(--timeline-line-color); margin-left:8px; }
+[dir="rtl"] .et-eventtrace { border-left:none; border-right:2px solid var(--timeline-line-color); margin-left:0; margin-right:8px; }
+.et-eventtrace__step { position:relative; padding:0 0 18px 20px; }
+[dir="rtl"] .et-eventtrace__step { padding:0 20px 18px 0; }
+.et-eventtrace__marker { position:absolute; left:-7px; top:0; width:12px; height:12px; border-radius:50%; border:2px solid var(--surface-canvas); }
+[dir="rtl"] .et-eventtrace__marker { left:auto; right:-7px; }
+.et-eventtrace__header { display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
+.et-eventtrace__timestamp { font-family:var(--p-font-mono); font-variant-numeric:tabular-nums; font-size:11px; color:var(--text-tertiary); white-space:nowrap; }
+.et-eventtrace__code { display:inline-block; margin-top:6px; font-family:var(--p-font-mono); font-variant-numeric:tabular-nums; font-size:11px; background:var(--timeline-code-bg); border:1px solid var(--timeline-code-border); border-radius:var(--timeline-code-radius); padding:2px 8px; }
+.et-incidentcard { background:var(--incidentcard-bg); border:1px solid var(--incidentcard-border); border-radius:var(--incidentcard-radius); padding:var(--incidentcard-padding); }
+.et-credentialfield input { font-family:var(--p-font-mono); }

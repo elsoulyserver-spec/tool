@@ -1,61 +1,61 @@
-# Free-Trial Feature — Status: INCOMPLETE (do not enable in production)
+# Free-Trial Feature — Status: backend/admin complete, frontend still off
 
-**Frozen for launch.** This document records exactly what exists, what is missing,
-and why the trial UI must stay off until a clean post-launch follow-up.
+**Updated 2026-08-01** (release-QA pass on `feature/managed-hosting-phase2`). The previous
+version of this document said the admin control and `lib/profile-service.js` changes were
+uncommitted working-tree WIP. That is no longer true — `git log` and the code both show
+them committed on this branch. This revision reflects what the branch actually contains.
 
-## ⛔ Do not enable in production
-The trial UI is **not wired end-to-end**. Enabling it now would show trial/expired
-messaging without a reliable paid signal on the customer path. Keep it off.
+## What is committed
 
-## What is committed (2 commits, local only — NOT pushed, NOT deployed)
-
-| Commit | Scope | State |
+| Area | File(s) | State |
 |---|---|---|
-| `65d9d2d` `feat(billing): add manual paid marker and trial metadata support` | `firestore-service.js`, `.env.example` | ✅ committed |
-| `780a253` `feat(frontend): add display-only free trial banner` | `frontend/lib/trial-display.js`, `frontend/components/TrialBanner.tsx`, `frontend/app/home/page.tsx`, `frontend/.env.local.example`, `tests/trial-display.test.js` | ✅ committed |
+| Server-owned trial derivation | `lib/trial-service.js` | ✅ committed, unit-tested (`tests/trial-service.test.js`, 12 tests) |
+| Manual paid marker + `paidAt` ownership | `firestore-service.js` (`updateClient`) | ✅ committed |
+| Admin audit of paid/unpaid transitions | `server.js` (`POST /api/admin/client/:uid`) | ✅ committed |
+| Admin "mark as paid" control + trial chip | `admin.html` | ✅ committed |
+| Profile endpoint exposes `paidAt` / `paymentStatus` | `lib/profile-service.js` | ✅ committed |
+| Display-only Next.js trial banner | `frontend/lib/trial-display.js`, `frontend/components/TrialBanner.tsx`, `frontend/app/home/page.tsx` | ✅ committed, still **inactive** |
 
-## Completeness checklist
+## Verified behaviour (release QA, synthetic data only)
 
-1. ✅ **Backend can store the manual payment marker.** `firestore-service.updateClient`
-   accepts an admin-only `paymentStatus` (`'paid'|'unpaid'`); the server owns `paidAt`
-   (`paid` → `serverTimestamp()`, `unpaid` → `null`). Client-supplied `paidAt` is never
-   trusted. `paymentStatus` is **only a manual admin marker — not a payment system.**
-   `exportAll` exposes `trialLaunchAt` from `TRIAL_LAUNCH_AT`.
-2. ✅ **The (inactive) Next.js frontend contains the display helper and banner.**
-   `trial-display.js` (pure, fail-open) + `TrialBanner.tsx`. Frontend is **not deployed**
-   and gated behind `NEXT_UI_ENABLED=false`.
-3. ❌ **The admin control is NOT committed.** The "Mark as paid" control, the derived
-   trial chip, and the "Trial Expired · Not Paid" admin notice were implemented in the
-   working tree but **deferred** — `admin.html` carries ~871 lines of interleaved
-   pre-existing production WIP that must be reviewed/committed separately first.
-4. ❌ **The profile endpoint does NOT yet expose `paidAt`.** The change to
-   `lib/profile-service.js` (`paidAt`, `paymentStatus`, and a `createdAt` robustness fix)
-   is **uncommitted** — that file is untracked pre-existing Phase-2 WIP, so the 3 lines
-   were not committed in isolation. Until this lands, `TrialBanner` cannot read a paid
-   signal and would fail-open (show nothing / neutral).
-5. ⛔ **Therefore the trial UI must NOT be enabled in production.** Missing #3 (no admin
-   way to mark paid via a committed UI) and #4 (banner can't see `paidAt`) mean the
-   customer-facing trial is not trustworthy yet.
+- Trial is derived server-side from the server-stamped `created_at` — never from a
+  client-supplied date. Confirmed: a client-written `trialStartedAt`/`trialEndsAt` is
+  never trusted as an anchor, and a future `trialAnchoredAt` (only reachable via
+  tampering) is rejected.
+- `paidAt` is server-owned: `paymentStatus: 'paid'` → `serverTimestamp()`,
+  `'unpaid'` → `null`. A client-supplied `paidAt` is never accepted.
+- The profile endpoint exposes `paidAt` and `paymentStatus`, so a frontend banner has a
+  real signal to fail open on if absent.
+- Admin login → mark-paid flow exercised end-to-end against a local server instance with
+  production credentials blanked (see the 2026-08-01 QA report); `POST
+  /api/admin/client/:uid` with `paymentStatus: 'paid'|'unpaid'` writes the audit log
+  (`client_marked_paid` / `client_marked_unpaid`).
 
-## Freeze constraints (in effect)
-- Do **not** push or deploy `65d9d2d` / `780a253`.
-- Keep `NEXT_UI_ENABLED=false`; do **not** enable the Next.js `/home` route.
-- No new workaround, endpoint, duplicate profile implementation, or temporary
-  paid-status source.
-- Do **not** modify `admin.html`, `lib/profile-service.js`, `tool.html`, or `server.js`.
-- All pre-existing WIP stays untouched and unstaged.
+## What is still NOT enabled
 
-## Uncommitted (intentionally left in the working tree)
-- `admin.html` — my trial admin-UI edits sit alongside the pre-existing production WIP
-  (interleaved; not separable cleanly right now).
-- `lib/profile-service.js` — my 3 trial lines sit alongside its Phase-2 WIP.
+- ⛔ **The Next.js `/home` trial banner route is still off** (`NEXT_UI_ENABLED=false` in
+  `frontend/.env.local.example`). Nothing in this QA/fix pass changed that flag or asked to.
+- ⛔ **`TRIAL_LAUNCH_AT` is not set** in any deployed environment. Until it is, existing
+  pre-trial-launch accounts should not be treated as having a bounded trial — that is the
+  clamp `trial-service.js` implements, but it only activates once the env var is set.
+- `admin.html`'s client-side `computeTrialLabel()` re-derives the trial from
+  `created_at`/`paidAt` in the browser instead of trusting the server-computed
+  `trialStatus` the profile endpoint already returns. This is a duplication, not a
+  security issue (the server never trusts what the admin UI displays), but the two
+  computations must be kept in sync by hand. Flagged as a P3 in the QA report; not fixed
+  here — it is refactor scope, not one of the four authorized P1 fixes.
 
-## Post-launch follow-up (planned order)
-1. **Isolate & commit the existing `admin.html` production WIP** (escapeHtml hardening,
-   button restyle, etc.) on its own.
-2. **Isolate & commit `lib/profile-service.js`** Phase-2 WIP, including the `paidAt` /
-   `paymentStatus` exposure + `createdAt` robustness.
-3. **Complete the trial UI in a clean follow-up commit**: the admin "Mark as paid"
-   control + trial chip + admin notice, now on a clean `admin.html` baseline.
-4. Only then consider enabling the trial UI (with `TRIAL_LAUNCH_AT` set and the frontend
-   route enabled).
+## Before enabling the customer-facing trial banner
+
+1. Decide and set `TRIAL_LAUNCH_AT` for the actual launch date.
+2. Flip `NEXT_UI_ENABLED=true` and deploy the Next.js `/home` route.
+3. Re-verify the admin mark-paid → banner-hides flow against a real (non-synthetic)
+   staging account before flipping the flag in production.
+
+## Change history
+
+- **2026-08-01** — rewritten during release QA. The prior version said the admin control
+  and `lib/profile-service.js` were uncommitted WIP living only in a working tree; both
+  are now committed on this branch and were verified working. The freeze constraints in
+  that version ("do not modify `admin.html`") no longer apply now that the change is a
+  committed, tested part of the branch.

@@ -1,0 +1,26 @@
+/* Primitive tokens — raw scales, no meaning attached. Never consumed directly outside semantic.*.css */
+:root {
+  --p-gray-0:#0a0b0d; --p-gray-50:#111318; --p-gray-100:#171a21; --p-gray-150:#1d212a;
+  --p-gray-200:#252a35; --p-gray-300:#333a48; --p-gray-400:#4a5266; --p-gray-500:#6b7488;
+  --p-gray-600:#8d94a6; --p-gray-700:#b0b6c4; --p-gray-800:#d3d7e0; --p-gray-900:#eef0f4; --p-gray-1000:#fafbfc;
+  --p-brand-400: oklch(0.62 0.14 260); --p-brand-500: oklch(0.55 0.16 260); --p-brand-600: oklch(0.47 0.16 260);
+  --p-green-400: oklch(0.72 0.15 155); --p-green-500: oklch(0.62 0.15 155); --p-green-600: oklch(0.5 0.14 155);
+  --p-blue-400: oklch(0.68 0.14 250); --p-blue-500: oklch(0.58 0.15 250); --p-blue-600: oklch(0.48 0.15 250);
+  --p-amber-400: oklch(0.78 0.14 80); --p-amber-500: oklch(0.68 0.16 75); --p-amber-600: oklch(0.55 0.15 70);
+  --p-red-400: oklch(0.68 0.17 25); --p-red-500: oklch(0.58 0.19 25); --p-red-600: oklch(0.48 0.18 25);
+  --p-violet-400: oklch(0.68 0.05 290); --p-violet-500: oklch(0.58 0.06 290); --p-violet-600: oklch(0.48 0.06 290);
+  --p-space-0:0px; --p-space-1:2px; --p-space-2:4px; --p-space-3:8px; --p-space-4:12px; --p-space-5:16px;
+  --p-space-6:20px; --p-space-7:24px; --p-space-8:32px; --p-space-9:40px; --p-space-10:48px; --p-space-11:64px; --p-space-12:96px;
+  --p-radius-0:0px; --p-radius-1:3px; --p-radius-2:6px; --p-radius-3:10px; --p-radius-4:14px; --p-radius-full:999px;
+  --p-font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --p-font-family-ar: 'Tahoma', 'Segoe UI', sans-serif;
+  --p-font-mono: 'SF Mono', 'Consolas', Menlo, monospace;
+  --p-fs-1:11px; --p-fs-2:12px; --p-fs-3:13px; --p-fs-4:14px; --p-fs-5:15px; --p-fs-6:17px; --p-fs-7:20px; --p-fs-8:26px; --p-fs-9:34px; --p-fs-10:44px;
+  --p-lh-tight:1.2; --p-lh-normal:1.5; --p-lh-loose:1.65;
+  --p-fw-regular:400; --p-fw-medium:500; --p-fw-semibold:600; --p-fw-bold:700;
+  --p-duration-instant:80ms; --p-duration-fast:120ms; --p-duration-base:200ms; --p-duration-slow:320ms;
+  --p-easing-standard: cubic-bezier(.2,.6,.3,1); --p-easing-decel: cubic-bezier(0,0,.2,1); --p-easing-accel: cubic-bezier(.4,0,1,1);
+  --p-z-base:0; --p-z-sticky:10; --p-z-dropdown:200; --p-z-overlay:900; --p-z-modal:1000; --p-z-toast:1100; --p-z-palette:1200;
+  --p-container-sm:640px; --p-container-md:960px; --p-container-lg:1280px; --p-container-xl:1600px;
+  --p-bp-mobile:0px; --p-bp-tablet:768px; --p-bp-desktop:1280px;
+}

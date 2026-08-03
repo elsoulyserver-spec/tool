@@ -1,0 +1,5 @@
+/* Shared keyframes referenced across component CSS files. */
+@keyframes et-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}

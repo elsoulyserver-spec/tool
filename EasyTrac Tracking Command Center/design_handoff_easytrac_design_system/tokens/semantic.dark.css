@@ -1,0 +1,10 @@
+/* Semantic tokens — dark theme (primary mode). Consumed by component-token files, never by components directly. */
+[data-theme="dark"] {
+  --surface-canvas: var(--p-gray-0); --surface-1: var(--p-gray-50); --surface-2: var(--p-gray-100); --surface-3: var(--p-gray-150);
+  --surface-overlay: var(--p-gray-100); --surface-sunken: var(--p-gray-0);
+  --text-primary: var(--p-gray-1000); --text-secondary: var(--p-gray-700); --text-tertiary: var(--p-gray-500); --text-disabled: var(--p-gray-400);
+  --border-subtle: var(--p-gray-200); --border-default: var(--p-gray-300); --border-strong: var(--p-gray-400);
+  --brand: var(--p-brand-400); --brand-strong: var(--p-brand-500); --on-brand: var(--p-gray-0);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.4); --shadow-md: 0 4px 16px rgba(0,0,0,.5); --shadow-lg: 0 12px 40px rgba(0,0,0,.6);
+  --focus-ring: 0 0 0 2px var(--surface-canvas), 0 0 0 4px var(--p-blue-400);
+}

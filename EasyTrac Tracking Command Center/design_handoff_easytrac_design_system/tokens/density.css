@@ -1,0 +1,5 @@
+/* Density modes — consumed via [data-density] on any ancestor. Design System §24. */
+[data-density="low"] { --d-row:56px; --d-pad:24px; --d-gap:32px; --d-fs: var(--p-fs-5); --d-icon:20px; }
+[data-density="medium"] { --d-row:44px; --d-pad:16px; --d-gap:20px; --d-fs: var(--p-fs-4); --d-icon:20px; }
+[data-density="high"] { --d-row:34px; --d-pad:10px; --d-gap:10px; --d-fs: var(--p-fs-3); --d-icon:16px; }
+[data-density="veryhigh"] { --d-row:24px; --d-pad:6px; --d-gap:6px; --d-fs: var(--p-fs-2); --d-icon:16px; }
