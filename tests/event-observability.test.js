@@ -204,6 +204,7 @@ test('ingest/read endpoint flags default off and gate routes before auth/storage
   assert.match(source, /EVENT_OBSERVABILITY_READ_ENABLED === '1'/);
   assert.match(source, /if \(!eventIngestEnabled\).*503/s);
   assert.match(source, /if \(!eventReadEnabled\).*503/s);
+  assert.match(source, /telemetryEnabled: eventIngestEnabled/, 'summary reports ingestion state explicitly instead of inferring it from read access');
 });
 
 test('event-failure ingestion is hard-disabled (501) independent of any rollout flag', () => {

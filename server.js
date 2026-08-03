@@ -4232,7 +4232,7 @@ const server = http.createServer(async (req, res) => {
         try {
           if (eventReadMatch[3] === 'summary') {
             const result = await firestoreService.queryEventSummary(targetId, eventFilters());
-            sendJSON(res, 200, { ok: true, ...result });
+            sendJSON(res, 200, { ok: true, telemetryEnabled: eventIngestEnabled, ...result });
           } else {
             const result = await firestoreService.queryEventFailures(targetId, eventFilters());
             sendJSON(res, 200, { ok: true, ...result });

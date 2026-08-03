@@ -136,6 +136,109 @@
   font-size: 12.5px;
 }
 
+/* Level 1 Event Observability: aggregate container-ingestion evidence only. */
+#appShellV2Root .et-tracking-continuity,
+#appShellV2Root #view-events {
+  margin-top: 24px;
+  background: var(--surface-1, var(--sur2));
+  border: 1px solid var(--border-subtle, var(--bdr2));
+  border-radius: var(--card-radius, 16px);
+  padding: 20px;
+}
+
+#appShellV2Root .et-continuity-heading h2,
+#appShellV2Root .et-events-header h1 {
+  margin: 0;
+  color: var(--text-primary, var(--wht));
+  font-size: 20px;
+}
+
+#appShellV2Root .et-continuity-heading p,
+#appShellV2Root .et-events-header p,
+#appShellV2Root .et-continuity-meta {
+  margin: 5px 0 16px;
+  color: var(--text-tertiary, var(--mut));
+  font-size: 12px;
+}
+
+#appShellV2Root .et-continuity-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+#appShellV2Root .et-continuity-metrics > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  background: var(--surface-2, var(--sur3));
+  border-radius: 8px;
+}
+
+#appShellV2Root .et-continuity-metrics span {
+  color: var(--text-tertiary, var(--mut));
+  font-size: 11px;
+}
+
+#appShellV2Root .et-continuity-metrics strong {
+  color: var(--text-primary, var(--wht));
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+
+#appShellV2Root .et-continuity-state {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 16px;
+  border: 1px dashed var(--border-default, var(--bdr));
+  border-radius: 8px;
+  color: var(--text-secondary, var(--wht2));
+}
+
+#appShellV2Root .et-continuity-state span {
+  color: var(--text-tertiary, var(--mut));
+  font-size: 12px;
+}
+
+#appShellV2Root .et-events-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 16px 0 12px;
+  color: var(--text-tertiary, var(--mut));
+  font-size: 12px;
+}
+
+#appShellV2Root #view-events .et-table {
+  width: 100%;
+}
+
+#appShellV2Root .et-events-trend {
+  margin-top: 16px;
+  color: var(--text-tertiary, var(--mut));
+  font-size: 11px;
+}
+
+#appShellV2Root .et-events-trend > div {
+  margin-bottom: 6px;
+}
+
+@media (max-width: 720px) {
+  #appShellV2Root .et-continuity-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #appShellV2Root .et-events-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 /* Setup Wizard (#view-pixels) — restyle existing step chrome with
    design-system card/button tokens. No markup, handler, or step-logic
    change: goStep(), updateProg(), buildEvGrid(), buildPixInputs(), and
