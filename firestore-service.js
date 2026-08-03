@@ -1563,6 +1563,126 @@ async function transitionManagedDeployment(deploymentId, toState, patch = {}) {
   });
 }
 
+// Event Observability V1. Counter documents are always sharded and every
+// counter mutation uses FieldValue.increment; no read-modify-write path exists.
+const EVENT_AGG_SHARDS_COLLECTION = 'event_agg_shards';
+const EVENT_AGG_DAILY_COLLECTION = 'event_agg_daily';
+const EVENT_FAILURE_SAMPLES_COLLECTION = 'event_failure_samples';
+
+async function incrementEventAggregate(shard, daily) {
+  const batch = db().batch();
+  const inc = admin.firestore.FieldValue.increment;
+  const shardRef = db().collection(EVENT_AGG_SHARDS_COLLECTION).doc(shard.id);
+  const dailyRef = db().collection(EVENT_AGG_DAILY_COLLECTION).doc(daily.id);
+  const shardDoc = {
+    clientId: shard.clientId, eventName: shard.eventName, destination: shard.destination,
+    bucketStart: shard.bucketStart, shardId: shard.shardId,
+    accepted: inc(shard.accepted), failed: inc(shard.failed), validationFailed: inc(shard.validationFailed),
+    expiresAt: shard.expiresAt,
+  };
+  if (shard.latencyP50Ms !== undefined) shardDoc.latencyP50Ms = shard.latencyP50Ms;
+  if (shard.latencyP95Ms !== undefined) shardDoc.latencyP95Ms = shard.latencyP95Ms;
+  batch.set(shardRef, shardDoc, { merge: true });
+  batch.set(dailyRef, {
+    clientId: daily.clientId, eventName: daily.eventName, destination: daily.destination,
+    dayStart: daily.dayStart,
+    accepted: inc(daily.accepted), failed: inc(daily.failed), validationFailed: inc(daily.validationFailed),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+  await batch.commit();
+}
+
+async function reserveEventFailureSample(sample, caps) {
+  const collection = db().collection(EVENT_FAILURE_SAMPLES_COLLECTION);
+  return db().runTransaction(async tx => {
+    const reasonQuery = collection
+      .where('clientId', '==', sample.clientId)
+      .where('eventName', '==', sample.eventName)
+      .where('destination', '==', sample.destination)
+      .where('reasonCode', '==', sample.reasonCode)
+      .where('receivedAt', '>=', caps.reasonSince)
+      .limit(caps.reasonCap);
+    const dailyQuery = collection
+      .where('clientId', '==', sample.clientId)
+      .where('receivedAt', '>=', caps.dayStart)
+      .limit(caps.dailyCap);
+    const [reasonSnap, dailySnap] = await Promise.all([tx.get(reasonQuery), tx.get(dailyQuery)]);
+    if (reasonSnap.size >= caps.reasonCap || dailySnap.size >= caps.dailyCap) return null;
+    const ref = collection.doc();
+    // `sample` was constructed field-by-field by buildFailureSample; no request
+    // object or unknown field reaches this write.
+    tx.create(ref, sample);
+    return ref.id;
+  });
+}
+
+async function queryEventSummary(clientId, filters = {}) {
+  let q = db().collection(EVENT_AGG_DAILY_COLLECTION).where('clientId', '==', clientId);
+  if (filters.eventName) q = q.where('eventName', '==', filters.eventName);
+  if (filters.destination) q = q.where('destination', '==', filters.destination);
+  if (filters.since) q = q.where('dayStart', '>=', filters.since);
+  const snap = await q.orderBy('dayStart', 'desc').limit(Math.min(filters.limit || 400, 400)).get();
+  let liveQuery = db().collection(EVENT_AGG_SHARDS_COLLECTION)
+    .where('clientId', '==', clientId)
+    .where('bucketStart', '>=', new Date(Date.now() - 60 * 60 * 1000));
+  if (filters.eventName) liveQuery = liveQuery.where('eventName', '==', filters.eventName);
+  if (filters.destination) liveQuery = liveQuery.where('destination', '==', filters.destination);
+  const liveSnap = await liveQuery.orderBy('bucketStart', 'desc').limit(1200).get();
+  const liveByBucket = new Map();
+  for (const doc of liveSnap.docs) {
+    const row = doc.data();
+    const key = [row.eventName, row.destination, _toMillis(row.bucketStart)].join('|');
+    const sum = liveByBucket.get(key) || {
+      eventName: row.eventName, destination: row.destination, bucketStart: row.bucketStart,
+      accepted: 0, failed: 0, validationFailed: 0,
+    };
+    sum.accepted += row.accepted || 0;
+    sum.failed += row.failed || 0;
+    sum.validationFailed += row.validationFailed || 0;
+    liveByBucket.set(key, sum);
+  }
+  return {
+    rows: snap.docs.map(d => ({ id: d.id, ...d.data() })),
+    live: Array.from(liveByBucket.values()),
+  };
+}
+
+async function queryEventFailures(clientId, filters = {}) {
+  let q = db().collection(EVENT_FAILURE_SAMPLES_COLLECTION).where('clientId', '==', clientId);
+  if (filters.eventName) q = q.where('eventName', '==', filters.eventName);
+  if (filters.destination) q = q.where('destination', '==', filters.destination);
+  if (filters.reasonCode) q = q.where('reasonCode', '==', filters.reasonCode);
+  q = q.orderBy('receivedAt', 'desc');
+  if (filters.before) q = q.startAfter(filters.before);
+  const snap = await q.limit(Math.min(filters.limit || 50, 100)).get();
+  const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return { rows, nextCursor: rows.length ? rows[rows.length - 1].receivedAt : null };
+}
+
+async function deleteExpiredEventObservability(collectionName, now, limit, cursor) {
+  const allowed = new Set([EVENT_AGG_SHARDS_COLLECTION, EVENT_FAILURE_SAMPLES_COLLECTION, EVENT_AGG_DAILY_COLLECTION]);
+  if (!allowed.has(collectionName)) throw new Error('unsupported observability collection');
+  const field = collectionName === EVENT_AGG_DAILY_COLLECTION ? 'dayStart' : 'expiresAt';
+  let cutoff = now;
+  if (collectionName === EVENT_AGG_DAILY_COLLECTION) {
+    cutoff = new Date(now.getTime());
+    cutoff.setUTCMonth(cutoff.getUTCMonth() - 13);
+  }
+  let q = db().collection(collectionName).where(field, '<', cutoff)
+    .orderBy(field, 'asc').orderBy(admin.firestore.FieldPath.documentId(), 'asc');
+  if (cursor) q = q.startAfter(cursor.value, cursor.id);
+  const snap = await q.limit(Math.min(limit, 500)).get();
+  const batch = db().batch();
+  for (const doc of snap.docs) batch.delete(doc.ref);
+  if (snap.size) await batch.commit();
+  const last = snap.docs[snap.docs.length - 1];
+  return {
+    deleted: snap.size,
+    nextCursor: snap.size === Math.min(limit, 500) && last
+      ? { value: last.get(field), id: last.id } : null,
+  };
+}
+
 module.exports = {
   isConfigured,
   BEACON_EVENTS,
@@ -1672,4 +1792,10 @@ module.exports = {
   listManagedDeployments,
   listDeployments,
   transitionManagedDeployment,
+  // Event Observability V1
+  incrementEventAggregate,
+  reserveEventFailureSample,
+  queryEventSummary,
+  queryEventFailures,
+  deleteExpiredEventObservability,
 };

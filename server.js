@@ -161,6 +161,17 @@ const healthService   = optionalStartupRequire('./lib/health-service', () => req
 const dlqWorker       = optionalStartupRequire('./lib/dlq-worker', () => require('./lib/dlq-worker'), {
   start: () => ({ unref: () => {} }),
 });
+const eventObservability = optionalStartupRequire('./lib/event-observability-service', () => require('./lib/event-observability-service'), {
+  create: () => _unavailableModule('event-observability-service'),
+});
+const eventObservabilityAuth = require('./lib/event-observability-auth');
+const ttlBackstopWorker = optionalStartupRequire('./lib/ttl-backstop-worker', () => require('./lib/ttl-backstop-worker'), {
+  start: () => ({ unref: () => {} }),
+});
+const eventObservabilityService = eventObservability.create({
+  incrementAggregate: (shard, daily) => firestoreService.incrementEventAggregate(shard, daily),
+  reserveFailureSample: (sample, caps) => firestoreService.reserveEventFailureSample(sample, caps),
+});
 // In-process metrics counters — exposed via GET /api/v1/metrics
 const metrics           = optionalStartupRequire('./lib/metrics', () => require('./lib/metrics'), {
   incCapiSuccess: () => {},
@@ -4124,6 +4135,113 @@ const server = http.createServer(async (req, res) => {
       ? new URLSearchParams(req.url.split('?')[1])
       : new URLSearchParams();
 
+    const eventIngestEnabled = process.env.EVENT_OBSERVABILITY_INGEST_ENABLED === '1';
+    const eventReadEnabled = process.env.EVENT_OBSERVABILITY_READ_ENABLED === '1';
+
+    async function eventApiKeyAuth() {
+      const auth = (req.headers['authorization'] || req.headers['Authorization'] || '').trim();
+      const rawKey = /^Bearer\s+(.+)$/i.test(auth) ? auth.replace(/^Bearer\s+/i, '').trim() : '';
+      try { return await eventObservabilityAuth.authenticateApiKey(rawKey, apiKeyService, firestoreService); }
+      catch (e) { sendJSON(res, e.status || 401, { error: e.message }); return null; }
+    }
+
+    async function eventOwnerAuth(targetId) {
+      const authz = (req.headers['authorization'] || req.headers['Authorization'] || '').trim();
+      const match = /^Bearer\s+(.+)$/i.exec(authz);
+      if (!match || !match[1] || match[1].length > 8192) {
+        sendJSON(res, 401, { error: 'Authorization: Bearer <Firebase ID token> required' });
+        return false;
+      }
+      let decoded;
+      try { decoded = await firestoreService.verifyIdToken(match[1].trim()); }
+      catch (_) { sendJSON(res, 401, { error: 'Invalid or expired token' }); return false; }
+      if (!eventObservabilityAuth.authorizeOwner(decoded, targetId)) {
+        sendJSON(res, 403, { error: 'Access denied' });
+        return false;
+      }
+      return true;
+    }
+
+    function eventFilters() {
+      const out = {};
+      if (v1Params.get('eventName')) out.eventName = v1Params.get('eventName');
+      if (v1Params.get('destination')) out.destination = v1Params.get('destination');
+      if (v1Params.get('reasonCode')) out.reasonCode = v1Params.get('reasonCode');
+      if (v1Params.get('range')) {
+        const days = Math.min(Math.max(parseInt(v1Params.get('range'), 10) || 30, 1), 400);
+        out.since = new Date(Date.now() - days * 86400000);
+      }
+      if (v1Params.get('before')) {
+        const before = new Date(v1Params.get('before'));
+        if (Number.isFinite(before.getTime())) out.before = before;
+      }
+      return out;
+    }
+
+    function eventBodyClaimsClientId(body) {
+      if (!body || typeof body !== 'object') return false;
+      if (Object.prototype.hasOwnProperty.call(body, 'clientId')) return true;
+      return Array.isArray(body.reports) && body.reports.some(report =>
+        report && typeof report === 'object' && Object.prototype.hasOwnProperty.call(report, 'clientId'));
+    }
+
+    // Failure-sample ingestion is disabled/unwired for V1, independent of any
+    // rollout flag. No generated sGTM container calls this endpoint: there is
+    // no real, native mechanism in this container architecture (no custom
+    // templates, no tag sequencing) for an independent tag to observe whether
+    // a sibling native tag (e.g. the GA4 forward tag) actually delivered. See
+    // docs/product/event-observability-v1-implementation-plan.md
+    // ("Failure-sample ingestion — removed from V1"). The underlying
+    // cap-enforcement/PII-allowlist logic below is retained and tested for
+    // when/if a real delivery-failure signal exists, but is not reachable.
+    if (req.method === 'POST' && v1Path === '/api/v1/internal/event-failure') {
+      sendJSON(res, 501, { error: 'Failure-sample ingestion is not available in V1 — no verified GA4 delivery-failure signal exists in this container architecture. See docs/product/event-observability-v1-implementation-plan.md.' });
+      return;
+    }
+
+    if (req.method === 'POST' && v1Path === '/api/v1/internal/event-telemetry') {
+      if (!eventIngestEnabled) { sendJSON(res, 503, { error: 'Event observability ingestion is disabled' }); return; }
+      if (!firestoreService.isConfigured()) { sendJSON(res, 503, { error: 'Firestore not configured' }); return; }
+      (async () => {
+        const auth = await eventApiKeyAuth();
+        if (!auth) return;
+        parseJsonBody(req, res, async body => {
+          // Tenant attribution is exclusively key-bound. A body attempting to
+          // claim any clientId is rejected without consuming that field's value.
+          if (eventBodyClaimsClientId(body)) {
+            sendJSON(res, 403, { error: 'clientId must not be supplied' });
+            return;
+          }
+          try {
+            const result = await eventObservabilityService.ingestTelemetry(auth.clientId, body);
+            sendJSON(res, 202, result);
+          } catch (e) { sendJSON(res, 400, { error: e.message }); }
+        }, SS_BODY_LIMIT);
+      })();
+      return;
+    }
+
+    const eventReadMatch = v1Path.match(/^\/api\/v1\/(admin\/)?clients\/([^/]+)\/events\/(summary|failures)$/);
+    if (req.method === 'GET' && eventReadMatch) {
+      if (!eventReadEnabled) { sendJSON(res, 503, { error: 'Event observability reads are disabled' }); return; }
+      const isAdminRead = !!eventReadMatch[1];
+      const targetId = decodeURIComponent(eventReadMatch[2]);
+      (async () => {
+        if (isAdminRead) { if (!(await _requireAdmin())) return; }
+        else if (!(await eventOwnerAuth(targetId))) return;
+        try {
+          if (eventReadMatch[3] === 'summary') {
+            const result = await firestoreService.queryEventSummary(targetId, eventFilters());
+            sendJSON(res, 200, { ok: true, ...result });
+          } else {
+            const result = await firestoreService.queryEventFailures(targetId, eventFilters());
+            sendJSON(res, 200, { ok: true, ...result });
+          }
+        } catch (e) { sendJSON(res, 500, { error: e.message }); }
+      })();
+      return;
+    }
+
     // ── GET /api/v1/healthz — unauthenticated liveness probe ───────────────
     if (req.method === 'GET' && v1Path === '/api/v1/healthz') {
       sendJSON(res, 200, { ok: true, ts: new Date().toISOString() });
@@ -5052,6 +5170,7 @@ server.listen(PORT, () => {
   // and retries with exponential back-off. Interval: 60s.
   if (firestoreService.isConfigured()) {
     dlqWorker.start(firestoreService, 60 * 1000).unref();
+    ttlBackstopWorker.start(firestoreService, 6 * 60 * 60 * 1000).unref();
   } else {
     console.warn('[dlq-worker] Firestore not configured — DLQ retry worker disabled');
   }
