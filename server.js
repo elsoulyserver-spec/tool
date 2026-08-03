@@ -171,6 +171,10 @@ const ttlBackstopWorker = optionalStartupRequire('./lib/ttl-backstop-worker', ()
 const eventObservabilityService = eventObservability.create({
   incrementAggregate: (shard, daily) => firestoreService.incrementEventAggregate(shard, daily),
   reserveFailureSample: (sample, caps) => firestoreService.reserveEventFailureSample(sample, caps),
+  reserveDebugSample: (sample, caps) => firestoreService.reserveEventDebugSample(sample, caps),
+}, {
+  debugSampleRate: process.env.EVENT_DEBUG_SAMPLING_RATE,
+  debugRetentionDays: process.env.EVENT_DEBUG_SAMPLING_RETENTION_DAYS,
 });
 // In-process metrics counters — exposed via GET /api/v1/metrics
 const metrics           = optionalStartupRequire('./lib/metrics', () => require('./lib/metrics'), {
@@ -4137,6 +4141,8 @@ const server = http.createServer(async (req, res) => {
 
     const eventIngestEnabled = process.env.EVENT_OBSERVABILITY_INGEST_ENABLED === '1';
     const eventReadEnabled = process.env.EVENT_OBSERVABILITY_READ_ENABLED === '1';
+    const debugSampleIngestEnabled = process.env.EVENT_DEBUG_SAMPLING_INGEST_ENABLED === '1';
+    const debugSampleReadEnabled = process.env.EVENT_DEBUG_SAMPLING_READ_ENABLED === '1';
 
     async function eventApiKeyAuth() {
       const auth = (req.headers['authorization'] || req.headers['Authorization'] || '').trim();
@@ -4185,6 +4191,56 @@ const server = http.createServer(async (req, res) => {
         report && typeof report === 'object' && Object.prototype.hasOwnProperty.call(report, 'clientId'));
     }
 
+    function debugBodyClaimsClientId(value) {
+      const stack = [value];
+      let visited = 0;
+      while (stack.length) {
+        const current = stack.pop();
+        if (!current || typeof current !== 'object') continue;
+        if (++visited > 512) return true; // reject pathological objects conservatively
+        if (Object.prototype.hasOwnProperty.call(current, 'clientId')) return true;
+        for (const nested of Object.values(current)) stack.push(nested);
+      }
+      return false;
+    }
+
+    function debugTenantEnabled(clientId) {
+      const allowed = new Set((process.env.EVENT_DEBUG_SAMPLING_CLIENT_IDS || '')
+        .split(',').map(value => value.trim()).filter(Boolean));
+      return allowed.has(clientId);
+    }
+
+    function debugReadFilters() {
+      const requestedDays = parseInt(v1Params.get('range') || '7', 10);
+      const days = Math.min(Math.max(Number.isFinite(requestedDays) ? requestedDays : 7, 1), 14);
+      const out = {
+        eventName: 'purchase',
+        intendedDestination: 'ga4',
+        since: new Date(Date.now() - days * 86400000),
+        limit: Math.min(Math.max(parseInt(v1Params.get('limit') || '50', 10) || 50, 1), 100),
+      };
+      const cursor = v1Params.get('cursor');
+      if (cursor) {
+        try {
+          const parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));
+          if (parsed && typeof parsed.id === 'string' && /^[a-f0-9]{32}$/.test(parsed.id) && Number.isFinite(parsed.t)) {
+            out.before = { receivedAt: new Date(parsed.t), id: parsed.id };
+          }
+        } catch (_) {}
+      }
+      return out;
+    }
+
+    function debugCursor(result) {
+      const cursor = result && result.nextCursor;
+      if (!cursor || !cursor.receivedAt || !cursor.id) return null;
+      const value = cursor.receivedAt;
+      const millis = typeof value.toMillis === 'function' ? value.toMillis()
+        : (typeof value.toDate === 'function' ? value.toDate().getTime() : new Date(value).getTime());
+      return Number.isFinite(millis)
+        ? Buffer.from(JSON.stringify({ t: millis, id: cursor.id }), 'utf8').toString('base64url') : null;
+    }
+
     // Failure-sample ingestion is disabled/unwired for V1, independent of any
     // rollout flag. No generated sGTM container calls this endpoint: there is
     // no real, native mechanism in this container architecture (no custom
@@ -4217,6 +4273,51 @@ const server = http.createServer(async (req, res) => {
             sendJSON(res, 202, result);
           } catch (e) { sendJSON(res, 400, { error: e.message }); }
         }, SS_BODY_LIMIT);
+      })();
+      return;
+    }
+
+    if (req.method === 'POST' && v1Path === '/api/v1/internal/event-debug-sample') {
+      if (!debugSampleIngestEnabled) { sendJSON(res, 503, { error: 'Debug sampling ingestion is disabled' }); return; }
+      if (!firestoreService.isConfigured()) { sendJSON(res, 503, { error: 'Firestore not configured' }); return; }
+      (async () => {
+        const auth = await eventApiKeyAuth();
+        if (!auth) return;
+        parseJsonBody(req, res, async body => {
+          if (debugBodyClaimsClientId(body)) {
+            sendJSON(res, 403, { error: 'clientId must not be supplied' });
+            return;
+          }
+          if (!debugTenantEnabled(auth.clientId)) {
+            sendJSON(res, 202, { ok: true, sampled: false, reason: 'tenant_not_enabled' });
+            return;
+          }
+          const result = await eventObservabilityService.ingestDebugSample(auth.clientId, body);
+          sendJSON(res, 202, result);
+        }, 16 * 1024);
+      })().catch(() => sendJSON(res, 202, { ok: true, sampled: false, reason: 'sampling_error' }));
+      return;
+    }
+
+    const debugReadMatch = v1Path.match(/^\/api\/v1\/(admin\/)?clients\/([^/]+)\/events\/debug-samples(?:\/([a-f0-9]{32}))?$/);
+    if (req.method === 'GET' && debugReadMatch) {
+      if (!debugSampleReadEnabled) { sendJSON(res, 503, { error: 'Debug sampling reads are disabled' }); return; }
+      const isAdminRead = !!debugReadMatch[1];
+      const targetId = decodeURIComponent(debugReadMatch[2]);
+      const sampleId = debugReadMatch[3] || null;
+      (async () => {
+        if (isAdminRead) { if (!(await _requireAdmin())) return; }
+        else if (!(await eventOwnerAuth(targetId))) return;
+        try {
+          if (sampleId) {
+            const sample = await firestoreService.getEventDebugSample(targetId, sampleId);
+            if (!sample) { sendJSON(res, 404, { error: 'Debug sample not found' }); return; }
+            sendJSON(res, 200, { ok: true, sample });
+          } else {
+            const result = await firestoreService.queryEventDebugSamples(targetId, debugReadFilters());
+            sendJSON(res, 200, { ok: true, rows: result.rows, nextCursor: debugCursor(result) });
+          }
+        } catch (_) { sendJSON(res, 500, { error: 'Could not read debug samples' }); }
       })();
       return;
     }

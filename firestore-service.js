@@ -1568,6 +1568,7 @@ async function transitionManagedDeployment(deploymentId, toState, patch = {}) {
 const EVENT_AGG_SHARDS_COLLECTION = 'event_agg_shards';
 const EVENT_AGG_DAILY_COLLECTION = 'event_agg_daily';
 const EVENT_FAILURE_SAMPLES_COLLECTION = 'event_failure_samples';
+const EVENT_DEBUG_SAMPLES_COLLECTION = 'event_debug_samples';
 
 async function incrementEventAggregate(shard, daily) {
   const batch = db().batch();
@@ -1616,6 +1617,111 @@ async function reserveEventFailureSample(sample, caps) {
   });
 }
 
+const DEBUG_SAMPLE_FIELD_NAMES = new Set([
+  'transaction_id', 'currency', 'value', 'items', 'tax', 'shipping', 'coupon',
+  'affiliation', 'content_ids', 'content_name', 'content_type', 'items_count',
+  'num_items', 'search_string', 'event_time', 'device_type', 'language',
+]);
+const DEBUG_SAMPLE_CMS = new Set(['salla', 'zid', 'woocommerce', 'shopify', 'custom', 'unknown']);
+const DEBUG_SAMPLE_ENVIRONMENTS = new Set(['synthetic', 'test', 'staging', 'development']);
+function _debugSampleNames(values) {
+  return Array.isArray(values)
+    ? Array.from(new Set(values.filter(value => typeof value === 'string' && DEBUG_SAMPLE_FIELD_NAMES.has(value)))).sort()
+    : [];
+}
+function _debugSampleText(value, fallback, max) {
+  return typeof value === 'string' && value.length <= max && /^[A-Za-z0-9._-]+$/.test(value) ? value : fallback;
+}
+function _projectEventDebugSample(data, fallbackId, expectedClientId) {
+  const validation = data && data.validation && typeof data.validation === 'object' ? data.validation : {};
+  const metadata = data && data.metadata && typeof data.metadata === 'object' ? data.metadata : {};
+  const projected = {
+    sampleId: /^[a-f0-9]{32}$/.test(data.sampleId || '') ? data.sampleId : fallbackId,
+    clientId: expectedClientId,
+    eventName: data.eventName === 'purchase' ? 'purchase' : 'unknown',
+    intendedDestination: data.intendedDestination === 'ga4' ? 'ga4' : 'unknown',
+    receivedAt: data.receivedAt,
+    containerVersion: _debugSampleText(data.containerVersion, 'unknown', 64),
+    schemaVersion: _debugSampleText(data.schemaVersion, 'unknown', 32),
+    ingestionAccepted: data.ingestionAccepted === true,
+    validation: {
+      passed: validation.passed === true,
+      missingRequiredFields: _debugSampleNames(validation.missingRequiredFields),
+      optionalFieldsPresent: _debugSampleNames(validation.optionalFieldsPresent),
+      invalidFieldNames: _debugSampleNames(validation.invalidFieldNames),
+    },
+    metadata: {
+      cms: DEBUG_SAMPLE_CMS.has(metadata.cms) ? metadata.cms : 'unknown',
+      platform: metadata.platform === 'ga4' ? 'ga4' : 'unknown',
+      environment: DEBUG_SAMPLE_ENVIRONMENTS.has(metadata.environment) ? metadata.environment : 'synthetic',
+    },
+    expiresAt: data.expiresAt,
+  };
+  if (Number.isSafeInteger(data.processingTimeMs) && data.processingTimeMs >= 0 && data.processingTimeMs <= 60000) {
+    projected.processingTimeMs = data.processingTimeMs;
+  }
+  return projected;
+}
+
+async function reserveEventDebugSample(sample, caps) {
+  const collection = db().collection(EVENT_DEBUG_SAMPLES_COLLECTION);
+  return db().runTransaction(async tx => {
+    const ref = collection.doc(sample.sampleId);
+    const existing = await tx.get(ref);
+    if (existing.exists) return sample.sampleId;
+    const tenantQuery = collection
+      .where('clientId', '==', sample.clientId)
+      .where('receivedAt', '>=', caps.dayStart)
+      .limit(caps.dailyTenantCap);
+    const dimensionQuery = collection
+      .where('clientId', '==', sample.clientId)
+      .where('eventName', '==', sample.eventName)
+      .where('intendedDestination', '==', sample.intendedDestination)
+      .where('receivedAt', '>=', caps.dayStart)
+      .limit(caps.dailyDimensionCap);
+    const [tenantSnap, dimensionSnap] = await Promise.all([tx.get(tenantQuery), tx.get(dimensionQuery)]);
+    if (tenantSnap.size >= caps.dailyTenantCap || dimensionSnap.size >= caps.dailyDimensionCap) return null;
+    // `sample` is a strict field-by-field service projection. No request body,
+    // arbitrary metadata, field values, or unknown nested keys reach this write.
+    tx.create(ref, sample);
+    return sample.sampleId;
+  });
+}
+
+async function queryEventDebugSamples(clientId, filters = {}) {
+  const now = new Date();
+  const earliest = new Date(now.getTime() - 14 * 86400000);
+  const requestedSince = filters.since instanceof Date && Number.isFinite(filters.since.getTime())
+    ? filters.since : new Date(now.getTime() - 7 * 86400000);
+  const since = requestedSince < earliest ? earliest : requestedSince;
+  let q = db().collection(EVENT_DEBUG_SAMPLES_COLLECTION)
+    .where('clientId', '==', clientId)
+    .where('receivedAt', '>=', since);
+  if (filters.eventName) q = q.where('eventName', '==', filters.eventName);
+  if (filters.intendedDestination) q = q.where('intendedDestination', '==', filters.intendedDestination);
+  q = q.orderBy('receivedAt', 'desc').orderBy(admin.firestore.FieldPath.documentId(), 'desc');
+  if (filters.before && filters.before.id && filters.before.receivedAt) {
+    q = q.startAfter(filters.before.receivedAt, filters.before.id);
+  }
+  const limit = Math.min(Math.max(filters.limit || 50, 1), 100);
+  const snap = await q.limit(limit).get();
+  const rows = snap.docs.map(doc => _projectEventDebugSample(doc.data(), doc.id, clientId));
+  const last = rows[rows.length - 1];
+  return {
+    rows,
+    nextCursor: rows.length === limit && last
+      ? { receivedAt: last.receivedAt, id: last.sampleId } : null,
+  };
+}
+
+async function getEventDebugSample(clientId, sampleId) {
+  const snap = await db().collection(EVENT_DEBUG_SAMPLES_COLLECTION).doc(sampleId).get();
+  if (!snap.exists) return null;
+  const data = snap.data();
+  if (!data || data.clientId !== clientId) return null;
+  return _projectEventDebugSample(data, snap.id, clientId);
+}
+
 async function queryEventSummary(clientId, filters = {}) {
   let q = db().collection(EVENT_AGG_DAILY_COLLECTION).where('clientId', '==', clientId);
   if (filters.eventName) q = q.where('eventName', '==', filters.eventName);
@@ -1660,7 +1766,10 @@ async function queryEventFailures(clientId, filters = {}) {
 }
 
 async function deleteExpiredEventObservability(collectionName, now, limit, cursor) {
-  const allowed = new Set([EVENT_AGG_SHARDS_COLLECTION, EVENT_FAILURE_SAMPLES_COLLECTION, EVENT_AGG_DAILY_COLLECTION]);
+  const allowed = new Set([
+    EVENT_AGG_SHARDS_COLLECTION, EVENT_FAILURE_SAMPLES_COLLECTION,
+    EVENT_AGG_DAILY_COLLECTION, EVENT_DEBUG_SAMPLES_COLLECTION,
+  ]);
   if (!allowed.has(collectionName)) throw new Error('unsupported observability collection');
   const field = collectionName === EVENT_AGG_DAILY_COLLECTION ? 'dayStart' : 'expiresAt';
   let cutoff = now;
@@ -1797,5 +1906,8 @@ module.exports = {
   reserveEventFailureSample,
   queryEventSummary,
   queryEventFailures,
+  reserveEventDebugSample,
+  queryEventDebugSamples,
+  getEventDebugSample,
   deleteExpiredEventObservability,
 };
