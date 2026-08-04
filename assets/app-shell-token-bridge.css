@@ -228,6 +228,69 @@
   margin-bottom: 6px;
 }
 
+/* Level 2 Event Details: safe Debug Sampling fields only. */
+#appShellV2Root .et-debug-samples {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-subtle, var(--bdr2));
+}
+
+#appShellV2Root .et-debug-samples h2,
+#appShellV2Root .et-event-details h1,
+#appShellV2Root .et-event-details h2 {
+  margin: 0 0 8px;
+  color: var(--text-primary, var(--wht));
+}
+
+#appShellV2Root .et-debug-samples > p {
+  margin: 0 0 14px;
+  color: var(--text-tertiary, var(--mut));
+  font-size: 12px;
+}
+
+#appShellV2Root .et-debug-sample-row {
+  cursor: pointer;
+}
+
+#appShellV2Root .et-debug-sample-row:focus-visible {
+  outline: 2px solid var(--focus-ring, var(--brand));
+  outline-offset: -2px;
+}
+
+#appShellV2Root .et-event-details {
+  margin-top: 24px;
+}
+
+#appShellV2Root .et-event-details-toolbar {
+  justify-content: space-between;
+}
+
+#appShellV2Root .et-event-details-toolbar h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+#appShellV2Root .et-event-details-notice {
+  margin: 16px 0;
+  padding: 14px 16px;
+  white-space: pre-line;
+  color: var(--text-secondary, var(--wht2));
+  background: var(--surface-2, var(--sur3));
+  border: 1px solid var(--border-default, var(--bdr));
+  border-radius: var(--card-radius, 8px);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+#appShellV2Root .et-event-details-card .et-table,
+#appShellV2Root .et-event-details-section .et-table {
+  width: 100%;
+}
+
+#appShellV2Root .et-event-details-section {
+  margin-top: 20px;
+}
+
 @media (max-width: 720px) {
   #appShellV2Root .et-continuity-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));

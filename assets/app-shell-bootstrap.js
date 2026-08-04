@@ -51,7 +51,8 @@ async function init() {
     { createSelect },
     { createEmptyState },
     { createLoadingState },
-    { createSparkline }
+    { createSparkline },
+    { createEventTrace }
   ] = await Promise.all([
     import(`${designSystemRoot}/layout/AppShell.js`),
     import(`${designSystemRoot}/components/Sidebar.js`),
@@ -65,7 +66,8 @@ async function init() {
     import(`${designSystemRoot}/components/Select.js`),
     import(`${designSystemRoot}/operational/EmptyState.js`),
     import(`${designSystemRoot}/operational/LoadingState.js`),
-    import(`${designSystemRoot}/charts/Sparkline.js`)
+    import(`${designSystemRoot}/charts/Sparkline.js`),
+    import(`${designSystemRoot}/operational/EventTrace.js`)
   ]);
 
   const storeSwitcher = createStoreSwitcher(
@@ -110,8 +112,13 @@ async function init() {
     pixelsAnchor.insertAdjacentElement('afterend', destinationsSection);
   }
 
+  const eventDetails = mountEventDetails({
+    createDataTable, createEmptyState, createLoadingState, createEventTrace,
+    createPanel, createSection, createToolbar
+  });
   const eventsExplorer = mountEventsExplorer({
-    createDataTable, createSelect, createEmptyState, createLoadingState, createSparkline
+    createDataTable, createSelect, createEmptyState, createLoadingState, createSparkline,
+    openSample: eventDetails && eventDetails.openSample
   });
   const trackingContinuity = mountTrackingContinuity({ createSparkline });
 
@@ -123,6 +130,7 @@ async function init() {
     userBar,
     destinationsSection,
     eventsExplorer,
+    eventDetails,
     trackingContinuity
   });
 }
@@ -440,7 +448,218 @@ function mountTrackingContinuity({ createSparkline }) {
   return { section, render };
 }
 
-function mountEventsExplorer({ createDataTable, createSelect, createEmptyState, createLoadingState, createSparkline }) {
+const DEBUG_REQUIRED_FIELDS = ['transaction_id', 'currency', 'value', 'items'];
+const DEBUG_OPTIONAL_FIELDS = [
+  'tax', 'shipping', 'coupon', 'affiliation', 'content_ids', 'content_name',
+  'content_type', 'items_count', 'num_items', 'search_string', 'event_time',
+  'device_type', 'language'
+];
+const DEBUG_SAFE_FIELDS = new Set(DEBUG_REQUIRED_FIELDS.concat(DEBUG_OPTIONAL_FIELDS));
+const EVENT_DETAILS_NOTICE = 'This screen describes what EasyTrac received inside the server container.\n\n' +
+  'It does not confirm whether any advertising or analytics platform accepted the event.';
+
+function debugSafeText(value, max) {
+  return typeof value === 'string' && value.length <= max ? value : '';
+}
+
+function debugSafeFieldNames(value) {
+  return Array.isArray(value)
+    ? Array.from(new Set(value.filter(function (name) { return DEBUG_SAFE_FIELDS.has(name); }))).sort()
+    : [];
+}
+
+function eventDetailsTime(value) {
+  const millis = eventTimestampMillis(value);
+  return millis ? new Date(millis).toLocaleString() : '';
+}
+
+function buildEventDetailsModel(sample) {
+  if (!sample || typeof sample !== 'object') return null;
+  const validation = sample.validation && typeof sample.validation === 'object' ? sample.validation : null;
+  const missingRequired = validation ? debugSafeFieldNames(validation.missingRequiredFields) : [];
+  const optionalPresent = validation ? debugSafeFieldNames(validation.optionalFieldsPresent) : [];
+  const invalidFields = validation ? debugSafeFieldNames(validation.invalidFieldNames) : [];
+  const metadata = sample.metadata && typeof sample.metadata === 'object' ? sample.metadata : {};
+  const receivedTime = eventDetailsTime(sample.receivedAt);
+  const containerVersion = debugSafeText(sample.containerVersion, 64);
+  const schemaVersion = debugSafeText(sample.schemaVersion, 32);
+  const model = {
+    header: [
+      ['Event Name', debugSafeText(sample.eventName, 100)],
+      ['Intended Destination', debugSafeText(sample.intendedDestination, 100)],
+      ['Received Time', receivedTime],
+      ['Container Version', containerVersion],
+      ['Sample ID', /^[a-f0-9]{32}$/.test(sample.sampleId || '') ? sample.sampleId : '']
+    ].filter(function (row) { return !!row[1]; }),
+    timeline: [],
+    validation: [],
+    metadata: [
+      ['Container Version', containerVersion],
+      ['Schema Version', schemaVersion],
+      ['Processing Time', Number.isSafeInteger(sample.processingTimeMs) && sample.processingTimeMs >= 0
+        ? sample.processingTimeMs + ' ms' : ''],
+      ['CMS', debugSafeText(metadata.cms, 32)],
+      ['Environment', debugSafeText(metadata.environment, 32)],
+      ['Platform', debugSafeText(metadata.platform, 32)]
+    ].filter(function (row) { return !!row[1]; })
+  };
+
+  if (sample.receivedAt) {
+    model.timeline.push({ title: '✓ Received', detail: 'Observed inside the EasyTrac server container.', state: 'Healthy', timestamp: receivedTime });
+  }
+  if (validation) {
+    model.timeline.push({ title: '✓ Validated', detail: 'Schema validation completed.', state: 'Healthy' });
+  }
+  if (sample.ingestionAccepted === true) {
+    model.timeline.push({ title: '✓ Accepted by EasyTrac', detail: 'EasyTrac ingestion accepted the event.', state: 'Healthy' });
+  }
+  model.timeline.push({ title: '✓ Stored as Debug Sample', detail: 'A privacy-safe debug sample was stored.', state: 'Healthy' });
+
+  if (validation) {
+    DEBUG_REQUIRED_FIELDS.forEach(function (name) {
+      model.validation.push({ group: 'Required Fields', field: name, state: missingRequired.includes(name) ? 'Missing' : '✓ Present' });
+    });
+    optionalPresent.forEach(function (name) {
+      model.validation.push({ group: 'Optional Fields Present', field: name, state: '✓ Present' });
+    });
+    invalidFields.forEach(function (name) {
+      model.validation.push({ group: 'Invalid Fields', field: name, state: 'Invalid' });
+    });
+  }
+  return model;
+}
+
+async function fetchDebugSamples(sampleId) {
+  const scope = eventScope();
+  if (!scope) return { kind: 'unauthorized' };
+  if (sampleId && !/^[a-f0-9]{32}$/.test(sampleId)) return { kind: 'not-found', scope };
+
+  let token;
+  try {
+    const user = window.firebase && window.firebase.auth().currentUser;
+    if (!user) return { kind: 'unauthorized', scope };
+    token = await user.getIdToken();
+  } catch (_) {
+    return { kind: 'unauthorized', scope };
+  }
+
+  let response;
+  const base = '/api/v1/clients/' + encodeURIComponent(scope.clientId) + '/events/debug-samples';
+  try {
+    response = await fetch(sampleId ? base + '/' + encodeURIComponent(sampleId) : base + '?range=7&limit=50', {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+  } catch (_) {
+    return { kind: 'error', scope };
+  }
+  if (response.status === 503) return { kind: 'disabled', scope };
+  if (response.status === 401 || response.status === 403) return { kind: 'unauthorized', scope };
+  if (response.status === 404) return { kind: 'not-found', scope };
+  if (!response.ok) return { kind: 'error', scope };
+
+  let data;
+  try { data = await response.json(); }
+  catch (_) { return { kind: 'error', scope }; }
+  if (sampleId) return data && data.sample ? { kind: 'ok', scope, sample: data.sample } : { kind: 'not-found', scope };
+  const rows = Array.isArray(data && data.rows) ? data.rows : [];
+  return rows.length ? { kind: 'ok', scope, rows } : { kind: 'empty', scope };
+}
+
+function mountEventDetails({
+  createDataTable, createEmptyState, createLoadingState, createEventTrace,
+  createPanel, createSection, createToolbar
+}) {
+  if (window.__etShellV2 && window.__etShellV2.eventDetails) return null;
+  const main = document.querySelector('.app > .main') || document.querySelector('.main');
+  if (!main) return null;
+  const view = document.createElement('div');
+  view.className = 'app-view et-event-details';
+  view.id = 'view-event-details';
+  view.setAttribute('aria-live', 'polite');
+  main.appendChild(view);
+  window.APP_VIEWS = window.APP_VIEWS || {};
+  window.APP_VIEWS.eventDetails = 'view-event-details';
+
+  function frame() {
+    view.replaceChildren();
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.className = 'btn btn-secondary';
+    back.textContent = '← Events Explorer';
+    back.addEventListener('click', function () {
+      const eventsButton = document.getElementById('sbEvents');
+      if (typeof window.switchAppView === 'function') window.switchAppView('events', eventsButton);
+    });
+    const title = document.createElement('h1');
+    title.textContent = 'Event Details';
+    view.appendChild(createToolbar({ className: 'et-event-details-toolbar', children: [back, title] }));
+    const notice = document.createElement('aside');
+    notice.className = 'et-event-details-notice';
+    notice.textContent = EVENT_DETAILS_NOTICE;
+    view.appendChild(notice);
+  }
+
+  function state(kind) {
+    const messages = {
+      disabled: 'Debug sampling telemetry is disabled.',
+      unauthorized: 'You are not authorized to view this debug sample.',
+      empty: 'No debug sample is available.',
+      'not-found': 'Sample not found.',
+      error: 'Unexpected error while loading the debug sample.'
+    };
+    view.appendChild(createEmptyState(messages[kind] || messages.error));
+  }
+
+  function renderSample(sample) {
+    const model = buildEventDetailsModel(sample);
+    if (!model) { state('empty'); return; }
+
+    const header = createDataTable(
+      [{ key: 'label', label: 'Field' }, { key: 'value', label: 'Observed' }],
+      model.header.map(function (row) { return { label: row[0], value: row[1] }; }),
+      { selectable: false }
+    );
+    view.appendChild(createPanel({ className: 'et-event-details-card', children: header }));
+
+    const timelineTitle = document.createElement('h2'); timelineTitle.textContent = 'Timeline';
+    view.appendChild(createSection({ className: 'et-event-details-section', children: [timelineTitle, createEventTrace(model.timeline)] }));
+
+    const validationTitle = document.createElement('h2'); validationTitle.textContent = 'Validation';
+    const validation = model.validation.length
+      ? createDataTable(
+        [{ key: 'group', label: 'Field Group' }, { key: 'field', label: 'Field Name' }, { key: 'state', label: 'Validation' }],
+        model.validation, { selectable: false }
+      )
+      : createEmptyState('No validation summary is stored for this debug sample.');
+    view.appendChild(createSection({ className: 'et-event-details-section', children: [validationTitle, validation] }));
+
+    const metadataTitle = document.createElement('h2'); metadataTitle.textContent = 'Metadata';
+    const metadata = model.metadata.length
+      ? createDataTable(
+        [{ key: 'label', label: 'Metadata' }, { key: 'value', label: 'Observed' }],
+        model.metadata.map(function (row) { return { label: row[0], value: row[1] }; }),
+        { selectable: false }
+      )
+      : createEmptyState('No diagnostic metadata is stored for this debug sample.');
+    view.appendChild(createSection({ className: 'et-event-details-section', children: [metadataTitle, metadata] }));
+  }
+
+  async function openSample(sampleId) {
+    if (typeof window.switchAppView === 'function') {
+      window.switchAppView('eventDetails', document.getElementById('sbEvents'));
+    }
+    frame();
+    view.appendChild(createLoadingState('Loading debug sample…'));
+    const result = await fetchDebugSamples(sampleId);
+    frame();
+    if (result.kind !== 'ok') { state(result.kind); return; }
+    renderSample(result.sample);
+  }
+
+  return { view, openSample, renderSample };
+}
+
+function mountEventsExplorer({ createDataTable, createSelect, createEmptyState, createLoadingState, createSparkline, openSample }) {
   if (window.__etShellV2 && window.__etShellV2.eventsExplorer) {
     return null; // idempotency guard: never build a second copy
   }
@@ -545,11 +764,80 @@ function mountEventsExplorer({ createDataTable, createSelect, createEmptyState, 
     view.appendChild(trendWrap);
   }
 
+  async function renderDebugSampleList() {
+    const section = document.createElement('section');
+    section.className = 'et-debug-samples';
+    const heading = document.createElement('h2');
+    heading.textContent = 'Debug Samples';
+    const description = document.createElement('p');
+    description.textContent = 'Privacy-safe diagnostic samples received inside the EasyTrac server container.';
+    const body = document.createElement('div');
+    body.appendChild(createLoadingState('Loading debug samples…'));
+    section.append(heading, description, body);
+    view.appendChild(section);
+
+    const result = await fetchDebugSamples();
+    if (!section.isConnected) return;
+    body.replaceChildren();
+    if (result.kind === 'disabled') {
+      body.appendChild(createEmptyState('Debug sampling telemetry is disabled.'));
+      return;
+    }
+    if (result.kind === 'unauthorized') {
+      body.appendChild(createEmptyState('You are not authorized to view debug samples for this store.'));
+      return;
+    }
+    if (result.kind === 'empty') {
+      body.appendChild(createEmptyState('No debug samples are available for this store.'));
+      return;
+    }
+    if (result.kind !== 'ok') {
+      body.appendChild(createEmptyState('Unexpected error while loading debug samples.'));
+      return;
+    }
+
+    const rows = result.rows.map(function (sample) {
+      return {
+        sampleId: /^[a-f0-9]{32}$/.test(sample.sampleId || '') ? sample.sampleId : '',
+        eventName: debugSafeText(sample.eventName, 100),
+        intendedDestination: debugSafeText(sample.intendedDestination, 100),
+        receivedTime: eventDetailsTime(sample.receivedAt)
+      };
+    }).filter(function (sample) { return !!sample.sampleId; });
+    if (!rows.length) {
+      body.appendChild(createEmptyState('No debug samples are available for this store.'));
+      return;
+    }
+    const table = createDataTable(
+      [
+        { key: 'sampleId', label: 'Sample ID' },
+        { key: 'eventName', label: 'Event Name' },
+        { key: 'intendedDestination', label: 'Intended Destination' },
+        { key: 'receivedTime', label: 'Received Time' }
+      ],
+      rows,
+      { selectable: false }
+    );
+    Array.from(table.querySelectorAll('tbody tr')).forEach(function (row, index) {
+      row.classList.add('et-debug-sample-row');
+      row.tabIndex = 0;
+      row.setAttribute('role', 'button');
+      row.setAttribute('aria-label', 'Open debug sample ' + rows[index].sampleId);
+      const activate = function () { if (typeof openSample === 'function') openSample(rows[index].sampleId); };
+      row.addEventListener('click', activate);
+      row.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activate(); }
+      });
+    });
+    body.appendChild(table);
+  }
+
   async function renderEventsExplorer(rangeDays) {
     view.innerHTML = '';
     view.appendChild(createLoadingState('Loading telemetry…'));
     const result = await fetchEventContinuity(rangeDays);
     renderResult(result);
+    await renderDebugSampleList();
   }
 
   return { view, button: btn, render: renderEventsExplorer };
