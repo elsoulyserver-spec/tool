@@ -666,6 +666,7 @@ function mountEventsExplorer({ createDataTable, createSelect, createEmptyState, 
 
   const opsSection = document.querySelector('#et-sidebar .sb-nav-section');
   const nav = document.querySelector('#et-sidebar .sb-nav');
+  const pixelsButton = document.getElementById('sbPixels');
   if (!nav) return null;
 
   const view = document.createElement('div');
@@ -686,7 +687,8 @@ function mountEventsExplorer({ createDataTable, createSelect, createEmptyState, 
     if (typeof window.switchAppView === 'function') window.switchAppView('events', btn);
     renderEventsExplorer(currentRange);
   });
-  if (opsSection) opsSection.insertAdjacentElement('beforebegin', btn);
+  if (pixelsButton && pixelsButton.parentNode === nav) pixelsButton.insertAdjacentElement('afterend', btn);
+  else if (opsSection) opsSection.insertAdjacentElement('beforebegin', btn);
   else nav.appendChild(btn);
 
   let currentRange = EVENTS_EXPLORER_DEFAULT_RANGE;
